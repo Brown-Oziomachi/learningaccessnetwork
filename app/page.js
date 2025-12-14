@@ -1,65 +1,151 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+export default function LearningAccessNetwork() {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const bookImages = [
+    '/image1.png',
+    '/image2.png',
+    '/image3.png',
+    '/image4.png',
+    '/image5.png',
+    // 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1920&h=1080&fit=crop'
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prevIndex) =>
+        prevIndex === bookImages.length - 1 ? 0 : prevIndex + 1
+      );
+    }, 5000); // Change image every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [bookImages.length]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="min-h-screen flex flex-col relative overflow-hidden">
+      {/* Background Carousel */}
+      <div className="absolute inset-0 z-0 mask-b-from-0 mask-t-from-0">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentImageIndex}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.5, ease: "easeInOut" }}
+            className="absolute inset-0"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            <div
+              className="absolute inset-0 bg-no-repeat lg:bg-cover bg-center"
+              style={{
+                backgroundImage: `url(${bookImages[currentImageIndex]})`,
+              }}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            {/* Dark overlay for better text readability */}
+            <div className="absolute inset-0 bg-black/60" />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10 flex flex-col min-h-screen">
+        {/* Header */}
+        <header className="pt-8 px-4 md:pt-12">
+          <h1 className="text-center text-3xl md:text-5xl font-bold">
+            <span className="text-white">LEARNING </span>
+            <span className="text-blue-900 font-black">ACCESS NETWORK</span>
+          </h1>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col items-center justify-center px-4 py-8 md:py-0">
+          {/* Globe Icon */}
+          <div className="mb-8 md:mb-12">
+            <div className="relative w-64 h-64 md:w-96 md:h-96">
+              {/* Globe SVG with rotation animation */}
+              <svg viewBox="0 0 200 200" className="w-full h-full animate-spin" style={{ animationDuration: '8s' }}>
+                {/* Top half - blue */}
+                <ellipse cx="100" cy="100" rx="80" ry="80" fill="#0c7c9e" />
+
+                {/* Bottom half - dark */}
+                <path d="M 20 100 A 80 80 0 0 0 180 100 Z" fill="#2d3e50" />
+
+                {/* Grid lines */}
+                <ellipse cx="100" cy="100" rx="80" ry="80" fill="none" stroke="#8b9299" strokeWidth="2" />
+                <ellipse cx="100" cy="100" rx="60" ry="80" fill="none" stroke="#8b9299" strokeWidth="2" />
+                <ellipse cx="100" cy="100" rx="30" ry="80" fill="none" stroke="#8b9299" strokeWidth="2" />
+                <line x1="20" y1="100" x2="180" y2="100" stroke="#8b9299" strokeWidth="2" />
+                <ellipse cx="100" cy="100" rx="80" ry="50" fill="none" stroke="#8b9299" strokeWidth="2" />
+                <ellipse cx="100" cy="100" rx="80" ry="25" fill="none" stroke="#8b9299" strokeWidth="2" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Info Box */}
+          <div className="w-full max-w-4xl mb-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="bg-blue-950/90 backdrop-blur-sm text-white p-6 md:p-8 rounded-lg shadow-2xl"
+            >
+              <p className="text-base md:text-lg leading-relaxed">
+                Learning Access Network is a digital platform designed to make knowledge easily accessible to everyone.
+                The website allows users to discover, read, and purchase books across various categories,
+                including education, personal development, business, technology, and more.
+              </p>
+            </motion.div>
+
+            {/* Read More Button - Only visible on desktop */}
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+              className="hidden md:block mt-4 bg-white text-gray-800 px-8 py-2 rounded-full font-medium hover:bg-gray-100 transition-colors"
+            >
+              Read More
+            </motion.button>
+          </div>
+        </main>
+
+        {/* Footer Buttons */}
+        <footer className="pb-8 md:pb-12 px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+            className="flex flex-col md:flex-row gap-4 justify-center items-center"
           >
-            Documentation
-          </a>
+            <a
+              href="/auth/signin"
+              className="w-full md:w-auto bg-white text-center font-bold text-gray-800 px-12 py-3 rounded font-medium hover:bg-gray-100 transition-colors"
+            >
+              SIGN IN
+            </a>
+            <button className="w-full md:w-auto bg-blue-950 text-white px-8 py-3 rounded font-medium hover:bg-blue-800 transition-colors">
+              ADVERTISE YOUR BOOK
+            </button>
+          </motion.div>
+        </footer>
+
+        {/* Carousel Indicators */}
+        <div className="fixed bottom-0 right-6 flex gap-5 z-20">
+          {bookImages.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentImageIndex(index)}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${index === currentImageIndex
+                  ? 'bg-white w-8'
+                  : 'bg-white/50 hover:bg-white/75'
+                }`}
+              aria-label={`Go to slide ${index + 1}`}
+            />
+          ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
