@@ -272,7 +272,7 @@ export default function AuthSystem() {
                                 <button
                                     onClick={handleGoogleSignIn}
                                     disabled={loading}
-                                    className="w-full bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold py-4 rounded-full transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                    className="w-full bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold py-3 rounded-full transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                                 >
                                     <span>Continue with Google</span>
                                 </button>
@@ -309,23 +309,24 @@ export default function AuthSystem() {
                             <button
                                 onClick={handleLogin}
                                 disabled={loading}
-                                className="w-full max-w-md bg-blue-950 text-white py-4 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-4 disabled:opacity-50"
+                                className="w-full max-w-md bg-blue-950 text-white py-3 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-4 disabled:opacity-50"
                             >
                                 {loading ? 'Signing in...' : 'Log in'}
                             </button>
 
+                            <Link href="/auth/find-my-account">
                             <button
-                                onClick={() => handleNext('findaccount')}
                                 className="text-blue-950 hover:underline mb-12"
                             >
                                 Forgotten password?
                             </button>
+                            </Link>
 
                             <div className="flex-1"></div>
 
                             <button
                                 onClick={() => handleNext('join')}
-                                className="w-full max-w-md bg-white border-2 border-blue-950 text-blue-950 py-4 rounded-full font-semibold hover:bg-blue-50 transition-colors mb-4"
+                                className="w-full max-w-md bg-white border-2 border-blue-950 text-blue-950 py-3 rounded-full font-semibold hover:bg-blue-50 transition-colors mb-4"
                             >
                                 Create new account
                             </button>
@@ -374,19 +375,22 @@ export default function AuthSystem() {
                                 Create an account to access thousands of PDF books, connect with learners, and build your digital library.
                             </p>
 
-                            <div className="space-y-4 flex">
-                                <button
-                                    onClick={() => handleNext('name')}
-                                    className="w-full bg-blue-950 text-white py-4 rounded-full font-semibold hover:bg-blue-900 transition-colors"
-                                >
-                                    Create new account
-                                </button>
-                                <Link href="/auth/find-my-account"
-                                    className="w-full bg-white border-2 text-center border-gray-300 text-gray-700 py-4 rounded-full font-semibold hover:bg-gray-50 transition-colors"
-                                >
-                                    Find my account
-                                </Link>
+            <div className="flex flex-col md:flex-row gap-5 max-md:w-full">
+                            <button
+                                onClick={() => handleNext('name')}
+                                className="w-full md:w-auto bg-blue-950 text-white py-3 px-5 rounded-full font-semibold hover:bg-blue-900 transition-colors"
+                            >
+                                Create new account
+                            </button>
+
+                            <a
+                                href="/auth/find-my-account"
+                                className="w-full md:w-auto text-center bg-white text-blue-950 py-3 px-12 rounded-full border border-blue-950 font-semibold hover:bg-blue-950 hover:text-white transition-colors"
+                            >
+                                Find my account
+                            </a>
                             </div>
+
                         </div>
                     </motion.div>
                 )}
@@ -411,6 +415,7 @@ export default function AuthSystem() {
                         </div>
 
                         <div className="flex-1 px-6 pt-4 flex flex-col">
+                            <div id="/create-account"></div>
                             <h1 className="text-3xl font-bold text-gray-900 mb-2">
                                 What's your name?
                             </h1>
@@ -445,18 +450,19 @@ export default function AuthSystem() {
 
                             <button
                                 onClick={() => handleNext('dob')}
-                                className="w-full bg-blue-950 text-white py-4 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-auto"
+                                className="max-md:w-full lg:w-1/4 mx-auto bg-blue-950 text-white py-3 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-auto"
                             >
                                 Next
                             </button>
 
                             <div className="py-8">
+                                <Link href="/auth/find-my-account">
                                 <button
-                                    onClick={() => handleNext('findaccount')}
                                     className="text-blue-950 hover:underline font-medium"
                                 >
                                     Find my account
-                                </button>
+                                </button>                              
+                                </Link>
                             </div>
                         </div>
                     </motion.div>
@@ -506,18 +512,19 @@ export default function AuthSystem() {
 
                             <button
                                 onClick={() => handleNext('email')}
-                                className="w-full bg-blue-950 text-white py-4 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-auto"
+                                className="max-md:w-full lg:w-1/4 mx-auto bg-blue-950 text-white py-3 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-auto"
                             >
                                 Next
                             </button>
 
                             <div className="py-8">
+                                <Link href="/auth/find-my-account">
                                 <button
-                                    onClick={() => handleNext('findaccount')}
                                     className="text-blue-950 hover:underline font-medium"
                                 >
                                     Find my account
-                                </button>
+                                </button>                              
+                                </Link>
                             </div>
                         </div>
                     </motion.div>
@@ -565,18 +572,19 @@ export default function AuthSystem() {
 
                             <button
                                 onClick={() => handleNext('password')}
-                                className="w-full bg-blue-950 text-white py-4 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-auto"
+                                className="max-md:w-full lg:w-1/4 mx-auto bg-blue-950 text-white py-3 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-auto"
                             >
                                 Next
                             </button>
 
                             <div className="py-8">
+                                <Link href="/auth/find-my-account">
                                 <button
-                                    onClick={() => handleNext('findaccount')}
                                     className="text-blue-950 hover:underline font-medium"
                                 >
                                     Find my account
-                                </button>
+                                </button>                              
+                                </Link>
                             </div>
                         </div>
                     </motion.div>
@@ -624,18 +632,19 @@ export default function AuthSystem() {
 
                             <button
                                 onClick={() => handleNext('confirm')}
-                                className="w-full bg-blue-950 text-white py-4 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-auto"
+                                className="max-md:w-full lg:w-1/4 mx-auto bg-blue-950  text-white py-3 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-auto"
                             >
                                 Next
                             </button>
 
                             <div className="py-8">
+                                 <Link href="/auth/find-my-account">
                                 <button
-                                    onClick={() => handleNext('findaccount')}
                                     className="text-blue-950 hover:underline font-medium"
                                 >
                                     Find my account
-                                </button>
+                                </button>                              
+                                </Link>
                             </div>
                         </div>
                     </motion.div>
@@ -670,6 +679,12 @@ export default function AuthSystem() {
 
                             <div className="bg-blue-50 border-2 border-blue-950 rounded-2xl p-6 mb-8">
                                 <div className="space-y-4">
+                                     <button
+                                    onClick={() => handleNext('name')}
+                                    className="max-md:w-full lg:right-10 mt-6 bg-white lg:w-1/4 border-2 border-blue-950 text-blue-950 py-3 rounded-full font-semibold hover:bg-blue-50 transition-colors"
+                                >
+                                    Edit Information
+                                </button>
                                     <div>
                                         <label className="text-sm text-gray-600 font-medium">Name</label>
                                         <p className="text-lg text-gray-900 font-semibold">
@@ -690,12 +705,7 @@ export default function AuthSystem() {
                                     </div>
                                 </div>
 
-                                <button
-                                    onClick={() => handleNext('name')}
-                                    className="w-full mt-6 bg-white border-2 border-blue-950 text-blue-950 py-3 rounded-full font-semibold hover:bg-blue-50 transition-colors"
-                                >
-                                    Edit Information
-                                </button>
+                               
                             </div>
 
                             <p className="text-xs text-gray-600 mb-6 leading-relaxed">
@@ -708,7 +718,7 @@ export default function AuthSystem() {
                             <button
                                 onClick={handleSubmit}
                                 disabled={loading}
-                                className="w-full bg-blue-950 text-white py-4 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-auto disabled:opacity-50"
+                                className="max-md:w-full lg:w-1/4 mx-auto bg-blue-950 text-white py-3 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-auto disabled:opacity-50"
                             >
                                 {loading ? 'Creating Account...' : 'Create Account'}
                             </button>

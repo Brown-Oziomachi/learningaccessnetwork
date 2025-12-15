@@ -132,11 +132,12 @@ export default function FindAccountPage() {
                         <button
                             onClick={handleFindAccount}
                             disabled={loading}
-                            className="w-full bg-blue-950 text-white py-4 rounded-full font-semibold hover:bg-blue-900 transition-colors disabled:opacity-50"
+                            className="w-full lg:w-1/4 bg-blue-950 text-white py-3 rounded-full font-semibold hover:bg-blue-900 transition-colors disabled:opacity-50"
                         >
                             {loading ? 'Searching...' : 'Continue'}
                         </button>
-
+                        
+                        <div>
                         <button
                             onClick={() => {
                                 alert('Please use your email address to find your account.');
@@ -145,6 +146,7 @@ export default function FindAccountPage() {
                         >
                             Search by name instead
                         </button>
+                        </div>
                     </>
                 )}
 
@@ -171,11 +173,12 @@ export default function FindAccountPage() {
                         <button
                             onClick={handleLogin}
                             disabled={loading}
-                            className="w-full bg-blue-950 text-white py-4 rounded-full font-semibold hover:bg-blue-900 transition-colors disabled:opacity-50"
+                            className="w-full lg:w-1/4 bg-blue-950 text-white py-3 rounded-full font-semibold hover:bg-blue-900 transition-colors disabled:opacity-50"
                         >
                             {loading ? 'Signing in...' : 'Sign in'}
                         </button>
 
+                        <div>
                         <button
                             onClick={() => {
                                 setStep('email');
@@ -188,6 +191,7 @@ export default function FindAccountPage() {
                         >
                             Use a different email
                         </button>
+                        </div>
                     </>
                 )}
 
@@ -222,10 +226,10 @@ export default function FindAccountPage() {
                             >
                                 TRY AGAIN
                             </button>
-                            <button
+                            <button 
                                 onClick={() => {
                                     setShowAccountNotFoundModal(false);
-                                    router.push('/auth/signup');
+                                    router.push('/auth/signin');
                                 }}
                                 className="flex-1 text-blue-600 font-bold py-3 hover:bg-blue-50 rounded-lg transition-colors"
                             >

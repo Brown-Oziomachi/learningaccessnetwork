@@ -61,10 +61,10 @@ export default function LearningAccessNetwork() {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col items-center justify-center px-4 py-8 md:py-0">
+        <main className="flex-1 flex flex-col items-center justify-center px-4 py-5 md:py-0">
           {/* Globe Icon */}
           <div className="mb-8 md:mb-12">
-            <div className="relative w-64 h-64 md:w-96 md:h-96">
+            <div className="relative w-44 h-44 md:w-76 md:h-76">
               {/* Globe SVG with rotation animation */}
               <svg viewBox="0 0 200 200" className="w-full h-full animate-spin" style={{ animationDuration: '8s' }}>
                 {/* Top half - blue */}
@@ -100,14 +100,14 @@ export default function LearningAccessNetwork() {
             </motion.div>
 
             {/* Read More Button - Only visible on desktop */}
-            <motion.button
+            {/* <motion.button
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.4 }}
               className="hidden md:block mt-4 bg-white text-gray-800 px-8 py-2 rounded-full font-medium hover:bg-gray-100 transition-colors"
             >
               Read More
-            </motion.button>
+            </motion.button> */}
           </div>
         </main>
 
