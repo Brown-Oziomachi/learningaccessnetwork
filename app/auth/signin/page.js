@@ -375,7 +375,7 @@ export default function AuthSystem() {
                                 Create an account to access thousands of PDF books, connect with learners, and build your digital library.
                             </p>
 
-            <div className="flex flex-col md:flex-row gap-5 max-md:w-full">
+                                <div className="flex flex-col md:flex-row gap-5 max-md:w-full">
                             <button
                                 onClick={() => handleNext('name')}
                                 className="w-full md:w-auto bg-blue-950 text-white py-3 px-5 rounded-full font-semibold hover:bg-blue-900 transition-colors"

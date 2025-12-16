@@ -19,50 +19,62 @@ export default function FindAccountPage() {
     const [error, setError] = useState('');
     const [userData, setUserData] = useState(null);
     const [showAccountNotFoundModal, setShowAccountNotFoundModal] = useState(false);
+    const [accounts, setAccounts] = useState([]);
+    const [showAccountList, setShowAccountList] = useState(false);
 
     // STEP 1: FIND ACCOUNT in Firestore by email or name
-    const handleFindAccount = async () => {
-        if (!searchInput.trim()) {
-            setError('Please enter your email or name');
-            return;
-        }
+  const handleFindAccount = async () => {
+    if (!searchInput.trim()) {
+        setError('Please enter your email or name');
+        return;
+    }
 
-        setLoading(true);
-        setError('');
+    setLoading(true);
+    setError('');
 
-        try {
-            const usersRef = collection(db, 'users');
+    try {
+        const usersRef = collection(db, 'users');
 
-            // Search by email OR name
-            const qEmail = query(usersRef, where('email', '==', searchInput.trim()));
-            const qName = query(usersRef, where('firstName', '==', searchInput.trim()));
+        const qEmail = query(
+            usersRef,
+            where('email', '>=', searchInput),
+            where('email', '<=', searchInput + '\uf8ff')
+        );
 
-            const [emailSnap, nameSnap] = await Promise.all([getDocs(qEmail), getDocs(qName)]);
+        const qName = query(
+            usersRef,
+            where('firstName', '>=', searchInput),
+            where('firstName', '<=', searchInput + '\uf8ff')
+        );
 
-            let userDoc = null;
+        const [emailSnap, nameSnap] = await Promise.all([
+            getDocs(qEmail),
+            getDocs(qName)
+        ]);
 
-            if (!emailSnap.empty) {
-                userDoc = emailSnap.docs[0].data();
-            } else if (!nameSnap.empty) {
-                userDoc = nameSnap.docs[0].data();
+        const results = [];
+
+        emailSnap.forEach(doc => results.push(doc.data()));
+        nameSnap.forEach(doc => {
+            if (!results.some(u => u.email === doc.data().email)) {
+                results.push(doc.data());
             }
+        });
 
-            if (!userDoc) {
-                // No user found
-                setShowAccountNotFoundModal(true);
-            } else {
-                // User found → move to password step
-                setUserData(userDoc);
-                setEmail(userDoc.email);
-                setStep('password');
-            }
-        } catch (err) {
-            console.error('Find Account Error:', err);
-            setError('Something went wrong. Please try again.');
-        } finally {
-            setLoading(false);
+        if (results.length === 0) {
+            setShowAccountNotFoundModal(true);
+        } else {
+            setAccounts(results);
+            setShowAccountList(true);
         }
-    };
+    } catch (err) {
+        console.error(err);
+        setError('Something went wrong');
+    } finally {
+        setLoading(false);
+    }
+};
+
 
     // STEP 2: LOGIN
     const handleLogin = async () => {
@@ -150,6 +162,42 @@ export default function FindAccountPage() {
                     </>
                 )}
 
+                    {showAccountList && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-8 space-y-4"
+                        >
+                            {accounts.map((user, index) => (
+                                <button
+                                    key={index}
+                                    onClick={() => {
+                                        setUserData(user);
+                                        setEmail(user.email);
+                                        setShowAccountList(false);
+                                        setStep('password');
+                                    }}
+                                    className="w-full flex items-center gap-4 p-4 border rounded-xl hover:bg-gray-50 transition"
+                                >
+                                    <img
+                                        src={user.photoBase64 || '/avatar.png'}
+                                        alt={user.displayName}
+                                        className="w-12 h-12 rounded-full object-cover"
+                                    />
+
+                                    <div className="flex-1 text-left">
+                                        <p className="font-semibold text-gray-900">
+                                            {user.displayName || `${user.firstName}`}
+                                        </p>
+                                        <p className="text-sm text-gray-600">{user.email}</p>
+                                    </div>
+
+                                    <span className="text-gray-400">{'>'}</span>
+                                </button>
+                            ))}
+                        </motion.div>
+                    )}
+
                 {step === 'password' && userData && (
                     <>
                         <p className="text-gray-600 mb-8">
@@ -208,10 +256,10 @@ export default function FindAccountPage() {
                         animate={{ opacity: 1, scale: 1 }}
                         className="bg-white rounded-2xl p-6 max-w-md w-full"
                     >
-                        <h3 className="text-xl font-bold text-gray-900 mb-3" style={{ fontFamily: 'cursive' }}>
+                        <h3 className="text-xl font-bold text-gray-900 mb-3" >
                             We couldn't find your account. Create a new account?
                         </h3>
-                        <p className="text-gray-700 mb-6" style={{ fontFamily: 'cursive' }}>
+                        <p className="text-gray-700 mb-6" >
                             It looks like <span className="font-semibold">{searchInput}</span> isn't connected to an account.
                             You can create a new account with this email address or try again.
                         </p>

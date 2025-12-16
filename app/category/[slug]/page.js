@@ -1,28 +1,69 @@
 // ===========================
-// FILE: app/page.jsx (HomePage)
-// UPDATED TO CHECK FIREBASE FOR PURCHASED BOOKS
+// FILE: app/category/[slug]/page.jsx
+// DYNAMIC CATEGORY PAGES
 // ===========================
 
 "use client"
 import React, { useState, useEffect } from 'react';
-import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut } from 'lucide-react';
+import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
 import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
-import { useRouter } from "next/navigation";
 import { booksData } from "@/lib/booksData";
 import { doc, getDoc } from 'firebase/firestore';
 
-export default function HomePage() {
+export default function CategoryPage() {
+    const params = useParams();
+    const router = useRouter();
+    const categorySlug = params.slug;
+    
     const [searchQuery, setSearchQuery] = useState('');
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [selectedBook, setSelectedBook] = useState(null);
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
     const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
-    const router = useRouter();
+    const [sortBy, setSortBy] = useState('popularity');
 
-    // Get first 25 books for home page
-    const displayBooks = booksData.slice(0, 25);
+    // Category mapping
+    const categoryMap = {
+        'education': 'Education',
+        'personal-development': 'Personal Development',
+        'business': 'Business',
+        'technology': 'Technology',
+        'science': 'Science',
+        'literature': 'Literature',
+        'health-wellness': 'Health & Wellness',
+        'history': 'History',
+        'arts-culture': 'Arts & Culture'
+    };
+
+    const categoryName = categoryMap[categorySlug] || 'Category';
+
+    // Filter books by category
+    const categoryBooks = booksData.filter(book => {
+        const bookCategory = book.category?.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-');
+        return bookCategory === categorySlug;
+    });
+
+    // Sort books
+    const sortBooks = (books) => {
+        const sorted = [...books];
+        switch(sortBy) {
+            case 'price-low':
+                return sorted.sort((a, b) => a.price - b.price);
+            case 'price-high':
+                return sorted.sort((a, b) => b.price - a.price);
+            case 'rating':
+                return sorted.sort((a, b) => b.rating - a.rating);
+            case 'newest':
+                return sorted.sort((a, b) => b.id - a.id);
+            default: // popularity
+                return sorted.sort((a, b) => b.reviews - a.reviews);
+        }
+    };
+
+    const displayBooks = sortBooks(categoryBooks);
 
     const categories = [
         'Education',
@@ -36,7 +77,7 @@ export default function HomePage() {
         'Arts & Culture'
     ];
 
-    // Fetch purchased books from Firebase on mount
+    // Fetch purchased books from Firebase
     useEffect(() => {
         const fetchPurchasedBooks = async () => {
             try {
@@ -50,22 +91,10 @@ export default function HomePage() {
                         const purchased = userData.purchasedBooks || [];
                         const bookIds = new Set(purchased.map(book => book.id));
                         setPurchasedBookIds(bookIds);
-                    } else {
-                        // Fallback to localStorage
-                        const localPurchased = JSON.parse(localStorage.getItem(`purchased_${user.email}`) || '[]');
-                        const bookIds = new Set(localPurchased.map(book => book.id));
-                        setPurchasedBookIds(bookIds);
                     }
                 }
             } catch (error) {
                 console.error('Error fetching purchased books:', error);
-                // Fallback to localStorage
-                const userEmail = auth.currentUser?.email;
-                if (userEmail) {
-                    const localPurchased = JSON.parse(localStorage.getItem(`purchased_${userEmail}`) || '[]');
-                    const bookIds = new Set(localPurchased.map(book => book.id));
-                    setPurchasedBookIds(bookIds);
-                }
             }
         };
 
@@ -112,10 +141,10 @@ export default function HomePage() {
                             {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
                         </button>
 
-                        <Link href="/" className="flex items-center gap-2">
+                        <Link href="/home" className="flex items-center gap-2">
                             <Globe className="w-8 h-8 text-white" />
                             <h1 className="text-xl md:text-2xl font-bold">
-                                LEARNING <span className="text-blue-400">ACCESS</span>
+                                L <span className="text-blue-400">A N</span>
                             </h1>
                         </Link>
 
@@ -198,159 +227,195 @@ export default function HomePage() {
             <div className="bg-blue-900 text-white shadow-md">
                 <div className="max-w-7xl mx-auto px-4 py-3">
                     <div className="flex gap-6 overflow-x-auto scrollbar-hide">
-                        {categories.map((category, index) => (
-                            <Link
-                                key={index}
-                                href={`/category/${category.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')}`}
-                                className="whitespace-nowrap hover:text-blue-300 transition-colors text-sm"
-                            >
-                                {category}
-                            </Link>
-                        ))}
+                        {categories.map((category, index) => {
+                            const slug = category.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-');
+                            const isActive = slug === categorySlug;
+                            return (
+                                <Link
+                                    key={index}
+                                    href={`/category/${slug}`}
+                                    className={`whitespace-nowrap transition-colors text-sm ${
+                                        isActive 
+                                            ? 'text-blue-300 font-bold border-b-2 border-blue-300' 
+                                            : 'hover:text-blue-300'
+                                    }`}
+                                >
+                                    {category}
+                                </Link>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
 
-            {/* Info Banner */}
-            <div className="bg-blue-50 border-b border-blue-100">
-                <div className="max-w-7xl mx-auto px-4 py-4">
-                    <div className="flex items-center gap-3 text-blue-950">
-                        <FileText className="w-6 h-6" />
-                        <p className="text-sm md:text-base">
-                            <strong>Access PDFs Instantly!</strong> Purchase books and get instant access to downloadable PDFs sent to your registered email.
-                        </p>
+            {/* Breadcrumb */}
+            <div className="bg-gray-50 border-b border-gray-200">
+                <div className="max-w-7xl mx-auto px-4 py-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Link href="/home" className="hover:text-blue-600">Home</Link>
+                        <span>&gt;</span>
+                        <Link href="/pdf" className="hover:text-blue-600">All Books</Link>
+                        <span>&gt;</span>
+                        <span className="text-gray-900 font-semibold">{categoryName}</span>
                     </div>
                 </div>
             </div>
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 py-8">
-                <div className="text-sm text-gray-600 mb-6">
-                    Home &gt; All PDF Books
+                {/* Category Header */}
+                <div className="mb-8">
+                    <div className="flex items-center gap-3 mb-3">
+                        <button 
+                            onClick={() => router.back()}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                            <ArrowLeft size={24} />
+                        </button>
+                        <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+                            {categoryName}
+                        </h1>
+                    </div>
+                    <p className="text-gray-600 ml-14">
+                        Explore {displayBooks.length} {displayBooks.length === 1 ? 'book' : 'books'} in {categoryName}
+                    </p>
                 </div>
 
+                {/* Filters */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-                    <div>
-                        <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
-                            Digital PDF Library
-                        </h2>
-                        <p className="text-gray-600 mt-1">
-                            (Showing {displayBooks.length} of {booksData.length} PDF books - <Link href="/pdf" className="text-blue-600 hover:underline">View All</Link>)
-                        </p>
+                    <div className="flex items-center gap-2">
+                        <span className="text-gray-700 text-sm">Showing {displayBooks.length} results</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="text-gray-700">Sort by:</span>
-                        <select className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-950">
-                            <option>Popularity</option>
-                            <option>Price: Low to High</option>
-                            <option>Price: High to Low</option>
-                            <option>Newest First</option>
-                            <option>Rating</option>
+                        <span className="text-gray-700 text-sm">Sort by:</span>
+                        <select 
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-950"
+                        >
+                            <option value="popularity">Popularity</option>
+                            <option value="price-low">Price: Low to High</option>
+                            <option value="price-high">Price: High to Low</option>
+                            <option value="newest">Newest First</option>
+                            <option value="rating">Highest Rated</option>
                         </select>
                     </div>
                 </div>
 
-                <div className="mb-6 flex flex-wrap gap-2 items-center">
-                    <span className="text-gray-700">Quick links:</span>
-                    <Link href="/category/education" className="text-blue-600 hover:text-blue-800 hover:underline">Education</Link>
-                    <span>|</span>
-                    <Link href="/category/business" className="text-blue-600 hover:text-blue-800 hover:underline">Business</Link>
-                    <span>|</span>
-                    <Link href="/category/technology" className="text-blue-600 hover:text-blue-800 hover:underline">Technology</Link>
-                    <span>|</span>
-                    <Link href="/pdf" className="text-blue-600 hover:text-blue-800 hover:underline font-semibold">
-                        All Books →
-                    </Link>
-                </div>
-
                 {/* Books Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {displayBooks.map((book) => (
-                        <div
-                            key={book.id}
-                            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                {displayBooks.length === 0 ? (
+                    <div className="bg-white rounded-lg shadow-lg p-12 text-center">
+                        <FileText className="w-20 h-20 mx-auto mb-4 text-gray-400" />
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">No Books Found</h3>
+                        <p className="text-gray-600 mb-6">
+                            We don't have any books in the {categoryName} category yet.
+                        </p>
+                        <Link
+                            href="/pdf"
+                            className="inline-block bg-blue-950 text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors"
                         >
-                            <div className="relative">
-                                <img
-                                    src={book.image}
-                                    alt={book.title}
-                                    className="w-full h-64 object-cover"
-                                />
-                                <div className="absolute top-3 right-3 flex flex-col gap-2">
-                                    <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
-                                        <FileText size={14} />
-                                        {book.format}
-                                    </span>
-                                    {isPurchased(book.id) && (
-                                        <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
-                                            <Download size={14} />
-                                            Owned
+                            Browse All Books
+                        </Link>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {displayBooks.map((book) => (
+                            <div
+                                key={book.id}
+                                className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                            >
+                                <div className="relative">
+                                    <img
+                                        src={book.image}
+                                        alt={book.title}
+                                        className="w-full h-64 object-cover"
+                                    />
+                                    <div className="absolute top-3 right-3 flex flex-col gap-2">
+                                        <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
+                                            <FileText size={14} />
+                                            {book.format}
+                                        </span>
+                                        {isPurchased(book.id) && (
+                                            <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
+                                                <Download size={14} />
+                                                Owned
+                                            </span>
+                                        )}
+                                    </div>
+                                    {book.discount && (
+                                        <span className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold">
+                                            {book.discount}
                                         </span>
                                     )}
                                 </div>
-                                {book.discount && (
-                                    <span className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold">
-                                        {book.discount}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="p-4">
-                                <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
-                                    {book.title}
-                                </h3>
-                                <p className="text-sm text-gray-600 mb-2">{book.author}</p>
-                                <p className="text-xs text-gray-500 mb-2">{book.pages} pages</p>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className="flex text-yellow-400 text-sm">
-                                        {'★'.repeat(Math.floor(book.rating))}
-                                        {'☆'.repeat(5 - Math.floor(book.rating))}
+                                <div className="p-4">
+                                    <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
+                                        {book.title}
+                                    </h3>
+                                    <p className="text-sm text-gray-600 mb-2">{book.author}</p>
+                                    <p className="text-xs text-gray-500 mb-2">{book.pages} pages</p>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="flex text-yellow-400 text-sm">
+                                            {'★'.repeat(Math.floor(book.rating))}
+                                            {'☆'.repeat(5 - Math.floor(book.rating))}
+                                        </div>
+                                        <span className="text-sm text-gray-600">({book.reviews})</span>
                                     </div>
-                                    <span className="text-sm text-gray-600">({book.reviews})</span>
-                                </div>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="text-xl font-bold text-gray-900">₦ {book.price.toLocaleString()}</span>
-                                    {book.oldPrice && (
-                                        <span className="text-sm text-gray-500 line-through">₦ {book.oldPrice.toLocaleString()}</span>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <span className="text-xl font-bold text-gray-900">₦ {book.price.toLocaleString()}</span>
+                                        {book.oldPrice && (
+                                            <span className="text-sm text-gray-500 line-through">₦ {book.oldPrice.toLocaleString()}</span>
+                                        )}
+                                    </div>
+
+                                    {isPurchased(book.id) ? (
+                                        <button
+                                            onClick={() => handleDownload(book)}
+                                            className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <Download size={18} />
+                                            Download PDF
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => handlePurchase(book)}
+                                            className="w-full bg-blue-950 text-white py-2 rounded hover:bg-blue-900 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <Lock size={18} />
+                                            Purchase & Access
+                                        </button>
                                     )}
                                 </div>
-
-                                {isPurchased(book.id) ? (
-                                    <button
-                                        onClick={() => handleDownload(book)}
-                                        className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <Download size={18} />
-                                        Download PDF
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={() => handlePurchase(book)}
-                                        className="w-full bg-blue-950 text-white py-2 rounded hover:bg-blue-900 transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <Lock size={18} />
-                                        Purchase & Access
-                                    </button>
-                                )}
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                )}
 
-                {/* View All Books Button */}
-                <div className="text-center mt-12">
-                    <Link
-                        href="/pdf"
-                        className="inline-flex items-center gap-2 bg-blue-950 text-white px-8 py-4 rounded-lg hover:bg-blue-900 transition-colors text-lg font-semibold shadow-lg"
-                    >
-                        <FileText size={24} />
-                        View All {booksData.length} Books in Library
-                    </Link>
+                {/* Browse Other Categories */}
+                <div className="mt-12 bg-blue-50 border border-blue-200 rounded-lg p-6">
+                    <h3 className="text-xl font-bold text-gray-900 mb-4">Browse Other Categories</h3>
+                    <div className="flex flex-wrap gap-3">
+                        {categories
+                            .filter(cat => cat.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-') !== categorySlug)
+                            .map((category, index) => {
+                                const slug = category.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-');
+                                return (
+                                    <Link
+                                        key={index}
+                                        href={`/category/${slug}`}
+                                        className="bg-white border border-blue-300 text-blue-950 px-4 py-2 rounded-lg hover:bg-blue-950 hover:text-white transition-colors text-sm font-semibold"
+                                    >
+                                        {category}
+                                    </Link>
+                                );
+                            })}
+                    </div>
                 </div>
             </main>
 
             {/* Purchase Modal */}
             {showPurchaseModal && selectedBook && (
-                <div className="fixed inset-0 bg-white/50 bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg max-w-md w-full p-6">
                         <div className="flex justify-between items-start mb-4">
                             <h3 className="text-xl font-bold text-gray-900">Purchase PDF Book</h3>
