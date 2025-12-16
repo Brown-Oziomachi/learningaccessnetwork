@@ -8,7 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut, Filter } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
 import { booksData } from "@/lib/booksData";
 import { doc, getDoc } from 'firebase/firestore';
@@ -75,6 +75,18 @@ export default function AllBooksPage() {
     const startIndex = (currentPage - 1) * booksPerPage;
     const displayBooks = sortedBooks.slice(startIndex, startIndex + booksPerPage);
 
+     useEffect(() => {
+            const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+                if (currentUser) {
+                    setUser(currentUser);
+                } else {
+                    router.push('/auth/signin');
+                }
+            });
+    
+            return () => unsubscribe();
+     }, [router]);
+    
     // Fetch purchased books from Firebase
     useEffect(() => {
         const fetchPurchasedBooks = async () => {

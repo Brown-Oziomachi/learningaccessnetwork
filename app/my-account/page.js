@@ -10,12 +10,14 @@ import {
     ArrowLeft,
     Settings,
     Shield,
-    MoreVertical
+    MoreVertical,
+    Book
 } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 export default function MyAccount() {
     const [user, setUser] = useState(null);
@@ -23,9 +25,8 @@ export default function MyAccount() {
     const [isEditing, setIsEditing] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
-
     const menuRef = useRef(null);
-
+    const router = useRouter()
     const [formData, setFormData] = useState({
         firstName: "",
         surname: "",
@@ -33,6 +34,18 @@ export default function MyAccount() {
         dateOfBirth: ""
     });
 
+      useEffect(() => {
+            const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+                if (currentUser) {
+                    setUser(currentUser);
+                } else {
+                    router.push('/auth/signin');
+                }
+            });
+    
+            return () => unsubscribe();
+      }, [router]);
+    
     /* Close dropdown on outside click */
     useEffect(() => {
         const handler = (e) => {
@@ -123,7 +136,7 @@ export default function MyAccount() {
             <header className="bg-blue-950 text-white">
                 <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between">
                    <Link href="/home" className="flex items-center gap-2">
-                            <Globe className="w-8 h-8" />
+                            <img src="/lan-logo.png" alt="lan logo" className="w-20 h-20" />
                             <h1 className="text-xl md:text-2xl font-bold">
                                 L <span className="text-blue-400">A N</span>
                             </h1>
@@ -139,11 +152,10 @@ export default function MyAccount() {
 
                     {/* Profile Header */}
                             <div
-                                className="relative p-8 text-white bg-cover bg-repeat bg-center"
+                                className="relative p-8 text-white bg-repeat-x bg-center"
                                 style={{
                                     backgroundImage: `
-                                        linear-gradient(to right, rgba(2,6,23,0.85), rgba(30,64,175,0.85)),
-                                        url('/profile-bg.jpg')
+                                        url('/lan-logo.png')
                                     `
                                 }}
                             >
@@ -204,10 +216,17 @@ export default function MyAccount() {
                                         </button>
 
                                         <Link
-                                            href="/"
+                                            href="/pdf"
                                             className="block px-4 py-3 hover:bg-gray-100 flex gap-2"
                                         >
                                             <Globe size={16} /> Browse Books
+                                        </Link>
+
+                                        <Link
+                                            href="/advertise"
+                                            className="block px-4 py-3 hover:bg-gray-100 flex gap-2"
+                                        >
+                                            <Book size={16} /> Advertise with Us
                                         </Link>
                                     </div>
                                 )}

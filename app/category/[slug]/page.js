@@ -8,7 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
 import { booksData } from "@/lib/booksData";
 import { doc, getDoc } from 'firebase/firestore';
@@ -17,7 +17,6 @@ export default function CategoryPage() {
     const params = useParams();
     const router = useRouter();
     const categorySlug = params.slug;
-    
     const [searchQuery, setSearchQuery] = useState('');
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [selectedBook, setSelectedBook] = useState(null);
@@ -77,6 +76,18 @@ export default function CategoryPage() {
         'Arts & Culture'
     ];
 
+     useEffect(() => {
+            const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+                if (currentUser) {
+                    setUser(currentUser);
+                } else {
+                    router.push('/auth/signin');
+                }
+            });
+    
+            return () => unsubscribe();
+     }, [router]);
+    
     // Fetch purchased books from Firebase
     useEffect(() => {
         const fetchPurchasedBooks = async () => {

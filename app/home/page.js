@@ -12,6 +12,7 @@ import { auth, db } from "@/lib/firebaseConfig";
 import { useRouter } from "next/navigation";
 import { booksData } from "@/lib/booksData";
 import { doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function HomePage() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -36,6 +37,18 @@ export default function HomePage() {
         'Arts & Culture'
     ];
 
+      useEffect(() => {
+            const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+                if (currentUser) {
+                    setUser(currentUser);
+                } else {
+                    router.push('/auth/signin');
+                }
+            });
+    
+            return () => unsubscribe();
+        }, [router]);
+    
     // Fetch purchased books from Firebase on mount
     useEffect(() => {
         const fetchPurchasedBooks = async () => {
@@ -113,9 +126,9 @@ export default function HomePage() {
                         </button>
 
                         <Link href="/" className="flex items-center gap-2">
-                            <Globe className="w-8 h-8 text-white" />
-                            <h1 className="text-xl md:text-2xl font-bold">
-                                LEARNING <span className="text-blue-400">ACCESS</span>
+                            <img src="/lan-logo.png" alt="lan logo" className="lg:w-20 lg:h-20 max-lg:w-10 max-lg:h-10" />
+                            <h1 className=" max-md:text-sm font-bold">
+                                LEARNING <span className="text-blue-400">ACCESS NETWORK</span>
                             </h1>
                         </Link>
 
@@ -185,6 +198,10 @@ export default function HomePage() {
                                 <span className="text-sm font-medium">My Books</span>
                             </Link>
 
+                            <Link href="/advertise" className="flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-800 hover:text-blue-400 transition-colors">
+                                <Download size={20} />
+                                <span className="text-sm font-medium">Advertise</span>
+                            </Link>
                             <button onClick={handleLogout} className="flex items-center gap-2 w-full px-3 py-2 rounded text-red-400 hover:bg-red-800 hover:text-red-300 transition-colors">
                                 <LogOut size={20} />
                                 <span className="text-sm font-medium">Logout</span>

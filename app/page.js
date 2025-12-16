@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 
 export default function LearningAccessNetwork() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -125,9 +126,12 @@ export default function LearningAccessNetwork() {
             >
               SIGN IN
             </a>
-            <button className="w-full md:w-auto bg-blue-950 text-white px-8 py-3 rounded font-medium hover:bg-blue-800 transition-colors">
-              ADVERTISE YOUR BOOK
-            </button>
+            <Link
+              href="/advertise"
+              className="inline-block w-full md:w-auto bg-blue-950 text-white px-8 py-3 rounded font-medium hover:bg-blue-800 transition-colors text-center"
+            >
+              ADVERTISE WITH US
+            </Link>
           </motion.div>
         </footer>
 
