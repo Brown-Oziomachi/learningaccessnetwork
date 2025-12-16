@@ -1,11 +1,11 @@
 // ===========================
 // FILE: app/pdf/page.jsx
-// ALL BOOKS LIBRARY PAGE
+// ALL BOOKS LIBRARY PAGE WITH CAROUSEL
 // ===========================
 
 "use client"
 import React, { useState, useEffect } from 'react';
-import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut, Filter } from 'lucide-react';
+import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut, Filter, AlignEndVertical } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -15,7 +15,7 @@ import { doc, getDoc } from 'firebase/firestore';
 
 export default function AllBooksPage() {
     const router = useRouter();
-    
+
     const [searchQuery, setSearchQuery] = useState('');
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [selectedBook, setSelectedBook] = useState(null);
@@ -25,6 +25,7 @@ export default function AllBooksPage() {
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [currentPage, setCurrentPage] = useState(1);
     const [showFilters, setShowFilters] = useState(false);
+    const [user, setUser] = useState(null);
     const booksPerPage = 12;
 
     const categories = [
@@ -43,7 +44,7 @@ export default function AllBooksPage() {
     // Filter books by category and search
     const filteredBooks = booksData.filter(book => {
         const matchesCategory = selectedCategory === 'all' || book.category === selectedCategory;
-        const matchesSearch = searchQuery === '' || 
+        const matchesSearch = searchQuery === '' ||
             book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             book.author.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesCategory && matchesSearch;
@@ -52,7 +53,7 @@ export default function AllBooksPage() {
     // Sort books
     const sortBooks = (books) => {
         const sorted = [...books];
-        switch(sortBy) {
+        switch (sortBy) {
             case 'price-low':
                 return sorted.sort((a, b) => a.price - b.price);
             case 'price-high':
@@ -75,18 +76,18 @@ export default function AllBooksPage() {
     const startIndex = (currentPage - 1) * booksPerPage;
     const displayBooks = sortedBooks.slice(startIndex, startIndex + booksPerPage);
 
-     useEffect(() => {
-            const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-                if (currentUser) {
-                    setUser(currentUser);
-                } else {
-                    router.push('/auth/signin');
-                }
-            });
-    
-            return () => unsubscribe();
-     }, [router]);
-    
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                setUser(currentUser);
+            } else {
+                router.push('/auth/signin');
+            }
+        });
+
+        return () => unsubscribe();
+    }, [router]);
+
     // Fetch purchased books from Firebase
     useEffect(() => {
         const fetchPurchasedBooks = async () => {
@@ -95,7 +96,7 @@ export default function AllBooksPage() {
                 if (user) {
                     const userDocRef = doc(db, 'users', user.uid);
                     const userDoc = await getDoc(userDocRef);
-                    
+
                     if (userDoc.exists()) {
                         const userData = userDoc.data();
                         const purchased = userData.purchasedBooks || [];
@@ -162,9 +163,9 @@ export default function AllBooksPage() {
                         </button>
 
                         <Link href="/home" className="flex items-center gap-2">
-                            <Globe className="w-8 h-8 text-white" />
-                            <h1 className="text-xl md:text-2xl font-bold">
-                                L <span className="text-blue-400">A N</span>
+                            <img src="/lan-logo.png" alt="lan logo" className="lg:w-20 lg:h-20 max-lg:w-10 max-lg:h-10" />
+                            <h1 className="max-md:text-sm font-bold">
+                                LEARNING <span className="text-blue-400">ACCESS NETWORK</span>
                             </h1>
                         </Link>
 
@@ -219,7 +220,7 @@ export default function AllBooksPage() {
                 </div>
 
                 {showMobileMenu && (
-                    <div className="md:hidden bg-blue-900 border-t border-blue-800">
+                    <div className="md:hidden bg-blue-950 border-t border-blue-800">
                         <div className="px-4 py-3 space-y-2">
                             <Link href="/my-account" className="flex items-center justify-between gap-2 px-3 py-2 rounded hover:bg-blue-800 hover:text-blue-400 transition-colors">
                                 <div className="flex items-center gap-2">
@@ -234,6 +235,12 @@ export default function AllBooksPage() {
                                 <span className="text-sm font-medium">My Books</span>
                             </Link>
 
+                            <Link href="/advertise" className="flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-800 hover:text-blue-400 transition-colors">
+                                <AlignEndVertical size={20} />
+                                <span className="text-sm font-medium">Advertise With Us</span>
+                            </Link>
+
+
                             <button onClick={handleLogout} className="flex items-center gap-2 w-full px-3 py-2 rounded text-red-400 hover:bg-red-800 hover:text-red-300 transition-colors">
                                 <LogOut size={20} />
                                 <span className="text-sm font-medium">Logout</span>
@@ -247,7 +254,7 @@ export default function AllBooksPage() {
             <div className="bg-gray-50 border-b border-gray-200">
                 <div className="max-w-7xl mx-auto px-4 py-3">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Link href="/home" className="hover:text-blue-600">Home</Link>
+                        <Link href="/" className="hover:text-blue-600">Home</Link>
                         <span>&gt;</span>
                         <span className="text-gray-900 font-semibold">All PDF Books</span>
                     </div>
@@ -278,7 +285,7 @@ export default function AllBooksPage() {
                                 <Filter size={18} />
                                 Filters
                             </button>
-                            
+
                             <div className={`${showFilters ? 'block' : 'hidden'} md:flex items-center gap-3 w-full md:w-auto`}>
                                 <label className="text-sm font-semibold text-gray-700">Category:</label>
                                 <select
@@ -296,7 +303,7 @@ export default function AllBooksPage() {
                         </div>
 
                         {/* Right Side - Sort & Results */}
-                        <div className="flex items-center gap-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                             <span className="text-sm text-gray-600">
                                 Showing {startIndex + 1}-{Math.min(startIndex + booksPerPage, sortedBooks.length)} of {sortedBooks.length}
                             </span>
@@ -319,7 +326,7 @@ export default function AllBooksPage() {
                     </div>
                 </div>
 
-                {/* Books Grid */}
+                {/* Books Grid or No Results */}
                 {displayBooks.length === 0 ? (
                     <div className="bg-white rounded-lg shadow-lg p-12 text-center">
                         <FileText className="w-20 h-20 mx-auto mb-4 text-gray-400" />
@@ -339,8 +346,9 @@ export default function AllBooksPage() {
                     </div>
                 ) : (
                     <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {displayBooks.map((book) => (
+                        {/* First 6 Books - Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+                            {displayBooks.slice(0, 6).map((book) => (
                                 <div
                                     key={book.id}
                                     className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
@@ -411,13 +419,145 @@ export default function AllBooksPage() {
                             ))}
                         </div>
 
+                        {/* Carousel Section - For Mobile */}
+                        {displayBooks.length > 6 && (
+                            <div className="mb-12 bg-gray-50 -mx-4 px-4 py-8 md:hidden">
+                                <h3 className="text-2xl font-bold text-gray-900 mb-4">More Books You'll Love</h3>
+                                <div className="overflow-x-auto scrollbar-hide">
+                                    <div className="flex gap-4 pb-4">
+                                        {displayBooks.slice(6, 12).map((book) => (
+                                            <div
+                                                key={book.id}
+                                                className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                                            >
+                                                <div className="relative">
+                                                    <img
+                                                        src={book.image}
+                                                        alt={book.title}
+                                                        className="w-full h-48 object-cover"
+                                                    />
+                                                    {isPurchased(book.id) && (
+                                                        <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                                                            Owned
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="p-3">
+                                                    <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
+                                                        {book.title}
+                                                    </h4>
+                                                    <div className="flex text-yellow-400 text-xs mb-2">
+                                                        {'★'.repeat(Math.floor(book.rating))}
+                                                    </div>
+                                                    <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
+
+                                                    {isPurchased(book.id) ? (
+                                                        <button
+                                                            onClick={() => handleDownload(book)}
+                                                            className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                                                        >
+                                                            <Download size={14} />
+                                                            Download
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handlePurchase(book)}
+                                                            className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
+                                                        >
+                                                            <Lock size={14} />
+                                                            Purchase
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Remaining Books - Grid (Desktop shows all, mobile shows after carousel) */}
+                        {displayBooks.length > 6 && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {displayBooks.slice(6).map((book) => (
+                                    <div
+                                        key={book.id}
+                                        className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                                    >
+                                        <div className="relative">
+                                            <img
+                                                src={book.image}
+                                                alt={book.title}
+                                                className="w-full h-64 object-cover"
+                                            />
+                                            <div className="absolute top-3 right-3 flex flex-col gap-2">
+                                                <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
+                                                    <FileText size={14} />
+                                                    {book.format}
+                                                </span>
+                                                {isPurchased(book.id) && (
+                                                    <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
+                                                        <Download size={14} />
+                                                        Owned
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {book.discount && (
+                                                <span className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold">
+                                                    {book.discount}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="p-4">
+                                            <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
+                                                {book.title}
+                                            </h3>
+                                            <p className="text-sm text-gray-600 mb-2">{book.author}</p>
+                                            <p className="text-xs text-gray-500 mb-2">{book.pages} pages</p>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="flex text-yellow-400 text-sm">
+                                                    {'★'.repeat(Math.floor(book.rating))}
+                                                    {'☆'.repeat(5 - Math.floor(book.rating))}
+                                                </div>
+                                                <span className="text-sm text-gray-600">({book.reviews})</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <span className="text-xl font-bold text-gray-900">₦ {book.price.toLocaleString()}</span>
+                                                {book.oldPrice && (
+                                                    <span className="text-sm text-gray-500 line-through">₦ {book.oldPrice.toLocaleString()}</span>
+                                                )}
+                                            </div>
+
+                                            {isPurchased(book.id) ? (
+                                                <button
+                                                    onClick={() => handleDownload(book)}
+                                                    className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                                                >
+                                                    <Download size={18} />
+                                                    Download PDF
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handlePurchase(book)}
+                                                    className="w-full bg-blue-950 text-white py-2 rounded hover:bg-blue-900 transition-colors flex items-center justify-center gap-2"
+                                                >
+                                                    <Lock size={18} />
+                                                    Purchase & Access
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
                         {/* Pagination */}
                         {totalPages > 1 && (
-                            <div className="mt-12 flex items-center justify-center gap-2">
+                            <div className="mt-12 flex flex-wrap items-center justify-center gap-2">
                                 <button
                                     onClick={() => goToPage(currentPage - 1)}
                                     disabled={currentPage === 1}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                                 >
                                     Previous
                                 </button>
@@ -434,11 +574,10 @@ export default function AllBooksPage() {
                                             <button
                                                 key={page}
                                                 onClick={() => goToPage(page)}
-                                                className={`px-4 py-2 rounded-lg ${
-                                                    currentPage === page
+                                                className={`px-4 py-2 rounded-lg text-sm ${currentPage === page
                                                         ? 'bg-blue-950 text-white'
                                                         : 'border border-gray-300 hover:bg-gray-50'
-                                                }`}
+                                                    }`}
                                             >
                                                 {page}
                                             </button>
@@ -447,7 +586,7 @@ export default function AllBooksPage() {
                                         page === currentPage - 2 ||
                                         page === currentPage + 2
                                     ) {
-                                        return <span key={page}>...</span>;
+                                        return <span key={page} className="text-gray-500">...</span>;
                                     }
                                     return null;
                                 })}
@@ -455,7 +594,7 @@ export default function AllBooksPage() {
                                 <button
                                     onClick={() => goToPage(currentPage + 1)}
                                     disabled={currentPage === totalPages}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                                 >
                                     Next
                                 </button>

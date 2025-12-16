@@ -121,7 +121,7 @@ export default function MyBooksPage() {
                             You haven't purchased any books yet. Browse our library to get started!
                         </p>
                         <Link
-                            href="/"
+                            href="/pdf"
                             className="inline-block bg-blue-950 text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors"
                         >
                             Browse Books

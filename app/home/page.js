@@ -1,11 +1,11 @@
 // ===========================
 // FILE: app/page.jsx (HomePage)
-// UPDATED TO CHECK FIREBASE FOR PURCHASED BOOKS
+// UPDATED WITH AMAZON-LIKE CAROUSEL LAYOUT
 // ===========================
 
 "use client"
 import React, { useState, useEffect } from 'react';
-import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut } from 'lucide-react';
+import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut, AlignEndVertical } from 'lucide-react';
 import Link from 'next/link';
 import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
@@ -15,11 +15,13 @@ import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
 export default function HomePage() {
-    const [searchQuery, setSearchQuery] = useState('');
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [selectedBook, setSelectedBook] = useState(null);
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
     const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
+    const [user, setUser] = useState(null);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [showMobileSearch, setShowMobileSearch] = useState(false);
     const router = useRouter();
 
     // Get first 25 books for home page
@@ -37,18 +39,28 @@ export default function HomePage() {
         'Arts & Culture'
     ];
 
-      useEffect(() => {
-            const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-                if (currentUser) {
-                    setUser(currentUser);
-                } else {
-                    router.push('/auth/signin');
-                }
-            });
-    
-            return () => unsubscribe();
-        }, [router]);
-    
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                setUser(currentUser);
+            } else {
+                router.push('/auth/signin');
+            }
+        });
+
+        return () => unsubscribe();
+    }, [router]);
+
+
+    // inside your Header component
+
+    const handleSearch = () => {
+        if (searchQuery.trim()) {
+            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+            setShowMobileSearch(false); // hide mobile dropdown if open
+        }
+    };
+
     // Fetch purchased books from Firebase on mount
     useEffect(() => {
         const fetchPurchasedBooks = async () => {
@@ -57,7 +69,7 @@ export default function HomePage() {
                 if (user) {
                     const userDocRef = doc(db, 'users', user.uid);
                     const userDoc = await getDoc(userDocRef);
-                    
+
                     if (userDoc.exists()) {
                         const userData = userDoc.data();
                         const purchased = userData.purchasedBooks || [];
@@ -88,7 +100,7 @@ export default function HomePage() {
     const handleLogout = async () => {
         try {
             await signOut(auth);
-            router.push("/auth/signin");
+            router.push("/");
         } catch (error) {
             console.error("Logout error:", error);
         }
@@ -117,7 +129,9 @@ export default function HomePage() {
             {/* Header */}
             <header className="bg-blue-950 text-white sticky top-0 z-50 shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 py-4">
+                    {/* TOP BAR */}
                     <div className="flex items-center justify-between gap-4">
+                        {/* MOBILE MENU BUTTON */}
                         <button
                             className="md:hidden"
                             onClick={() => setShowMobileMenu(!showMobileMenu)}
@@ -125,90 +139,133 @@ export default function HomePage() {
                             {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
                         </button>
 
-                        <Link href="/" className="flex items-center gap-2">
-                            <img src="/lan-logo.png" alt="lan logo" className="lg:w-20 lg:h-20 max-lg:w-10 max-lg:h-10" />
-                            <h1 className=" max-md:text-sm font-bold">
-                                LEARNING <span className="text-blue-400">ACCESS NETWORK</span>
-                            </h1>
-                        </Link>
-
-                        <div className="hidden md:flex flex-1 max-w-2xl">
-                            <div className="relative w-full">
-                                <input
-                                    type="text"
-                                    placeholder="Search for PDF books, authors, categories..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full px-4 py-2 rounded-l-lg text-gray-900 focus:outline-none"
+                        {/* LOGO + MOBILE SEARCH ICON */}
+                        <div className="flex items-center justify-between w-full relative">
+                            {/* LOGO */}
+                            <Link href="/" className="flex items-center gap-2">
+                                <img
+                                    src="/lan-logo.png"
+                                    alt="lan logo"
+                                    className="lg:w-20 lg:h-20 max-lg:w-10 max-lg:h-10"
                                 />
-                                <button className="absolute right-0 top-0 bottom-0 bg-blue-600 hover:bg-blue-700 px-6 rounded-r-lg transition-colors">
-                                    <Search size={20} />
-                                </button>
-                            </div>
+                                <h1 className="max-md:text-sm font-bold">
+                                    LEARNING <span className="text-blue-400">ACCESS NETWORK</span>
+                                </h1>
+                            </Link>
+
+                            {/* MOBILE SEARCH ICON */}
+                            <button
+                                onClick={() => setShowMobileSearch(!showMobileSearch)}
+                                className="md:hidden text-white hover:text-blue-400"
+                            >
+                                <Search size={22} />
+                            </button>
                         </div>
 
-                        <div className="flex items-center gap-4">
-                            <Link href="/my-account" className="hidden md:flex items-center gap-2 hover:text-blue-400 transition-colors">
+
+                        {/* DESKTOP ACTIONS */}
+                        <div className="hidden md:flex items-center gap-4">
+                            <Link
+                                href="/my-account"
+                                className="flex items-center gap-2 hover:text-blue-400 transition-colors"
+                            >
                                 <User size={20} />
                                 <span>Account</span>
                                 <ChevronDown size={16} />
                             </Link>
 
-                            <Link href="/my-books" className="hidden md:flex items-center gap-2 hover:text-blue-400 transition-colors">
+                            <Link
+                                href="/my-books"
+                                className="flex items-center gap-2 hover:text-blue-400 transition-colors"
+                            >
                                 <Download size={20} />
                                 <span>My Books</span>
                             </Link>
 
-                            <button onClick={handleLogout} className="hidden md:flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors">
+                            <Link
+                                href="/advertise"
+                                className="flex items-center gap-2 hover:text-blue-400 transition-colors"
+                            >
+                                <AlignEndVertical size={20} />
+                                <span>Advertise With Us</span>
+                            </Link>
+
+                            <button
+                                onClick={handleLogout}
+                                className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors"
+                            >
                                 <LogOut size={20} />
                                 <span>Logout</span>
                             </button>
                         </div>
                     </div>
 
-                    <div className="md:hidden mt-4">
-                        <div className="relative">
-                            <input
-                                type="text"
-                                placeholder="Search PDF books..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full px-4 py-2 rounded-lg text-gray-900 focus:outline-none"
-                            />
-                            <button className="absolute right-2 top-2 text-blue-950">
-                                <Search size={20} />
-                            </button>
+                    {/* MOBILE SEARCH DROPDOWN */}
+                    {showMobileSearch && (
+                        <div className="md:hidden mt-4 border border-white">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Search PDF books..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                                    className="w-full text-white px-4 py-2 rounded-lg text-gray-900 focus:outline-none"
+                                    autoFocus
+                                />
+
+                                <button
+                                    onClick={() => setShowMobileSearch(false)}
+                                    className="absolute right-2 top-2 text-blue-950"
+                                >
+                                    <Search size={20} />
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* MOBILE MENU */}
+                    {showMobileMenu && (
+                        <div className="md:hidden bg-blue-950 border-t border-blue-800">
+                            <div className="px-4 py-3 space-y-2">
+                                <Link
+                                    href="/my-account"
+                                    className="flex items-center justify-between px-3 py-2 rounded hover:bg-blue-800 hover:text-blue-400 transition-colors"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <User size={20} />
+                                        <span className="text-sm font-medium">Account</span>
+                                    </div>
+                                    <ChevronDown size={16} />
+                                </Link>
+
+                                <Link
+                                    href="/my-books"
+                                    className="flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-800 hover:text-blue-400 transition-colors"
+                                >
+                                    <Download size={20} />
+                                    <span className="text-sm font-medium">My Books</span>
+                                </Link>
+
+                                <Link
+                                    href="/advertise"
+                                    className="flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-800 hover:text-blue-400 transition-colors"
+                                >
+                                    <AlignEndVertical size={20} />
+                                    <span className="text-sm font-medium">Advertise With Us</span>
+                                </Link>
+
+                                <button
+                                    onClick={handleLogout}
+                                    className="flex items-center gap-2 w-full px-3 py-2 rounded text-red-400 hover:bg-red-800 hover:text-red-300 transition-colors"
+                                >
+                                    <LogOut size={20} />
+                                    <span className="text-sm font-medium">Logout</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
-
-                {showMobileMenu && (
-                    <div className="md:hidden bg-blue-900 border-t border-blue-800">
-                        <div className="px-4 py-3 space-y-2">
-                            <Link href="/my-account" className="flex items-center justify-between gap-2 px-3 py-2 rounded hover:bg-blue-800 hover:text-blue-400 transition-colors">
-                                <div className="flex items-center gap-2">
-                                    <User size={20} />
-                                    <span className="text-sm font-medium">Account</span>
-                                </div>
-                                <ChevronDown size={16} />
-                            </Link>
-
-                            <Link href="/my-books" className="flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-800 hover:text-blue-400 transition-colors">
-                                <Download size={20} />
-                                <span className="text-sm font-medium">My Books</span>
-                            </Link>
-
-                            <Link href="/advertise" className="flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-800 hover:text-blue-400 transition-colors">
-                                <Download size={20} />
-                                <span className="text-sm font-medium">Advertise</span>
-                            </Link>
-                            <button onClick={handleLogout} className="flex items-center gap-2 w-full px-3 py-2 rounded text-red-400 hover:bg-red-800 hover:text-red-300 transition-colors">
-                                <LogOut size={20} />
-                                <span className="text-sm font-medium">Logout</span>
-                            </button>
-                        </div>
-                    </div>
-                )}
             </header>
 
             {/* Categories Bar */}
@@ -280,9 +337,9 @@ export default function HomePage() {
                     </Link>
                 </div>
 
-                {/* Books Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {displayBooks.map((book) => (
+                {/* Books Grid - First 8 books */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+                    {displayBooks.slice(0, 8).map((book) => (
                         <div
                             key={book.id}
                             className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
@@ -353,6 +410,189 @@ export default function HomePage() {
                     ))}
                 </div>
 
+                {/* Carousel Section 1 - Featured Categories */}
+                <div className="mb-12 bg-gray-50 -mx-4 px-4 py-8">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Related to Your Interests</h3>
+                    <div className="overflow-x-auto scrollbar-hide">
+                        <div className="flex gap-4 pb-4">
+                            {displayBooks.slice(8, 14).map((book) => (
+                                <div
+                                    key={book.id}
+                                    className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                                >
+                                    <div className="relative">
+                                        <img
+                                            src={book.image}
+                                            alt={book.title}
+                                            className="w-full h-48 object-cover"
+                                        />
+                                        {isPurchased(book.id) && (
+                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                                                Owned
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="p-3">
+                                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
+                                            {book.title}
+                                        </h4>
+                                        <div className="flex text-yellow-400 text-xs mb-2">
+                                            {'★'.repeat(Math.floor(book.rating))}
+                                        </div>
+                                        <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
+
+                                        {isPurchased(book.id) ? (
+                                            <button
+                                                onClick={() => handleDownload(book)}
+                                                className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Download size={14} />
+                                                Download
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handlePurchase(book)}
+                                                className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Lock size={14} />
+                                                Purchase
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Books Grid - Middle section */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+                    {displayBooks.slice(14, 20).map((book) => (
+                        <div
+                            key={book.id}
+                            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                        >
+                            <div className="relative">
+                                <img
+                                    src={book.image}
+                                    alt={book.title}
+                                    className="w-full h-64 object-cover"
+                                />
+                                <div className="absolute top-3 right-3 flex flex-col gap-2">
+                                    <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
+                                        <FileText size={14} />
+                                        {book.format}
+                                    </span>
+                                    {isPurchased(book.id) && (
+                                        <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
+                                            <Download size={14} />
+                                            Owned
+                                        </span>
+                                    )}
+                                </div>
+                                {book.discount && (
+                                    <span className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold">
+                                        {book.discount}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="p-4">
+                                <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
+                                    {book.title}
+                                </h3>
+                                <p className="text-sm text-gray-600 mb-2">{book.author}</p>
+                                <p className="text-xs text-gray-500 mb-2">{book.pages} pages</p>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="flex text-yellow-400 text-sm">
+                                        {'★'.repeat(Math.floor(book.rating))}
+                                        {'☆'.repeat(5 - Math.floor(book.rating))}
+                                    </div>
+                                    <span className="text-sm text-gray-600">({book.reviews})</span>
+                                </div>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="text-xl font-bold text-gray-900">₦ {book.price.toLocaleString()}</span>
+                                    {book.oldPrice && (
+                                        <span className="text-sm text-gray-500 line-through">₦ {book.oldPrice.toLocaleString()}</span>
+                                    )}
+                                </div>
+
+                                {isPurchased(book.id) ? (
+                                    <button
+                                        onClick={() => handleDownload(book)}
+                                        className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <Download size={18} />
+                                        Download PDF
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => handlePurchase(book)}
+                                        className="w-full bg-blue-950 text-white py-2 rounded hover:bg-blue-900 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <Lock size={18} />
+                                        Purchase & Access
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Carousel Section 2 - Popular Picks */}
+                <div className="mb-12 bg-gray-50 -mx-4 px-4 py-8">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Popular Right Now</h3>
+                    <div className="overflow-x-auto scrollbar-hide">
+                        <div className="flex gap-4 pb-4">
+                            {displayBooks.slice(20, 25).map((book) => (
+                                <div
+                                    key={book.id}
+                                    className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                                >
+                                    <div className="relative">
+                                        <img
+                                            src={book.image}
+                                            alt={book.title}
+                                            className="w-full h-48 object-cover"
+                                        />
+                                        {isPurchased(book.id) && (
+                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                                                Owned
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="p-3">
+                                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
+                                            {book.title}
+                                        </h4>
+                                        <div className="flex text-yellow-400 text-xs mb-2">
+                                            {'★'.repeat(Math.floor(book.rating))}
+                                        </div>
+                                        <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
+
+                                        {isPurchased(book.id) ? (
+                                            <button
+                                                onClick={() => handleDownload(book)}
+                                                className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Download size={14} />
+                                                Download
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handlePurchase(book)}
+                                                className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Lock size={14} />
+                                                Purchase
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
                 {/* View All Books Button */}
                 <div className="text-center mt-12">
                     <Link
@@ -367,7 +607,7 @@ export default function HomePage() {
 
             {/* Purchase Modal */}
             {showPurchaseModal && selectedBook && (
-                <div className="fixed inset-0 bg-white/50 bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg max-w-md w-full p-6">
                         <div className="flex justify-between items-start mb-4">
                             <h3 className="text-xl font-bold text-gray-900">Purchase PDF Book</h3>
@@ -382,7 +622,7 @@ export default function HomePage() {
                                 alt={selectedBook.title}
                                 className="w-full h-48 object-cover rounded-lg mb-4"
                             />
-                            <h4 className="font-bold text-lg">{selectedBook.title}</h4>
+                            <h4 className="font-bold text-lg text-blue-950">{selectedBook.title}</h4>
                             <p className="text-gray-600">{selectedBook.author}</p>
                             <p className="text-2xl font-bold text-blue-950 mt-2">₦ {selectedBook.price.toLocaleString()}</p>
                         </div>
@@ -398,7 +638,7 @@ export default function HomePage() {
                             </div>
                         </div>
 
-                        <button 
+                        <button
                             onClick={handleProceedToPayment}
                             className="w-full bg-blue-950 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors font-semibold"
                         >
