@@ -149,7 +149,7 @@ export default function AuthSystem() {
                     break;
 
                 default:
-                    alert('Failed to sign in. Please check your credentials or try again later.');
+                    alert('Failed to sign in. Please create account to continue or try again later.');
             }
         } finally {
             setLoading(false);

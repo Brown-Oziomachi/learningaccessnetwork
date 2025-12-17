@@ -5,7 +5,7 @@
 
 "use client"
 import React, { useState, useEffect } from 'react';
-import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut, ArrowLeft } from 'lucide-react';
+import { Globe, Search, User, Menu, X,ArrowLeft, ChevronDown, Download, Lock, FileText, LogOut, AlignEndVertical } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -22,6 +22,8 @@ export default function CategoryPage() {
     const [selectedBook, setSelectedBook] = useState(null);
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
     const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
+        const [showMobileSearch, setShowMobileSearch] = useState(false);
+
     const [sortBy, setSortBy] = useState('popularity');
 
     // Category mapping
@@ -88,6 +90,13 @@ export default function CategoryPage() {
             return () => unsubscribe();
      }, [router]);
     
+     const handleSearch = () => {
+        if (searchQuery.trim()) {
+            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+            setShowMobileSearch(false); // hide mobile dropdown if open
+        }
+    };
+
     // Fetch purchased books from Firebase
     useEffect(() => {
         const fetchPurchasedBooks = async () => {
@@ -142,96 +151,186 @@ export default function CategoryPage() {
     return (
         <div className="min-h-screen bg-white">
             {/* Header */}
-            <header className="bg-blue-950 text-white sticky top-0 z-50 shadow-lg">
-                <div className="max-w-7xl mx-auto px-4 py-4">
-                    <div className="flex items-center justify-between gap-4">
+           <header className="bg-blue-950 text-white sticky top-0 z-50 shadow-lg ">
+                <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4">
+                    {/* TOP BAR */}
+                    <div className="flex items-center justify-between gap-2 sm:gap-4">
+                        {/* MOBILE MENU BUTTON */}
                         <button
-                            className="md:hidden"
-                            onClick={() => setShowMobileMenu(!showMobileMenu)}
+                            className="md:hidden p-2 hover:bg-blue-900 rounded-lg transition-colors"
+                            onClick={() => {
+                                setShowMobileMenu(!showMobileMenu);
+                                setShowMobileSearch(false);
+                            }}
+                            aria-label="Toggle menu"
                         >
                             {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
                         </button>
 
-                        <Link href="/home" className="flex items-center gap-2">
-                            <Globe className="w-8 h-8 text-white" />
-                            <h1 className="text-xl md:text-2xl font-bold">
-                                L <span className="text-blue-400">A N</span>
+                        {/* LOGO */}
+                        <a href="/home" className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                            <img
+                                src="/lan-logo.png"
+                                alt="LAN logo"
+                                className="w-8 h-8 sm:w-12 sm:h-12 lg:w-16 lg:h-16 object-contain"
+                            />
+                            <h1 className="text-xl sm:text-sm lg:text-base font-bold leading-tight">
+                                LEARNING <span className="text-blue-400 block sm:inline">ACCESS NETWORK</span>
                             </h1>
-                        </Link>
+                        </a>
 
-                        <div className="hidden md:flex flex-1 max-w-2xl">
+                        {/* MOBILE SEARCH ICON */}
+                        <button
+                            onClick={() => {
+                                setShowMobileSearch(!showMobileSearch);
+                                setShowMobileMenu(false);
+                            }}
+                            className="md:hidden p-2 hover:bg-blue-900 rounded-lg transition-colors"
+                            aria-label="Toggle search"
+                        >
+                            <Search size={22} />
+                        </button>
+
+                        {/* DESKTOP SEARCH */}
+                        <div className="hidden md:flex flex-1 max-w-md mx-4 lg:mx-8">
                             <div className="relative w-full">
                                 <input
                                     type="text"
-                                    placeholder="Search for PDF books, authors, categories..."
+                                    placeholder="Search PDF books..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full px-4 py-2 rounded-l-lg text-gray-900 focus:outline-none"
+                                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                                    className="w-full text-white px-4 py-2 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-400"
                                 />
-                                <button className="absolute right-0 top-0 bottom-0 bg-blue-600 hover:bg-blue-700 px-6 rounded-r-lg transition-colors">
+                                <button
+                                    onClick={handleSearch}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-950 hover:text-blue-700 transition-colors"
+                                    aria-label="Search"
+                                >
                                     <Search size={20} />
                                 </button>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-4">
-                            <Link href="/my-account" className="hidden md:flex items-center gap-2 hover:text-blue-400 transition-colors">
-                                <User size={20} />
-                                <span>Account</span>
-                                <ChevronDown size={16} />
-                            </Link>
+                        {/* DESKTOP ACTIONS */}
+                        <nav className="hidden md:flex items-center gap-2 lg:gap-4 flex-shrink-0">
+                            <a
+                                href="/my-account"
+                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
+                            >
+                                <User size={18} className="lg:w-5 lg:h-5" />
+                                <span className="hidden lg:inline">Account</span>
+                                <ChevronDown size={14} className="lg:w-4 lg:h-4" />
+                            </a>
 
-                            <Link href="/my-books" className="hidden md:flex items-center gap-2 hover:text-blue-400 transition-colors">
-                                <Download size={20} />
-                                <span>My Books</span>
-                            </Link>
+                            <a
+                                href="/my-books"
+                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
+                            >
+                                <Download size={18} className="lg:w-5 lg:h-5" />
+                                <span className="hidden lg:inline">My Books</span>
+                            </a>
 
-                            <button onClick={handleLogout} className="hidden md:flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors">
-                                <LogOut size={20} />
-                                <span>Logout</span>
+                            <a
+                                href="/advertise"
+                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base whitespace-nowrap"
+                            >
+                                <AlignEndVertical size={18} className="lg:w-5 lg:h-5" />
+                                <span className="hidden xl:inline">Advertise</span>
+                            </a>
+
+                            <button
+                                onClick={handleLogout}
+                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
+                            >
+                                <LogOut size={18} className="lg:w-5 lg:h-5" />
+                                <span className="hidden lg:inline">Logout</span>
                             </button>
-                        </div>
+                        </nav>
                     </div>
 
-                    <div className="md:hidden mt-4">
-                        <div className="relative">
-                            <input
-                                type="text"
-                                placeholder="Search PDF books..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full px-4 py-2 rounded-lg text-gray-900 focus:outline-none"
-                            />
-                            <button className="absolute right-2 top-2 text-blue-950">
-                                <Search size={20} />
-                            </button>
+                    {/* MOBILE SEARCH DROPDOWN */}
+                    {showMobileSearch && (
+                        <div className="mt-3 md:hidden animate-slideDown">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Search PDF books..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                                    className="w-full text-white px-4 py-2 pr-10 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    autoFocus
+                                />
+                                <button
+                                    onClick={handleSearch}
+                                    className="absolute right-2 t text-blue-950 hover:text-blue-700 transition-colors"
+                                    aria-label="Search"
+                                >
+                                    <Search size={20} />
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* MOBILE MENU */}
+                    {showMobileMenu && (
+                        <nav className="md:hidden mt-3 border-t border-blue-800 pt-3 animate-slideDown">
+                            <div className="space-y-1">
+                                <a
+                                    href="/my-account"
+                                    className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-blue-900 transition-colors"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <User size={20} />
+                                        <span className="text-sm font-medium">Account</span>
+                                    </div>
+                                    <ChevronDown size={16} />
+                                </a>
+
+                                <a
+                                    href="/my-books"
+                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900 transition-colors"
+                                >
+                                    <Download size={20} />
+                                    <span className="text-sm font-medium">My Books</span>
+                                </a>
+
+                                <a
+                                    href="/advertise"
+                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900 transition-colors"
+                                >
+                                    <AlignEndVertical size={20} />
+                                    <span className="text-sm font-medium">Advertise With Us</span>
+                                </a>
+
+                                <button
+                                    onClick={handleLogout}
+                                    className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
+                                >
+                                    <LogOut size={20} />
+                                    <span className="text-sm font-medium">Logout</span>
+                                </button>
+                            </div>
+                        </nav>
+                    )}
                 </div>
 
-                {showMobileMenu && (
-                    <div className="md:hidden bg-blue-900 border-t border-blue-800">
-                        <div className="px-4 py-3 space-y-2">
-                            <Link href="/my-account" className="flex items-center justify-between gap-2 px-3 py-2 rounded hover:bg-blue-800 hover:text-blue-400 transition-colors">
-                                <div className="flex items-center gap-2">
-                                    <User size={20} />
-                                    <span className="text-sm font-medium">Account</span>
-                                </div>
-                                <ChevronDown size={16} />
-                            </Link>
-
-                            <Link href="/my-books" className="flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-800 hover:text-blue-400 transition-colors">
-                                <Download size={20} />
-                                <span className="text-sm font-medium">My Books</span>
-                            </Link>
-
-                            <button onClick={handleLogout} className="flex items-center gap-2 w-full px-3 py-2 rounded text-red-400 hover:bg-red-800 hover:text-red-300 transition-colors">
-                                <LogOut size={20} />
-                                <span className="text-sm font-medium">Logout</span>
-                            </button>
-                        </div>
-                    </div>
-                )}
+                <style jsx>{`
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-slideDown {
+          animation: slideDown 0.2s ease-out;
+        }
+      `}</style>
             </header>
 
             {/* Categories Bar */}

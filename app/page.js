@@ -46,18 +46,18 @@ export default function LearningAccessNetwork() {
               }}
             />
             {/* Dark overlay for better text readability */}
-            <div className="absolute inset-0 bg-black/60" />
+            <div className="absolute inset-0 " />
           </motion.div>
         </AnimatePresence>
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col min-h-screen">
+      <div className="relative z-10 flex flex-col min-h-screen bg-black/0">
         {/* Header */}
         <header className="pt-8 px-4 md:pt-12">
           <h1 className="text-center text-3xl md:text-5xl font-bold">
-            <span className="text-white">LEARNING </span>
-            <span className="text-blue-900 font-black">ACCESS NETWORK</span>
+            <span className="text-white bg-blue-950 px-2">LEARNING </span>
+            <span className="text-blue-900 font-black ml-3">ACCESS NETWORK</span>
           </h1>
         </header>
 
@@ -94,7 +94,7 @@ export default function LearningAccessNetwork() {
               className="bg-blue-950/90 backdrop-blur-sm text-white p-6 md:p-8 rounded-lg shadow-2xl"
             >
               <p className="text-base md:text-lg leading-relaxed">
-                Learning Access Network is a digital platform designed to make knowledge easily accessible to everyone.
+                <span className="bg-white text-blue-950 px-2"> Learning Access Network</span> is a digital platform designed to make knowledge easily accessible to everyone.
                 The website allows users to discover, read, and purchase books across various categories,
                 including education, personal development, business, technology, and more.
               </p>

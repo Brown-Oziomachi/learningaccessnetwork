@@ -162,7 +162,7 @@ export default function AllBooksPage() {
                             {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
                         </button>
 
-                        <Link href="/home" className="flex items-center gap-2">
+                        <Link href="/" className="flex items-center gap-2">
                             <img src="/lan-logo.png" alt="lan logo" className="lg:w-20 lg:h-20 max-lg:w-10 max-lg:h-10" />
                             <h1 className="max-md:text-sm font-bold">
                                 LEARNING <span className="text-blue-400">ACCESS NETWORK</span>
@@ -287,11 +287,11 @@ export default function AllBooksPage() {
                             </button>
 
                             <div className={`${showFilters ? 'block' : 'hidden'} md:flex items-center gap-3 w-full md:w-auto`}>
-                                <label className="text-sm font-semibold text-gray-700">Category:</label>
+                                <label className="text-sm font-semibold text-blue-950">Category:</label>
                                 <select
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-950"
+                                    className="border text-blue-950 border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-950"
                                 >
                                     {categories.map(cat => (
                                         <option key={cat.value} value={cat.value}>
@@ -312,7 +312,7 @@ export default function AllBooksPage() {
                                 <select
                                     value={sortBy}
                                     onChange={(e) => setSortBy(e.target.value)}
-                                    className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-950"
+                                    className="border text-blue-950 border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-950"
                                 >
                                     <option value="popularity">Popularity</option>
                                     <option value="price-low">Price: Low to High</option>
