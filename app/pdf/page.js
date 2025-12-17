@@ -716,7 +716,11 @@ export default function AllBooksPage() {
                             />
                             <h4 className="font-bold text-lg text-blue-950">{selectedBook.title}</h4>
                             <p className="text-gray-600">{selectedBook.author}</p>
+                            <p className="text-xs text-gray-500 mb-1 mt-1">{selectedBook.pages} pages</p>
+
                             <p className="text-2xl font-bold text-blue-950 mt-2">₦ {selectedBook.price.toLocaleString()}</p>
+                            <p className="text-xs text-gray-500 mb-1 mt-3">{selectedBook.description}</p>
+
                         </div>
 
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">

@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { booksData } from "@/lib/booksData";
 import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import BrowseMegaMenu from '@/components/BrowseMegaMenu';
 
 export default function HomePage() {
     const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -24,7 +25,8 @@ export default function HomePage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [showMobileSearch, setShowMobileSearch] = useState(false);
     const router = useRouter();
-
+    const [isBrowseOpen, setIsBrowseOpen] = useState(false);
+    const [isAccountOpen, setIsAccountOpen] = useState(false);
     // Get first 25 books for home page
     const displayBooks = booksData.slice(0, 25);
 
@@ -49,7 +51,7 @@ export default function HomePage() {
             }
             setTimeout(() => {
                 setLoading(false);
-            }, 2000);
+            }, 1000);
         });
 
         return () => unsubscribe();
@@ -129,16 +131,16 @@ export default function HomePage() {
     };
 
 
-    if (loading || !user) {
-        return (
-            <div className="min-h-screen bg-blue-950 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-50 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading Learning Access Network...</p>
-                </div>
-            </div>
-        );
-    }
+    // if (loading || !user) {
+    //     return (
+    //         <div className="min-h-screen bg-blue-950 flex items-center justify-center">
+    //             <div className="text-center">
+    //                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-50 mx-auto"></div>
+    //                 <p className="mt-4 text-gray-600">Loading Learning Access Network...</p>
+    //             </div>
+    //         </div>
+    //     );
+    // }
 
     return (
         <div className="min-h-screen bg-white">
@@ -238,6 +240,7 @@ export default function HomePage() {
                                 <LogOut size={18} className="lg:w-5 lg:h-5" />
                                 <span className="hidden lg:inline">Logout</span>
                             </button>
+                            
                         </nav>
                     </div>
 
@@ -269,40 +272,67 @@ export default function HomePage() {
                     {showMobileMenu && (
                         <nav className="md:hidden mt-3 border-t border-blue-800 pt-3 animate-slideDown">
                             <div className="space-y-1">
-                                <a
-                                    href="/my-account"
-                                    className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-blue-900 transition-colors"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <User size={20} />
-                                        <span className="text-sm font-medium">Account</span>
-                                    </div>
-                                    <ChevronDown size={16} />
-                                </a>
 
-                                <a
-                                    href="/my-books"
-                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900 transition-colors"
-                                >
-                                    <Download size={20} />
-                                    <span className="text-sm font-medium">My Books</span>
-                                </a>
+                                {/* Browse Dropdown */}
+                                <div>
+                                    <button
+                                        onClick={() => setIsBrowseOpen(!isBrowseOpen)}
+                                        className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-blue-900 transition-colors"
+                                    >
+                                        <AlignEndVertical size={20} />
+                                        <span className="text-sm font-medium">Browse</span>
+                                        <ChevronDown
+                                            size={16}
+                                            className={`ml-auto transition-transform ${isBrowseOpen ? "rotate-180" : "rotate-0"}`}
+                                        />
+                                    </button>
 
-                                <a
-                                    href="/advertise"
-                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900 transition-colors"
-                                >
-                                    <AlignEndVertical size={20} />
-                                    <span className="text-sm font-medium">Advertise With Us</span>
-                                </a>
+                                    {isBrowseOpen && (
+                                        <div className="mt-1 ml-6 space-y-1">
+                                            <BrowseMegaMenu /> {/* Your dropdown items */}
+                                        </div>
+                                    )}
+                                </div>
 
-                                <button
-                                    onClick={handleLogout}
-                                    className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
-                                >
-                                    <LogOut size={20} />
-                                    <span className="text-sm font-medium">Logout</span>
-                                </button>
+                                {/* Account Dropdown */}
+                                <div>
+                                    <button
+                                        onClick={() => setIsAccountOpen(!isAccountOpen)}
+                                        className="flex items-center justify-between w-full px-3 py-2.5 rounded-lg hover:bg-blue-900 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <User size={20} />
+                                            <span className="text-sm font-medium">Account</span>
+                                        </div>
+                                        <ChevronDown
+                                            size={16}
+                                            className={`transition-transform ${isAccountOpen ? "rotate-180" : "rotate-0"}`}
+                                        />
+                                    </button>
+
+                                    {isAccountOpen && (
+                                        <div className="mt-1 ml-6 space-y-1">
+                                            <a href="/my-books" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-900 transition-colors">
+                                                <Download size={20} />
+                                                <span className="text-sm font-medium">My Books</span>
+                                            </a>
+
+                                            <a href="/advertise" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-900 transition-colors">
+                                                <AlignEndVertical size={20} />
+                                                <span className="text-sm font-medium">Advertise With Us</span>
+                                            </a>
+
+                                            <button
+                                                onClick={handleLogout}
+                                                className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
+                                            >
+                                                <LogOut size={20} />
+                                                <span className="text-sm font-medium">Logout</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
                             </div>
                         </nav>
                     )}
@@ -682,7 +712,7 @@ export default function HomePage() {
 
             {/* Purchase Modal */}
             {showPurchaseModal && selectedBook && (
-                <div className="fixed inset-0 bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 max-md:bg-white lg:bg-black/80 max-lg:bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg max-w-md w-full p-6">
                         <div className="flex justify-between items-start mb-4">
                             <h3 className="text-xl font-bold text-gray-900">Purchase PDF Book</h3>
@@ -707,7 +737,10 @@ export default function HomePage() {
                             </div>
                                 <p className="text-xs text-gray-500 mb-2">{selectedBook.pages} pages</p>
                         </div>
+                        <div>
+                            <p className="text-xs text-gray-500 mb-2">{selectedBook.description} pages</p>
 
+                        </div>
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                             <div className="flex items-start gap-3">
                                 <FileText className="w-5 h-5 text-blue-950 mt-1" />
@@ -745,10 +778,10 @@ export default function HomePage() {
                         <div>
                             <h4 className="font-bold mb-4">Quick Links</h4>
                             <ul className="space-y-2 text-sm">
-                                <li><Link href="/about" className="text-gray-300 hover:text-white">About Us</Link></li>
-                                <li><Link href="/how-it-works" className="text-gray-300 hover:text-white">How It Works</Link></li>
-                                <li><Link href="/faq" className="text-gray-300 hover:text-white">FAQs</Link></li>
-                                <li><Link href="/contact" className="text-gray-300 hover:text-white">Contact</Link></li>
+                                <li><Link href="/about/lan" className="text-gray-300 hover:text-white">About Us</Link></li>
+                                <li><Link href="/lan/explains/how-it-works" className="text-gray-300 hover:text-white">How It Works</Link></li>
+                                <li><Link href="/lan/faqs" className="text-gray-300 hover:text-white">FAQs</Link></li>
+                                <li><Link href="/contact/lan/4/enquiry" className="text-gray-300 hover:text-white">Contact</Link></li>
                             </ul>
                         </div>
                         <div>
@@ -765,7 +798,7 @@ export default function HomePage() {
                             <ul className="space-y-2 text-sm">
                                 <li><Link href="/my-account" className="text-gray-300 hover:text-white">My Account</Link></li>
                                 <li><Link href="/my-books" className="text-gray-300 hover:text-white">My Books</Link></li>
-                                <li><Link href="/help" className="text-gray-300 hover:text-white">Help Center</Link></li>
+                                <li><Link href="/lan/net/help-center" className="text-gray-300 hover:text-white">Help Center</Link></li>
                             </ul>
                         </div>
                     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Globe } from 'lucide-react';
 import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { db, auth } from '@/lib/firebaseConfig';
 import { sendPasswordResetEmail, fetchSignInMethodsForEmail } from 'firebase/auth';
 import Link from 'next/link';
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function AuthSystem() {
     const router = useRouter();
@@ -16,7 +17,6 @@ export default function AuthSystem() {
     const [loading, setLoading] = useState(false);
     const [showAccountNotFoundModal, setShowAccountNotFoundModal] = useState(false);
     const [notFoundEmail, setNotFoundEmail] = useState('');
-
     const [formData, setFormData] = useState({
         firstName: '',
         surname: '',
@@ -157,6 +157,18 @@ export default function AuthSystem() {
     };
 
 
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                router.replace("/home"); // Redirect if already logged in
+            } else {
+                setLoading(false); // Show login form
+            }
+        });
+
+        return () => unsubscribe(); // Cleanup
+    }, [router]);
+
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
         setErrors({});
@@ -231,6 +243,14 @@ export default function AuthSystem() {
         animate: { opacity: 1, x: 0 },
         exit: { opacity: 0, x: -20 }
     };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <p>Loading...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-white flex flex-col">

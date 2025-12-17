@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebaseConfig';
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function FindAccountPage() {
     const router = useRouter();
@@ -21,7 +22,19 @@ export default function FindAccountPage() {
     const [showAccountNotFoundModal, setShowAccountNotFoundModal] = useState(false);
     const [accounts, setAccounts] = useState([]);
     const [showAccountList, setShowAccountList] = useState(false);
-
+    
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+          if (user) {
+            router.replace("/home"); // Redirect if already logged in
+          } else {
+            setLoading(false); // Show login form
+          }
+        });
+    
+        return () => unsubscribe(); // Cleanup
+    }, [router]);
+    
     // STEP 1: FIND ACCOUNT in Firestore by email or name
   const handleFindAccount = async () => {
     if (!searchInput.trim()) {
@@ -103,6 +116,14 @@ export default function FindAccountPage() {
             setLoading(false);
         }
     };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <p>Loading...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-white flex flex-col">

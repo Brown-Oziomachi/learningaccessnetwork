@@ -206,6 +206,44 @@ export default function PaymentClient() {
         }
     };
 
+    useEffect(() => {
+        if (document.getElementById("paypal-sdk")) return;
+
+        const script = document.createElement("script");
+        script.id = "paypal-sdk";
+        script.src =
+            "https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=USD";
+        script.async = true;
+        document.body.appendChild(script);
+    }, []);
+
+    
+    useEffect(() => {
+  if (paymentMethod !== "paypal") return;
+  if (!window.paypal || !book) return;
+
+  document.getElementById("paypal-button-container").innerHTML = "";
+
+  window.paypal.Buttons({
+    createOrder: (data, actions) =>
+      actions.order.create({
+        purchase_units: [
+          {
+            amount: {
+              value: (book.price / 1500).toFixed(2),
+            },
+          },
+        ],
+      }),
+
+    onApprove: async (data, actions) => {
+      const details = await actions.order.capture();
+      handlePaymentSuccess(details);
+    },
+  }).render("#paypal-button-container");
+}, [paymentMethod, book]);
+
+    
     const handlePaymentSuccess = async (paymentDetails) => {
         const userEmail = formData.email || auth.currentUser?.email;
         
@@ -337,7 +375,7 @@ export default function PaymentClient() {
                         </button>
 
                         {/* LOGO */}
-                        <a href="/" className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                        <a href="/home" className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                             <img
                                 src="/lan-logo.png"
                                 alt="LAN logo"
@@ -638,6 +676,8 @@ export default function PaymentClient() {
                                 <h4 className="font-bold text-gray-900">{book.title}</h4>
                                 <p className="text-sm text-gray-600">{book.author}</p>
                                 <p className="text-xs text-gray-500 mt-1">{book.pages} pages • {book.format}</p>
+                                <p className="text-xs text-gray-500 mb-2 mt-2">{book.description} pages</p>
+
                             </div>
 
                             <div className="border-t border-gray-200 pt-4 space-y-3">
@@ -658,7 +698,7 @@ export default function PaymentClient() {
                                     </div>
                                 )}
                                 <div className="border-t border-gray-200 pt-3 flex justify-between text-lg font-bold">
-                                    <span>Total</span>
+                                    <span className='text-gray-600'>Total</span>
                                     <span className="text-blue-950">₦ {book.price.toLocaleString()}</span>
                                 </div>
                             </div>

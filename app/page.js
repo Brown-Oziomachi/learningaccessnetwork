@@ -3,9 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/lib/firebaseConfig";
 
 export default function LearningAccessNetwork() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
 
   const bookImages = [
     '/image1.png',
@@ -17,6 +22,18 @@ export default function LearningAccessNetwork() {
   ];
 
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.replace("/home"); // Redirect if already logged in
+      } else {
+        setLoading(false); // Show login form
+      }
+    });
+
+    return () => unsubscribe(); // Cleanup
+  }, [router]);
+
+  useEffect(() => {
     const interval = setInterval(() => {
       setCurrentImageIndex((prevIndex) =>
         prevIndex === bookImages.length - 1 ? 0 : prevIndex + 1
@@ -26,6 +43,13 @@ export default function LearningAccessNetwork() {
     return () => clearInterval(interval);
   }, [bookImages.length]);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
       {/* Background Carousel */}
@@ -57,7 +81,7 @@ export default function LearningAccessNetwork() {
         <header className="pt-8 px-4 md:pt-12">
           <h1 className="text-center text-3xl md:text-5xl font-bold">
             <span className="text-white bg-blue-950 px-2">LEARNING </span>
-            <span className="text-blue-900 font-black ml-3">ACCESS NETWORK</span>
+            <span className="text-blue-900 max-md:font-black ml-1 lg:bg-white">ACCESS NETWORK</span>
           </h1>
         </header>
 
@@ -133,6 +157,27 @@ export default function LearningAccessNetwork() {
               ADVERTISE WITH US
             </Link>
           </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 0 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+            className='items-center justify-center flex gap-6 mt-5 right-0'>
+            <Link href="/joins/lan-faqs">
+              <button
+                className="text-blue-950 hover:underline mb-12"
+              >
+                FAQ?
+              </button>
+            </Link>
+            <Link href="/joins/how-it-works">
+              <button
+                className="text-blue-950 hover:underline mb-12"
+              >
+                How it works?
+              </button>
+            </Link>
+          </motion.div>
         </footer>
 
         {/* Carousel Indicators */}
@@ -142,8 +187,8 @@ export default function LearningAccessNetwork() {
               key={index}
               onClick={() => setCurrentImageIndex(index)}
               className={`w-2 h-2 rounded-full transition-all duration-300 ${index === currentImageIndex
-                  ? 'bg-white w-8'
-                  : 'bg-white/50 hover:bg-white/75'
+                ? 'bg-white w-8'
+                : 'bg-white/50 hover:bg-white/75'
                 }`}
               aria-label={`Go to slide ${index + 1}`}
             />
