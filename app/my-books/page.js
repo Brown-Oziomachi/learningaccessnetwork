@@ -22,6 +22,7 @@ export default function MyBooksPage() {
     const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
     const [showMobileSearch, setShowMobileSearch] = useState(false);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
+    const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -150,6 +151,11 @@ export default function MyBooksPage() {
 
     const isPurchased = (bookId) => {
         return purchasedBookIds.has(bookId);
+    };
+
+ const handlePurchase = (book) => {
+        setSelectedBook(book);
+        setShowPurchaseModal(true);
     };
 
     const handlePurchaseRelatedBook = (book) => {
@@ -355,22 +361,61 @@ export default function MyBooksPage() {
                                 </>
                             )}
 
-                            {/* Show related books from booksData if no relatedDocs */}
-                            {(!selectedBook.relatedDocs || selectedBook.relatedDocs.length === 0) && getRelatedBooks(selectedBook).length > 0 && (
-                                <>
-                                    <h3 className="font-bold mb-3">Related documents</h3>
-                                    <div className="space-y-3 mb-6">
-                                        {getRelatedBooks(selectedBook).slice(0, 3).map((relatedBook) => (
-                                            <div key={relatedBook.id} className="flex gap-3">
-                                                <img src={relatedBook.image} alt={relatedBook.title} className="w-16 h-20 object-cover rounded" />
-                                                <div className="flex-1">
-                                                    <p className="text-sm font-medium line-clamp-2">{relatedBook.title}</p>
-                                                </div>
-                                            </div>
-                                        ))}
+                            {/* Show related books for overview */}
+{/*                             
+                         <div className=" bg-gray-50 -mx-4 px-1 py-8">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Related to Your Interests</h3>
+                    <div className="overflow-x-auto scrollbar-hide p-1">
+                        <div className="flex gap-2 pb-4">
+                            {displayBooks.slice(8, 14).map((book) => (
+                                <div
+                                    key={book.id}
+                                    className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                                >
+                                    <div className="relative">
+                                        <img
+                                            src={book.image}
+                                            alt={book.title}
+                                            className="w-full h-48 object-cover"
+                                        />
+                                        {isPurchased(book.id) && (
+                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                                                Owned
+                                            </span>
+                                        )}
                                     </div>
-                                </>
-                            )}
+                                    <div className="p-3">
+                                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
+                                            {book.title}
+                                        </h4>
+                                        <div className="flex text-yellow-400 text-xs mb-2">
+                                            {'★'.repeat(Math.floor(book.rating))}
+                                        </div>
+                                        <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
+
+                                        {isPurchased(book.id) ? (
+                                            <button
+                                                onClick={() => handleDownload(book)}
+                                                className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Download size={14} />
+                                                Download
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handlePurchase(book)}
+                                                className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Lock size={14} />
+                                                Purchase
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div> */}
 
                             <h3 className="font-bold mb-2">Available Formats</h3>
                             <p className="text-sm text-gray-600 mb-6">Download as PDF, TXT or read online</p>
@@ -625,6 +670,14 @@ export default function MyBooksPage() {
                                 <span className="hidden lg:inline">My Books</span>
                             </a>
 
+                              <a
+                                href="/saved-my-book"
+                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
+                            >
+                                <User size={18} className="lg:w-5 lg:h-5" />
+                                <span className=" lg:inline">Saved</span>
+                            </a>
+                            
                             <a
                                 href="/advertise"
                                 className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base whitespace-nowrap"

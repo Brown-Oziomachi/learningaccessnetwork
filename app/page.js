@@ -163,11 +163,11 @@ export default function LearningAccessNetwork() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
             className='items-center justify-center flex gap-6 mt-5 right-0'>
-            <Link href="/joins/lan-faqs">
+            <Link href="/lan/net/help-center">
               <button
                 className="text-blue-950 hover:underline mb-12"
               >
-                FAQ?
+                Help Center?
               </button>
             </Link>
             <Link href="/joins/how-it-works">

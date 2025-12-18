@@ -1,17 +1,13 @@
-// ===========================
-// FILE: app/page.jsx (HomePage)
-// UPDATED WITH AMAZON-LIKE CAROUSEL LAYOUT
-// ===========================
 
 "use client"
 import React, { useState, useEffect } from 'react';
-import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut, AlignEndVertical } from 'lucide-react';
+import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut, AlignEndVertical,MoreVertical, Bookmark, Share2, Flag } from 'lucide-react';
 import Link from 'next/link';
 import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
 import { useRouter } from "next/navigation";
 import { booksData } from "@/lib/booksData";
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc  } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import BrowseMegaMenu from '@/components/BrowseMegaMenu';
 
@@ -27,7 +23,8 @@ export default function HomePage() {
     const router = useRouter();
     const [isBrowseOpen, setIsBrowseOpen] = useState(false);
     const [isAccountOpen, setIsAccountOpen] = useState(false);
-    // Get first 25 books for home page
+    const [showBookMenu, setShowBookMenu] = useState(false);
+    const [savedBooks, setSavedBooks] = useState(new Set());
     const displayBooks = booksData.slice(0, 25);
 
     const categories = [
@@ -57,6 +54,87 @@ export default function HomePage() {
         return () => unsubscribe();
     }, [router]);
 
+
+    useEffect(() => {
+    const loadSavedBooks = async () => {
+        try {
+            const user = auth.currentUser;
+            if (user) {
+                const userDocRef = doc(db, 'users', user.uid);
+                const userDoc = await getDoc(userDocRef);
+                
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    const saved = userData.savedBooks || [];
+                    setSavedBooks(new Set(saved.map(book => book.id)));
+                }
+            }
+        } catch (error) {
+            console.error('Error loading saved books:', error);
+        }
+    };
+    
+    if (user) {
+        loadSavedBooks();
+    }
+}, [user]);
+
+
+// Add this function to handle save/unsave
+const handleSaveBook = async (book) => {
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            alert('Please sign in to save books');
+            return;
+        }
+
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        let savedBooksArray = [];
+        if (userDoc.exists()) {
+            const userData = userDoc.data();
+            savedBooksArray = userData.savedBooks || [];
+        }
+
+        const isCurrentlySaved = savedBooks.has(book.id);
+        
+        if (isCurrentlySaved) {
+            // Remove from saved
+            savedBooksArray = savedBooksArray.filter(b => b.id !== book.id);
+            setSavedBooks(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(book.id);
+                return newSet;
+            });
+            alert('Removed from Saved');
+        } else {
+            // Add to saved
+            const bookToSave = {
+                id: book.id,
+                title: book.title,
+                author: book.author,
+                image: book.image,
+                price: book.price,
+                category: book.category,
+                savedAt: new Date().toISOString()
+            };
+            savedBooksArray.push(bookToSave);
+            setSavedBooks(prev => new Set(prev).add(book.id));
+            alert('Saved for later!');
+        }
+
+        await updateDoc(userDocRef, {
+            savedBooks: savedBooksArray
+        });
+        
+        setShowBookMenu(false);
+    } catch (error) {
+        console.error('Error saving book:', error);
+        alert('Error saving book. Please try again.');
+    }
+};
 
     // inside your Header component
 
@@ -130,18 +208,6 @@ export default function HomePage() {
         return purchasedBookIds.has(bookId);
     };
 
-
-    // if (loading || !user) {
-    //     return (
-    //         <div className="min-h-screen bg-blue-950 flex items-center justify-center">
-    //             <div className="text-center">
-    //                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-50 mx-auto"></div>
-    //                 <p className="mt-4 text-gray-600">Loading Learning Access Network...</p>
-    //             </div>
-    //         </div>
-    //     );
-    // }
-
     return (
         <div className="min-h-screen bg-white">
             {/* Header */}
@@ -163,11 +229,11 @@ export default function HomePage() {
 
                         {/* LOGO */}
                         <a href="/home" className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                            <img
+                            {/* <img
                                 src="/lan-logo.png"
                                 alt="LAN logo"
                                 className="w-8 h-8 sm:w-12 sm:h-12 lg:w-16 lg:h-16 object-contain"
-                            />
+                            /> */}
                             <h1 className="text-xl sm:text-sm lg:text-base font-bold leading-tight">
                                 LEARNING <span className="text-blue-400 block sm:inline">ACCESS NETWORK</span>
                             </h1>
@@ -231,6 +297,14 @@ export default function HomePage() {
                             >
                                 <AlignEndVertical size={18} className="lg:w-5 lg:h-5" />
                                 <span className="hidden xl:inline">Advertise</span>
+                            </a>
+                            
+                            <a
+                                href="/saved-my-book"
+                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
+                            >
+                                <User size={18} className="lg:w-5 lg:h-5" />
+                                <span className=" lg:inline">Saved</span>
                             </a>
 
                             <button
@@ -315,6 +389,21 @@ export default function HomePage() {
                                             <a href="/my-books" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-900 transition-colors">
                                                 <Download size={20} />
                                                 <span className="text-sm font-medium">My Books</span>
+                                            </a>
+                                            <a
+                                                href="/my-account"
+                                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
+                                            >
+                                                <User size={18} className="lg:w-5 lg:h-5" />
+                                                <span className=" lg:inline">My Account</span>
+                                            </a>
+
+                                               <a
+                                                href="/saved-my-book"
+                                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
+                                            >
+                                                <User size={18} className="lg:w-5 lg:h-5" />
+                                                <span className=" lg:inline">Saved</span>
                                             </a>
 
                                             <a href="/advertise" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-900 transition-colors">
@@ -425,101 +514,64 @@ export default function HomePage() {
                 </div>
 
                 {/* Books Grid - First 8 books */}
-           <div
-            className="
-                flex gap-1 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide
-                sm:gap-6
-                lg:grid lg:grid-cols-3 xl:grid-cols-4
-                lg:overflow-x-visible lg:snap-none
-                mb-12
-            "
-  style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
->
-  {displayBooks.slice(0, 6).map((book) => (
-    <div
-      key={book.id}
-      className="
-        flex-none snap-start
-        w-[160px] sm:w-[180px] lg:w-auto
-        bg-white border border-gray-200 rounded-lg
-        overflow-hidden hover:shadow-lg transition-shadow
-      "
-    >
-      <div className="relative">
-        <img
-          src={book.image}
-          alt={book.title}
-          className="w-full h-50 object-cover"
-        />
+         <div className=" bg-gray-50 -mx-4 px-1 py-8">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Related to Your Interests</h3>
+                    <div className="overflow-x-auto scrollbar-hide p-1">
+                        <div className="flex gap-2 pb-4">
+                            {displayBooks.slice(8, 14).map((book) => (
+                                <div
+                                    key={book.id}
+                                    className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                                >
+                                    <div className="relative">
+                                        <img
+                                            src={book.image}
+                                            alt={book.title}
+                                            className="w-full h-48 object-cover"
+                                        />
+                                        {isPurchased(book.id) && (
+                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                                                Owned
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="p-3">
+                                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
+                                            {book.title}
+                                        </h4>
+                                        <div className="flex text-yellow-400 text-xs mb-2">
+                                            {'★'.repeat(Math.floor(book.rating))}
+                                        </div>
+                                        <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
 
-        <div className="absolute top-3 right-3 flex flex-col gap-2">
-          <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
-            <FileText size={14} />
-            {book.format}
-          </span>
-
-          {isPurchased(book.id) && (
-            <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
-              <Download size={14} />
-              Owned
-            </span>
-          )}
-        </div>
-
-        {book.discount && (
-          <span className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold">
-            {book.discount}
-          </span>
-        )}
-      </div>
-
-      <div className="p-4">
-        <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
-          {book.title}
-        </h3>
-
-        <p className="text-sm text-gray-600 mb-2">{book.author}</p>
-
-        <div className="flex items-center gap-2 mb-2">
-          <div className="flex text-yellow-400 text-sm">
-            {"★".repeat(Math.floor(book.rating))}
-            {"☆".repeat(5 - Math.floor(book.rating))}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-xl font-bold text-gray-900">
-            ₦ {book.price.toLocaleString()}
-          </span>
-        </div>
-
-        {isPurchased(book.id) ? (
-          <button
-            onClick={() => handleDownload(book)}
-            className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-          >
-            <Download size={18} />
-            Download PDF
-          </button>
-        ) : (
-          <button
-            onClick={() => handlePurchase(book)}
-            className="w-full bg-blue-950 text-white py-2 rounded hover:bg-blue-900 transition-colors flex items-center justify-center gap-2"
-          >
-            <Lock size={18} />
-            Purchase
-          </button>
-        )}
-      </div>
-    </div>
-  ))}
- </div>
+                                        {isPurchased(book.id) ? (
+                                            <button
+                                                onClick={() => handleDownload(book)}
+                                                className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Download size={14} />
+                                                Download
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handlePurchase(book)}
+                                                className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Lock size={14} />
+                                                Purchase
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
 
                 {/* Carousel Section 1 - Featured Categories */}
-                <div className="mb-12 bg-gray-50 -mx-4 px-1 py-8">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Related to Your Interests</h3>
-                    <div className="overflow-x-auto scrollbar-hide">
-                        <div className="flex gap-4 pb-4">
+                <div className=" bg-gray-50 -mx-4 px-1 py-4 ">
+                    <div className="overflow-x-auto scrollbar-hide p-1">
+                        <div className="flex gap-2 pb-4">
                             {displayBooks.slice(8, 14).map((book) => (
                                 <div
                                     key={book.id}
@@ -571,83 +623,65 @@ export default function HomePage() {
                 </div>
 
                 {/* Books Grid - Middle section */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
-                    {displayBooks.slice(14, 20).map((book) => (
-                        <div
-                            key={book.id}
-                            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                        >
-                            <div className="relative">
-                                <img
-                                    src={book.image}
-                                    alt={book.title}
-                                    className="w-full h-64 object-cover"
-                                />
-                                <div className="absolute top-3 right-3 flex flex-col gap-2">
-                                    <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
-                                        <FileText size={14} />
-                                        {book.format}
-                                    </span>
-                                    {isPurchased(book.id) && (
-                                        <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
-                                            <Download size={14} />
-                                            Owned
-                                        </span>
-                                    )}
-                                </div>
-                                {book.discount && (
-                                    <span className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold">
-                                        {book.discount}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="p-4">
-                                <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
-                                    {book.title}
-                                </h3>
-                                <p className="text-sm text-gray-600 mb-2">{book.author}</p>
-                                <p className="text-xs text-gray-500 mb-2">{book.pages} pages</p>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className="flex text-yellow-400 text-sm">
-                                        {'★'.repeat(Math.floor(book.rating))}
-                                        {'☆'.repeat(5 - Math.floor(book.rating))}
+              <div className="mb-12 bg-gray-50 -mx-4 px-1 py-8">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Related to Your Interests</h3>
+                    <div className="overflow-x-auto scrollbar-hide p-1">
+                        <div className="flex gap-2 pb-4">
+                            {displayBooks.slice(8, 14).map((book) => (
+                                <div
+                                    key={book.id}
+                                    className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                                >
+                                    <div className="relative">
+                                        <img
+                                            src={book.image}
+                                            alt={book.title}
+                                            className="w-full h-48 object-cover"
+                                        />
+                                        {isPurchased(book.id) && (
+                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                                                Owned
+                                            </span>
+                                        )}
                                     </div>
-                                    <span className="text-sm text-gray-600">({book.reviews})</span>
-                                </div>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="text-xl font-bold text-gray-900">₦ {book.price.toLocaleString()}</span>
-                                    {book.oldPrice && (
-                                        <span className="text-sm text-gray-500 line-through">₦ {book.oldPrice.toLocaleString()}</span>
-                                    )}
-                                </div>
+                                    <div className="p-3">
+                                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
+                                            {book.title}
+                                        </h4>
+                                        <div className="flex text-yellow-400 text-xs mb-2">
+                                            {'★'.repeat(Math.floor(book.rating))}
+                                        </div>
+                                        <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
 
-                                {isPurchased(book.id) ? (
-                                    <button
-                                        onClick={() => handleDownload(book)}
-                                        className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <Download size={18} />
-                                        Download PDF
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={() => handlePurchase(book)}
-                                        className="w-full bg-blue-950 text-white py-2 rounded hover:bg-blue-900 transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <Lock size={18} />
-                                        Purchase & Access
-                                    </button>
-                                )}
-                            </div>
+                                        {isPurchased(book.id) ? (
+                                            <button
+                                                onClick={() => handleDownload(book)}
+                                                className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Download size={14} />
+                                                Download
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handlePurchase(book)}
+                                                className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Lock size={14} />
+                                                Purchase
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    ))}
+                    </div>
                 </div>
 
                 {/* Carousel Section 2 - Popular Picks */}
                 <div className="mb-12 bg-gray-50 -mx-4 px-4 py-8">
                     <h3 className="text-2xl font-bold text-gray-900 mb-4">Popular Right Now</h3>
-                    <div className="overflow-x-auto scrollbar-hide">
-                        <div className="flex gap-4 pb-4">
+                    <div className="overflow-x-auto scrollbar-hide p-1">
+                        <div className="flex gap-2 pb-4">
                             {displayBooks.slice(20, 27).map((book) => (
                                 <div
                                     key={book.id}
@@ -710,57 +744,170 @@ export default function HomePage() {
                 </div>
             </main>
 
-            {/* Purchase Modal */}
-            {showPurchaseModal && selectedBook && (
-                <div className="fixed inset-0 max-md:bg-white lg:bg-black/80 max-lg:bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg max-w-md w-full p-6">
-                        <div className="flex justify-between items-start mb-4">
-                            <h3 className="text-xl font-bold text-gray-900">Purchase PDF Book</h3>
-                            <button onClick={() => setShowPurchaseModal(false)}>
-                                <X size={24} className="text-gray-600 hover:text-gray-900" />
-                            </button>
-                        </div>
+{showPurchaseModal && selectedBook && (
+    <div className="fixed inset-0 max-md:bg-white lg:bg-black/80 max-lg:bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-md w-full p-6 relative">
+            <div className="flex justify-between items-start mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Purchase PDF Book</h3>
+                <div className="flex items-center gap-2">
+                    {/* Three Dots Menu Button */}
+                    <button 
+                        onClick={() => setShowBookMenu(!showBookMenu)}
+                        className="p-2 hover:bg-gray-100 rounded-full transition-colors relative"
+                    >
+                        <MoreVertical size={20} className="text-gray-600" />
+                    </button>
+                    
+                    <button onClick={() => setShowPurchaseModal(false)}>
+                        <X size={24} className="text-gray-600 hover:text-gray-900" />
+                    </button>
+                </div>
+            </div>
 
-                        <div className="mb-4">
-                            <img
-                                src={selectedBook.image}
-                                alt={selectedBook.title}
-                                className="w-full h-48 object-cover rounded-lg mb-4"
-                            />
-                            <h4 className="font-bold text-lg text-blue-950">{selectedBook.title}</h4>
-                            <p className="text-gray-600">{selectedBook.author}</p>
-                            <div className="flex gap-2 items-center">
-                            <p className="text-2xl font-bold text-blue-950">₦ {selectedBook.price.toLocaleString()}</p>
-                             {selectedBook.oldPrice && (
-                                        <span className="text-sm text-gray-500 line-through">₦ {selectedBook.oldPrice.toLocaleString()}</span>
-                                    )}
+            {/* Popup Menu from Bottom */}
+            {showBookMenu && (
+                <>
+                    {/* Backdrop */}
+                    <div 
+                        className="fixed inset-0 bg-black/20 z-50"
+                        onClick={() => setShowBookMenu(false)}
+                    />
+                    
+                    {/* Bottom Sheet Menu */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-50 animate-slideUp">
+                        <div className="p-4">
+                            {/* Handle Bar */}
+                            <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
+                            
+                            <h4 className="font-bold text-lg text-gray-900 mb-4">Options</h4>
+                            
+                            <div className="space-y-2">
+                                {/* Save for Later */}
+                                <button
+                                    onClick={() => handleSaveBook(selectedBook)}
+                                    className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left"
+                                >
+                                    <Bookmark 
+                                        size={20} 
+                                        className={savedBooks.has(selectedBook.id) ? "text-blue-950 fill-blue-950" : "text-gray-600"}
+                                    />
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-gray-900">
+                                            {savedBooks.has(selectedBook.id) ? 'Saved' : 'Save for later'}
+                                        </p>
+                                        <p className="text-sm text-gray-500">
+                                            {savedBooks.has(selectedBook.id) 
+                                                ? 'Remove from your saved books' 
+                                                : 'Add to your saved books list'}
+                                        </p>
+                                    </div>
+                                </button>
+
+                                {/* Share */}
+                                <button
+                                    onClick={() => {
+                                        if (navigator.share) {
+                                            navigator.share({
+                                                title: selectedBook.title,
+                                                text: `Check out "${selectedBook.title}" by ${selectedBook.author}`,
+                                                url: window.location.href
+                                            });
+                                        } else {
+                                            navigator.clipboard.writeText(window.location.href);
+                                            alert('Link copied to clipboard!');
+                                        }
+                                        setShowBookMenu(false);
+                                    }}
+                                    className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left"
+                                >
+                                    <Share2 size={20} className="text-gray-600" />
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-gray-900">Share</p>
+                                        <p className="text-sm text-gray-500">Share this book with others</p>
+                                    </div>
+                                </button>
+
+                                {/* Report */}
+                                <button
+                                    onClick={() => {
+                                        alert('Report functionality coming soon');
+                                        setShowBookMenu(false);
+                                    }}
+                                    className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left"
+                                >
+                                    <Flag size={20} className="text-gray-600" />
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-gray-900">Report</p>
+                                        <p className="text-sm text-gray-500">Report an issue with this book</p>
+                                    </div>
+                                </button>
+
+                                {/* Cancel */}
+                                <button
+                                    onClick={() => setShowBookMenu(false)}
+                                    className="w-full p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-semibold text-gray-900"
+                                >
+                                    Cancel
+                                </button>
                             </div>
-                                <p className="text-xs text-gray-500 mb-2">{selectedBook.pages} pages</p>
                         </div>
-                        <div>
-                            <p className="text-xs text-gray-500 mb-2">{selectedBook.description} pages</p>
+                    </div>
+                </>
+            )}
 
-                        </div>
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                            <div className="flex items-start gap-3">
-                                <FileText className="w-5 h-5 text-blue-950 mt-1" />
-                                <div className="text-sm text-blue-950">
-                                    <p className="font-semibold mb-1">Instant PDF Access</p>
-                                    <p>After payment, the PDF will be sent to: <strong>{auth.currentUser?.email || 'user@example.com'}</strong></p>
-                                    <p className="mt-2">You can also download it from "My Books" section anytime.</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={handleProceedToPayment}
-                            className="w-full bg-blue-950 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors font-semibold"
-                        >
-                            Proceed to Payment
-                        </button>
+            <div className="mb-4">
+                <img
+                    src={selectedBook.image}
+                    alt={selectedBook.title}
+                    className="w-full h-48 object-cover rounded-lg mb-4"
+                />
+                <h4 className="font-bold text-lg text-blue-950">{selectedBook.title}</h4>
+                <p className="text-gray-600">{selectedBook.author}</p>
+                <div className="flex gap-2 items-center">
+                    <p className="text-2xl font-bold text-blue-950">₦ {selectedBook.price.toLocaleString()}</p>
+                    {selectedBook.oldPrice && (
+                        <span className="text-sm text-gray-500 line-through">₦ {selectedBook.oldPrice.toLocaleString()}</span>
+                    )}
+                </div>
+                <p className="text-xs text-gray-500 mb-2">{selectedBook.pages} pages</p>
+            </div>
+            <div>
+                <p className="text-xs text-gray-500 mb-2">{selectedBook.description}</p>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                    <FileText className="w-5 h-5 text-blue-950 mt-1" />
+                    <div className="text-sm text-blue-950">
+                        <p className="font-semibold mb-1">Instant PDF Access</p>
+                        <p>After payment, the PDF will be sent to: <strong>{auth.currentUser?.email || 'user@example.com'}</strong></p>
+                        <p className="mt-2">You can also download it from "My Books" section anytime.</p>
                     </div>
                 </div>
-            )}
+            </div>
+
+            <button
+                onClick={handleProceedToPayment}
+                className="w-full bg-blue-950 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors font-semibold"
+            >
+                Proceed to Payment
+            </button>
+        </div>
+
+        <style jsx>{`
+            @keyframes slideUp {
+                from {
+                    transform: translateY(100%);
+                }
+                to {
+                    transform: translateY(0);
+                }
+            }
+            .animate-slideUp {
+                animation: slideUp 0.3s ease-out;
+            }
+        `}</style>
+    </div>
+)}
 
             {/* Footer */}
             <footer className="bg-blue-950 text-white mt-16">

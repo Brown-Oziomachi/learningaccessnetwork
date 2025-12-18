@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { Upload, X, FileText } from "lucide-react";
 
 export default function AdvertiseClient() {
     const router = useRouter();
@@ -12,6 +13,7 @@ export default function AdvertiseClient() {
     const [checkingAuth, setCheckingAuth] = useState(true);
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [pdfFile, setPdfFile] = useState(null);
     const [formData, setFormData] = useState({
         name: "",
         email: "",
@@ -55,10 +57,30 @@ export default function AdvertiseClient() {
         return () => unsubscribe();
     }, [router]);
 
-
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
+    };
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file type
+            if (file.type !== 'application/pdf') {
+                alert('Please upload a PDF file only');
+                return;
+            }
+            // Validate file size (max 10MB for base64 storage)
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File size must be less than 10MB');
+                return;
+            }
+            setPdfFile(file);
+        }
+    };
+
+    const removePdfFile = () => {
+        setPdfFile(null);
     };
 
     const handleSubmit = async () => {
@@ -69,45 +91,90 @@ export default function AdvertiseClient() {
             return;
         }
 
+        if (!pdfFile) {
+            alert("Please upload your PDF book");
+            return;
+        }
+
         try {
             setLoading(true);
+            console.log("Starting submission process...");
 
-            await addDoc(collection(db, "advert my book"), {
-                userId: user.uid,
-                name: formData.name,
-                email: formData.email,
-                bookTitle: formData.bookTitle,
-                author: formData.author,
-                category: formData.category,
-                price: Number(formData.price),
-                format: formData.format,
-                pages: Number(formData.pages),
-                description: formData.description,
-                message: formData.message,
-                status: "pending",
-                createdAt: serverTimestamp(),
-            });
+            // Convert PDF to base64
+            const reader = new FileReader();
+            reader.readAsDataURL(pdfFile);
+            
+            reader.onload = async () => {
+                try {
+                    const base64PDF = reader.result;
+                    
+                    console.log("Saving to Firestore...");
+                    const docRef = await addDoc(collection(db, "advertMyBook"), {
+                        userId: user.uid,
+                        name: formData.name,
+                        email: formData.email,
+                        bookTitle: formData.bookTitle,
+                        author: formData.author,
+                        category: formData.category,
+                        price: Number(formData.price),
+                        format: formData.format,
+                        pages: Number(formData.pages),
+                        description: formData.description,
+                        message: formData.message,
+                        pdfData: base64PDF, // Store as base64
+                        pdfFileName: pdfFile.name,
+                        pdfSize: pdfFile.size,
+                        status: "pending",
+                        createdAt: serverTimestamp(),
+                    });
+                    console.log("Document saved with ID:", docRef.id);
 
-            alert("Request sent successfully! We'll contact you shortly.");
+                    alert("Request sent successfully! We'll contact you shortly.");
 
-            setFormData({
-                name: "",
-                email: user.email || "",
-                bookTitle: "",
-                author: "",
-                category: "",
-                price: "",
-                format: "PDF",
-                pages: "",
-                description: "",
-                message: "",
-            });
+                    // Reset form
+                    setFormData({
+                        name: "",
+                        email: user.email || "",
+                        bookTitle: "",
+                        author: "",
+                        category: "",
+                        price: "",
+                        format: "PDF",
+                        pages: "",
+                        description: "",
+                        message: "",
+                    });
+                    setPdfFile(null);
 
-            router.replace("/advertise?success=1");
+                    router.replace("/advertise?success=1");
+                } catch (error) {
+                    console.error("Detailed error:", error);
+                    console.error("Error code:", error.code);
+                    console.error("Error message:", error.message);
+                    
+                    let errorMessage = "Something went wrong. Please try again.";
+                    
+                    if (error.code === 'permission-denied') {
+                        errorMessage = "Permission denied. Please check Firestore rules.";
+                    } else if (error.message) {
+                        errorMessage = error.message;
+                    }
+                    
+                    alert(errorMessage);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            reader.onerror = () => {
+                console.error("Error reading file");
+                alert("Error reading file. Please try again.");
+                setLoading(false);
+            };
+
         } catch (error) {
-            console.error("Error sending request:", error);
+            console.error("Error:", error);
             alert("Something went wrong. Please try again.");
-        } finally {
             setLoading(false);
         }
     };
@@ -156,7 +223,7 @@ export default function AdvertiseClient() {
                                 placeholder="Enter your full name"
                                 value={formData.name}
                                 onChange={handleChange}
-                                className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
+                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
                             />
                         </div>
 
@@ -170,7 +237,7 @@ export default function AdvertiseClient() {
                                 value={formData.email}
                                 onChange={handleChange}
                                 placeholder="your.email@example.com"
-                                className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent bg-gray-50"
+                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent bg-gray-50"
                                 readOnly
                             />
                         </div>
@@ -186,7 +253,7 @@ export default function AdvertiseClient() {
                                 placeholder="The title of your book"
                                 value={formData.bookTitle}
                                 onChange={handleChange}
-                                className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
+                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
                             />
                         </div>
 
@@ -199,7 +266,7 @@ export default function AdvertiseClient() {
                                 placeholder="Author's name"
                                 value={formData.author}
                                 onChange={handleChange}
-                                className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
+                                className="w-full border text-blue-950 border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
                             />
                         </div>
                     </div>
@@ -213,7 +280,7 @@ export default function AdvertiseClient() {
                                 name="category"
                                 value={formData.category}
                                 onChange={handleChange}
-                                className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
+                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
                             >
                                 <option value="">Select a category</option>
                                 {categories.map((cat) => (
@@ -234,7 +301,7 @@ export default function AdvertiseClient() {
                                 placeholder="e.g., 2400"
                                 value={formData.price}
                                 onChange={handleChange}
-                                className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
+                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
                             />
                         </div>
                     </div>
@@ -248,7 +315,7 @@ export default function AdvertiseClient() {
                                 name="format"
                                 value={formData.format}
                                 onChange={handleChange}
-                                className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
+                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
                             >
                                 <option value="PDF">PDF</option>
                                 <option value="EPUB">EPUB</option>
@@ -266,9 +333,55 @@ export default function AdvertiseClient() {
                                 placeholder="e.g., 224"
                                 value={formData.pages}
                                 onChange={handleChange}
-                                className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
+                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
                             />
                         </div>
+                    </div>
+
+                    {/* PDF Upload Section */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Upload PDF Book * (Max 10MB)
+                        </label>
+                        
+                        {!pdfFile ? (
+                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                    <Upload className="w-10 h-10 mb-2 text-gray-400" />
+                                    <p className="mb-2 text-sm text-gray-500">
+                                        <span className="font-semibold">Click to upload</span> or drag and drop
+                                    </p>
+                                    <p className="text-xs text-gray-500">PDF only (Max 10MB)</p>
+                                </div>
+                                <input
+                                    type="file"
+                                    accept=".pdf"
+                                    onChange={handleFileChange}
+                                    className="hidden"
+                                />
+                            </label>
+                        ) : (
+                            <div className="border-2 border-green-300 bg-green-50 rounded-lg p-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <FileText className="w-8 h-8 text-green-600" />
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-900">{pdfFile.name}</p>
+                                            <p className="text-xs text-gray-500">
+                                                {(pdfFile.size / (1024 * 1024)).toFixed(2)} MB
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={removePdfFile}
+                                        disabled={loading}
+                                        className="p-2 hover:bg-red-100 rounded-full transition-colors"
+                                    >
+                                        <X className="w-5 h-5 text-red-600" />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div>
@@ -281,7 +394,7 @@ export default function AdvertiseClient() {
                             rows={3}
                             value={formData.description}
                             onChange={handleChange}
-                            className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent resize-none"
+                            className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent resize-none"
                         />
                     </div>
 
@@ -295,7 +408,7 @@ export default function AdvertiseClient() {
                             rows={3}
                             value={formData.message}
                             onChange={handleChange}
-                            className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent resize-none"
+                            className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent resize-none"
                         />
                     </div>
                 </div>

@@ -5,13 +5,13 @@
 
 "use client"
 import React, { useState, useEffect } from 'react';
-import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut, Filter, AlignEndVertical } from 'lucide-react';
+import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut, Filter, AlignEndVertical,MoreVertical, Bookmark, Share2, Flag  } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
 import { booksData } from "@/lib/booksData";
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc,updateDoc } from 'firebase/firestore';
 
 export default function AllBooksPage() {
     const router = useRouter();
@@ -26,6 +26,8 @@ export default function AllBooksPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [showFilters, setShowFilters] = useState(false);
     const [user, setUser] = useState(null);
+     const [showBookMenu, setShowBookMenu] = useState(false);
+    const [savedBooks, setSavedBooks] = useState(new Set());
     const booksPerPage = 12;
     const [showMobileSearch, setShowMobileSearch] = useState(false);
 
@@ -88,6 +90,91 @@ export default function AllBooksPage() {
 
         return () => unsubscribe();
     }, [router]);
+
+    // SAVED BOOK FUNCTION
+
+    
+    useEffect(() => {
+    const loadSavedBooks = async () => {
+        try {
+            const user = auth.currentUser;
+            if (user) {
+                const userDocRef = doc(db, 'users', user.uid);
+                const userDoc = await getDoc(userDocRef);
+                
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    const saved = userData.savedBooks || [];
+                    setSavedBooks(new Set(saved.map(book => book.id)));
+                }
+            }
+        } catch (error) {
+            console.error('Error loading saved books:', error);
+        }
+    };
+    
+    if (user) {
+        loadSavedBooks();
+    }
+}, [user]);
+
+
+// Add this function to handle save/unsave
+const handleSaveBook = async (book) => {
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            alert('Please sign in to save books');
+            return;
+        }
+
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        let savedBooksArray = [];
+        if (userDoc.exists()) {
+            const userData = userDoc.data();
+            savedBooksArray = userData.savedBooks || [];
+        }
+
+        const isCurrentlySaved = savedBooks.has(book.id);
+        
+        if (isCurrentlySaved) {
+            // Remove from saved
+            savedBooksArray = savedBooksArray.filter(b => b.id !== book.id);
+            setSavedBooks(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(book.id);
+                return newSet;
+            });
+            alert('Removed from Saved');
+        } else {
+            // Add to saved
+            const bookToSave = {
+                id: book.id,
+                title: book.title,
+                author: book.author,
+                image: book.image,
+                price: book.price,
+                category: book.category,
+                savedAt: new Date().toISOString()
+            };
+            savedBooksArray.push(bookToSave);
+            setSavedBooks(prev => new Set(prev).add(book.id));
+            alert('Saved for later!');
+        }
+
+        await updateDoc(userDocRef, {
+            savedBooks: savedBooksArray
+        });
+        
+        setShowBookMenu(false);
+    } catch (error) {
+        console.error('Error saving book:', error);
+        alert('Error saving book. Please try again.');
+    }
+};
+
 
     // Fetch purchased books from Firebase
     useEffect(() => {
@@ -178,11 +265,7 @@ export default function AllBooksPage() {
         
                                 {/* LOGO */}
                                 <a href="/home" className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                                    <img
-                                        src="/lan-logo.png"
-                                        alt="LAN logo"
-                                        className="w-8 h-8 sm:w-12 sm:h-12 lg:w-16 lg:h-16 object-contain"
-                                    />
+                                   
                                     <h1 className="text-xl sm:text-sm lg:text-base font-bold leading-tight">
                                         LEARNING <span className="text-blue-400 block sm:inline">ACCESS NETWORK</span>
                                     </h1>
@@ -247,7 +330,14 @@ export default function AllBooksPage() {
                                         <AlignEndVertical size={18} className="lg:w-5 lg:h-5" />
                                         <span className="hidden xl:inline">Advertise</span>
                                     </a>
-        
+
+                                     <a
+                                            href="/saved-my-book"
+                                            className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
+                                        >
+                                            <User size={18} className="lg:w-5 lg:h-5" />
+                                            <span className=" lg:inline">Saved</span>
+                                        </a>
                                     <button
                                         onClick={handleLogout}
                                         className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
@@ -312,7 +402,13 @@ export default function AllBooksPage() {
                                             <AlignEndVertical size={20} />
                                             <span className="text-sm font-medium">Advertise With Us</span>
                                         </a>
-        
+                                        <a
+                                            href="/saved-my-book"
+                                            className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
+                                        >
+                                            <User size={18} className="lg:w-5 lg:h-5" />
+                                            <span className=" lg:inline">Saved</span>
+                                        </a>
                                         <button
                                             onClick={handleLogout}
                                             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
@@ -440,210 +536,168 @@ export default function AllBooksPage() {
                 ) : (
                     <>
                         {/* First 6 Books - Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+                        <div className="mb-12 bg-gray-50 -mx-4 px-1 py-8">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Related to Your Interests</h3>
+                    <div className="overflow-x-auto scrollbar-hide">
+                        <div className="flex gap-4 pb-4">
                             {displayBooks.slice(0, 6).map((book) => (
                                 <div
                                     key={book.id}
-                                    className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                                    className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
                                 >
                                     <div className="relative">
                                         <img
                                             src={book.image}
                                             alt={book.title}
-                                            className="w-full h-64 object-cover"
+                                            className="w-full h-48 object-cover"
                                         />
-                                        <div className="absolute top-3 right-3 flex flex-col gap-2">
-                                            <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
-                                                <FileText size={14} />
-                                                {book.format}
-                                            </span>
-                                            {isPurchased(book.id) && (
-                                                <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
-                                                    <Download size={14} />
-                                                    Owned
-                                                </span>
-                                            )}
-                                        </div>
-                                        {book.discount && (
-                                            <span className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold">
-                                                {book.discount}
+                                        {isPurchased(book.id) && (
+                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                                                Owned
                                             </span>
                                         )}
                                     </div>
-                                    <div className="p-4">
-                                        <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
+                                    <div className="p-3">
+                                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
                                             {book.title}
-                                        </h3>
-                                        <p className="text-sm text-gray-600 mb-2">{book.author}</p>
-                                        <p className="text-xs text-gray-500 mb-2">{book.pages} pages</p>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <div className="flex text-yellow-400 text-sm">
-                                                {'★'.repeat(Math.floor(book.rating))}
-                                                {'☆'.repeat(5 - Math.floor(book.rating))}
-                                            </div>
-                                            <span className="text-sm text-gray-600">({book.reviews})</span>
+                                        </h4>
+                                        <div className="flex text-yellow-400 text-xs mb-2">
+                                            {'★'.repeat(Math.floor(book.rating))}
                                         </div>
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <span className="text-xl font-bold text-gray-900">₦ {book.price.toLocaleString()}</span>
-                                            {book.oldPrice && (
-                                                <span className="text-sm text-gray-500 line-through">₦ {book.oldPrice.toLocaleString()}</span>
-                                            )}
-                                        </div>
+                                        <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
 
                                         {isPurchased(book.id) ? (
                                             <button
                                                 onClick={() => handleDownload(book)}
-                                                className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                                                className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
                                             >
-                                                <Download size={18} />
-                                                Download PDF
+                                                <Download size={14} />
+                                                Download
                                             </button>
                                         ) : (
                                             <button
                                                 onClick={() => handlePurchase(book)}
-                                                className="w-full bg-blue-950 text-white py-2 rounded hover:bg-blue-900 transition-colors flex items-center justify-center gap-2"
+                                                className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
                                             >
-                                                <Lock size={18} />
-                                                Purchase & Access
+                                                <Lock size={14} />
+                                                Purchase
                                             </button>
                                         )}
                                     </div>
                                 </div>
                             ))}
                         </div>
+                    </div>
+                </div>
 
                         {/* Carousel Section - For Mobile */}
-                        {displayBooks.length > 6 && (
-                            <div className="mb-12 bg-gray-50 -mx-4 px-4 py-8 md:hidden">
-                                <h3 className="text-2xl font-bold text-gray-900 mb-4">More Books You'll Love</h3>
-                                <div className="overflow-x-auto scrollbar-hide">
-                                    <div className="flex gap-4 pb-4">
-                                        {displayBooks.slice(6, 12).map((book) => (
-                                            <div
-                                                key={book.id}
-                                                className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                                            >
-                                                <div className="relative">
-                                                    <img
-                                                        src={book.image}
-                                                        alt={book.title}
-                                                        className="w-full h-48 object-cover"
-                                                    />
-                                                    {isPurchased(book.id) && (
-                                                        <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
-                                                            Owned
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="p-3">
-                                                    <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
-                                                        {book.title}
-                                                    </h4>
-                                                    <div className="flex text-yellow-400 text-xs mb-2">
-                                                        {'★'.repeat(Math.floor(book.rating))}
-                                                    </div>
-                                                    <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
+                        <div className="mb-12 bg-gray-50 -mx-4 px-1 py-8">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Related to Your Interests</h3>
+                    <div className="overflow-x-auto scrollbar-hide">
+                        <div className="flex gap-4 pb-4">
+                            {displayBooks.slice(7, 16).map((book) => (
+                                <div
+                                    key={book.id}
+                                    className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                                >
+                                    <div className="relative">
+                                        <img
+                                            src={book.image}
+                                            alt={book.title}
+                                            className="w-full h-48 object-cover"
+                                        />
+                                        {isPurchased(book.id) && (
+                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                                                Owned
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="p-3">
+                                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
+                                            {book.title}
+                                        </h4>
+                                        <div className="flex text-yellow-400 text-xs mb-2">
+                                            {'★'.repeat(Math.floor(book.rating))}
+                                        </div>
+                                        <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
 
-                                                    {isPurchased(book.id) ? (
-                                                        <button
-                                                            onClick={() => handleDownload(book)}
-                                                            className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
-                                                        >
-                                                            <Download size={14} />
-                                                            Download
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => handlePurchase(book)}
-                                                            className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
-                                                        >
-                                                            <Lock size={14} />
-                                                            Purchase
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
+                                        {isPurchased(book.id) ? (
+                                            <button
+                                                onClick={() => handleDownload(book)}
+                                                className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Download size={14} />
+                                                Download
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handlePurchase(book)}
+                                                className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Lock size={14} />
+                                                Purchase
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            ))}
+                        </div>
+                    </div>
+                </div>
 
                         {/* Remaining Books - Grid (Desktop shows all, mobile shows after carousel) */}
-                        {displayBooks.length > 6 && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {displayBooks.slice(6).map((book) => (
-                                    <div
-                                        key={book.id}
-                                        className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                                    >
-                                        <div className="relative">
-                                            <img
-                                                src={book.image}
-                                                alt={book.title}
-                                                className="w-full h-64 object-cover"
-                                            />
-                                            <div className="absolute top-3 right-3 flex flex-col gap-2">
-                                                <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
-                                                    <FileText size={14} />
-                                                    {book.format}
-                                                </span>
-                                                {isPurchased(book.id) && (
-                                                    <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
-                                                        <Download size={14} />
-                                                        Owned
-                                                    </span>
-                                                )}
-                                            </div>
-                                            {book.discount && (
-                                                <span className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold">
-                                                    {book.discount}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="p-4">
-                                            <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
-                                                {book.title}
-                                            </h3>
-                                            <p className="text-sm text-gray-600 mb-2">{book.author}</p>
-                                            <p className="text-xs text-gray-500 mb-2">{book.pages} pages</p>
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <div className="flex text-yellow-400 text-sm">
-                                                    {'★'.repeat(Math.floor(book.rating))}
-                                                    {'☆'.repeat(5 - Math.floor(book.rating))}
-                                                </div>
-                                                <span className="text-sm text-gray-600">({book.reviews})</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <span className="text-xl font-bold text-gray-900">₦ {book.price.toLocaleString()}</span>
-                                                {book.oldPrice && (
-                                                    <span className="text-sm text-gray-500 line-through">₦ {book.oldPrice.toLocaleString()}</span>
-                                                )}
-                                            </div>
-
-                                            {isPurchased(book.id) ? (
-                                                <button
-                                                    onClick={() => handleDownload(book)}
-                                                    className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-                                                >
-                                                    <Download size={18} />
-                                                    Download PDF
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    onClick={() => handlePurchase(book)}
-                                                    className="w-full bg-blue-950 text-white py-2 rounded hover:bg-blue-900 transition-colors flex items-center justify-center gap-2"
-                                                >
-                                                    <Lock size={18} />
-                                                    Purchase & Access
-                                                </button>
-                                            )}
-                                        </div>
+                       <div className="mb-12 bg-gray-50 -mx-4 px-1 py-8">
+                    <div className="overflow-x-auto scrollbar-hide">
+                        <div className="flex gap-4 pb-4">
+                            {displayBooks.slice(17, 24).map((book) => (
+                                <div
+                                    key={book.id}
+                                    className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                                >
+                                    <div className="relative">
+                                        <img
+                                            src={book.image}
+                                            alt={book.title}
+                                            className="w-full h-48 object-cover"
+                                        />
+                                        {isPurchased(book.id) && (
+                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                                                Owned
+                                            </span>
+                                        )}
                                     </div>
-                                ))}
-                            </div>
-                        )}
+                                    <div className="p-3">
+                                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
+                                            {book.title}
+                                        </h4>
+                                        <div className="flex text-yellow-400 text-xs mb-2">
+                                            {'★'.repeat(Math.floor(book.rating))}
+                                        </div>
+                                        <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
 
+                                        {isPurchased(book.id) ? (
+                                            <button
+                                                onClick={() => handleDownload(book)}
+                                                className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Download size={14} />
+                                                Download
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handlePurchase(book)}
+                                                className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Lock size={14} />
+                                                Purchase
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
                         {/* Pagination */}
                         {totalPages > 1 && (
                             <div className="mt-12 flex flex-wrap items-center justify-center gap-2">
@@ -697,52 +751,171 @@ export default function AllBooksPage() {
                 )}
             </main>
 
-            {/* Purchase Modal */}
-            {showPurchaseModal && selectedBook && (
-                <div className="fixed inset-0 bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg max-w-md w-full p-6">
-                        <div className="flex justify-between items-start mb-4">
-                            <h3 className="text-xl font-bold text-gray-900">Purchase PDF Book</h3>
-                            <button onClick={() => setShowPurchaseModal(false)}>
-                                <X size={24} className="text-gray-600 hover:text-gray-900" />
-                            </button>
-                        </div>
+           {showPurchaseModal && selectedBook && (
+    <div className="fixed inset-0 max-md:bg-white lg:bg-black/80 max-lg:bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-md w-full p-6 relative">
+            <div className="flex justify-between items-start mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Purchase PDF Book</h3>
+                <div className="flex items-center gap-2">
+                    {/* Three Dots Menu Button */}
+                    <button 
+                        onClick={() => setShowBookMenu(!showBookMenu)}
+                        className="p-2 hover:bg-gray-100 rounded-full transition-colors relative"
+                    >
+                        <MoreVertical size={20} className="text-gray-600" />
+                    </button>
+                    
+                    <button onClick={() => setShowPurchaseModal(false)}>
+                        <X size={24} className="text-gray-600 hover:text-gray-900" />
+                    </button>
+                </div>
+            </div>
 
-                        <div className="mb-4">
-                            <img
-                                src={selectedBook.image}
-                                alt={selectedBook.title}
-                                className="w-full h-48 object-cover rounded-lg mb-4"
-                            />
-                            <h4 className="font-bold text-lg text-blue-950">{selectedBook.title}</h4>
-                            <p className="text-gray-600">{selectedBook.author}</p>
-                            <p className="text-xs text-gray-500 mb-1 mt-1">{selectedBook.pages} pages</p>
+            {/* Popup Menu from Bottom */}
+            {showBookMenu && (
+                <>
+                    {/* Backdrop */}
+                    <div 
+                        className="fixed inset-0 bg-black/20 z-50"
+                        onClick={() => setShowBookMenu(false)}
+                    />
+                    
+                    {/* Bottom Sheet Menu */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-50 animate-slideUp">
+                        <div className="p-4">
+                            {/* Handle Bar */}
+                            <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
+                            
+                            <h4 className="font-bold text-lg text-gray-900 mb-4">Options</h4>
+                            
+                            <div className="space-y-2">
+                                {/* Save for Later */}
+                                <button
+                                    onClick={() => handleSaveBook(selectedBook)}
+                                    className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left"
+                                >
+                                    <Bookmark 
+                                        size={20} 
+                                        className={savedBooks.has(selectedBook.id) ? "text-blue-950 fill-blue-950" : "text-gray-600"}
+                                    />
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-gray-900">
+                                            {savedBooks.has(selectedBook.id) ? 'Saved' : 'Save for later'}
+                                        </p>
+                                        <p className="text-sm text-gray-500">
+                                            {savedBooks.has(selectedBook.id) 
+                                                ? 'Remove from your saved books' 
+                                                : 'Add to your saved books list'}
+                                        </p>
+                                    </div>
+                                </button>
 
-                            <p className="text-2xl font-bold text-blue-950 mt-2">₦ {selectedBook.price.toLocaleString()}</p>
-                            <p className="text-xs text-gray-500 mb-1 mt-3">{selectedBook.description}</p>
+                                {/* Share */}
+                                <button
+                                    onClick={() => {
+                                        if (navigator.share) {
+                                            navigator.share({
+                                                title: selectedBook.title,
+                                                text: `Check out "${selectedBook.title}" by ${selectedBook.author}`,
+                                                url: window.location.href
+                                            });
+                                        } else {
+                                            navigator.clipboard.writeText(window.location.href);
+                                            alert('Link copied to clipboard!');
+                                        }
+                                        setShowBookMenu(false);
+                                    }}
+                                    className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left"
+                                >
+                                    <Share2 size={20} className="text-gray-600" />
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-gray-900">Share</p>
+                                        <p className="text-sm text-gray-500">Share this book with others</p>
+                                    </div>
+                                </button>
 
-                        </div>
+                                {/* Report */}
+                                <button
+                                    onClick={() => {
+                                        alert('Report functionality coming soon');
+                                        setShowBookMenu(false);
+                                    }}
+                                    className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left"
+                                >
+                                    <Flag size={20} className="text-gray-600" />
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-gray-900">Report</p>
+                                        <p className="text-sm text-gray-500">Report an issue with this book</p>
+                                    </div>
+                                </button>
 
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                            <div className="flex items-start gap-3">
-                                <FileText className="w-5 h-5 text-blue-950 mt-1" />
-                                <div className="text-sm text-blue-950">
-                                    <p className="font-semibold mb-1">Instant PDF Access</p>
-                                    <p>After payment, the PDF will be sent to: <strong>{auth.currentUser?.email || 'user@example.com'}</strong></p>
-                                    <p className="mt-2">You can also download it from "My Books" section anytime.</p>
-                                </div>
+                                {/* Cancel */}
+                                <button
+                                    onClick={() => setShowBookMenu(false)}
+                                    className="w-full p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-semibold text-gray-900"
+                                >
+                                    Cancel
+                                </button>
                             </div>
                         </div>
+                    </div>
+                </>
+            )}
 
-                        <button 
-                            onClick={handleProceedToPayment}
-                            className="w-full bg-blue-950 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors font-semibold"
-                        >
-                            Proceed to Payment
-                        </button>
+            <div className="mb-4">
+                <img
+                    src={selectedBook.image}
+                    alt={selectedBook.title}
+                    className="w-full h-48 object-cover rounded-lg mb-4"
+                />
+                <h4 className="font-bold text-lg text-blue-950">{selectedBook.title}</h4>
+                <p className="text-gray-600">{selectedBook.author}</p>
+                <div className="flex gap-2 items-center">
+                    <p className="text-2xl font-bold text-blue-950">₦ {selectedBook.price.toLocaleString()}</p>
+                    {selectedBook.oldPrice && (
+                        <span className="text-sm text-gray-500 line-through">₦ {selectedBook.oldPrice.toLocaleString()}</span>
+                    )}
+                </div>
+                <p className="text-xs text-gray-500 mb-2">{selectedBook.pages} pages</p>
+            </div>
+            <div>
+                <p className="text-xs text-gray-500 mb-2">{selectedBook.description}</p>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                    <FileText className="w-5 h-5 text-blue-950 mt-1" />
+                    <div className="text-sm text-blue-950">
+                        <p className="font-semibold mb-1">Instant PDF Access</p>
+                        <p>After payment, the PDF will be sent to: <strong>{auth.currentUser?.email || 'user@example.com'}</strong></p>
+                        <p className="mt-2">You can also download it from "My Books" section anytime.</p>
                     </div>
                 </div>
-            )}
+            </div>
+
+            <button
+                onClick={handleProceedToPayment}
+                className="w-full bg-blue-950 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors font-semibold"
+            >
+                Proceed to Payment
+            </button>
+        </div>
+
+        <style jsx>{`
+            @keyframes slideUp {
+                from {
+                    transform: translateY(100%);
+                }
+                to {
+                    transform: translateY(0);
+                }
+            }
+            .animate-slideUp {
+                animation: slideUp 0.3s ease-out;
+            }
+        `}</style>
+    </div>
+)}
+
 
             {/* Footer */}
             <footer className="bg-blue-950 text-white mt-16">
@@ -760,10 +933,10 @@ export default function AllBooksPage() {
                         <div>
                             <h4 className="font-bold mb-4">Quick Links</h4>
                             <ul className="space-y-2 text-sm">
-                                <li><Link href="/about" className="text-gray-300 hover:text-white">About Us</Link></li>
-                                <li><Link href="/how-it-works" className="text-gray-300 hover:text-white">How It Works</Link></li>
-                                <li><Link href="/faq" className="text-gray-300 hover:text-white">FAQs</Link></li>
-                                <li><Link href="/contact" className="text-gray-300 hover:text-white">Contact</Link></li>
+                                <li><Link href="/about/lan" className="text-gray-300 hover:text-white">About Us</Link></li>
+                                <li><Link href="lan/explains/how-it-works" className="text-gray-300 hover:text-white">How It Works</Link></li>
+                                <li><Link href="/lan/faqs" className="text-gray-300 hover:text-white">FAQs</Link></li>
+                                <li><Link href="/contact/lan/4/enquiry" className="text-gray-300 hover:text-white">Contact</Link></li>
                             </ul>
                         </div>
                         <div>
@@ -780,7 +953,7 @@ export default function AllBooksPage() {
                             <ul className="space-y-2 text-sm">
                                 <li><Link href="/my-account" className="text-gray-300 hover:text-white">My Account</Link></li>
                                 <li><Link href="/my-books" className="text-gray-300 hover:text-white">My Books</Link></li>
-                                <li><Link href="/help" className="text-gray-300 hover:text-white">Help Center</Link></li>
+                                <li><Link href="lan/net/help-center" className="text-gray-300 hover:text-white">Help Center</Link></li>
                             </ul>
                         </div>
                     </div>
