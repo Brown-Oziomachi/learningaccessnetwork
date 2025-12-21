@@ -1,35 +1,24 @@
-"use client";
-import React, { useState, useEffect, useRef } from "react";
-import {
-    Globe,
-    User,
-    Camera,
-    Save,
-    ArrowLeft,
-    Settings,
-    MoreVertical,
-    Book
-} from "lucide-react";
-import Link from "next/link";
-import {  Search, Menu, X, ChevronDown, Download, Lock, FileText, LogOut, AlignEndVertical } from 'lucide-react';
+// app/my-account/page.js
 
+"use client";
+import React, { useState, useEffect } from "react";
+import { Globe, Camera, Save, Settings, X, Mail, Store } from "lucide-react";
+import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+// ADD THESE IMPORTS FOR FIREBASE STORAGE
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useRouter } from "next/navigation";
+import Navbar from "@/components/NavBar";
 
 export default function MyAccount() {
     const [user, setUser] = useState(null);
-        const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [loading, setLoading] = useState(true);
-        const [searchQuery, setSearchQuery] = useState("");
     const [isEditing, setIsEditing] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [showMenu, setShowMenu] = useState(false);
-    const menuRef = useRef(null);
-        const [showMobileSearch, setShowMobileSearch] = useState(false);
+    const router = useRouter();
 
-    const router = useRouter()
     const [formData, setFormData] = useState({
         firstName: "",
         surname: "",
@@ -37,108 +26,123 @@ export default function MyAccount() {
         dateOfBirth: ""
     });
 
-     const handleSearch = () => {
-        if (searchQuery.trim()) {
-            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-            setShowMobileSearch(false); // hide mobile dropdown if open
-        }
-    };
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                await fetchUserData(currentUser.uid);
+            } else {
+                router.push('/auth/signin');
+            }
+        });
 
-     const handleLogout = async () => {
+        return () => unsubscribe();
+    }, [router]);
+
+    const fetchUserData = async (uid) => {
         try {
-            await signOut(auth);
-            router.push("/");
+            setLoading(true);
+            const userDoc = await getDoc(doc(db, "users", uid));
+
+            if (userDoc.exists()) {
+                const userData = userDoc.data();
+
+                setUser({ uid, ...userData });
+                setFormData({
+                    firstName: userData.firstName || "",
+                    surname: userData.surname || "",
+                    displayName: userData.displayName || "",
+                    dateOfBirth: userData.dateOfBirth || ""
+                });
+            }
         } catch (error) {
-            console.error("Logout error:", error);
+            console.error("Error fetching user data:", error);
+        } finally {
+            setLoading(false);
         }
     };
 
-      useEffect(() => {
-            const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-                if (currentUser) {
-                    setUser(currentUser);
-                } else {
-                    router.push('/auth/signin');
-                }
-            });
-    
-            return () => unsubscribe();
-      }, [router]);
-    
-    /* Close dropdown on outside click */
-    useEffect(() => {
-        const handler = (e) => {
-            if (menuRef.current && !menuRef.current.contains(e.target)) {
-                setShowMenu(false);
-            }
-        };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
-    }, []);
-
-    /* Image Upload */
-    const handleImageUpload = (e) => {
+    const handleImageUpload = async (e) => {
         const file = e.target.files[0];
-        if (!file || !file.type.startsWith("image/")) return;
+        if (!file) return;
 
-        const reader = new FileReader();
-        setUploading(true);
+        // Validate file type
+        if (!file.type.startsWith("image/")) {
+            alert("Please upload an image file");
+            return;
+        }
 
-        reader.onloadend = async () => {
-            try {
-                const base64Image = reader.result;
-                await updateDoc(doc(db, "users", user.uid), {
-                    photoBase64: base64Image
-                });
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert("Image size should be less than 5MB");
+            return;
+        }
 
-                setUser((prev) => ({ ...prev, photoBase64: base64Image }));
-            } catch (err) {
-                alert("Failed to update image");
-            } finally {
-                setUploading(false);
-            }
-        };
+        try {
+            setUploading(true);
 
-        reader.readAsDataURL(file);
+            // Get Firebase Storage instance
+            const storage = getStorage();
+
+            // Create a unique filename with timestamp
+            const timestamp = Date.now();
+            const imageRef = ref(storage, `profile-images/${user.uid}_${timestamp}.jpg`);
+
+            console.log("Uploading image...");
+
+            // Upload the file
+            await uploadBytes(imageRef, file);
+
+            console.log("Getting download URL...");
+
+            // Get the download URL
+            const downloadURL = await getDownloadURL(imageRef);
+
+            console.log("Download URL:", downloadURL);
+
+            // Update Firestore with the new photo URL
+            await updateDoc(doc(db, "users", user.uid), {
+                photoURL: downloadURL
+            });
+
+            // Update local state
+            setUser(prev => ({
+                ...prev,
+                photoURL: downloadURL
+            }));
+
+            alert("Profile picture updated successfully!");
+
+        } catch (error) {
+            console.error("Image upload failed:", error);
+            alert(`Failed to upload image: ${error.message}`);
+        } finally {
+            setUploading(false);
+        }
     };
 
-    /* Fetch user */
-    useEffect(() => {
-        const unsub = onAuthStateChanged(auth, async (authUser) => {
-            if (!authUser) return setLoading(false);
-
-            const snap = await getDoc(doc(db, "users", authUser.uid));
-            if (!snap.exists()) return setLoading(false);
-
-            const data = snap.data();
-            setUser({ uid: authUser.uid, ...data });
-            setFormData({
-                firstName: data.firstName || "",
-                surname: data.surname || "",
-                displayName: data.displayName || "",
-                dateOfBirth: data.dateOfBirth || ""
+    const handleSave = async () => {
+        try {
+            await updateDoc(doc(db, "users", user.uid), {
+                ...formData,
+                displayName: `${formData.firstName} ${formData.surname}`
             });
 
-            setLoading(false);
-        });
+            setUser((prev) => ({
+                ...prev,
+                ...formData,
+                displayName: `${formData.firstName} ${formData.surname}`
+            }));
 
-        return () => unsub();
-    }, []);
+            setIsEditing(false);
+            alert("Profile updated successfully!");
+        } catch (error) {
+            console.error("Error saving profile:", error);
+            alert("Failed to save profile");
+        }
+    };
 
-    /* Save */
-    const handleSave = async () => {
-        await updateDoc(doc(db, "users", user.uid), {
-            ...formData,
-            displayName: `${formData.firstName} ${formData.surname}`
-        });
-
-        setUser((prev) => ({
-            ...prev,
-            ...formData,
-            displayName: `${formData.firstName} ${formData.surname}`
-        }));
-
-        setIsEditing(false);
+    const handleBecomeSeller = () => {
+        router.push('/become-seller');
     };
 
     if (loading || !user) {
@@ -146,359 +150,226 @@ export default function MyAccount() {
             <div className="min-h-screen bg-blue-950 flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-50 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading My Account...</p>
+                    <p className="mt-4 text-gray-300">Loading My Account...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 text-blue-950">
-            {/* Header */}
-          <header className="bg-blue-950 text-white sticky top-0 z-50 shadow-lg ">
-                <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4">
-                    {/* TOP BAR */}
-                    <div className="flex items-center justify-between gap-2 sm:gap-4">
-                        {/* MOBILE MENU BUTTON */}
-                        <button
-                            className="md:hidden p-2 hover:bg-blue-900 rounded-lg transition-colors"
-                            onClick={() => {
-                                setShowMobileMenu(!showMobileMenu);
-                                setShowMobileSearch(false);
-                            }}
-                            aria-label="Toggle menu"
-                        >
-                            {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
-                        </button>
-
-                        {/* LOGO */}
-                        <a href="/home" className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                            <img
-                                src="/lan-logo.png"
-                                alt="LAN logo"
-                                className="w-8 h-8 sm:w-12 sm:h-12 lg:w-16 lg:h-16 object-contain"
-                            />
-                            <h1 className="text-xl sm:text-sm lg:text-base font-bold leading-tight">
-                                LEARNING <span className="text-blue-400 block sm:inline">ACCESS NETWORK</span>
-                            </h1>
-                        </a>
-
-                        {/* MOBILE SEARCH ICON */}
-                        <button
-                            onClick={() => {
-                                setShowMobileSearch(!showMobileSearch);
-                                setShowMobileMenu(false);
-                            }}
-                            className="md:hidden p-2 hover:bg-blue-900 rounded-lg transition-colors"
-                            aria-label="Toggle search"
-                        >
-                            <Search size={22} />
-                        </button>
-
-                        {/* DESKTOP SEARCH */}
-                        <div className="hidden md:flex flex-1 max-w-md mx-4 lg:mx-8">
-                            <div className="relative w-full">
-                                <input
-                                    type="text"
-                                    placeholder="Search PDF books..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                                    className="w-full text-white px-4 py-2 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                />
+        <div className="min-h-screen bg-gray-50">
+            <Navbar />
+            <header className="bg-blue-950 text-white shadow-lg">
+                <div className="max-w-7xl mx-auto px-4 py-4">
+                    <div className="flex justify-between items-center">
+                        <h1 className="text-2xl font-bold">My Account</h1>
+                        <div className="flex items-center gap-3">
+                            {user?.isSeller && (
                                 <button
-                                    onClick={handleSearch}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-950 hover:text-blue-700 transition-colors"
-                                    aria-label="Search"
+                                    onClick={() => router.push('/my-account/seller-account')}
+                                    className="bg-blue-800 hover:bg-blue-700 px-4 py-2 rounded-lg font-semibold transition-colors text-sm"
                                 >
-                                    <Search size={20} />
+                                    Seller Dashboard
                                 </button>
-                            </div>
+                            )}
+                            {!user?.isSeller && (
+                                <button
+                                    onClick={handleBecomeSeller}
+                                    className="bg-green-600 hover:bg-green-700 px-4 sm:px-6 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2"
+                                >
+                                    <Store size={20} />
+                                    <span className="hidden sm:inline">Become a Seller</span>
+                                    <span className="sm:hidden">Sell</span>
+                                </button>
+                            )}
                         </div>
-
-                        {/* DESKTOP ACTIONS */}
-                        <nav className="hidden md:flex items-center gap-2 lg:gap-4 flex-shrink-0">
-                            <a
-                                href="/my-account"
-                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
-                            >
-                                <User size={18} className="lg:w-5 lg:h-5" />
-                                <span className="hidden lg:inline">Account</span>
-                                <ChevronDown size={14} className="lg:w-4 lg:h-4" />
-                            </a>
-
-                            <a
-                                href="/my-books"
-                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
-                            >
-                                <Download size={18} className="lg:w-5 lg:h-5" />
-                                <span className="hidden lg:inline">My Books</span>
-                            </a>
-
-                            <a
-                                href="/advertise"
-                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base whitespace-nowrap"
-                            >
-                                <AlignEndVertical size={18} className="lg:w-5 lg:h-5" />
-                                <span className="hidden xl:inline">Advertise</span>
-                            </a>
-
-                            <button
-                                onClick={handleLogout}
-                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
-                            >
-                                <LogOut size={18} className="lg:w-5 lg:h-5" />
-                                <span className="hidden lg:inline">Logout</span>
-                            </button>
-                        </nav>
                     </div>
-
-                    {/* MOBILE SEARCH DROPDOWN */}
-                    {showMobileSearch && (
-                        <div className="mt-3 md:hidden animate-slideDown">
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    placeholder="Search PDF books..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                                    className="w-full text-white px-4 py-2 pr-10 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                    autoFocus
-                                />
-                                <button
-                                    onClick={handleSearch}
-                                    className="absolute right-2 t text-blue-950 hover:text-blue-700 transition-colors"
-                                    aria-label="Search"
-                                >
-                                    <Search size={20} />
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* MOBILE MENU */}
-                    {showMobileMenu && (
-                        <nav className="md:hidden mt-3 border-t border-blue-800 pt-3 animate-slideDown">
-                            <div className="space-y-1">
-                                <a
-                                    href="/my-account"
-                                    className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-blue-900 transition-colors"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <User size={20} />
-                                        <span className="text-sm font-medium">Account</span>
-                                    </div>
-                                    <ChevronDown size={16} />
-                                </a>
-
-                                <a
-                                    href="/my-books"
-                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900 transition-colors"
-                                >
-                                    <Download size={20} />
-                                    <span className="text-sm font-medium">My Books</span>
-                                </a>
-
-                                <a
-                                    href="/advertise"
-                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900 transition-colors"
-                                >
-                                    <AlignEndVertical size={20} />
-                                    <span className="text-sm font-medium">Advertise With Us</span>
-                                </a>
-
-                                <button
-                                    onClick={handleLogout}
-                                    className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
-                                >
-                                    <LogOut size={20} />
-                                    <span className="text-sm font-medium">Logout</span>
-                                </button>
-                            </div>
-                        </nav>
-                    )}
                 </div>
-
-                <style jsx>{`
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-slideDown {
-          animation: slideDown 0.2s ease-out;
-        }
-      `}</style>
             </header>
 
-
-            <main className="max-w-4xl mx-auto px-4 py-8">
+            <main className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
                 <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-
-                    {/* Profile Header */}
-                            <div
-                                className="relative p-8 text-white bg-repeat-x bg-center"
-                                style={{
-                                    backgroundImage: `
-                                        url('/lan-logo.png')
-                                    `
-                                }}
-                            >
-                        <div className="flex justify-center">
+                    <div className="relative bg-gradient-to-r from-blue-950 to-blue-800 p-6 sm:p-8 text-white">
+                        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
                             <div className="relative">
                                 <img
-                                    src={user.photoBase64 || "/avatar.png"}
-                                    className="w-32 h-32 rounded-full border-4 border-white object-cover"
+                                    src={user.photoURL || "/api/placeholder/128/128"}
+                                    className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white object-cover"
                                     alt="profile"
                                 />
+                            </div>
+                            <div className="text-center sm:text-left flex-1">
+                                <h2 className="text-2xl sm:text-3xl font-bold">{user.displayName}</h2>
+                                <p className="text-blue-200 flex items-center gap-2 justify-center sm:justify-start mt-1">
+                                    <Mail size={16} />
+                                    {user.email}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setIsEditing(true)}
+                                className="bg-white text-blue-950 px-4 sm:px-6 py-2 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center gap-2"
+                            >
+                                <Settings size={18} />
+                                Edit Profile
+                            </button>
+                        </div>
+                    </div>
 
-                                {/* Camera ONLY when editing */}
-                                {isEditing && (
-                                    <label className="absolute bottom-0 right-0 bg-blue-600 p-2 rounded-full cursor-pointer">
-                                        <Camera size={18} />
+                    <div className="p-4 sm:p-8 text-blue-950">
+                        <h3 className="text-xl font-bold mb-4">Account Information</h3>
+                        <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
+                            <div>
+                                <label className="font-semibold text-gray-700">First Name</label>
+                                <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user.firstName}</p>
+                            </div>
+                            <div>
+                                <label className="font-semibold text-gray-700">Surname</label>
+                                <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user.surname}</p>
+                            </div>
+                            <div>
+                                <label className="font-semibold text-gray-700">Email</label>
+                                <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user.email}</p>
+                            </div>
+                            <div>
+                                <label className="font-semibold text-gray-700">Date of Birth</label>
+                                <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user.dateOfBirth || 'Not set'}</p>
+                            </div>
+                        </div>
+
+                        <div className="mt-8">
+                            <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <Link href="/pdf" className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-600 hover:bg-blue-50 transition-all flex items-center gap-3">
+                                    <Globe className="text-blue-600" size={24} />
+                                    <span className="font-semibold">Browse Books</span>
+                                </Link>
+                                {user?.isSeller ? (
+                                    <button
+                                        onClick={() => router.push('/my-account/seller-account')}
+                                        className="p-4 border-2 border-blue-500 bg-blue-50 rounded-lg hover:border-blue-600 hover:bg-blue-100 transition-all flex items-center gap-3"
+                                    >
+                                        <Store className="text-blue-600" size={24} />
+                                        <span className="font-semibold text-blue-700">Go to Seller Dashboard</span>
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleBecomeSeller}
+                                        className="p-4 border-2 border-green-500 bg-green-50 rounded-lg hover:border-green-600 hover:bg-green-100 transition-all flex items-center gap-3"
+                                    >
+                                        <Store className="text-green-600" size={24} />
+                                        <span className="font-semibold text-green-700">Start Selling Books</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            {/* Edit Profile Modal */}
+            {isEditing && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white text-blue-950 rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <div className="sticky top-0 bg-white text-blue-950 border-b px-6 py-4 flex justify-between items-center">
+                            <h2 className="text-2xl font-bold text-blue-950">Edit Profile</h2>
+                            <button
+                                onClick={() => setIsEditing(false)}
+                                className="p-2 hover:bg-gray-100 rounded-full"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            <div className="flex justify-center mb-6">
+                                <div className="relative">
+                                    <img
+                                        src={user.photoURL || "/api/placeholder/128/128"}
+                                        className="w-32 h-32 rounded-full border-4 border-gray-200 object-cover"
+                                        alt="profile"
+                                    />
+                                    <label className="absolute bottom-0 right-0 bg-blue-600 p-3 rounded-full cursor-pointer hover:bg-blue-700 transition-colors">
+                                        <Camera size={18} className="text-white" />
                                         <input
                                             type="file"
                                             accept="image/*"
                                             className="hidden"
                                             onChange={handleImageUpload}
+                                            disabled={uploading}
                                         />
                                     </label>
-                                )}
-
-                                {uploading && (
-                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-full text-sm">
-                                        Uploading...
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Account Info */}
-                    <div className="p-8">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-2xl font-bold">Account Information</h3>
-
-                            {/* ⋯ MENU */}
-                            <div className="relative" ref={menuRef}>
-                                <button
-                                    onClick={() => setShowMenu(!showMenu)}
-                                    className="p-2 rounded-full hover:bg-gray-100"
-                                >
-                                    <MoreVertical />
-                                </button>
-
-                                {showMenu && (
-                                    <div className="absolute right-0 mt-2 w-48 bg-white border rounded-lg shadow-lg z-10">
-                                        <button
-                                            onClick={() => {
-                                                setIsEditing(true);
-                                                setShowMenu(false);
-                                            }}
-                                            className="w-full px-4 py-3 hover:bg-gray-100 flex gap-2"
-                                        >
-                                            <Settings size={16} /> Edit Profile
-                                        </button>
-
-                                        <Link
-                                            href="/pdf"
-                                            className="block px-4 py-3 hover:bg-gray-100 flex gap-2"
-                                        >
-                                            <Globe size={16} /> Browse Books
-                                        </Link>
-
-                                        <Link
-                                            href="/advertise"
-                                            className="block px-4 py-3 hover:bg-gray-100 flex gap-2"
-                                        >
-                                            <Book size={16} /> Advertise with Us
-                                        </Link>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="grid md:grid-cols-2 gap-6">
-                            {["firstName", "surname"].map((field) => (
-                                <div key={field}>
-                                    <label className="font-semibold capitalize">{field}</label>
-                                    {isEditing ? (
-                                        <input
-                                            value={formData[field]}
-                                            onChange={(e) =>
-                                                setFormData({ ...formData, [field]: e.target.value })
-                                            }
-                                            className="w-full border px-4 py-2 rounded-lg"
-                                        />
-                                    ) : (
-                                        <p className="bg-gray-50 px-4 py-2 rounded-lg">
-                                            {user[field]}
-                                        </p>
+                                    {uploading && (
+                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-full">
+                                            <div className="text-center">
+                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-1"></div>
+                                                <p className="text-xs text-white">Uploading...</p>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
-                            ))}
-
-                            <div>
-                                <label>Email</label>
-                                <p className="bg-gray-50 px-4 py-2 rounded-lg">{user.email}</p>
                             </div>
 
-                            <div>
-                                <label>Date of Birth</label>
-                                {isEditing ? (
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="font-semibold text-gray-700 block mb-2">First Name</label>
+                                    <input
+                                        value={formData.firstName}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, firstName: e.target.value })
+                                        }
+                                        className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="font-semibold text-gray-700 block mb-2">Surname</label>
+                                    <input
+                                        value={formData.surname}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, surname: e.target.value })
+                                        }
+                                        className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="font-semibold text-gray-700 block mb-2">Email</label>
+                                    <input
+                                        value={user.email}
+                                        disabled
+                                        className="w-full border border-gray-300 px-4 py-3 rounded-lg bg-gray-100 cursor-not-allowed"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="font-semibold text-gray-700 block mb-2">Date of Birth</label>
                                     <input
                                         type="date"
                                         value={formData.dateOfBirth}
                                         onChange={(e) =>
                                             setFormData({ ...formData, dateOfBirth: e.target.value })
                                         }
-                                        className="w-full border px-4 py-2 rounded-lg"
+                                        className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
-                                ) : (
-                                    <p className="bg-gray-50 px-4 py-2 rounded-lg">
-                                        {user.dateOfBirth}
-                                    </p>
-                                )}
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Save / Cancel */}
-                        {isEditing && (
-                            <div className="mt-6 flex gap-4">
+                            <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:justify-end">
                                 <button
                                     onClick={() => setIsEditing(false)}
-                                    className="border px-6 py-2 rounded-lg"
+                                    className="border border-blue-950 px-6 py-3 rounded-lg hover:bg-gray-50 font-semibold transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleSave}
-                                    className="bg-green-600 text-white px-6 py-2 rounded-lg flex gap-2"
+                                    className="bg-blue-950 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-semibold flex items-center justify-center gap-2 transition-colors"
                                 >
-                                    <Save size={16} /> Save
+                                    <Save size={18} />
+                                    Save Changes
                                 </button>
                             </div>
-                        )}
-                    </div>
-                    {/* Quick Actions */} 
-                    <div className="mt-8 grid md:grid-cols-3 gap-4 mb-10 p-8"> 
-                        <Link href="/my-books" className="p-4 border rounded-lg">
-                             <User />
-                              My Books 
-                         </Link> 
-                         <Link href="/pdf" className="p-4 border rounded-lg"> 
-                             <Globe /> 
-                             Browse Books 
-                         </Link>
+                        </div>
                     </div>
                 </div>
-            </main>
+            )}
         </div>
     );
 }

@@ -90,9 +90,8 @@ export default function HelpArticlePage() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
-              <Globe className="w-8 h-8 text-white" />
-              <h1 className="text-xl md:text-2xl font-bold">
-                LEARNING <span className="text-blue-400">ACCESS</span>
+              <h1 className="text-xl md:text-2xl font-bold lg:text-3xl  ">
+                LAN <span className="text-blue-400">Library</span>
               </h1>
             </Link>
             <Link href="/lan/net/help-center" className="text-blue-400 hover:text-white transition-colors flex items-center gap-2">
@@ -188,7 +187,7 @@ export default function HelpArticlePage() {
               Was this article helpful?
             </h3>
             <div className="flex gap-4 justify-center flex-wrap">
-              <button className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+              <button className="px-6 py-2 bg-blue-950 text-white rounded-lg hover:bg-green-700 transition-colors">
                 Yes, it helped
               </button>
               <button className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">

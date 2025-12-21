@@ -1,955 +1,269 @@
-
 "use client"
 import React, { useState, useEffect } from 'react';
-import { Globe, Search, User, Menu, X, ChevronDown, Download, Lock, FileText, LogOut, AlignEndVertical,MoreVertical, Bookmark, Share2, Flag } from 'lucide-react';
-import Link from 'next/link';
-import { signOut } from "firebase/auth";
-import { auth, db } from "@/lib/firebaseConfig";
-import { useRouter } from "next/navigation";
-import { booksData } from "@/lib/booksData";
-import { doc, getDoc, updateDoc  } from 'firebase/firestore';
+import { FileText, Monitor, Upload, Smartphone, Globe, ArrowRight, ChevronRight } from 'lucide-react';
+import Navbar from '@/components/NavBar';
 import { onAuthStateChanged } from 'firebase/auth';
-import BrowseMegaMenu from '@/components/BrowseMegaMenu';
+import { useRouter } from "next/navigation";
+import { auth} from "@/lib/firebaseConfig";
+import HomeLoading from './loading';
 
 export default function HomePage() {
-    const [showMobileMenu, setShowMobileMenu] = useState(false);
-    const [selectedBook, setSelectedBook] = useState(null);
-    const [showPurchaseModal, setShowPurchaseModal] = useState(false);
     const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState({ uid: 'demo-user' });
     const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [showMobileSearch, setShowMobileSearch] = useState(false);
+    const [allBooks, setAllBooks] = useState([]);
     const router = useRouter();
-    const [isBrowseOpen, setIsBrowseOpen] = useState(false);
-    const [isAccountOpen, setIsAccountOpen] = useState(false);
-    const [showBookMenu, setShowBookMenu] = useState(false);
-    const [savedBooks, setSavedBooks] = useState(new Set());
-    const displayBooks = booksData.slice(0, 25);
-
+    // Category data
     const categories = [
-        'Education',
-        'Personal Development',
-        'Business',
-        'Technology',
-        'Science',
-        'Literature',
-        'Health & Wellness',
-        'History',
-        'Arts & Culture'
+        {
+            name: 'Education',
+            subcategories: 8,
+            image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400',
+            description: 'Academic resources and learning materials'
+        },
+        {
+            name: 'Business',
+            subcategories: 10,
+            image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400',
+            description: 'Management, finance, and entrepreneurship'
+        },
+        {
+            name: 'Technology',
+            subcategories: 7,
+            image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400',
+            description: 'Programming, IT, and digital innovation'
+        },
+        {
+            name: 'Health & Wellness',
+            subcategories: 6,
+            image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=400',
+            description: 'Medical, fitness, and mental health'
+        },
+        {
+            name: 'Biography & Memoir',
+            subcategories: 4,
+            image: 'https://images.unsplash.com/photo-1524578271613-d550eacf6090?w=400',
+            description: 'Life stories and personal narratives'
+        },
+        {
+            name: 'Science',
+            subcategories: 9,
+            image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400',
+            description: 'Research, discoveries, and exploration'
+        },
+        {
+            name: 'Arts & Culture',
+            subcategories: 5,
+            image: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=400',
+            description: 'Creative expression and cultural studies'
+        },
+        {
+            name: 'History',
+            subcategories: 6,
+            image: 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=400',
+            description: 'Historical events and civilizations'
+        },
+        {
+            name: 'Relationship',
+            subcategories: 6,
+            image: 'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=400',
+            description: 'Love, marriage, dating, communication, and personal connections'
+        }
+
     ];
 
-    useEffect(() => {
+      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 setUser(currentUser);
             } else {
                 router.push('/auth/signin');
             }
-            setTimeout(() => {
-                setLoading(false);
-            }, 1000);
         });
 
         return () => unsubscribe();
     }, [router]);
-
-
-    useEffect(() => {
-    const loadSavedBooks = async () => {
-        try {
-            const user = auth.currentUser;
-            if (user) {
-                const userDocRef = doc(db, 'users', user.uid);
-                const userDoc = await getDoc(userDocRef);
-                
-                if (userDoc.exists()) {
-                    const userData = userDoc.data();
-                    const saved = userData.savedBooks || [];
-                    setSavedBooks(new Set(saved.map(book => book.id)));
-                }
-            }
-        } catch (error) {
-            console.error('Error loading saved books:', error);
-        }
-    };
     
-    if (user) {
-        loadSavedBooks();
-    }
-}, [user]);
-
-
-// Add this function to handle save/unsave
-const handleSaveBook = async (book) => {
-    try {
-        const user = auth.currentUser;
-        if (!user) {
-            alert('Please sign in to save books');
-            return;
-        }
-
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        
-        let savedBooksArray = [];
-        if (userDoc.exists()) {
-            const userData = userDoc.data();
-            savedBooksArray = userData.savedBooks || [];
-        }
-
-        const isCurrentlySaved = savedBooks.has(book.id);
-        
-        if (isCurrentlySaved) {
-            // Remove from saved
-            savedBooksArray = savedBooksArray.filter(b => b.id !== book.id);
-            setSavedBooks(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(book.id);
-                return newSet;
-            });
-            alert('Removed from Saved');
-        } else {
-            // Add to saved
-            const bookToSave = {
-                id: book.id,
-                title: book.title,
-                author: book.author,
-                image: book.image,
-                price: book.price,
-                category: book.category,
-                savedAt: new Date().toISOString()
-            };
-            savedBooksArray.push(bookToSave);
-            setSavedBooks(prev => new Set(prev).add(book.id));
-            alert('Saved for later!');
-        }
-
-        await updateDoc(userDocRef, {
-            savedBooks: savedBooksArray
-        });
-        
-        setShowBookMenu(false);
-    } catch (error) {
-        console.error('Error saving book:', error);
-        alert('Error saving book. Please try again.');
-    }
-};
-
-    // inside your Header component
-
-    const handleSearch = () => {
-        if (searchQuery.trim()) {
-            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-            setShowMobileSearch(false); // hide mobile dropdown if open
-        }
-    };
-
-    // Fetch purchased books from Firebase on mount
+    // Mock books data
     useEffect(() => {
-        const fetchPurchasedBooks = async () => {
-            try {
-                const user = auth.currentUser;
-                if (user) {
-                    const userDocRef = doc(db, 'users', user.uid);
-                    const userDoc = await getDoc(userDocRef);
-
-                    if (userDoc.exists()) {
-                        const userData = userDoc.data();
-                        const purchased = userData.purchasedBooks || [];
-                        const bookIds = new Set(purchased.map(book => book.id));
-                        setPurchasedBookIds(bookIds);
-                    } else {
-                        // Fallback to localStorage
-                        const localPurchased = JSON.parse(localStorage.getItem(`purchased_${user.email}`) || '[]');
-                        const bookIds = new Set(localPurchased.map(book => book.id));
-                        setPurchasedBookIds(bookIds);
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching purchased books:', error);
-                // Fallback to localStorage
-                const userEmail = auth.currentUser?.email;
-                if (userEmail) {
-                    const localPurchased = JSON.parse(localStorage.getItem(`purchased_${userEmail}`) || '[]');
-                    const bookIds = new Set(localPurchased.map(book => book.id));
-                    setPurchasedBookIds(bookIds);
-                }
+        const mockBooks = [
+            {
+                id: '1',
+                title: 'Introduction to Machine Learning',
+                author: 'Dr. Sarah Johnson',
+                category: 'Technology',
+                price: 5000,
+                image: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=400',
+                rating: 4.8,
+                reviews: 245
+            },
+            {
+                id: '2',
+                title: 'The Digital Marketing Handbook',
+                author: 'Michael Chen',
+                category: 'Business',
+                price: 4500,
+                image: 'https://images.unsplash.com/photo-1533750349088-cd871a92f312?w=400',
+                rating: 4.6,
+                reviews: 189
+            },
+            {
+                id: '3',
+                title: 'Modern Educational Psychology',
+                author: 'Dr. Emily Roberts',
+                category: 'Education',
+                price: 3500,
+                image: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400',
+                rating: 4.7,
+                reviews: 312
             }
-        };
-
-        fetchPurchasedBooks();
+        ];
+        setAllBooks(mockBooks);
     }, []);
 
-    const handleLogout = async () => {
-        try {
-            await signOut(auth);
-            router.push("/");
-        } catch (error) {
-            console.error("Logout error:", error);
-        }
-    };
+    useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false)
+    }, 2000)
 
-    const handlePurchase = (book) => {
-        setSelectedBook(book);
-        setShowPurchaseModal(true);
-    };
+    return () => clearTimeout(timer)
+  }, [])
 
-    const handleProceedToPayment = () => {
-        setShowPurchaseModal(false);
-        router.push(`/payment?bookId=${selectedBook.id}`);
-    };
-
-    const handleDownload = (book) => {
-        alert(`Downloading ${book.title}...\nPDF will be sent to your registered email.`);
-    };
-
-    const isPurchased = (bookId) => {
-        return purchasedBookIds.has(bookId);
-    };
-
+  if (loading) {
+    return <HomeLoading />
+  }
     return (
         <div className="min-h-screen bg-white">
-            {/* Header */}
-            <header className="bg-blue-950 text-white sticky top-0 z-50 shadow-lg ">
-                <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4">
-                    {/* TOP BAR */}
-                    <div className="flex items-center justify-between gap-2 sm:gap-4">
-                        {/* MOBILE MENU BUTTON */}
-                        <button
-                            className="md:hidden p-2 hover:bg-blue-900 rounded-lg transition-colors"
-                            onClick={() => {
-                                setShowMobileMenu(!showMobileMenu);
-                                setShowMobileSearch(false);
-                            }}
-                            aria-label="Toggle menu"
-                        >
-                            {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
-                        </button>
+            {/* Navbar */}
+            <Navbar/>
 
-                        {/* LOGO */}
-                        <a href="/home" className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                            {/* <img
-                                src="/lan-logo.png"
-                                alt="LAN logo"
-                                className="w-8 h-8 sm:w-12 sm:h-12 lg:w-16 lg:h-16 object-contain"
-                            /> */}
-                            <h1 className="text-xl sm:text-sm lg:text-base font-bold leading-tight">
-                                LEARNING <span className="text-blue-400 block sm:inline">ACCESS NETWORK</span>
-                            </h1>
+            {/* Hero Section */}
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 py-16">
+                <div className="max-w-7xl mx-auto px-4">
+                    <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 mb-6">
+                        You've seen it all, now understand it all.
+                    </h1>
+                    <p className="text-lg md:text-xl text-gray-700 max-w-4xl">
+                        Make sense of anything with information on just about everything, shared by a global community of thinkers.
+                    </p>
+                </div>
+            </div>
+
+            {/* Categories Grid */}
+            <main className="max-w-7xl mx-auto px-4 py-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ">
+                    {categories.map((category, index) => (
+                        <a 
+                            key={index}
+                            href={`/category/${category.name.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')}`}
+                            className="group bg-white border border-gray-200  overflow-hidden hover:shadow-xl transition-all duration-300"
+                        >
+                            <div className="p-6 bg-gray-100">
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                    {category.name}
+                                </h3>
+                                <p className="text-sm text-gray-600 mb-4">
+                                    {category.subcategories} categories
+                                </p>
+                                
+                                <div className="flex items-center text-blue-950 font-medium group-hover:gap-3 transition-all">
+                                    View all 
+                                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                                </div>
+                            </div>
+                            
+                            <div className="relative h-48 overflow-hidden">
+                                <img 
+                                    src={category.image} 
+                                    alt={category.name}
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                />
+                            </div>
                         </a>
-
-                        {/* MOBILE SEARCH ICON */}
-                        <button
-                            onClick={() => {
-                                setShowMobileSearch(!showMobileSearch);
-                                setShowMobileMenu(false);
-                            }}
-                            className="md:hidden p-2 hover:bg-blue-900 rounded-lg transition-colors"
-                            aria-label="Toggle search"
-                        >
-                            <Search size={22} />
-                        </button>
-
-                        {/* DESKTOP SEARCH */}
-                        <div className="hidden md:flex flex-1 max-w-md mx-4 lg:mx-8">
-                            <div className="relative w-full">
-                                <input
-                                    type="text"
-                                    placeholder="Search PDF books..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                                    className="w-full text-white px-4 py-2 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                />
-                                <button
-                                    onClick={handleSearch}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-950 hover:text-blue-700 transition-colors"
-                                    aria-label="Search"
-                                >
-                                    <Search size={20} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* DESKTOP ACTIONS */}
-                        <nav className="hidden md:flex items-center gap-2 lg:gap-4 flex-shrink-0">
-                            <a
-                                href="/my-account"
-                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
-                            >
-                                <User size={18} className="lg:w-5 lg:h-5" />
-                                <span className="hidden lg:inline">Account</span>
-                                <ChevronDown size={14} className="lg:w-4 lg:h-4" />
-                            </a>
-
-                            <a
-                                href="/my-books"
-                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
-                            >
-                                <Download size={18} className="lg:w-5 lg:h-5" />
-                                <span className="hidden lg:inline">My Books</span>
-                            </a>
-
-                            <a
-                                href="/advertise"
-                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base whitespace-nowrap"
-                            >
-                                <AlignEndVertical size={18} className="lg:w-5 lg:h-5" />
-                                <span className="hidden xl:inline">Advertise</span>
-                            </a>
-                            
-                            <a
-                                href="/saved-my-book"
-                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
-                            >
-                                <User size={18} className="lg:w-5 lg:h-5" />
-                                <span className=" lg:inline">Saved</span>
-                            </a>
-
-                            <button
-                                onClick={handleLogout}
-                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
-                            >
-                                <LogOut size={18} className="lg:w-5 lg:h-5" />
-                                <span className="hidden lg:inline">Logout</span>
-                            </button>
-                            
-                        </nav>
-                    </div>
-
-                    {/* MOBILE SEARCH DROPDOWN */}
-                    {showMobileSearch && (
-                        <div className="mt-3 md:hidden animate-slideDown">
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    placeholder="Search PDF books..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                                    className="w-full text-white px-4 py-2 pr-10 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                    autoFocus
-                                />
-                                <button
-                                    onClick={handleSearch}
-                                    className="absolute right-2 t text-blue-950 hover:text-blue-700 transition-colors"
-                                    aria-label="Search"
-                                >
-                                    <Search size={20} />
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* MOBILE MENU */}
-                    {showMobileMenu && (
-                        <nav className="md:hidden mt-3 border-t border-blue-800 pt-3 animate-slideDown">
-                            <div className="space-y-1">
-
-                                {/* Browse Dropdown */}
-                                <div>
-                                    <button
-                                        onClick={() => setIsBrowseOpen(!isBrowseOpen)}
-                                        className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-blue-900 transition-colors"
-                                    >
-                                        <AlignEndVertical size={20} />
-                                        <span className="text-sm font-medium">Browse</span>
-                                        <ChevronDown
-                                            size={16}
-                                            className={`ml-auto transition-transform ${isBrowseOpen ? "rotate-180" : "rotate-0"}`}
-                                        />
-                                    </button>
-
-                                    {isBrowseOpen && (
-                                        <div className="mt-1 ml-6 space-y-1">
-                                            <BrowseMegaMenu /> {/* Your dropdown items */}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Account Dropdown */}
-                                <div>
-                                    <button
-                                        onClick={() => setIsAccountOpen(!isAccountOpen)}
-                                        className="flex items-center justify-between w-full px-3 py-2.5 rounded-lg hover:bg-blue-900 transition-colors"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <User size={20} />
-                                            <span className="text-sm font-medium">Account</span>
-                                        </div>
-                                        <ChevronDown
-                                            size={16}
-                                            className={`transition-transform ${isAccountOpen ? "rotate-180" : "rotate-0"}`}
-                                        />
-                                    </button>
-
-                                    {isAccountOpen && (
-                                        <div className="mt-1 ml-6 space-y-1">
-                                            <a href="/my-books" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-900 transition-colors">
-                                                <Download size={20} />
-                                                <span className="text-sm font-medium">My Books</span>
-                                            </a>
-                                            <a
-                                                href="/my-account"
-                                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
-                                            >
-                                                <User size={18} className="lg:w-5 lg:h-5" />
-                                                <span className=" lg:inline">My Account</span>
-                                            </a>
-
-                                               <a
-                                                href="/saved-my-book"
-                                                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 hover:bg-blue-900 rounded-lg transition-colors text-sm lg:text-base"
-                                            >
-                                                <User size={18} className="lg:w-5 lg:h-5" />
-                                                <span className=" lg:inline">Saved</span>
-                                            </a>
-
-                                            <a href="/advertise" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-900 transition-colors">
-                                                <AlignEndVertical size={20} />
-                                                <span className="text-sm font-medium">Advertise With Us</span>
-                                            </a>
-
-                                            <button
-                                                onClick={handleLogout}
-                                                className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
-                                            >
-                                                <LogOut size={20} />
-                                                <span className="text-sm font-medium">Logout</span>
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-
-                            </div>
-                        </nav>
-                    )}
+                    ))}
                 </div>
 
-                <style jsx>{`
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-slideDown {
-          animation: slideDown 0.2s ease-out;
-        }
-      `}</style>
-            </header>
-
-            {/* Categories Bar */}
-            <div className="bg-blue-900 text-white shadow-md">
-                <div className="max-w-7xl mx-auto px-4 py-3">
-                    <div className="flex gap-6 overflow-x-auto scrollbar-hide">
-                        {categories.map((category, index) => (
-                            <Link
-                                key={index}
-                                href={`/category/${category.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')}`}
-                                className="whitespace-nowrap hover:text-blue-300 transition-colors text-sm"
-                            >
-                                {category}
-                            </Link>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* Info Banner */}
-            <div className="bg-blue-50 border-b border-blue-100">
-                <div className="max-w-7xl mx-auto px-4 py-4">
-                    <div className="flex items-center gap-3 text-blue-950">
-                        <FileText className="w-6 h-6" />
-                        <p className="text-sm md:text-base">
-                            <strong>Access PDFs Instantly!</strong> Purchase books and get instant access to downloadable PDFs sent to your registered email.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-4 py-8">
-                <div className="text-sm text-gray-600 mb-6">
-                    Home &gt; All PDF Books
-                </div>
-
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-                    <div>
-                        <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
-                            Digital PDF Library
-                        </h2>
-                        <p className="text-gray-600 mt-1">
-                            (Showing {displayBooks.length} of {booksData.length} PDF books - <Link href="/pdf" className="text-blue-600 hover:underline">View All</Link>)
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-gray-700">Sort by:</span>
-                        <select className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-950">
-                            <option>Popularity</option>
-                            <option>Price: Low to High</option>
-                            <option>Price: High to Low</option>
-                            <option>Newest First</option>
-                            <option>Rating</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div className="mb-6 flex flex-wrap gap-2 items-center">
-                    <span className="text-gray-700">Quick links:</span>
-                    <Link href="/category/education" className="text-blue-600 hover:text-blue-800 hover:underline">Education</Link>
-                    <span>|</span>
-                    <Link href="/category/business" className="text-blue-600 hover:text-blue-800 hover:underline">Business</Link>
-                    <span>|</span>
-                    <Link href="/category/technology" className="text-blue-600 hover:text-blue-800 hover:underline">Technology</Link>
-                    <span>|</span>
-                    <Link href="/pdf" className="text-blue-600 hover:text-blue-800 hover:underline font-semibold">
-                        All Books →
-                    </Link>
-                </div>
-
-                {/* Books Grid - First 8 books */}
-         <div className=" bg-gray-50 -mx-4 px-1 py-8">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Related to Your Interests</h3>
-                    <div className="overflow-x-auto scrollbar-hide p-1">
-                        <div className="flex gap-2 pb-4">
-                            {displayBooks.slice(8, 14).map((book) => (
-                                <div
-                                    key={book.id}
-                                    className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                                >
-                                    <div className="relative">
-                                        <img
-                                            src={book.image}
-                                            alt={book.title}
-                                            className="w-full h-48 object-cover"
-                                        />
-                                        {isPurchased(book.id) && (
-                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
-                                                Owned
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="p-3">
-                                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
-                                            {book.title}
-                                        </h4>
-                                        <div className="flex text-yellow-400 text-xs mb-2">
-                                            {'★'.repeat(Math.floor(book.rating))}
-                                        </div>
-                                        <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
-
-                                        {isPurchased(book.id) ? (
-                                            <button
-                                                onClick={() => handleDownload(book)}
-                                                className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
-                                            >
-                                                <Download size={14} />
-                                                Download
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={() => handlePurchase(book)}
-                                                className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
-                                            >
-                                                <Lock size={14} />
-                                                Purchase
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Carousel Section 1 - Featured Categories */}
-                <div className=" bg-gray-50 -mx-4 px-1 py-4 ">
-                    <div className="overflow-x-auto scrollbar-hide p-1">
-                        <div className="flex gap-2 pb-4">
-                            {displayBooks.slice(8, 14).map((book) => (
-                                <div
-                                    key={book.id}
-                                    className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                                >
-                                    <div className="relative">
-                                        <img
-                                            src={book.image}
-                                            alt={book.title}
-                                            className="w-full h-48 object-cover"
-                                        />
-                                        {isPurchased(book.id) && (
-                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
-                                                Owned
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="p-3">
-                                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
-                                            {book.title}
-                                        </h4>
-                                        <div className="flex text-yellow-400 text-xs mb-2">
-                                            {'★'.repeat(Math.floor(book.rating))}
-                                        </div>
-                                        <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
-
-                                        {isPurchased(book.id) ? (
-                                            <button
-                                                onClick={() => handleDownload(book)}
-                                                className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
-                                            >
-                                                <Download size={14} />
-                                                Download
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={() => handlePurchase(book)}
-                                                className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
-                                            >
-                                                <Lock size={14} />
-                                                Purchase
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Books Grid - Middle section */}
-              <div className="mb-12 bg-gray-50 -mx-4 px-1 py-8">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Related to Your Interests</h3>
-                    <div className="overflow-x-auto scrollbar-hide p-1">
-                        <div className="flex gap-2 pb-4">
-                            {displayBooks.slice(8, 14).map((book) => (
-                                <div
-                                    key={book.id}
-                                    className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                                >
-                                    <div className="relative">
-                                        <img
-                                            src={book.image}
-                                            alt={book.title}
-                                            className="w-full h-48 object-cover"
-                                        />
-                                        {isPurchased(book.id) && (
-                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
-                                                Owned
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="p-3">
-                                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
-                                            {book.title}
-                                        </h4>
-                                        <div className="flex text-yellow-400 text-xs mb-2">
-                                            {'★'.repeat(Math.floor(book.rating))}
-                                        </div>
-                                        <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
-
-                                        {isPurchased(book.id) ? (
-                                            <button
-                                                onClick={() => handleDownload(book)}
-                                                className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
-                                            >
-                                                <Download size={14} />
-                                                Download
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={() => handlePurchase(book)}
-                                                className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
-                                            >
-                                                <Lock size={14} />
-                                                Purchase
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Carousel Section 2 - Popular Picks */}
-                <div className="mb-12 bg-gray-50 -mx-4 px-4 py-8">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Popular Right Now</h3>
-                    <div className="overflow-x-auto scrollbar-hide p-1">
-                        <div className="flex gap-2 pb-4">
-                            {displayBooks.slice(20, 27).map((book) => (
-                                <div
-                                    key={book.id}
-                                    className="flex-none w-[160px] sm:w-[180px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                                >
-                                    <div className="relative">
-                                        <img
-                                            src={book.image}
-                                            alt={book.title}
-                                            className="w-full h-48 object-cover"
-                                        />
-                                        {isPurchased(book.id) && (
-                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
-                                                Owned
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="p-3">
-                                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">
-                                            {book.title}
-                                        </h4>
-                                        <div className="flex text-yellow-400 text-xs mb-2">
-                                            {'★'.repeat(Math.floor(book.rating))}
-                                        </div>
-                                        <p className="text-lg font-bold text-gray-900 mb-2">₦{book.price.toLocaleString()}</p>
-
-                                        {isPurchased(book.id) ? (
-                                            <button
-                                                onClick={() => handleDownload(book)}
-                                                className="w-full bg-green-600 text-white py-1.5 rounded text-xs hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
-                                            >
-                                                <Download size={14} />
-                                                Download
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={() => handlePurchase(book)}
-                                                className="w-full bg-blue-950 text-white py-1.5 rounded text-xs hover:bg-blue-900 transition-colors flex items-center justify-center gap-1"
-                                            >
-                                                <Lock size={14} />
-                                                Purchase
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* View All Books Button */}
+                {/* Explore All Link */}
                 <div className="text-center mt-12">
-                    <Link
-                        href="/pdf"
-                        className="inline-flex items-center gap-2 bg-blue-950 text-white px-8 py-4 rounded-lg hover:bg-blue-900 transition-colors text-lg font-semibold shadow-lg"
+                    <a 
+                        href="/pdf" 
+                        className="inline-flex items-center text-blue-950 font-semibold text-lg hover:underline"
                     >
-                        <FileText size={24} />
-                        View All {booksData.length} Books in Library
-                    </Link>
+                        Explore all of our categories
+                        <ChevronRight className="w-5 h-5 ml-1" />
+                    </a>
                 </div>
             </main>
 
-{showPurchaseModal && selectedBook && (
-    <div className="fixed inset-0 max-md:bg-white lg:bg-black/80 max-lg:bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg max-w-md w-full p-6 relative">
-            <div className="flex justify-between items-start mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Purchase PDF Book</h3>
-                <div className="flex items-center gap-2">
-                    {/* Three Dots Menu Button */}
-                    <button 
-                        onClick={() => setShowBookMenu(!showBookMenu)}
-                        className="p-2 hover:bg-gray-100 rounded-full transition-colors relative"
-                    >
-                        <MoreVertical size={20} className="text-gray-600" />
-                    </button>
-                    
-                    <button onClick={() => setShowPurchaseModal(false)}>
-                        <X size={24} className="text-gray-600 hover:text-gray-900" />
-                    </button>
-                </div>
-            </div>
+            {/* Upload Section */}
+            <div className="bg-gray-50 py-16">
+                <div className="max-w-5xl mx-auto px-4 text-center">
+                    <h2 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-6">
+                        Share the wealth <span className="text-gray-700">[of knowledge]</span>.
+                    </h2>
 
-            {/* Popup Menu from Bottom */}
-            {showBookMenu && (
-                <>
-                    {/* Backdrop */}
-                    <div 
-                        className="fixed inset-0 bg-black/20 z-50"
-                        onClick={() => setShowBookMenu(false)}
-                    />
-                    
-                    {/* Bottom Sheet Menu */}
-                    <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-50 animate-slideUp">
-                        <div className="p-4">
-                            {/* Handle Bar */}
-                            <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
-                            
-                            <h4 className="font-bold text-lg text-gray-900 mb-4">Options</h4>
-                            
-                            <div className="space-y-2">
-                                {/* Save for Later */}
-                                <button
-                                    onClick={() => handleSaveBook(selectedBook)}
-                                    className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left"
-                                >
-                                    <Bookmark 
-                                        size={20} 
-                                        className={savedBooks.has(selectedBook.id) ? "text-blue-950 fill-blue-950" : "text-gray-600"}
-                                    />
-                                    <div className="flex-1">
-                                        <p className="font-semibold text-gray-900">
-                                            {savedBooks.has(selectedBook.id) ? 'Saved' : 'Save for later'}
-                                        </p>
-                                        <p className="text-sm text-gray-500">
-                                            {savedBooks.has(selectedBook.id) 
-                                                ? 'Remove from your saved books' 
-                                                : 'Add to your saved books list'}
-                                        </p>
-                                    </div>
-                                </button>
+                    <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-12">
+                        Turn your books into income. Upload your work, reach a global audience{" "}
+                        <span className="font-medium text-gray-900">[90M+]</span>, and earn whenever
+                        readers discover and purchase your content.
+                    </p>
 
-                                {/* Share */}
-                                <button
-                                    onClick={() => {
-                                        if (navigator.share) {
-                                            navigator.share({
-                                                title: selectedBook.title,
-                                                text: `Check out "${selectedBook.title}" by ${selectedBook.author}`,
-                                                url: window.location.href
-                                            });
-                                        } else {
-                                            navigator.clipboard.writeText(window.location.href);
-                                            alert('Link copied to clipboard!');
-                                        }
-                                        setShowBookMenu(false);
-                                    }}
-                                    className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left"
-                                >
-                                    <Share2 size={20} className="text-gray-600" />
-                                    <div className="flex-1">
-                                        <p className="font-semibold text-gray-900">Share</p>
-                                        <p className="text-sm text-gray-500">Share this book with others</p>
-                                    </div>
-                                </button>
-
-                                {/* Report */}
-                                <button
-                                    onClick={() => {
-                                        alert('Report functionality coming soon');
-                                        setShowBookMenu(false);
-                                    }}
-                                    className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left"
-                                >
-                                    <Flag size={20} className="text-gray-600" />
-                                    <div className="flex-1">
-                                        <p className="font-semibold text-gray-900">Report</p>
-                                        <p className="text-sm text-gray-500">Report an issue with this book</p>
-                                    </div>
-                                </button>
-
-                                {/* Cancel */}
-                                <button
-                                    onClick={() => setShowBookMenu(false)}
-                                    className="w-full p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-semibold text-gray-900"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
+                    <div className="bg-white rounded-xl shadow-lg py-16 flex flex-col items-center justify-center">
+                        <div className="flex items-center gap-8 mb-8 text-gray-800">
+                            <Monitor size={64} strokeWidth={1.5} />
+                            <Upload size={48} strokeWidth={2} />
+                            <Smartphone size={56} strokeWidth={1.5} />
                         </div>
-                    </div>
-                </>
-            )}
 
-            <div className="mb-4">
-                <img
-                    src={selectedBook.image}
-                    alt={selectedBook.title}
-                    className="w-full h-48 object-cover rounded-lg mb-4"
-                />
-                <h4 className="font-bold text-lg text-blue-950">{selectedBook.title}</h4>
-                <p className="text-gray-600">{selectedBook.author}</p>
-                <div className="flex gap-2 items-center">
-                    <p className="text-2xl font-bold text-blue-950">₦ {selectedBook.price.toLocaleString()}</p>
-                    {selectedBook.oldPrice && (
-                        <span className="text-sm text-gray-500 line-through">₦ {selectedBook.oldPrice.toLocaleString()}</span>
-                    )}
-                </div>
-                <p className="text-xs text-gray-500 mb-2">{selectedBook.pages} pages</p>
-            </div>
-            <div>
-                <p className="text-xs text-gray-500 mb-2">{selectedBook.description}</p>
-            </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <div className="flex items-start gap-3">
-                    <FileText className="w-5 h-5 text-blue-950 mt-1" />
-                    <div className="text-sm text-blue-950">
-                        <p className="font-semibold mb-1">Instant PDF Access</p>
-                        <p>After payment, the PDF will be sent to: <strong>{auth.currentUser?.email || 'user@example.com'}</strong></p>
-                        <p className="mt-2">You can also download it from "My Books" section anytime.</p>
+                        <a 
+                            href="/advertise" 
+                            className="bg-blue-950 hover:bg-blue-800 transition-colors text-white font-semibold px-8 py-4 rounded-lg shadow-md text-lg"
+                        >
+                            Upload documents
+                        </a>
                     </div>
                 </div>
             </div>
 
-            <button
-                onClick={handleProceedToPayment}
-                className="w-full bg-blue-950 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors font-semibold"
-            >
-                Proceed to Payment
-            </button>
-        </div>
-
-        <style jsx>{`
-            @keyframes slideUp {
-                from {
-                    transform: translateY(100%);
-                }
-                to {
-                    transform: translateY(0);
-                }
-            }
-            .animate-slideUp {
-                animation: slideUp 0.3s ease-out;
-            }
-        `}</style>
-    </div>
-)}
-
+           
             {/* Footer */}
-            <footer className="bg-blue-950 text-white mt-16">
-                <div className="max-w-7xl mx-auto px-4 py-12">
+            <footer className="bg-blue-950 text-white py-12">
+                <div className="max-w-7xl mx-auto px-4">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                         <div>
                             <div className="flex items-center gap-2 mb-4">
                                 <Globe className="w-8 h-8" />
                                 <h3 className="text-xl font-bold">LEARNING ACCESS</h3>
                             </div>
-                            <p className="text-gray-300 text-sm">
-                                Digital PDF library making knowledge easily accessible to everyone.
+                            <p className="text-gray-400 text-sm">
+                                Digital PDF library making knowledge accessible to everyone.
                             </p>
                         </div>
                         <div>
                             <h4 className="font-bold mb-4">Quick Links</h4>
                             <ul className="space-y-2 text-sm">
-                                <li><Link href="/about/lan" className="text-gray-300 hover:text-white">About Us</Link></li>
-                                <li><Link href="/lan/explains/how-it-works" className="text-gray-300 hover:text-white">How It Works</Link></li>
-                                <li><Link href="/lan/faqs" className="text-gray-300 hover:text-white">FAQs</Link></li>
-                                <li><Link href="/contact/lan/4/enquiry" className="text-gray-300 hover:text-white">Contact</Link></li>
+                                <li><a href="/about/lan" className="text-gray-400 hover:text-white">About Us</a></li>
+                                <li><a href="/lan/explains/how-it-works" className="text-gray-400 hover:text-white">How It Works</a></li>
+                                <li><a href="/lan/faqs" className="text-gray-400 hover:text-white">FAQs</a></li>
                             </ul>
                         </div>
                         <div>
                             <h4 className="font-bold mb-4">Categories</h4>
                             <ul className="space-y-2 text-sm">
-                                <li><Link href="/category/education" className="text-gray-300 hover:text-white">Education</Link></li>
-                                <li><Link href="/category/business" className="text-gray-300 hover:text-white">Business</Link></li>
-                                <li><Link href="/category/technology" className="text-gray-300 hover:text-white">Technology</Link></li>
-                                <li><Link href="/pdf" className="text-gray-300 hover:text-white">All Books</Link></li>
+                                <li><a href="/category/education" className="text-gray-400 hover:text-white">Education</a></li>
+                                <li><a href="/category/business" className="text-gray-400 hover:text-white">Business</a></li>
+                                <li><a href="/pdf" className="text-gray-400 hover:text-white">All Books</a></li>
                             </ul>
                         </div>
                         <div>
                             <h4 className="font-bold mb-4">Customer Service</h4>
                             <ul className="space-y-2 text-sm">
-                                <li><Link href="/my-account" className="text-gray-300 hover:text-white">My Account</Link></li>
-                                <li><Link href="/my-books" className="text-gray-300 hover:text-white">My Books</Link></li>
-                                <li><Link href="/lan/net/help-center" className="text-gray-300 hover:text-white">Help Center</Link></li>
+                                <li><a href="/my-account" className="text-gray-400 hover:text-white">My Account</a></li>
+                                <li><a href="/my-books" className="text-gray-400 hover:text-white">My Books</a></li>
                             </ul>
                         </div>
                     </div>
-                    <div className="border-t border-blue-800 mt-8 pt-8 text-center text-sm text-gray-300">
+                    <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
                         <p>&copy; 2025 Learning Access Network. All rights reserved.</p>
                     </div>
                 </div>

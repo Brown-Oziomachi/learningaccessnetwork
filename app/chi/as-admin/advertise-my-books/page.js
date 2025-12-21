@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '@/lib/firebaseConfig';
-import { FileText, Download, Trash2, Check, X, Search, Filter, Calendar, User, Shield } from 'lucide-react';
+import { FileText, Download, Trash2, Check, X, Search, Filter, Calendar, User, Shield, Link2, Eye, Copy, CheckCircle } from 'lucide-react';
 
 export default function AdminAdvertMyBook() {
   const [advertisements, setAdvertisements] = useState([]);
@@ -14,13 +14,101 @@ export default function AdminAdvertMyBook() {
   const [selectedAd, setSelectedAd] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [showDriveModal, setShowDriveModal] = useState(false);
+  const [driveUrl, setDriveUrl] = useState('');
+  const [extractedUrls, setExtractedUrls] = useState(null);
+  const [copied, setCopied] = useState('');
 
-  // List of admin email addresses (you can also store this in Firestore)
   const ADMIN_EMAILS = [
     'browncemmanuel@gmail.com',
     'chigozirimv35@gmail.com',
-    // Add your admin emails here
   ];
+
+  // Google Drive URL utility functions
+  const extractDriveFileId = (url) => {
+    if (!url) return null;
+    
+    const pattern1 = url.match(/\/file\/d\/([^\/\?]+)/);
+    if (pattern1) return pattern1[1];
+    
+    const pattern2 = url.match(/[?&]id=([^&]+)/);
+    if (pattern2) return pattern2[1];
+    
+    const pattern3 = url.match(/\/open\?id=([^&]+)/);
+    if (pattern3) return pattern3[1];
+    
+    if (url.length > 20 && !url.includes('/') && !url.includes('?')) {
+      return url;
+    }
+    
+    return null;
+  };
+
+  const getDriveUrls = (driveLink) => {
+    const fileId = extractDriveFileId(driveLink);
+    
+    if (!fileId) {
+      return null;
+    }
+    
+    return {
+      fileId,
+      preview: `https://drive.google.com/file/d/${fileId}/view`,
+      download: `https://drive.google.com/uc?export=download&id=${fileId}`,
+      embed: `https://drive.google.com/file/d/${fileId}/preview`,
+      thumbnail: `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`
+    };
+  };
+
+  const handleExtractDriveUrl = () => {
+    const urls = getDriveUrls(driveUrl);
+    if (urls) {
+      setExtractedUrls(urls);
+    } else {
+      alert('Invalid Google Drive URL. Please paste a valid link.');
+    }
+  };
+
+  const copyToClipboard = (text, type) => {
+    navigator.clipboard.writeText(text);
+    setCopied(type);
+    setTimeout(() => setCopied(''), 2000);
+  };
+
+  const addDriveUrlToAd = async (adId) => {
+    if (!extractedUrls) {
+      alert('Please extract URLs first');
+      return;
+    }
+
+    try {
+      const adRef = doc(db, 'advertMyBook', adId);
+      await updateDoc(adRef, {
+        driveFileId: extractedUrls.fileId,
+        pdfUrl: extractedUrls.download,
+        previewUrl: extractedUrls.preview,
+        embedUrl: extractedUrls.embed
+      });
+
+      setAdvertisements(advertisements.map(ad => 
+        ad.id === adId ? { 
+          ...ad, 
+          driveFileId: extractedUrls.fileId,
+          pdfUrl: extractedUrls.download,
+          previewUrl: extractedUrls.preview
+        } : ad
+      ));
+
+      alert('Google Drive URLs added successfully!');
+      setShowDriveModal(false);
+      setDriveUrl('');
+      setExtractedUrls(null);
+      setSelectedAd(null);
+    } catch (error) {
+      console.error('Error adding Drive URLs:', error);
+      alert('Error adding Drive URLs');
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -39,7 +127,6 @@ export default function AdminAdvertMyBook() {
 
   const checkAdminStatus = async (currentUser) => {
     try {
-      // Method 1: Check by email
       if (ADMIN_EMAILS.includes(currentUser.email)) {
         setIsAdmin(true);
         fetchAdvertisements();
@@ -47,7 +134,6 @@ export default function AdminAdvertMyBook() {
         return;
       }
 
-      // Method 2: Check Firestore for admin role
       const userDocRef = doc(db, 'users', currentUser.uid);
       const userDoc = await getDoc(userDocRef);
       
@@ -120,15 +206,16 @@ export default function AdminAdvertMyBook() {
   };
 
   const downloadPDF = (ad) => {
-    if (!ad.pdfData) {
+    if (!ad.pdfData && !ad.pdfUrl) {
       alert('No PDF available');
       return;
     }
 
     try {
       const link = document.createElement('a');
-      link.href = ad.pdfData;
+      link.href = ad.pdfUrl || ad.pdfData;
       link.download = ad.pdfFileName || `${ad.bookTitle}.pdf`;
+      link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -136,6 +223,16 @@ export default function AdminAdvertMyBook() {
       console.error('Error downloading PDF:', error);
       alert('Error downloading PDF');
     }
+  };
+
+  const previewPDF = (ad) => {
+    if (!ad.previewUrl && !ad.driveFileId) {
+      alert('No preview available');
+      return;
+    }
+
+    const previewUrl = ad.previewUrl || `https://drive.google.com/file/d/${ad.driveFileId}/view`;
+    window.open(previewUrl, '_blank');
   };
 
   const filteredAds = advertisements.filter(ad => {
@@ -185,37 +282,22 @@ export default function AdminAdvertMyBook() {
     );
   }
 
-  if (!user) {
+  if (!user || !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center bg-white p-8 rounded-lg shadow-lg max-w-md">
           <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600 mb-4">Please sign in to access the admin panel</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {!user ? 'Access Denied' : 'Unauthorized Access'}
+          </h2>
+          <p className="text-gray-600 mb-4">
+            {!user ? 'Please sign in to access the admin panel' : "You don't have permission to access this page."}
+          </p>
           <a 
-            href="/auth/signin?redirect=/admin/advert-books" 
+            href={!user ? '/auth/signin?redirect=/admin/advert-books' : '/home'}
             className="inline-block bg-blue-950 text-white px-6 py-2 rounded-lg hover:bg-blue-900 transition-colors"
           >
-            Sign In
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center bg-white p-8 rounded-lg shadow-lg max-w-md">
-          <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Unauthorized Access</h2>
-          <p className="text-gray-600 mb-4">You don't have permission to access this page.</p>
-          <p className="text-sm text-gray-500 mb-4">Purchase books and read</p>
-          <a 
-            href="/home" 
-            className="inline-block bg-blue-950 text-white px-6 py-2 rounded-lg hover:bg-blue-900 transition-colors"
-          >
-            Go to Home
+            {!user ? 'Sign In' : 'Go to Home'}
           </a>
         </div>
       </div>
@@ -238,15 +320,15 @@ export default function AdminAdvertMyBook() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Book Advertisements</h1>
-              <p className="text-gray-600">Manage book advertisement requests</p>
+              <p className="text-gray-600">Manage book advertisement requests & add Google Drive PDFs</p>
             </div>
             <div className="flex items-center gap-2 bg-green-50 px-4 py-2 rounded-lg">
               <Shield className="w-5 h-5 text-green-600" />
               <div>
-                <p className="text-sm font-semibold text-green-900">Admin Access</p>
+                <p className="text-sm font-semibold text-green-900">Admin</p>
                 <p className="text-xs text-green-600">{user.email}</p>
               </div>
             </div>
@@ -283,7 +365,7 @@ export default function AdminAdvertMyBook() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm p-4">
             <p className="text-gray-600 text-sm">Total</p>
             <p className="text-2xl font-bold text-gray-900">{advertisements.length}</p>
@@ -330,11 +412,19 @@ export default function AdminAdvertMyBook() {
                     </span>
                   </div>
 
+                  {/* Drive Status */}
+                  {ad.driveFileId && (
+                    <div className="mb-4 flex items-center gap-2 text-xs bg-green-50 text-green-700 px-3 py-2 rounded">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Google Drive PDF linked</span>
+                    </div>
+                  )}
+
                   {/* Details */}
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <User className="w-4 h-4" />
-                      <span>{ad.name} ({ad.email})</span>
+                      <span className="truncate">{ad.name} ({ad.email})</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Calendar className="w-4 h-4" />
@@ -343,42 +433,14 @@ export default function AdminAdvertMyBook() {
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div>
                         <span className="text-gray-500">Category:</span>
-                        <span className="ml-2 font-medium">{ad.category}</span>
+                        <span className="ml-2 font-medium text-blue-950">{ad.category}</span>
                       </div>
                       <div>
                         <span className="text-gray-500">Price:</span>
                         <span className="ml-2 font-medium">₦{ad.price?.toLocaleString()}</span>
                       </div>
-                      <div>
-                        <span className="text-gray-500">Pages:</span>
-                        <span className="ml-2 font-medium">{ad.pages}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Format:</span>
-                        <span className="ml-2 font-medium">{ad.format}</span>
-                      </div>
                     </div>
                   </div>
-
-                  {/* Description */}
-                  <div className="mb-4">
-                    <p className="text-sm text-gray-600 line-clamp-2">{ad.description}</p>
-                  </div>
-
-                  {/* PDF Info */}
-                  {ad.pdfFileName && (
-                    <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-5 h-5 text-gray-400" />
-                        <span className="text-sm text-gray-600">{ad.pdfFileName}</span>
-                        {ad.pdfSize && (
-                          <span className="text-xs text-gray-500">
-                            ({(ad.pdfSize / (1024 * 1024)).toFixed(2)} MB)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
 
                   {/* Actions */}
                   <div className="flex flex-wrap gap-2">
@@ -400,27 +462,30 @@ export default function AdminAdvertMyBook() {
                         Reject
                       </button>
                     )}
-                    {ad.pdfData && (
+                    <button
+                      onClick={() => {
+                        setSelectedAd(ad);
+                        setShowDriveModal(true);
+                      }}
+                      className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      <Link2 className="w-4 h-4" />
+                      Drive
+                    </button>
+                    {ad.previewUrl && (
                       <button
-                        onClick={() => downloadPDF(ad)}
-                        className="flex items-center gap-1 px-3 py-2 bg-blue-950 text-white rounded-lg hover:bg-blue-900 transition-colors text-sm"
+                        onClick={() => previewPDF(ad)}
+                        className="flex items-center gap-1 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
                       >
-                        <Download className="w-4 h-4" />
-                        Download PDF
+                        <Eye className="w-4 h-4" />
+                        View
                       </button>
                     )}
-                    <button
-                      onClick={() => setSelectedAd(ad)}
-                      className="flex items-center gap-1 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
-                    >
-                      View Details
-                    </button>
                     <button
                       onClick={() => deleteAdvertisement(ad.id)}
                       className="flex items-center gap-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
                     >
                       <Trash2 className="w-4 h-4" />
-                      Delete
                     </button>
                   </div>
                 </div>
@@ -430,81 +495,128 @@ export default function AdminAdvertMyBook() {
         </div>
       </div>
 
-      {/* Detail Modal */}
-      {selectedAd && (
+      {/* Google Drive URL Modal */}
+      {showDriveModal && selectedAd && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">{selectedAd.bookTitle}</h2>
-                <button onClick={() => setSelectedAd(null)} className="text-gray-400 hover:text-gray-600">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Add Google Drive PDF</h2>
+                  <p className="text-sm text-gray-600 mt-1">For: {selectedAd.bookTitle}</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setShowDriveModal(false);
+                    setDriveUrl('');
+                    setExtractedUrls(null);
+                  }} 
+                  className="text-gray-400 hover:text-gray-600"
+                >
                   <X className="w-6 h-6" />
                 </button>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Author</label>
-                  <p className="text-gray-900">{selectedAd.author}</p>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Paste Google Drive Share Link
+                  </label>
+                  <input
+                    type="text"
+                    value={driveUrl}
+                    onChange={(e) => setDriveUrl(e.target.value)}
+                    placeholder="https://drive.google.com/file/d/1ABC123XYZ/view?usp=sharing"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Make sure the file is set to "Anyone with the link" can view
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">Submitted By</label>
-                    <p className="text-gray-900">{selectedAd.name}</p>
-                    <p className="text-gray-600 text-sm">{selectedAd.email}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">Date</label>
-                    <p className="text-gray-900">{formatDate(selectedAd.createdAt)}</p>
-                  </div>
-                </div>
+                <button
+                  onClick={handleExtractDriveUrl}
+                  className="w-full bg-blue-950 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors font-semibold"
+                >
+                  Extract URLs
+                </button>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">Category</label>
-                    <p className="text-gray-900">{selectedAd.category}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">Price</label>
-                    <p className="text-gray-900">₦{selectedAd.price?.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">Pages</label>
-                    <p className="text-gray-900">{selectedAd.pages}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">Format</label>
-                    <p className="text-gray-900">{selectedAd.format}</p>
-                  </div>
-                </div>
+                {extractedUrls && (
+                  <div className="border border-green-200 bg-green-50 rounded-lg p-4">
+                    <h3 className="font-semibold text-green-900 mb-3 flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5" />
+                      URLs Extracted Successfully!
+                    </h3>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-700">File ID</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <code className="flex-1 text-xs text-black bg-white px-3 py-2 rounded border border-gray-200 overflow-x-auto">
+                            {extractedUrls.fileId}
+                          </code>
+                          <button
+                            onClick={() => copyToClipboard(extractedUrls.fileId, 'fileId')}
+                            className="p-2 hover:bg-green-100 rounded"
+                          >
+                            {copied === 'fileId' ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
 
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Description</label>
-                  <p className="text-gray-900">{selectedAd.description}</p>
-                </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-700">Preview URL</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <code className="flex-1 text-xs text-black bg-white px-3 py-2 rounded border border-gray-200 overflow-x-auto">
+                            {extractedUrls.preview}
+                          </code>
+                          <button
+                            onClick={() => copyToClipboard(extractedUrls.preview, 'preview')}
+                            className="p-2 hover:bg-green-100 rounded"
+                          >
+                            {copied === 'preview' ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
 
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Promotion Message</label>
-                  <p className="text-gray-900">{selectedAd.message}</p>
-                </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-700">Download URL</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <code className="flex-1 text-xs text-black bg-white px-3 py-2 rounded border border-gray-200 overflow-x-auto">
+                            {extractedUrls.download}
+                          </code>
+                          <button
+                            onClick={() => copyToClipboard(extractedUrls.download, 'download')}
+                            className="p-2 hover:bg-green-100 rounded"
+                          >
+                            {copied === 'download' ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
-                <div>
-                  <label className="text-sm font-semibold text-gray-700">Status</label>
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedAd.status)}`}>
-                    {selectedAd.status}
-                  </span>
-                </div>
-
-                {selectedAd.pdfData && (
-                  <button
-                    onClick={() => downloadPDF(selectedAd)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-950 text-white rounded-lg hover:bg-blue-900 transition-colors"
-                  >
-                    <Download className="w-5 h-5" />
-                    Download PDF
-                  </button>
+                    <div className="mt-4 pt-4 border-t border-green-200">
+                      <button
+                        onClick={() => addDriveUrlToAd(selectedAd.id)}
+                        className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle className="w-5 h-5" />
+                        Save to Advertisement
+                      </button>
+                    </div>
+                  </div>
                 )}
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-900 mb-2 text-sm">How to get Google Drive link:</h4>
+                  <ol className="text-xs text-blue-800 space-y-1 list-decimal list-inside">
+                    <li>Upload PDF to Google Drive</li>
+                    <li>Right-click → Share</li>
+                    <li>Change to "Anyone with the link"</li>
+                    <li>Set permission to "Viewer"</li>
+                    <li>Copy link and paste here</li>
+                  </ol>
+                </div>
               </div>
             </div>
           </div>

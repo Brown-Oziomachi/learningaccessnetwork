@@ -14,6 +14,7 @@ export default function SavedBooksPage() {
     const [user, setUser] = useState(null);
     const [selectedBook, setSelectedBook] = useState(null);
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+    const [showPopup, setShowPopup] = useState(false)
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -56,8 +57,8 @@ export default function SavedBooksPage() {
             });
 
             setSavedBooks(updatedBooks);
-            alert('Removed from saved books');
-        } catch (error) {
+            setShowPopup(true);
+            setTimeout(() => setShowPopup(false), 2000);        } catch (error) {
             console.error('Error removing book:', error);
             alert('Error removing book. Please try again.');
         }
@@ -209,6 +210,12 @@ export default function SavedBooksPage() {
                 )}
             </main>
 
+ 
+{showPopup && (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fadeIn">
+        Removed from saved later
+    </div>
+ )}
             {/* Purchase Modal */}
             {showPurchaseModal && selectedBook && (
                 <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
