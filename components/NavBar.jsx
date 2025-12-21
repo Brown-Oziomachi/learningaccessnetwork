@@ -22,7 +22,14 @@ import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
 import { useRouter } from "next/navigation";
 import { booksData } from "@/lib/booksData";
-import { collection, getDocs, query, where,doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
 export default function Navbar() {
@@ -339,17 +346,15 @@ export default function Navbar() {
                     Upload Document
                   </>
                 ) : (
-                    <>
-                        Become a Seller
-                    </>
-    )}
+                  <>Become a Seller</>
+                )}
               </button>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
               >
                 <LogOut size={18} className="lg:w-5 lg:h-5" />
-                <span className="hidden lg:inline">Logout</span>
+                <span className=" lg:inline">Logout</span>
               </button>
             </nav>
           </div>
@@ -715,27 +720,25 @@ export default function Navbar() {
 
             {mobileSubmenu === null ? (
               <div className="space-y-2 text-blue-950">
-                 <button
-                                           onClick={HandleClick}
-                                           disabled={checkingSeller}
-                                           className="bg-blue-950 hover:bg-blue-800 transition-colors text-white font-semibold px-8 py-4 rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                       >
-                                           {checkingSeller ? (
-                                               <>
-                                                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                                   Loading...
-                                               </>
-                                           ) : isSeller ? (
-                                               <>
-                                                   <Upload size={20} />
-                                                   Upload Document
-                                               </>
-                                           ) : (
-                                               <>
-                                                   Become a Seller
-                                               </>
-                                           )}
-                                       </button>
+                <button
+                  onClick={HandleClick}
+                  disabled={checkingSeller}
+                  className="bg-blue-950 hover:bg-blue-800 transition-colors text-white font-semibold px-8 py-4 rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {checkingSeller ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Loading...
+                    </>
+                  ) : isSeller ? (
+                    <>
+                      <Upload size={20} />
+                      Upload Document
+                    </>
+                  ) : (
+                    <>Become a Seller</>
+                  )}
+                </button>
                 <Link
                   href="/my-books"
                   className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
@@ -766,10 +769,10 @@ export default function Navbar() {
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-1 lg:gap-2 px-5 bg-blue-950 lg:px-3 py-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
+                  className="flex items-center gap-1 lg:gap-2 px-5 bg-red-700 lg:px-3 py-2 text-white hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
                 >
                   <LogOut size={18} className="lg:w-5 lg:h-5" />
-                  <span className="">Logout</span>
+                  <span>Logout</span>
                 </button>
 
                 <div className="border-t border-gray-200 my-4 pt-4">
