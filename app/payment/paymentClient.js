@@ -9,7 +9,7 @@ import { booksData } from "@/lib/booksData";
 import { PaymentMethodSelector } from '@/components/PaymentMethodSelector';
 import { PaymentForm } from '@/components/PaymentForm';
 import { OrderSummary } from '@/components/OrderSummary';
-import Navbar from '@/components/NavBar'; 
+import Navbar from '@/components/NavBar';
 import { usePayment } from '../hooks/usePayment';
 
 export default function PaymentClient() {
@@ -18,6 +18,7 @@ export default function PaymentClient() {
     const bookId = searchParams.get('bookId');
 
     const [book, setBook] = useState(null);
+    const [sellerDetails, setSellerDetails] = useState(null);
     const [loading, setLoading] = useState(true);
     const [paymentMethod, setPaymentMethod] = useState('flutterwave');
     const [formData, setFormData] = useState({
@@ -26,18 +27,18 @@ export default function PaymentClient() {
         name: ''
     });
 
-    // Use the payment hook
+    // Use the payment hook with seller details
     const {
         processing,
         paymentSuccess,
         error,
         processFlutterwavePayment,
         processPayPalPayment
-    } = usePayment(book, formData);
+    } = usePayment(book, formData, sellerDetails);
 
-    // Fetch book data
+    // Fetch book data and seller details
     useEffect(() => {
-        const fetchBook = async () => {
+        const fetchBookAndSeller = async () => {
             if (!bookId) {
                 setLoading(false);
                 return;
@@ -47,6 +48,9 @@ export default function PaymentClient() {
                 setLoading(true);
                 console.log('Fetching book with ID:', bookId);
 
+                let bookData = null;
+                let sellerId = null;
+
                 // Check if it's a Firestore book ID
                 if (bookId?.startsWith('firestore-')) {
                     const firestoreId = bookId.replace('firestore-', '');
@@ -55,7 +59,9 @@ export default function PaymentClient() {
 
                     if (bookDoc.exists()) {
                         const data = bookDoc.data();
-                        setBook({
+                        sellerId = data.sellerId || data.userId;
+
+                        bookData = {
                             id: bookId,
                             firestoreId: firestoreId,
                             title: data.bookTitle,
@@ -69,51 +75,86 @@ export default function PaymentClient() {
                             message: data.message,
                             pdfUrl: data.pdfLink,
                             driveFileId: data.driveFileId,
-                            sellerId: data.sellerId || data.userId,
+                            sellerId: sellerId,
                             oldPrice: data.oldPrice || null,
                             discount: data.discount || null
-                        });
-                        setLoading(false);
-                        return;
+                        };
                     }
                 } else {
                     // Try local booksData
                     const localBook = booksData.find(b => b.id === parseInt(bookId) || b.id === bookId);
                     if (localBook) {
-                        setBook(localBook);
-                        setLoading(false);
-                        return;
-                    }
+                        bookData = localBook;
+                        sellerId = localBook.sellerId;
+                    } else {
+                        // Try Firestore without prefix
+                        const bookDocRef = doc(db, 'advertMyBook', bookId);
+                        const bookDoc = await getDoc(bookDocRef);
 
-                    // Try Firestore without prefix
-                    const bookDocRef = doc(db, 'advertMyBook', bookId);
-                    const bookDoc = await getDoc(bookDocRef);
+                        if (bookDoc.exists()) {
+                            const data = bookDoc.data();
+                            sellerId = data.sellerId || data.userId;
 
-                    if (bookDoc.exists()) {
-                        const data = bookDoc.data();
-                        setBook({
-                            id: `firestore-${bookId}`,
-                            firestoreId: bookId,
-                            title: data.bookTitle,
-                            author: data.author || data.name,
-                            category: data.category,
-                            price: data.price,
-                            pages: data.pages,
-                            format: data.format || 'PDF',
-                            image: data.coverImage,
-                            description: data.description,
-                            pdfUrl: data.pdfLink,
-                            sellerId: data.sellerId || data.userId,
-                            oldPrice: data.oldPrice || null,
-                            discount: data.discount || null
-                        });
-                        setLoading(false);
-                        return;
+                            bookData = {
+                                id: `firestore-${bookId}`,
+                                firestoreId: bookId,
+                                title: data.bookTitle,
+                                author: data.author || data.name,
+                                category: data.category,
+                                price: data.price,
+                                pages: data.pages,
+                                format: data.format || 'PDF',
+                                image: data.coverImage,
+                                description: data.description,
+                                pdfUrl: data.pdfLink,
+                                sellerId: sellerId,
+                                oldPrice: data.oldPrice || null,
+                                discount: data.discount || null
+                            };
+                        }
                     }
                 }
 
-                console.error('Book not found with ID:', bookId);
-                setBook(null);
+                if (!bookData) {
+                    console.error('Book not found with ID:', bookId);
+                    setBook(null);
+                    setLoading(false);
+                    return;
+                }
+
+                setBook(bookData);
+
+                // Fetch seller details if sellerId exists
+                if (sellerId) {
+                    try {
+                        const sellerDocRef = doc(db, 'users', sellerId);
+                        const sellerDoc = await getDoc(sellerDocRef);
+
+                        if (sellerDoc.exists()) {
+                            const sellerData = sellerDoc.data();
+                            setSellerDetails({
+                                id: sellerId,
+                                name: sellerData.displayName || sellerData.name || 'Unknown Seller',
+                                email: sellerData.email,
+                                phone: sellerData.phone || sellerData.phoneNumber,
+                                accountDetails: sellerData.accountDetails || null,
+                                // Add any other relevant seller info for payment processing
+                                walletId: sellerData.walletId,
+                                bankAccount: sellerData.bankAccount
+                            });
+                            console.log('Seller details fetched:', sellerData);
+                        } else {
+                            console.warn('Seller not found in users collection');
+                            setSellerDetails({ id: sellerId, name: 'Unknown Seller' });
+                        }
+                    } catch (sellerError) {
+                        console.error('Error fetching seller details:', sellerError);
+                        setSellerDetails({ id: sellerId, name: 'Unknown Seller' });
+                    }
+                } else {
+                    console.warn('No seller ID found for book');
+                }
+
             } catch (error) {
                 console.error('Error fetching book:', error);
                 setBook(null);
@@ -122,7 +163,7 @@ export default function PaymentClient() {
             }
         };
 
-        fetchBook();
+        fetchBookAndSeller();
     }, [bookId]);
 
     // Redirect after successful payment
@@ -144,6 +185,12 @@ export default function PaymentClient() {
 
         if (!formData.email || !formData.phone || !formData.name) {
             alert('Please fill in all required fields');
+            return;
+        }
+
+        // Validate seller details exist
+        if (!sellerDetails) {
+            alert('Seller information is missing. Cannot process payment.');
             return;
         }
 
@@ -201,6 +248,11 @@ export default function PaymentClient() {
                         <p className="text-sm text-blue-950 mt-2">
                             <strong>Amount:</strong> ₦ {book.price.toLocaleString()}
                         </p>
+                        {sellerDetails && (
+                            <p className="text-sm text-blue-950 mt-2">
+                                <strong>Seller:</strong> {sellerDetails.name}
+                            </p>
+                        )}
                     </div>
                     <p className="text-gray-600 mb-4">Redirecting to book preview...</p>
                     <Link
@@ -230,6 +282,14 @@ export default function PaymentClient() {
                     </div>
                 )}
 
+                {!sellerDetails && (
+                    <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <p className="text-yellow-900">
+                            <strong>Warning:</strong> Seller information is missing. Payment may not be processed correctly.
+                        </p>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Payment Form */}
                     <div className="lg:col-span-2">
@@ -254,7 +314,7 @@ export default function PaymentClient() {
 
                     {/* Order Summary */}
                     <div className="lg:col-span-1">
-                        <OrderSummary book={book} />
+                        <OrderSummary book={book} sellerDetails={sellerDetails} />
                     </div>
                 </div>
             </main>

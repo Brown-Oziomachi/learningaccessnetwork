@@ -406,6 +406,7 @@ export default function AdminAdvertMyBook() {
                     <div className="flex-1">
                       <h3 className="text-xl font-bold text-gray-900 mb-1">{ad.bookTitle}</h3>
                       <p className="text-gray-600 text-sm">by {ad.author}</p>
+                      
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(ad.status)}`}>
                       {ad.status}

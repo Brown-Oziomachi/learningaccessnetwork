@@ -1,5 +1,5 @@
 // app/advertise/AdvertiseClient.jsx
-// UPDATED: Now includes seller information for payment tracking
+// UPDATED: Uses ImgBB free image hosting (no Firebase Storage needed)
 
 "use client";
 
@@ -15,10 +15,9 @@ export default function AdvertiseClient() {
 
     const [checkingAuth, setCheckingAuth] = useState(true);
     const [user, setUser] = useState(null);
-    const [userData, setUserData] = useState(null); // Store full user data
+    const [userData, setUserData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState("");
-    const [pdfFile, setPdfFile] = useState(null);
     const [coverImage, setCoverImage] = useState(null);
     const [coverImagePreview, setCoverImagePreview] = useState(null);
     const [formData, setFormData] = useState({
@@ -48,7 +47,10 @@ export default function AdvertiseClient() {
         'Relationship'
     ];
 
-    // Auth State Listener with auto-fill
+    // ImgBB API Key (Get free from https://api.imgbb.com/)
+    // This is just an example - GET YOUR OWN FREE API KEY from imgbb.com
+    const IMGBB_API_KEY = "b1dca0e473db0c33831f460354763f20"; // Replace with your actual key
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (!currentUser) {
@@ -56,21 +58,21 @@ export default function AdvertiseClient() {
                 router.replace("/auth/signin?redirect=/advertise");
             } else {
                 setUser(currentUser);
-                
+
                 try {
                     const userDocRef = doc(db, 'users', currentUser.uid);
                     const userDoc = await getDoc(userDocRef);
-                    
+
                     let displayName = currentUser.displayName || "";
                     let fullUserData = null;
-                    
+
                     if (userDoc.exists()) {
                         fullUserData = userDoc.data();
                         displayName = fullUserData.displayName || fullUserData.name || displayName;
                     }
-                    
-                    setUserData(fullUserData); // Store for later use
-                    
+
+                    setUserData(fullUserData);
+
                     setFormData((prev) => ({
                         ...prev,
                         name: displayName,
@@ -84,7 +86,7 @@ export default function AdvertiseClient() {
                         email: currentUser.email || "",
                     }));
                 }
-                
+
                 setCheckingAuth(false);
             }
         });
@@ -97,48 +99,74 @@ export default function AdvertiseClient() {
         setFormData({ ...formData, [name]: value });
     };
 
-    const compressImage = (file, maxSizeMB = 0.5) => {
+    const compressImage = (file, maxSizeMB = 1) => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
-            
+
             reader.onload = (event) => {
                 const img = new window.Image();
                 img.src = event.target.result;
-                
+
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
                     let width = img.width;
                     let height = img.height;
-                    
-                    const maxWidth = 800;
+
+                    const maxWidth = 1200;
                     if (width > maxWidth) {
                         height = (height * maxWidth) / width;
                         width = maxWidth;
                     }
-                    
+
                     canvas.width = width;
                     canvas.height = height;
-                    
+
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    
-                    let quality = 0.7;
+
+                    let quality = 0.8;
                     let result = canvas.toDataURL('image/jpeg', quality);
-                    
-                    while (result.length > maxSizeMB * 1024 * 1024 * 1.37 && quality > 0.1) {
+
+                    while (result.length > maxSizeMB * 1024 * 1024 * 1.37 && quality > 0.3) {
                         quality -= 0.1;
                         result = canvas.toDataURL('image/jpeg', quality);
                     }
-                    
+
                     resolve(result);
                 };
-                
+
                 img.onerror = reject;
             };
-            
+
             reader.onerror = reject;
         });
+    };
+
+    // Upload image to ImgBB
+    const uploadImageToImgBB = async (base64Image) => {
+        try {
+            const formData = new FormData();
+            // Remove data:image/jpeg;base64, prefix
+            const base64Data = base64Image.split(',')[1];
+            formData.append('image', base64Data);
+
+            const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                return data.data.url; // Returns the direct image URL
+            } else {
+                throw new Error(data.error?.message || 'Upload failed');
+            }
+        } catch (error) {
+            console.error('ImgBB upload error:', error);
+            throw error;
+        }
     };
 
     const handleCoverImageChange = async (e) => {
@@ -152,11 +180,11 @@ export default function AdvertiseClient() {
                 alert('Image size must be less than 10MB');
                 return;
             }
-            
+
             setCoverImage(file);
-            
+
             try {
-                const compressed = await compressImage(file, 0.5);
+                const compressed = await compressImage(file, 1);
                 setCoverImagePreview(compressed);
             } catch (error) {
                 console.error("Error compressing image:", error);
@@ -175,6 +203,7 @@ export default function AdvertiseClient() {
     };
 
     const handleSubmit = async () => {
+        // Validation
         if (!formData.name || !formData.email || !formData.bookTitle ||
             !formData.author || !formData.category || !formData.price ||
             !formData.pages || !formData.description || !formData.message) {
@@ -192,6 +221,7 @@ export default function AdvertiseClient() {
             return;
         }
 
+        // Validate URL
         try {
             new URL(formData.driveLink);
         } catch {
@@ -199,41 +229,38 @@ export default function AdvertiseClient() {
             return;
         }
 
+        // Check if API key is set
+        if (IMGBB_API_KEY === "YOUR_IMGBB_API_KEY") {
+            alert("Please configure ImgBB API key. Get free key from https://api.imgbb.com/");
+            return;
+        }
+
         try {
             setLoading(true);
-            setUploadProgress("Preparing submission...");
+            setUploadProgress("Uploading cover image...");
 
-            const storage = getStorage();
-            const imageRef = ref(
-            storage,
-            `book-covers/${user.uid}/${Date.now()}-${coverImage.name}`
-            );
+            // Upload image to ImgBB
+            const coverImageUrl = await uploadImageToImgBB(coverImagePreview);
 
-            await uploadBytes(imageRef, coverImage);
-            const coverImageURL = await getDownloadURL(imageRef);
-                        
+            console.log("Image uploaded successfully:", coverImageUrl);
+
             setUploadProgress("Saving book details...");
-            
+
             // Prepare seller information
-            const displayName = userData?.displayName || 
-                               userData?.name || 
-                               formData.name || 
-                               `${userData?.firstName || ''} ${userData?.surname || ''}`.trim();
+            const displayName = userData?.displayName ||
+                userData?.name ||
+                formData.name ||
+                `${userData?.firstName || ''} ${userData?.surname || ''}`.trim();
 
             const bookData = {
-                // User & seller
+                // User & seller info
                 userId: user.uid,
                 sellerId: user.uid,
                 sellerEmail: user.email,
                 sellerName: displayName,
-
-                // CRITICAL: Seller information for payment tracking
-                sellerId: user.uid,
-                sellerEmail: user.email,
-                sellerName: displayName,
                 sellerPhone: userData?.phoneNumber || null,
-                sellerProfilePic: user.photoURL || null,
-                
+                sellerProfilePic: user.photoURL || userData?.photoBase64 || null,
+
                 // Book info
                 bookTitle: formData.bookTitle,
                 author: formData.author,
@@ -244,9 +271,10 @@ export default function AdvertiseClient() {
                 description: formData.description,
                 message: formData.message,
 
-                // Files
+                // Files - Only store the URL (not base64)
                 pdfLink: formData.driveLink,
-                coverImageUrl: coverImageURL,
+                coverImage: coverImageUrl, // Just the URL!
+                coverImageUrl: coverImageUrl, // Same as above for compatibility
 
                 // Metadata
                 status: "pending",
@@ -256,15 +284,15 @@ export default function AdvertiseClient() {
                 updatedAt: serverTimestamp(),
             };
 
-
             console.log("Submitting book with seller info:", {
                 sellerId: bookData.sellerId,
                 sellerEmail: bookData.sellerEmail,
-                sellerName: bookData.sellerName
+                sellerName: bookData.sellerName,
+                coverImageUrl: coverImageUrl
             });
 
             const docRef = await addDoc(collection(db, "advertMyBook"), bookData);
-            
+
             console.log("Document saved with ID:", docRef.id);
             alert("Request sent successfully! We'll review your submission and contact you shortly.");
 
@@ -286,17 +314,19 @@ export default function AdvertiseClient() {
             setCoverImagePreview(null);
             setUploadProgress("");
 
-            router.replace("/advertise?success=1");
+            router.replace("/home");
         } catch (error) {
             console.error("Error:", error);
             let errorMessage = "Something went wrong. Please try again.";
-            
-            if (error.code === 'permission-denied') {
-                errorMessage = "Permission denied. Please check Firestore rules.";
+
+            if (error.message.includes('ImgBB') || error.message.includes('Upload')) {
+                errorMessage = "Failed to upload cover image. Please try again or use a smaller image.";
+            } else if (error.code === 'permission-denied') {
+                errorMessage = "Permission denied. Please check your authentication.";
             } else if (error.message) {
                 errorMessage = error.message;
             }
-            
+
             alert(errorMessage);
         } finally {
             setLoading(false);
@@ -502,9 +532,9 @@ export default function AdvertiseClient() {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Book Cover Image * (Will be compressed)
+                            Book Cover Image * (Uploaded to free hosting)
                         </label>
-                        
+
                         {!coverImage ? (
                             <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
                                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -524,18 +554,18 @@ export default function AdvertiseClient() {
                         ) : (
                             <div className="border-2 border-blue-300 bg-blue-50 rounded-lg p-4">
                                 <div className="flex items-start gap-4">
-                                    <img 
-                                        src={coverImagePreview} 
-                                        alt="Cover preview" 
+                                    <img
+                                        src={coverImagePreview}
+                                        alt="Cover preview"
                                         className="w-24 h-32 object-cover rounded border-2 border-gray-300"
                                     />
                                     <div className="flex-1">
                                         <p className="text-sm font-medium text-gray-900">{coverImage.name}</p>
-                                        <p className="text-xs text-green-600 mt-1">✓ Image compressed</p>
+                                        <p className="text-xs text-green-600 mt-1">✓ Image ready for upload</p>
                                         <button
                                             onClick={removeCoverImage}
                                             disabled={loading}
-                                            className="mt-2 text-sm text-red-600 hover:text-red-700 font-medium"
+                                            className="mt-2 text-sm text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
                                         >
                                             Remove Image
                                         </button>
@@ -595,12 +625,12 @@ export default function AdvertiseClient() {
                         disabled={loading}
                         className="flex-1 bg-blue-950 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-900 transition-colors disabled:opacity-50"
                     >
-                        {loading ? "Sending..." : "Send Request"}
+                        {loading ? "Uploading..." : "Send Request"}
                     </button>
                 </div>
 
                 <p className="text-center text-xs text-gray-500 mt-4">
-                    We typically respond within 24-48 hours • You'll earn 80% on every sale
+                    Images hosted on free ImgBB service • We typically respond within 24-48 hours
                 </p>
             </div>
         </div>

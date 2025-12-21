@@ -7,7 +7,6 @@ import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-// ADD THESE IMPORTS FOR FIREBASE STORAGE
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
@@ -17,6 +16,7 @@ export default function MyAccount() {
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [error, setError] = useState(null);
     const router = useRouter();
 
     const [formData, setFormData] = useState({
@@ -27,24 +27,41 @@ export default function MyAccount() {
     });
 
     useEffect(() => {
+        console.log("Setting up auth listener...");
+
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            console.log("Auth state changed:", currentUser ? "User logged in" : "No user");
+
             if (currentUser) {
+                console.log("User UID:", currentUser.uid);
                 await fetchUserData(currentUser.uid);
             } else {
+                console.log("No user, redirecting to signin...");
                 router.push('/auth/signin');
             }
         });
 
-        return () => unsubscribe();
+        return () => {
+            console.log("Cleaning up auth listener");
+            unsubscribe();
+        };
     }, [router]);
 
     const fetchUserData = async (uid) => {
         try {
+            console.log("Fetching user data for UID:", uid);
             setLoading(true);
-            const userDoc = await getDoc(doc(db, "users", uid));
+            setError(null);
+
+            const userDocRef = doc(db, "users", uid);
+            console.log("Document reference created");
+
+            const userDoc = await getDoc(userDocRef);
+            console.log("Document fetched, exists:", userDoc.exists());
 
             if (userDoc.exists()) {
                 const userData = userDoc.data();
+                console.log("User data:", userData);
 
                 setUser({ uid, ...userData });
                 setFormData({
@@ -53,10 +70,31 @@ export default function MyAccount() {
                     displayName: userData.displayName || "",
                     dateOfBirth: userData.dateOfBirth || ""
                 });
+
+                console.log("User state updated successfully");
+            } else {
+                console.error("User document does not exist!");
+                setError("User profile not found. Please complete your registration.");
+
+                // Create a basic user document if it doesn't exist
+                const basicUserData = {
+                    email: auth.currentUser?.email,
+                    createdAt: new Date().toISOString(),
+                    firstName: "",
+                    surname: "",
+                    displayName: auth.currentUser?.displayName || "",
+                };
+
+                await updateDoc(userDocRef, basicUserData);
+                setUser({ uid, ...basicUserData });
             }
         } catch (error) {
             console.error("Error fetching user data:", error);
+            console.error("Error code:", error.code);
+            console.error("Error message:", error.message);
+            setError(`Failed to load profile: ${error.message}`);
         } finally {
+            console.log("Setting loading to false");
             setLoading(false);
         }
     };
@@ -79,30 +117,33 @@ export default function MyAccount() {
 
         try {
             setUploading(true);
+            console.log("Starting image upload...");
 
             // Get Firebase Storage instance
             const storage = getStorage();
+            console.log("Storage instance obtained");
 
             // Create a unique filename with timestamp
             const timestamp = Date.now();
             const imageRef = ref(storage, `profile-images/${user.uid}_${timestamp}.jpg`);
-
-            console.log("Uploading image...");
+            console.log("Storage reference created:", `profile-images/${user.uid}_${timestamp}.jpg`);
 
             // Upload the file
+            console.log("Uploading file...");
             await uploadBytes(imageRef, file);
-
-            console.log("Getting download URL...");
+            console.log("File uploaded successfully");
 
             // Get the download URL
+            console.log("Getting download URL...");
             const downloadURL = await getDownloadURL(imageRef);
-
-            console.log("Download URL:", downloadURL);
+            console.log("Download URL obtained:", downloadURL);
 
             // Update Firestore with the new photo URL
+            console.log("Updating Firestore...");
             await updateDoc(doc(db, "users", user.uid), {
                 photoURL: downloadURL
             });
+            console.log("Firestore updated");
 
             // Update local state
             setUser(prev => ({
@@ -114,7 +155,22 @@ export default function MyAccount() {
 
         } catch (error) {
             console.error("Image upload failed:", error);
-            alert(`Failed to upload image: ${error.message}`);
+            console.error("Error code:", error.code);
+            console.error("Error message:", error.message);
+
+            // More detailed error messages
+            let errorMessage = "Failed to upload image";
+            if (error.code === 'storage/unauthorized') {
+                errorMessage = "Storage permission denied. Please check Firebase Storage rules.";
+            } else if (error.code === 'storage/canceled') {
+                errorMessage = "Upload was canceled";
+            } else if (error.code === 'storage/unknown') {
+                errorMessage = "Unknown storage error occurred";
+            } else {
+                errorMessage = `Upload failed: ${error.message}`;
+            }
+
+            alert(errorMessage);
         } finally {
             setUploading(false);
         }
@@ -122,6 +178,8 @@ export default function MyAccount() {
 
     const handleSave = async () => {
         try {
+            console.log("Saving profile changes...");
+
             await updateDoc(doc(db, "users", user.uid), {
                 ...formData,
                 displayName: `${formData.firstName} ${formData.surname}`
@@ -135,9 +193,10 @@ export default function MyAccount() {
 
             setIsEditing(false);
             alert("Profile updated successfully!");
+            console.log("Profile saved successfully");
         } catch (error) {
             console.error("Error saving profile:", error);
-            alert("Failed to save profile");
+            alert(`Failed to save profile: ${error.message}`);
         }
     };
 
@@ -145,12 +204,57 @@ export default function MyAccount() {
         router.push('/become-seller');
     };
 
-    if (loading || !user) {
+    // Show loading state
+    if (loading) {
         return (
             <div className="min-h-screen bg-blue-950 flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-50 mx-auto"></div>
                     <p className="mt-4 text-gray-300">Loading My Account...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Show error state
+    if (error && !user) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">
+                    <div className="text-red-500 text-6xl mb-4">⚠️</div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Profile</h2>
+                    <p className="text-gray-600 mb-6">{error}</p>
+                    <div className="flex gap-4 justify-center">
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="bg-blue-950 text-white px-6 py-2 rounded-lg hover:bg-blue-900"
+                        >
+                            Retry
+                        </button>
+                        <button
+                            onClick={() => router.push('/auth/signin')}
+                            className="border border-gray-300 px-6 py-2 rounded-lg hover:bg-gray-50"
+                        >
+                            Sign Out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show page if user exists
+    if (!user) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <p className="text-gray-600">No user data available</p>
+                    <button
+                        onClick={() => router.push('/auth/signin')}
+                        className="mt-4 bg-blue-950 text-white px-6 py-2 rounded-lg"
+                    >
+                        Go to Sign In
+                    </button>
                 </div>
             </div>
         );
@@ -193,13 +297,18 @@ export default function MyAccount() {
                         <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
                             <div className="relative">
                                 <img
-                                    src={user.photoURL || "/api/placeholder/128/128"}
+                                    src={user.photoURL || "https://ui-avatars.com/api/?name=" + encodeURIComponent(user.displayName || user.email)}
                                     className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white object-cover"
                                     alt="profile"
+                                    onError={(e) => {
+                                        e.target.src = "https://ui-avatars.com/api/?name=" + encodeURIComponent(user.displayName || user.email);
+                                    }}
                                 />
                             </div>
                             <div className="text-center sm:text-left flex-1">
-                                <h2 className="text-2xl sm:text-3xl font-bold">{user.displayName}</h2>
+                                <h2 className="text-2xl sm:text-3xl font-bold">
+                                    {user.displayName || user.email?.split('@')[0] || 'User'}
+                                </h2>
                                 <p className="text-blue-200 flex items-center gap-2 justify-center sm:justify-start mt-1">
                                     <Mail size={16} />
                                     {user.email}
@@ -220,11 +329,15 @@ export default function MyAccount() {
                         <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
                             <div>
                                 <label className="font-semibold text-gray-700">First Name</label>
-                                <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user.firstName}</p>
+                                <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">
+                                    {user.firstName || 'Not set'}
+                                </p>
                             </div>
                             <div>
                                 <label className="font-semibold text-gray-700">Surname</label>
-                                <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user.surname}</p>
+                                <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">
+                                    {user.surname || 'Not set'}
+                                </p>
                             </div>
                             <div>
                                 <label className="font-semibold text-gray-700">Email</label>
@@ -232,7 +345,9 @@ export default function MyAccount() {
                             </div>
                             <div>
                                 <label className="font-semibold text-gray-700">Date of Birth</label>
-                                <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user.dateOfBirth || 'Not set'}</p>
+                                <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">
+                                    {user.dateOfBirth || 'Not set'}
+                                </p>
                             </div>
                         </div>
 
@@ -284,9 +399,12 @@ export default function MyAccount() {
                             <div className="flex justify-center mb-6">
                                 <div className="relative">
                                     <img
-                                        src={user.photoURL || "/api/placeholder/128/128"}
+                                        src={user.photoURL || "https://ui-avatars.com/api/?name=" + encodeURIComponent(user.displayName || user.email)}
                                         className="w-32 h-32 rounded-full border-4 border-gray-200 object-cover"
                                         alt="profile"
+                                        onError={(e) => {
+                                            e.target.src = "https://ui-avatars.com/api/?name=" + encodeURIComponent(user.displayName || user.email);
+                                        }}
                                     />
                                     <label className="absolute bottom-0 right-0 bg-blue-600 p-3 rounded-full cursor-pointer hover:bg-blue-700 transition-colors">
                                         <Camera size={18} className="text-white" />

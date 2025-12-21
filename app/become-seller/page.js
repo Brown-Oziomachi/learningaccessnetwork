@@ -85,7 +85,7 @@ export default function BecomeSeller() {
 
                 if (userData.isSeller) {
                     alert('You are already a seller!');
-                    router.push('/seller-account');
+                    router.push('/my-account/seller-account');
                     return;
                 }
 

@@ -48,6 +48,8 @@ export default function BookPreviewPage() {
   const [toastMessage, setToastMessage] = useState("");
   const [expandedCategory, setExpandedCategory] = useState(null);
   const [previewContent, setPreviewContent] = useState("");
+  const [checkingSeller, setCheckingSeller] = useState(true);
+  const [isSeller, setIsSeller] = useState(false);
 
   const categories = [
     {
@@ -88,6 +90,64 @@ export default function BookPreviewPage() {
     },
   ];
 
+  // Check seller status
+  const checkSellerStatus = async (userId) => {
+    try {
+      setCheckingSeller(true);
+      console.log("Checking seller status for user:", userId);
+
+      const userDocRef = doc(db, "users", userId);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const isUserSeller = userData.isSeller === true;
+        console.log("User is seller:", isUserSeller);
+        setIsSeller(isUserSeller);
+      } else {
+        console.log("User document not found");
+        setIsSeller(false);
+      }
+    } catch (error) {
+      console.error("Error checking seller status:", error);
+      setIsSeller(false);
+    } finally {
+      setCheckingSeller(false);
+    }
+  };
+
+  // Auth state listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        await checkSellerStatus(currentUser.uid);
+      } else {
+        router.push("/auth/signin");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  // Handle upload button click
+  const HandleClick = () => {
+    console.log("Button clicked, isSeller:", isSeller);
+
+    if (!user) {
+      router.push("/auth/signin");
+      return;
+    }
+
+    if (isSeller) {
+      // User is already a seller, go to upload page
+      router.push("/advertise");
+    } else {
+      // User is not a seller, go to become seller page
+      router.push("/become-seller");
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
@@ -102,7 +162,6 @@ export default function BookPreviewPage() {
     return () => unsubscribe();
   }, []);
 
-  // NEW: Add visibility change listener to recheck purchase status when page becomes visible
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (!document.hidden && user) {
@@ -115,7 +174,6 @@ export default function BookPreviewPage() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [user, bookId]);
 
-  // NEW: Also recheck when the component mounts or bookId changes
   useEffect(() => {
     if (user && bookId) {
       checkPurchaseStatus(user.uid);
@@ -183,43 +241,61 @@ export default function BookPreviewPage() {
     }
   }, [bookId]);
 
-  const checkPurchaseStatus = async (userId) => {
-    try {
-      const userDocRef = doc(db, "users", userId);
-      const userDoc = await getDoc(userDocRef);
+ const checkPurchaseStatus = async (userId) => {
+  try {
+    const userDocRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userDocRef);
 
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        const purchasedBooks = userData.purchasedBooks || [];
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      const purchasedBooks = userData.purchasedBooks || {};
 
-        // Check both with and without 'firestore-' prefix
-        const cleanBookId = bookId?.replace("firestore-", "");
-        const purchased = purchasedBooks.some((b) => {
-          const cleanPurchasedId = b.id?.replace("firestore-", "");
+      // Clean the bookId for comparison
+      const cleanBookId = bookId?.replace("firestore-", "");
+      
+      // Check if the book exists in purchasedBooks object
+      // purchasedBooks is stored as an object/map, not an array
+      let purchased = false;
+      
+      // Method 1: Direct key check
+      if (purchasedBooks[bookId] || purchasedBooks[cleanBookId]) {
+        purchased = true;
+      }
+      
+      // Method 2: Check all keys in the purchasedBooks object
+      if (!purchased) {
+        const bookKeys = Object.keys(purchasedBooks);
+        purchased = bookKeys.some(key => {
+          const cleanKey = key.replace("firestore-", "");
           return (
-            b.id === bookId ||
-            b.id === cleanBookId ||
-            cleanPurchasedId === bookId ||
-            cleanPurchasedId === cleanBookId
+            key === bookId ||
+            key === cleanBookId ||
+            cleanKey === bookId ||
+            cleanKey === cleanBookId
           );
         });
-
-        setIsPurchased(purchased);
-
-        // Show a toast if the book was just purchased
-        if (purchased && searchParams.get("purchased") === "true") {
-          showToastMessage("Purchase successful! You now have full access.");
-          // Remove the 'purchased' query param
-          const url = new URL(window.location);
-          url.searchParams.delete("purchased");
-          window.history.replaceState({}, "", url);
-        }
       }
-    } catch (error) {
-      console.error("Error checking purchase status:", error);
-    }
-  };
 
+      console.log('Purchase check:', { bookId, cleanBookId, purchased, purchasedBooks });
+      setIsPurchased(purchased);
+
+      // Show success message if coming from payment
+      if (purchased && searchParams.get("purchased") === "true") {
+        showToastMessage("Purchase successful! You now have full access.");
+        
+        // Clean up URL
+        const url = new URL(window.location);
+        url.searchParams.delete("purchased");
+        window.history.replaceState({}, "", url);
+      }
+    }
+  } catch (error) {
+    console.error("Error checking purchase status:", error);
+    setIsPurchased(false);
+  }
+};
+
+// Also update checkSavedStatus to handle both array and object formats
   const checkSavedStatus = async (userId) => {
     try {
       const userDocRef = doc(db, "users", userId);
@@ -228,7 +304,18 @@ export default function BookPreviewPage() {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         const savedBooks = userData.savedBooks || [];
-        const saved = savedBooks.some((b) => b.id === bookId);
+      
+        // Check if savedBooks is an array or object
+        let saved = false;
+      
+        if (Array.isArray(savedBooks)) {
+          // Handle array format
+          saved = savedBooks.some((b) => b.id === bookId);
+        } else if (typeof savedBooks === 'object') {
+          // Handle object format
+          saved = savedBooks[bookId] !== undefined;
+        }
+      
         setIsSaved(saved);
       }
     } catch (error) {
@@ -257,7 +344,6 @@ export default function BookPreviewPage() {
         setIsSaved(false);
         showToastMessage("Removed from saved books");
       } else {
-        // FIXED: Store only minimal data to avoid document size limit
         const bookToSave = {
           id: book.id,
           title: book.title,
@@ -288,7 +374,6 @@ export default function BookPreviewPage() {
   };
 
   const handlePurchase = () => {
-    // Ensure we pass the correct bookId format to payment page
     const paymentBookId = bookId?.startsWith("firestore-")
       ? bookId
       : `firestore-${bookId}`;
@@ -425,17 +510,36 @@ export default function BookPreviewPage() {
                 <span className="font-medium">Saved Books</span>
                 <ChevronRight />
               </Link>
+              <Link
+                href="/my-books"
+                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg mb-4"
+              >
+                <span className="font-medium">My Books</span>
+                <ChevronRight />
+              </Link>
 
               <div className="border-t border-gray-200 my-4"></div>
 
               <div className="space-y-2">
-                <Link
-                  href="/advertise"
-                  className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg"
+                <button
+                  onClick={HandleClick}
+                  disabled={checkingSeller}
+                  className="bg-blue-950 hover:bg-blue-800 transition-colors text-white font-semibold px-8 py-2 rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  <Upload size={20} />
-                  <span>Upload / Advertise</span>
-                </Link>
+                  {checkingSeller ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Loading...
+                    </>
+                  ) : isSeller ? (
+                    <>
+                      <Upload size={20} />
+                      Upload Document
+                    </>
+                  ) : (
+                    <>Become a Seller</>
+                  )}
+                </button>
 
                 <Link
                   href="/lan/net/help-center"
@@ -564,7 +668,7 @@ export default function BookPreviewPage() {
                     </span>
                   </div>
                   <button
-                    onClick={handleDownload}
+                    onClick={() => router.push("/my-books")}
                     className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 font-semibold"
                   >
                     <Download size={20} />
@@ -626,7 +730,7 @@ export default function BookPreviewPage() {
             </div>
           </div>
 
-          {/* Right - PDF Preview/Full Content */}
+          {/* Right - PDF Preview with Lock Below */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="border-b border-gray-200 p-4 flex items-center justify-between">
@@ -640,7 +744,7 @@ export default function BookPreviewPage() {
                 )}
               </div>
 
-              <div className="relative bg-gray-100 min-h-[800px]">
+              <div className="bg-gray-100">
                 {isPurchased ? (
                   <div className="p-8">
                     {book.embedUrl ? (
@@ -699,53 +803,56 @@ export default function BookPreviewPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="relative">
-                    {/* Preview Content - Visible */}
-                    <div className="p-8">
-                      <div className="bg-white p-8 rounded-lg max-w-3xl mx-auto">
-                        <h3 className="text-2xl font-bold mb-6 text-gray-900">
-                          Preview
-                        </h3>
+                  <div>
+                    {/* PDF Preview (First Page/Beginning) */}
+                    <div className="relative">
+                      {book.embedUrl || book.pdfUrl ? (
+                        <div className="h-[600px] overflow-hidden">
+                          <iframe
+                            src={`${
+                              book.embedUrl || book.pdfUrl
+                            }#view=FitH&page=1&toolbar=0`}
+                            className="w-full h-full border-none pointer-events-none"
+                            title={`${book.title} - Preview`}
+                            scrolling="no"
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-[600px] p-8 bg-white">
+                          <h3 className="text-2xl font-bold mb-6 text-gray-900">
+                            {book.title}
+                          </h3>
 
-                        {book.introduction ? (
-                          <div className="space-y-4">
-                            <h4 className="text-lg font-semibold text-blue-950">
-                              Introduction
-                            </h4>
-                            <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                              {book.introduction.slice(0, 500)}
-                              {book.introduction.length > 500 && "..."}
-                            </p>
-                          </div>
-                        ) : previewContent ? (
-                          <div className="space-y-4">
-                            <h4 className="text-lg font-semibold text-blue-950">
-                              Preview
-                            </h4>
-                            <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                              {previewContent.slice(0, 500)}
-                              {previewContent.length > 500 && "..."}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            <p className="text-gray-700 leading-relaxed">
-                              {book.description}
-                            </p>
-                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                              <p className="text-sm text-gray-600">
-                                <strong>Pages:</strong> {book.pages} |{" "}
-                                <strong>Format:</strong> {book.format}
+                          {book.introduction ? (
+                            <div className="space-y-4">
+                              <h4 className="text-lg font-semibold text-blue-950">
+                                Introduction
+                              </h4>
+                              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                                {book.introduction.slice(0, 800)}
+                                {book.introduction.length > 800 && "..."}
                               </p>
                             </div>
-                          </div>
-                        )}
-                      </div>
+                          ) : (
+                            <div className="space-y-4">
+                              <p className="text-gray-700 leading-relaxed">
+                                {book.description}
+                              </p>
+                              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <p className="text-sm text-gray-600">
+                                  <strong>Pages:</strong> {book.pages} |{" "}
+                                  <strong>Format:</strong> {book.format}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Lock Overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-transparent via-white/90 to-white pointer-events-none">
-                      <div className="text-center max-w-md px-6 pointer-events-auto">
+                    {/* Lock Section Below PDF Preview */}
+                    <div className="bg-gradient-to-b from-gray-100 to-white p-12">
+                      <div className="text-center max-w-md mx-auto">
                         <div className="bg-white rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 shadow-lg">
                           <Lock className="w-10 h-10 text-blue-950" />
                         </div>

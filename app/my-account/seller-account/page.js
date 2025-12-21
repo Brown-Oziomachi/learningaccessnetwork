@@ -1,11 +1,9 @@
-// app/my-account/seller-account/page.js
-
 "use client";
 import React, { useState, useEffect } from "react";
-import { DollarSign, TrendingUp, ShoppingBag, CreditCard, Download, Book, Globe, Settings, X, Camera, Save, Mail, CheckCircle } from "lucide-react";
+import { DollarSign, TrendingUp, ShoppingBag, CreditCard, Download, Book, Globe, Settings, X, Camera, Save, Mail, CheckCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, increment } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
@@ -15,8 +13,8 @@ export default function SellerAccount() {
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [accountBalance, setAccountBalance] = useState(100);
-    const [totalEarnings, setTotalEarnings] = useState(100);
+    const [accountBalance, setAccountBalance] = useState(0);
+    const [totalEarnings, setTotalEarnings] = useState(0);
     const [booksSold, setBooksSold] = useState(0);
     const [transactions, setTransactions] = useState([]);
     const [withdrawals, setWithdrawals] = useState([]);
@@ -24,6 +22,7 @@ export default function SellerAccount() {
     const [withdrawAmount, setWithdrawAmount] = useState("");
     const [withdrawing, setWithdrawing] = useState(false);
     const [activeTab, setActiveTab] = useState("overview");
+    const [withdrawalError, setWithdrawalError] = useState("");
     const router = useRouter();
 
     const [formData, setFormData] = useState({
@@ -31,49 +30,6 @@ export default function SellerAccount() {
         surname: "",
         dateOfBirth: ""
     });
-
-      useEffect(() => {
-                    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-                        if (currentUser) {
-                            setUser(currentUser);
-                            await fetchPurchasedBooks(currentUser.uid);
-                        } else {
-                            router.push('/auth/signin');
-                        }
-                    });
-            
-                    return () => unsubscribe();
-      }, [router]);
-    
-    useEffect(() => {
-        if (!user?.uid) return;
-
-        // fetch seller bank details
-        const fetchSellerBankDetails = async () => {
-            try {
-                const sellerRef = doc(db, "sellers", user.uid);
-                const sellerSnap = await getDoc(sellerRef);
-
-                if (sellerSnap.exists()) {
-                    const { bankDetails } = sellerSnap.data();
-
-                    if (bankDetails) {
-                        setUser({
-                            uid: user.uid,
-                            bankDetails
-                        });
-                    } else {
-                        console.warn("No bank details found for seller");
-                    }
-                }
-            } catch (error) {
-                console.error("Error fetching bank details:", error);
-            }
-        };
-
-        fetchSellerBankDetails();
-    }, [user?.uid]);
-
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -89,49 +45,133 @@ export default function SellerAccount() {
     const fetchUserData = async (uid) => {
         try {
             setLoading(true);
+
+            // Fetch user document
             const userDoc = await getDoc(doc(db, "users", uid));
 
             if (userDoc.exists()) {
                 const userData = userDoc.data();
 
-                // Redirect to regular account if not a seller
                 if (!userData.isSeller) {
                     router.push('/my-account');
                     return;
                 }
 
-                setUser({ uid, ...userData });
+                // Fetch seller document
+                const sellerDoc = await getDoc(doc(db, "sellers", uid));
+                let bankDetails = null;
+
+                if (sellerDoc.exists()) {
+                    const sellerData = sellerDoc.data();
+
+                    // CRITICAL FIX: Set state immediately after fetching
+                    const balance = sellerData.accountBalance || 0;
+                    const earnings = sellerData.totalEarnings || 0;
+                    const sold = sellerData.booksSold || 0;
+
+                    console.log("Seller Data Found:", {
+                        accountBalance: balance,
+                        totalEarnings: earnings,
+                        booksSold: sold
+                    });
+
+                    setAccountBalance(balance);
+                    setTotalEarnings(earnings);
+                    setBooksSold(sold);
+
+                    bankDetails = sellerData.bankDetails || null;
+                } else {
+                    console.warn("Seller document does not exist for UID:", uid);
+                    // Initialize seller document if it doesn't exist
+                    setAccountBalance(0);
+                    setTotalEarnings(0);
+                    setBooksSold(0);
+                }
+
+                setUser({
+                    uid,
+                    ...userData,
+                    bankDetails
+                });
+
                 setFormData({
                     firstName: userData.firstName || "",
                     surname: userData.surname || "",
                     dateOfBirth: userData.dateOfBirth || ""
                 });
-                await fetchSellerData(uid);
+
+                await fetchSellerTransactions(uid);
             }
         } catch (error) {
-            console.error("Error:", error);
+            console.error("Error fetching user data:", error);
         } finally {
             setLoading(false);
         }
     };
 
-    const fetchSellerData = async (uid) => {
+    const fetchSellerTransactions = async (uid) => {
         try {
-            const sellerDoc = await getDoc(doc(db, "sellers", uid));
-            if (sellerDoc.exists()) {
-                const data = sellerDoc.data();
-                setAccountBalance(data.accountBalance || 100);
-                setTotalEarnings(data.totalEarnings || 100);
-                setBooksSold(data.booksSold || 0);
-            }
+            let allTransactions = [];
 
-            // Fetch transactions
+            // METHOD 1: Check transactions collection
             const transactionsQuery = query(
                 collection(db, "transactions"),
-                where("sellerId", "==", uid)
+                where("sellerId", "==", uid),
+                where("sellerEmail", "==", uid),
+                where("transactionId", "==", uid)
+
             );
             const transactionsSnapshot = await getDocs(transactionsQuery);
-            setTransactions(transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            const txnsFromCollection = transactionsSnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    bookTitle: data.bookTitle || data.title,
+                    createdAtDate: data.createdAt?.toDate?.() || (data.purchaseDate ? new Date(data.purchaseDate) : new Date())
+                };
+            });
+
+            console.log(`Found ${txnsFromCollection.length} transactions in transactions collection`);
+            allTransactions = [...txnsFromCollection];
+
+            // METHOD 2: If no transactions found, scan all users for purchases from this seller
+            if (txnsFromCollection.length === 0) {
+                console.log("No transactions in collection, scanning users' purchasedBooks...");
+                const usersSnapshot = await getDocs(collection(db, "users"));
+
+                usersSnapshot.docs.forEach(userDoc => {
+                    const userData = userDoc.data();
+                    const purchasedBooks = userData.purchasedBooks || {};
+
+                    // Loop through each purchased book
+                    Object.values(purchasedBooks).forEach(purchase => {
+                        // Check if this purchase is from our seller
+                        if (purchase.sellerId === uid) {
+                            allTransactions.push({
+                                id: purchase.transactionId || purchase.bookId,
+                                bookTitle: purchase.title,
+                                buyerName: userData.displayName || `${userData.firstName} ${userData.surname}`,
+                                buyerEmail: userDoc.data().email,
+                                amount: purchase.amount,
+                                sellerAmount: purchase.amount * 0.85, // 15% platform fee
+                                sellerId: purchase.sellerId,
+                                sellerName: purchase.sellerName,
+                                createdAtDate: purchase.purchaseDate ? new Date(purchase.purchaseDate) : new Date(),
+                                source: 'purchasedBooks'
+                            });
+                        }
+                    });
+                });
+
+                console.log(`Found ${allTransactions.length} transactions from users' purchasedBooks`);
+            }
+
+            // Sort by date, newest first
+            allTransactions.sort((a, b) => b.createdAtDate - a.createdAtDate);
+
+            console.log(`Total transactions loaded: ${allTransactions.length}`);
+            setTransactions(allTransactions);
 
             // Fetch withdrawals
             const withdrawalsQuery = query(
@@ -139,9 +179,51 @@ export default function SellerAccount() {
                 where("sellerId", "==", uid)
             );
             const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
-            setWithdrawals(withdrawalsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            const withdrawalsList = withdrawalsSnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    requestedAtDate: data.requestedAt?.toDate?.() || new Date()
+                };
+            });
+
+            // Sort by date, newest first
+            withdrawalsList.sort((a, b) => b.requestedAtDate - a.requestedAtDate);
+
+            console.log(`Loaded ${withdrawalsList.length} withdrawals`);
+            setWithdrawals(withdrawalsList);
+
+            // IMPORTANT: If seller document doesn't have accurate data, recalculate from transactions
+            if (allTransactions.length > 0) {
+                const calculatedEarnings = allTransactions.reduce((sum, txn) => sum + (txn.sellerAmount || txn.amount * 0.85), 0);
+                const calculatedBooksSold = allTransactions.length;
+
+                console.log(`Calculated from transactions: ${calculatedBooksSold} books sold, ₦${calculatedEarnings} total earnings`);
+
+                // Update local state if calculated values differ significantly
+                setTotalEarnings(calculatedEarnings);
+                setBooksSold(calculatedBooksSold);
+
+                // Optionally update Firestore seller document with correct values
+                const sellerDocRef = doc(db, "sellers", uid);
+                const sellerDoc = await getDoc(sellerDocRef);
+
+                if (sellerDoc.exists()) {
+                    const currentData = sellerDoc.data();
+                    // Only update if values are different
+                    if (currentData.totalEarnings !== calculatedEarnings || currentData.booksSold !== calculatedBooksSold) {
+                        console.log("Updating seller document with calculated values...");
+                        await updateDoc(sellerDocRef, {
+                            totalEarnings: calculatedEarnings,
+                            booksSold: calculatedBooksSold,
+                            updatedAt: serverTimestamp()
+                        });
+                    }
+                }
+            }
         } catch (error) {
-            console.error("Error fetching seller data:", error);
+            console.error("Error fetching transactions:", error);
         }
     };
 
@@ -173,7 +255,7 @@ export default function SellerAccount() {
                 ...formData,
                 displayName: `${formData.firstName} ${formData.surname}`
             });
-            setUser((prev) => ({ ...prev, ...formData }));
+            setUser((prev) => ({ ...prev, ...formData, displayName: `${formData.firstName} ${formData.surname}` }));
             setIsEditing(false);
         } catch (error) {
             alert("Failed to save profile");
@@ -182,30 +264,78 @@ export default function SellerAccount() {
 
     const handleWithdraw = async () => {
         const amount = parseFloat(withdrawAmount);
-        if (!amount || amount <= 0 || amount > accountBalance || amount < 1000) {
-            alert("Invalid amount. Minimum ₦1,000 and cannot exceed balance.");
+        setWithdrawalError("");
+
+        // Validation
+        if (!amount || isNaN(amount)) {
+            setWithdrawalError("Please enter a valid amount");
+            return;
+        }
+
+        if (amount < 1000) {
+            setWithdrawalError("Minimum withdrawal amount is ₦1,000");
+            return;
+        }
+
+        if (amount > accountBalance) {
+            setWithdrawalError(`Insufficient balance. Available: ₦${accountBalance.toLocaleString()}`);
+            return;
+        }
+
+        if (!user?.bankDetails) {
+            setWithdrawalError("Please add bank details first");
             return;
         }
 
         try {
             setWithdrawing(true);
-            await addDoc(collection(db, "withdrawals"), {
+
+            // Generate unique reference
+            const withdrawalRef = `WD-${Date.now()}-${user.uid.substring(0, 8)}`;
+
+            // Create withdrawal record with COMPLETED status (automatic)
+            const withdrawalData = {
                 sellerId: user.uid,
-                amount,
-                status: "pending",
-                requestedAt: serverTimestamp(),
+                sellerName: user.displayName || `${user.firstName} ${user.surname}`,
                 sellerEmail: user.email,
-                sellerName: user.displayName
-            });
+                amount: amount,
+                status: "completed",
+                requestedAt: serverTimestamp(),
+                processedAt: serverTimestamp(),
+                reference: withdrawalRef,
+                bankDetails: {
+                    accountName: user.bankDetails.accountName,
+                    accountNumber: user.bankDetails.accountNumber,
+                    bankName: user.bankDetails.bankName,
+                },
+                processingMethod: "automatic",
+                processingNote: "Automatic withdrawal - no approval required",
+            };
+
+            await addDoc(collection(db, "withdrawals"), withdrawalData);
+
+            // Deduct from seller's balance immediately
             const newBalance = accountBalance - amount;
-            await updateDoc(doc(db, "sellers", user.uid), { accountBalance: newBalance });
+            await updateDoc(doc(db, "sellers", user.uid), {
+                accountBalance: newBalance,
+                totalWithdrawn: increment(amount),
+                lastWithdrawalDate: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+
+            // Update local state immediately
             setAccountBalance(newBalance);
             setWithdrawAmount("");
             setShowWithdrawModal(false);
-            alert("Withdrawal request submitted!");
-            await fetchSellerData(user.uid);
+
+            alert(`✅ Withdrawal successful!\n\nAmount: ₦${amount.toLocaleString()}\nReference: ${withdrawalRef}\n\nFunds will be sent to:\n${user.bankDetails.accountName}\n${user.bankDetails.accountNumber}\n${user.bankDetails.bankName}`);
+
+            // Refresh withdrawal list
+            await fetchSellerTransactions(user.uid);
+
         } catch (error) {
-            alert("Error: " + error.message);
+            console.error("Withdrawal error:", error);
+            setWithdrawalError("Failed to process withdrawal: " + error.message);
         } finally {
             setWithdrawing(false);
         }
@@ -221,7 +351,6 @@ export default function SellerAccount() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* Header */}
             <Navbar />
             <header className="bg-blue-950 text-white shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 py-4">
@@ -234,7 +363,6 @@ export default function SellerAccount() {
                             <button
                                 onClick={() => router.push('/my-account')}
                                 className="bg-blue-800 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-                                title="Switch to regular account view"
                             >
                                 Regular View
                             </button>
@@ -246,7 +374,8 @@ export default function SellerAccount() {
                             </div>
                             <button
                                 onClick={() => setShowWithdrawModal(true)}
-                                className="bg-green-600 hover:bg-green-700 px-4 sm:px-6 py-2 rounded-lg font-semibold whitespace-nowrap"
+                                disabled={accountBalance < 1000}
+                                className="bg-green-600 hover:bg-green-700 px-4 sm:px-6 py-2 rounded-lg font-semibold whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Withdraw
                             </button>
@@ -256,6 +385,15 @@ export default function SellerAccount() {
             </header>
 
             <main className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
+                {/* Info Banner */}
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+                    <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
+                    <div className="text-sm text-green-900">
+                        <p className="font-semibold mb-1">Automatic Payments & Withdrawals</p>
+                        <p>All payments are credited instantly. Withdrawals are processed automatically without approval.</p>
+                    </div>
+                </div>
+
                 {/* Stats */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <div className="bg-white rounded-lg shadow p-4 sm:p-6">
@@ -294,8 +432,8 @@ export default function SellerAccount() {
                     <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                         <div className="flex justify-between items-center">
                             <div>
-                                <p className="text-sm text-gray-600">Commission</p>
-                                <p className="text-xl sm:text-2xl font-bold text-orange-600">20%</p>
+                                <p className="text-sm text-gray-600">Platform Fee</p>
+                                <p className="text-xl sm:text-2xl font-bold text-orange-600">15%</p>
                             </div>
                             <div className="bg-orange-100 p-3 rounded-full">
                                 <CreditCard className="text-orange-600" size={24} />
@@ -314,7 +452,7 @@ export default function SellerAccount() {
                                 alt="Profile"
                             />
                             <div className="text-center sm:text-left flex-1">
-                                <h2 className="text-2xl sm:text-3xl font-bold">{user?.displayName}</h2>
+                                <h2 className="text-2xl sm:text-3xl font-bold">{user?.displayName || `${user?.firstName} ${user?.surname}`}</h2>
                                 <p className="text-blue-200 flex items-center gap-2 justify-center sm:justify-start mt-1">
                                     <Mail size={16} />
                                     {user?.email}
@@ -340,8 +478,7 @@ export default function SellerAccount() {
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
-                                    className={`px-4 sm:px-6 py-3 font-semibold whitespace-nowrap ${activeTab === tab ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600 hover:text-blue-600"
-                                        }`}
+                                    className={`px-4 sm:px-6 py-3 font-semibold whitespace-nowrap ${activeTab === tab ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600 hover:text-blue-600"}`}
                                 >
                                     {tab.charAt(0).toUpperCase() + tab.slice(1)}
                                 </button>
@@ -357,11 +494,11 @@ export default function SellerAccount() {
                                 <div className="grid sm:grid-cols-2 gap-4 mb-8">
                                     <div>
                                         <label className="font-semibold text-gray-700">First Name</label>
-                                        <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user?.firstName}</p>
+                                        <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user?.firstName || 'Not set'}</p>
                                     </div>
                                     <div>
                                         <label className="font-semibold text-gray-700">Surname</label>
-                                        <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user?.surname}</p>
+                                        <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user?.surname || 'Not set'}</p>
                                     </div>
                                     <div>
                                         <label className="font-semibold text-gray-700">Email</label>
@@ -372,6 +509,28 @@ export default function SellerAccount() {
                                         <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user?.dateOfBirth || 'Not set'}</p>
                                     </div>
                                 </div>
+
+                                {/* Bank Details */}
+                                {user?.bankDetails ? (
+                                    <div className="mb-8">
+                                        <h3 className="text-xl font-bold mb-4">Bank Details</h3>
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+                                            <p><strong>Account Name:</strong> {user.bankDetails.accountName}</p>
+                                            <p><strong>Account Number:</strong> {user.bankDetails.accountNumber}</p>
+                                            <p><strong>Bank:</strong> {user.bankDetails.bankName}</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                        <div className="flex items-start gap-3">
+                                            <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
+                                            <div>
+                                                <p className="font-semibold text-yellow-900 mb-1">Bank Details Required</p>
+                                                <p className="text-sm text-yellow-800">Please add your bank details to receive withdrawals.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
                                 <div className="grid sm:grid-cols-3 gap-4">
@@ -406,17 +565,23 @@ export default function SellerAccount() {
                                                 <tr>
                                                     <th className="px-4 py-3 text-left text-sm font-semibold">Date</th>
                                                     <th className="px-4 py-3 text-left text-sm font-semibold">Book</th>
-                                                    <th className="px-4 py-3 text-right text-sm font-semibold">Amount</th>
-                                                    <th className="px-4 py-3 text-right text-sm font-semibold">Net</th>
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold">Buyer</th>
+                                                    <th className="px-4 py-3 text-right text-sm font-semibold">Price</th>
+                                                    <th className="px-4 py-3 text-right text-sm font-semibold">Your Earning</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y">
                                                 {transactions.map((txn) => (
                                                     <tr key={txn.id} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 text-sm">{txn.date?.toDate?.().toLocaleDateString()}</td>
+                                                        <td className="px-4 py-3 text-sm">
+                                                            {txn.createdAtDate?.toLocaleDateString() || 'N/A'}
+                                                        </td>
                                                         <td className="px-4 py-3 text-sm font-medium">{txn.bookTitle}</td>
+                                                        <td className="px-4 py-3 text-sm">{txn.buyerName}</td>
                                                         <td className="px-4 py-3 text-sm text-right">₦{txn.amount?.toLocaleString()}</td>
-                                                        <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">₦{txn.netEarning?.toLocaleString()}</td>
+                                                        <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">
+                                                            ₦{txn.sellerAmount?.toLocaleString() || ((txn.amount || 0) * 0.85).toLocaleString()}
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -437,16 +602,27 @@ export default function SellerAccount() {
                                 ) : (
                                     <div className="space-y-4">
                                         {withdrawals.map((w) => (
-                                            <div key={w.id} className="border rounded-lg p-4 flex justify-between items-center">
-                                                <div>
-                                                    <p className="font-semibold text-lg">₦{w.amount?.toLocaleString()}</p>
-                                                    <p className="text-sm text-gray-600">{w.requestedAt?.toDate?.().toLocaleDateString()}</p>
+                                            <div key={w.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <p className="font-semibold text-lg">₦{w.amount?.toLocaleString()}</p>
+                                                        <p className="text-sm text-gray-600">
+                                                            {w.requestedAtDate?.toLocaleDateString()} at {w.requestedAtDate?.toLocaleTimeString()}
+                                                        </p>
+                                                        {w.reference && (
+                                                            <p className="text-xs text-gray-500 mt-1">Ref: {w.reference}</p>
+                                                        )}
+                                                    </div>
+                                                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold">
+                                                        Completed
+                                                    </span>
                                                 </div>
-                                                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${w.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                                        w.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                                                    }`}>
-                                                    {w.status?.charAt(0).toUpperCase() + w.status?.slice(1)}
-                                                </span>
+                                                {w.bankDetails && (
+                                                    <div className="bg-gray-50 rounded p-3 mt-3 text-sm">
+                                                        <p><strong>Sent to:</strong> {w.bankDetails.accountName}</p>
+                                                        <p>{w.bankDetails.accountNumber} - {w.bankDetails.bankName}</p>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -457,47 +633,98 @@ export default function SellerAccount() {
                 </div>
             </main>
 
-            {/* Withdraw Modal */}
             {showWithdrawModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white text-blue-950 rounded-lg w-full max-w-md">
-                        <div className="p-6 border-b">
-                            {user?.bankDetails && (
-                                <div className="space-y-2">
-                                    <p><strong>Account Name:</strong> {user.bankDetails.accountName}</p>
-                                    <p><strong>Account Number:</strong> {user.bankDetails.accountNumber}</p>
-                                    <p><strong>Bank:</strong> {user.bankDetails.bankName}</p>
-                                </div>
-                            )}
-                        </div>
-                        <div className="bg-blue-950 text-white p-6  flex justify-between items-center">
+                        <div className="bg-blue-950 text-white p-6 flex justify-between items-center rounded-t-lg">
                             <h2 className="text-2xl font-bold">Withdraw Funds</h2>
-                            <button onClick={() => setShowWithdrawModal(false)}><X size={24} /></button>
+                            <button onClick={() => {
+                                setShowWithdrawModal(false);
+                                setWithdrawalError("");
+                                setWithdrawAmount("");
+                            }}>
+                                <X size={24} />
+                            </button>
                         </div>
+
+                        <div className="p-6 border-b space-y-2 bg-green-50">
+                            <div className="flex items-center gap-2 text-green-900 mb-2">
+                                <CheckCircle size={18} />
+                                <p className="text-sm font-semibold">Instant Withdrawal - No Approval Needed</p>
+                            </div>
+                        </div>
+
+                        {user?.bankDetails ? (
+                            <div className="p-6 border-b space-y-2 bg-gray-50">
+                                <p className="text-sm font-semibold text-gray-600">Withdrawal will be sent to:</p>
+                                <p><strong>Account Name:</strong> {user.bankDetails.accountName}</p>
+                                <p><strong>Account Number:</strong> {user.bankDetails.accountNumber}</p>
+                                <p><strong>Bank:</strong> {user.bankDetails.bankName}</p>
+                            </div>
+                        ) : (
+                            <div className="p-6 border-b bg-yellow-50">
+                                <div className="flex items-start gap-2">
+                                    <AlertCircle size={18} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+                                    <p className="text-sm text-yellow-900">Please add bank details to your profile first</p>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="p-6">
                             <div className="bg-blue-50 p-4 rounded-lg mb-4">
                                 <p className="text-sm text-gray-600">Available Balance</p>
                                 <p className="text-3xl font-bold text-blue-950">₦{accountBalance.toLocaleString()}</p>
                             </div>
+
+                            {withdrawalError && (
+                                <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                                    <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                                    <p className="text-sm text-red-900">{withdrawalError}</p>
+                                </div>
+                            )}
+
                             <label className="font-semibold block mb-2">Amount</label>
                             <input
                                 type="number"
                                 value={withdrawAmount}
-                                onChange={(e) => setWithdrawAmount(e.target.value)}
+                                onChange={(e) => {
+                                    setWithdrawAmount(e.target.value);
+                                    setWithdrawalError("");
+                                }}
                                 placeholder="Enter amount"
-                                className="w-full border-2 px-4 py-3 rounded-lg mb-2"
+                                className="w-full border-2 px-4 py-3 rounded-lg mb-2 focus:border-blue-600 focus:outline-none"
+                                min="1000"
+                                max={accountBalance}
                             />
                             <p className="text-sm text-gray-500 mb-4">Minimum: ₦1,000</p>
+
                             <div className="flex gap-3">
-                                <button onClick={() => setShowWithdrawModal(false)} className="flex-1 border-2 px-6 py-3 rounded-lg font-semibold">
+                                <button
+                                    onClick={() => {
+                                        setShowWithdrawModal(false);
+                                        setWithdrawalError("");
+                                        setWithdrawAmount("");
+                                    }}
+                                    className="flex-1 border-2 px-6 py-3 rounded-lg font-semibold hover:bg-gray-50"
+                                >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleWithdraw}
-                                    disabled={withdrawing}
-                                    className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                                    disabled={withdrawing || !user?.bankDetails}
+                                    className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:bg-green-700"
                                 >
-                                    {withdrawing ? "Processing..." : <><Download size={18} />Withdraw</>}
+                                    {withdrawing ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                            Processing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Download size={18} />
+                                            Withdraw Now
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </div>

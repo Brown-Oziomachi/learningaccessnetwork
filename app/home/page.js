@@ -4,15 +4,18 @@ import { FileText, Monitor, Upload, Smartphone, Globe, ArrowRight, ChevronRight 
 import Navbar from '@/components/NavBar';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from "next/navigation";
-import { auth} from "@/lib/firebaseConfig";
+import { auth, db } from "@/lib/firebaseConfig";
+import { doc, getDoc } from 'firebase/firestore';
 import HomeLoading from './loading';
 
 export default function HomePage() {
-    const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
-    const [user, setUser] = useState({ uid: 'demo-user' });
+    const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [allBooks, setAllBooks] = useState([]);
+    const [isSeller, setIsSeller] = useState(false);
+    const [checkingSeller, setCheckingSeller] = useState(true);
     const router = useRouter();
+
     // Category data
     const categories = [
         {
@@ -69,13 +72,40 @@ export default function HomePage() {
             image: 'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=400',
             description: 'Love, marriage, dating, communication, and personal connections'
         }
-
     ];
 
-      useEffect(() => {
+    // Check seller status
+    const checkSellerStatus = async (userId) => {
+        try {
+            setCheckingSeller(true);
+            console.log("Checking seller status for user:", userId);
+
+            const userDocRef = doc(db, 'users', userId);
+            const userDoc = await getDoc(userDocRef);
+
+            if (userDoc.exists()) {
+                const userData = userDoc.data();
+                const isUserSeller = userData.isSeller === true;
+                console.log("User is seller:", isUserSeller);
+                setIsSeller(isUserSeller);
+            } else {
+                console.log("User document not found");
+                setIsSeller(false);
+            }
+        } catch (error) {
+            console.error("Error checking seller status:", error);
+            setIsSeller(false);
+        } finally {
+            setCheckingSeller(false);
+        }
+    };
+
+    // Auth state listener
+    useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 setUser(currentUser);
+                await checkSellerStatus(currentUser.uid);
             } else {
                 router.push('/auth/signin');
             }
@@ -83,7 +113,25 @@ export default function HomePage() {
 
         return () => unsubscribe();
     }, [router]);
-    
+
+    // Handle upload button click
+    const HandleClick = () => {
+        console.log("Button clicked, isSeller:", isSeller);
+
+        if (!user) {
+            router.push('/auth/signin');
+            return;
+        }
+
+        if (isSeller) {
+            // User is already a seller, go to upload page
+            router.push('/advertise');
+        } else {
+            // User is not a seller, go to become seller page
+            router.push('/become-seller');
+        }
+    };
+
     // Mock books data
     useEffect(() => {
         const mockBooks = [
@@ -121,21 +169,23 @@ export default function HomePage() {
         setAllBooks(mockBooks);
     }, []);
 
+    // Loading timer
     useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false)
-    }, 2000)
+        const timer = setTimeout(() => {
+            setLoading(false);
+        }, 2000);
 
-    return () => clearTimeout(timer)
-  }, [])
+        return () => clearTimeout(timer);
+    }, []);
 
-  if (loading) {
-    return <HomeLoading />
-  }
+    if (loading) {
+        return <HomeLoading />;
+    }
+
     return (
         <div className="min-h-screen bg-white">
             {/* Navbar */}
-            <Navbar/>
+            <Navbar />
 
             {/* Hero Section */}
             <div className="bg-gradient-to-br from-gray-50 to-gray-100 py-16">
@@ -151,12 +201,12 @@ export default function HomePage() {
 
             {/* Categories Grid */}
             <main className="max-w-7xl mx-auto px-4 py-12">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {categories.map((category, index) => (
-                        <a 
+                        <a
                             key={index}
                             href={`/category/${category.name.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')}`}
-                            className="group bg-white border border-gray-200  overflow-hidden hover:shadow-xl transition-all duration-300"
+                            className="group bg-white border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300"
                         >
                             <div className="p-6 bg-gray-100">
                                 <h3 className="text-xl font-bold text-gray-900 mb-2">
@@ -165,16 +215,16 @@ export default function HomePage() {
                                 <p className="text-sm text-gray-600 mb-4">
                                     {category.subcategories} categories
                                 </p>
-                                
+
                                 <div className="flex items-center text-blue-950 font-medium group-hover:gap-3 transition-all">
-                                    View all 
+                                    View all
                                     <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                                 </div>
                             </div>
-                            
+
                             <div className="relative h-48 overflow-hidden">
-                                <img 
-                                    src={category.image} 
+                                <img
+                                    src={category.image}
                                     alt={category.name}
                                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                                 />
@@ -185,8 +235,8 @@ export default function HomePage() {
 
                 {/* Explore All Link */}
                 <div className="text-center mt-12">
-                    <a 
-                        href="/pdf" 
+                    <a
+                        href="/pdf"
                         className="inline-flex items-center text-blue-950 font-semibold text-lg hover:underline"
                     >
                         Explore all of our categories
@@ -215,17 +265,39 @@ export default function HomePage() {
                             <Smartphone size={56} strokeWidth={1.5} />
                         </div>
 
-                        <a 
-                            href="/advertise" 
-                            className="bg-blue-950 hover:bg-blue-800 transition-colors text-white font-semibold px-8 py-4 rounded-lg shadow-md text-lg"
+                        <button
+                            onClick={HandleClick}
+                            disabled={checkingSeller}
+                            className="bg-blue-950 hover:bg-blue-800 transition-colors text-white font-semibold px-8 py-4 rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
-                            Upload documents
-                        </a>
+                            {checkingSeller ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                    Loading...
+                                </>
+                            ) : isSeller ? (
+                                <>
+                                    <Upload size={20} />
+                                    Upload Document
+                                </>
+                            ) : (
+                                <>
+                                    Become a Seller
+                                </>
+                            )}
+                        </button>
+
+                        {/* Optional: Show seller status */}
+                        {!checkingSeller && isSeller && (
+                            <p className="text-sm text-green-600 mt-3 flex items-center gap-1">
+                                <span className="w-2 h-2 bg-green-600 rounded-full"></span>
+                                You're a verified seller
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>
 
-           
             {/* Footer */}
             <footer className="bg-blue-950 text-white py-12">
                 <div className="max-w-7xl mx-auto px-4">
