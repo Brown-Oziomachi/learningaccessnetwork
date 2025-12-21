@@ -193,7 +193,7 @@ export default function BecomeSeller() {
             ]);
 
             alert("Seller account created successfully! 🎉");
-            router.push('/seller-account');
+            router.push('/my-account/seller-account');
         } catch (error) {
             console.error("Error creating seller account:", error);
 
