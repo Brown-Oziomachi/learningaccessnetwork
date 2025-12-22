@@ -46,33 +46,51 @@ export default function BookPreviewPage() {
   const [checkingSeller, setCheckingSeller] = useState(true);
   const [isSeller, setIsSeller] = useState(false);
 
-  // Helper function to get thumbnail from PDF
+  // FIXED: Helper function to get thumbnail from PDF
   const getThumbnailUrl = (book) => {
-    if (book.driveFileId) {
-      return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
+    console.log("Getting thumbnail for:", book?.title, book);
+
+    // Priority 1: driveFileId
+    if (book?.driveFileId) {
+      const url = `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
+      console.log("Using driveFileId:", url);
+      return url;
     }
 
-    if (book.embedUrl) {
+    // Priority 2: Extract from embedUrl
+    if (book?.embedUrl) {
       const match = book.embedUrl.match(
-        /\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/
+        /\/d\/([\w-]+)|\/file\/d\/([\w-]+)|id=([\w-]+)/
       );
       if (match) {
         const fileId = match[1] || match[2] || match[3];
         if (fileId) {
-          return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
+          const url = `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
+          console.log("Using embedUrl fileId:", url);
+          return url;
         }
       }
     }
 
-    if (book.pdfUrl && book.pdfUrl.includes("drive.google.com")) {
-      const match = book.pdfUrl.match(/[-\w]{25,}/);
+    // Priority 3: Extract from pdfUrl
+    if (book?.pdfUrl && book.pdfUrl.includes("drive.google.com")) {
+      const match = book.pdfUrl.match(
+        /\/d\/([\w-]+)|\/file\/d\/([\w-]+)|id=([\w-]+)/
+      );
       if (match) {
-        return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
+        const fileId = match[1] || match[2] || match[3];
+        if (fileId) {
+          const url = `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
+          console.log("Using pdfUrl fileId:", url);
+          return url;
+        }
       }
     }
 
+    // Fallback
+    console.log("Using fallback image");
     return (
-      book.image ||
+      book?.image ||
       "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"
     );
   };
@@ -154,7 +172,6 @@ export default function BookPreviewPage() {
     return () => unsubscribe();
   }, [router]);
 
-  // Handle upload button click
   const HandleClick = () => {
     if (!user) {
       router.push("/auth/signin");
@@ -186,24 +203,31 @@ export default function BookPreviewPage() {
     }
   }, [user, bookId]);
 
+  // FIXED: Fetch book with proper embedUrl handling
   useEffect(() => {
     const fetchBook = async () => {
       try {
+        console.log("Fetching book with ID:", bookId);
+
         if (bookId?.startsWith("firestore-")) {
           const firestoreId = bookId.replace("firestore-", "");
+          console.log("Fetching from Firestore:", firestoreId);
+
           const bookDoc = await getDoc(doc(db, "advertMyBook", firestoreId));
 
           if (bookDoc.exists()) {
             const data = bookDoc.data();
-            setBook({
+            console.log("Firestore book data:", data);
+
+            const bookData = {
               id: bookId,
+              firestoreId: firestoreId,
               title: data.bookTitle,
               author: data.author,
               category: data.category,
               price: data.price,
               pages: data.pages,
               format: data.format || "PDF",
-              image: getThumbnailUrl(data),
               description: data.description,
               message: data.message,
               rating: 4.5,
@@ -211,10 +235,17 @@ export default function BookPreviewPage() {
               driveFileId: data.driveFileId,
               pdfUrl: data.pdfUrl,
               previewUrl: data.previewUrl,
-              embedUrl: data.embedUrl,
+              embedUrl: data.embedUrl, // ✅ CRITICAL: Include embedUrl
               introduction: data.introduction || data.message,
               previewText: data.previewText || data.description,
-            });
+              source: "firestore",
+            };
+
+            // Generate thumbnail
+            bookData.image = getThumbnailUrl(bookData);
+
+            console.log("Final book data:", bookData);
+            setBook(bookData);
 
             setPreviewContent(
               data.previewText ||
@@ -222,6 +253,8 @@ export default function BookPreviewPage() {
                 data.message ||
                 data.description
             );
+          } else {
+            console.error("Book document not found");
           }
         } else {
           const foundBook = booksData.find((b) => b.id === parseInt(bookId));
@@ -229,6 +262,7 @@ export default function BookPreviewPage() {
             setBook({
               ...foundBook,
               image: getThumbnailUrl(foundBook),
+              source: "platform",
             });
             setPreviewContent(
               foundBook.previewText ||
@@ -250,8 +284,7 @@ export default function BookPreviewPage() {
     }
   }, [bookId]);
 
-  // Improved checkPurchaseStatus function for BookPreviewPage
-
+  // FIXED: Check purchase status
   const checkPurchaseStatus = async (userId) => {
     try {
       console.log("=== CHECKING PURCHASE STATUS ===");
@@ -265,50 +298,54 @@ export default function BookPreviewPage() {
         const userData = userDoc.data();
         const purchasedBooks = userData.purchasedBooks || {};
 
-        console.log("Purchased books keys:", Object.keys(purchasedBooks));
+        console.log("Purchased books:", purchasedBooks);
 
-        // Clean the book ID (remove firestore- prefix if present)
+        // Clean the book ID
         const cleanBookId = bookId?.replace("firestore-", "");
 
         // Check all possible variations
         let purchased = false;
 
-        // Direct match with original bookId
+        // Check with original ID
         if (purchasedBooks[bookId]) {
           purchased = true;
-          console.log("✓ Found purchase with original ID:", bookId);
+          console.log("✓ Found with original ID:", bookId);
         }
 
-        // Match with cleaned bookId
-        if (!purchased && purchasedBooks[cleanBookId]) {
+        // Check with cleaned ID
+        if (!purchased && cleanBookId && purchasedBooks[cleanBookId]) {
           purchased = true;
-          console.log("✓ Found purchase with cleaned ID:", cleanBookId);
+          console.log("✓ Found with cleaned ID:", cleanBookId);
         }
 
-        // Check with firestore- prefix added
-        if (!purchased && purchasedBooks[`firestore-${cleanBookId}`]) {
+        // Check with firestore- prefix
+        if (
+          !purchased &&
+          cleanBookId &&
+          purchasedBooks[`firestore-${cleanBookId}`]
+        ) {
           purchased = true;
-          console.log("✓ Found purchase with firestore- prefix");
+          console.log("✓ Found with firestore- prefix");
         }
 
-        // Deep search through all keys
+        // Deep search
         if (!purchased) {
-          const bookKeys = Object.keys(purchasedBooks);
-          purchased = bookKeys.some((key) => {
+          const keys = Object.keys(purchasedBooks);
+          for (const key of keys) {
             const cleanKey = key.replace("firestore-", "");
-            const match =
+            if (
               key === bookId ||
               key === cleanBookId ||
               cleanKey === bookId ||
               cleanKey === cleanBookId ||
               key === `firestore-${bookId}` ||
-              key === `firestore-${cleanBookId}`;
-
-            if (match) {
-              console.log("✓ Found purchase with key:", key);
+              key === `firestore-${cleanBookId}`
+            ) {
+              purchased = true;
+              console.log("✓ Found with key:", key);
+              break;
             }
-            return match;
-          });
+          }
         }
 
         console.log(
@@ -317,11 +354,8 @@ export default function BookPreviewPage() {
         );
         setIsPurchased(purchased);
 
-        // Show success message if just purchased
         if (purchased && searchParams.get("purchased") === "true") {
           showToastMessage("Purchase successful! You now have full access.");
-
-          // Clean up URL
           const url = new URL(window.location);
           url.searchParams.delete("purchased");
           window.history.replaceState({}, "", url);
@@ -411,9 +445,9 @@ export default function BookPreviewPage() {
   };
 
   const handlePurchase = () => {
-    const paymentBookId = bookId?.startsWith("firestore-")
-      ? bookId
-      : `firestore-${bookId}`;
+    // Ensure we're passing the correct ID format
+    const paymentBookId = bookId;
+    console.log("Redirecting to payment with bookId:", paymentBookId);
     router.push(`/payment?bookId=${paymentBookId}`);
   };
 

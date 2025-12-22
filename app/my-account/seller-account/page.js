@@ -63,26 +63,35 @@ export default function SellerAccount() {
 
                 if (sellerDoc.exists()) {
                     const sellerData = sellerDoc.data();
+                    bankDetails = sellerData.bankDetails || null;
 
-                    // CRITICAL FIX: Set state immediately after fetching
-                    const balance = sellerData.accountBalance || 0;
-                    const earnings = sellerData.totalEarnings || 0;
-                    const sold = sellerData.booksSold || 0;
-
-                    console.log("Seller Data Found:", {
-                        accountBalance: balance,
-                        totalEarnings: earnings,
-                        booksSold: sold
+                    // Set initial values from Firestore (prevents flash of 0)
+                    console.log("Initial Seller Data:", {
+                        accountBalance: sellerData.accountBalance || 0,
+                        totalEarnings: sellerData.totalEarnings || 0,
+                        booksSold: sellerData.booksSold || 0
                     });
 
-                    setAccountBalance(balance);
-                    setTotalEarnings(earnings);
-                    setBooksSold(sold);
-
-                    bankDetails = sellerData.bankDetails || null;
+                    setAccountBalance(sellerData.accountBalance || 0);
+                    setTotalEarnings(sellerData.totalEarnings || 0);
+                    setBooksSold(sellerData.booksSold || 0);
                 } else {
                     console.warn("Seller document does not exist for UID:", uid);
-                    // Initialize seller document if it doesn't exist
+
+                    // Create seller document if it doesn't exist
+                    const sellerDocRef = doc(db, "sellers", uid);
+                    await setDoc(sellerDocRef, {
+                        sellerId: uid,
+                        sellerEmail: userData.email,
+                        sellerName: userData.displayName || `${userData.firstName} ${userData.surname}`,
+                        accountBalance: 0,
+                        totalEarnings: 0,
+                        booksSold: 0,
+                        totalWithdrawn: 0,
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                    });
+
                     setAccountBalance(0);
                     setTotalEarnings(0);
                     setBooksSold(0);
@@ -100,27 +109,33 @@ export default function SellerAccount() {
                     dateOfBirth: userData.dateOfBirth || ""
                 });
 
+                // Fetch and recalculate transactions
+                // This will update state again with accurate calculated values
                 await fetchSellerTransactions(uid);
             }
         } catch (error) {
             console.error("Error fetching user data:", error);
+            console.error("Error details:", error.message);
+            console.error("Error stack:", error.stack);
         } finally {
             setLoading(false);
         }
     };
+    // Replace the fetchSellerTransactions function in your seller-account/page.js
 
     const fetchSellerTransactions = async (uid) => {
         try {
             let allTransactions = [];
 
-            // METHOD 1: Check transactions collection
+            console.log('=== FETCHING SELLER TRANSACTIONS ===');
+            console.log('Seller UID:', uid);
+
+            // METHOD 1: Query transactions collection (FIXED QUERY)
             const transactionsQuery = query(
                 collection(db, "transactions"),
-                where("sellerId", "==", uid),
-                where("sellerEmail", "==", uid),
-                where("transactionId", "==", uid)
-
+                where("sellerId", "==", uid)  // ✅ Only query by sellerId
             );
+
             const transactionsSnapshot = await getDocs(transactionsQuery);
             const txnsFromCollection = transactionsSnapshot.docs.map(doc => {
                 const data = doc.data();
@@ -132,45 +147,50 @@ export default function SellerAccount() {
                 };
             });
 
-            console.log(`Found ${txnsFromCollection.length} transactions in transactions collection`);
+            console.log(`✅ Found ${txnsFromCollection.length} transactions in transactions collection`);
             allTransactions = [...txnsFromCollection];
 
-            // METHOD 2: If no transactions found, scan all users for purchases from this seller
-            if (txnsFromCollection.length === 0) {
-                console.log("No transactions in collection, scanning users' purchasedBooks...");
-                const usersSnapshot = await getDocs(collection(db, "users"));
+            // METHOD 2: Also check users' purchasedBooks as backup
+            console.log("🔍 Scanning users' purchasedBooks for additional transactions...");
+            const usersSnapshot = await getDocs(collection(db, "users"));
 
-                usersSnapshot.docs.forEach(userDoc => {
-                    const userData = userDoc.data();
-                    const purchasedBooks = userData.purchasedBooks || {};
+            usersSnapshot.docs.forEach(userDoc => {
+                const userData = userDoc.data();
+                const purchasedBooks = userData.purchasedBooks || {};
 
-                    // Loop through each purchased book
-                    Object.values(purchasedBooks).forEach(purchase => {
-                        // Check if this purchase is from our seller
-                        if (purchase.sellerId === uid) {
+                // Loop through each purchased book
+                Object.values(purchasedBooks).forEach(purchase => {
+                    // Check if this purchase is from our seller
+                    if (purchase.sellerId === uid) {
+                        // Check if we already have this transaction
+                        const existingTxn = allTransactions.find(
+                            t => t.id === purchase.transactionId ||
+                                t.bookTitle === purchase.title && t.buyerEmail === userData.email
+                        );
+
+                        if (!existingTxn) {
                             allTransactions.push({
-                                id: purchase.transactionId || purchase.bookId,
+                                id: purchase.transactionId || `purchase-${purchase.bookId}-${userDoc.id}`,
                                 bookTitle: purchase.title,
-                                buyerName: userData.displayName || `${userData.firstName} ${userData.surname}`,
-                                buyerEmail: userDoc.data().email,
+                                buyerName: userData.displayName || `${userData.firstName || ''} ${userData.surname || ''}`.trim() || 'Unknown Buyer',
+                                buyerEmail: userData.email,
                                 amount: purchase.amount,
-                                sellerAmount: purchase.amount * 0.85, // 15% platform fee
+                                sellerAmount: purchase.amount * 0.85,
                                 sellerId: purchase.sellerId,
                                 sellerName: purchase.sellerName,
                                 createdAtDate: purchase.purchaseDate ? new Date(purchase.purchaseDate) : new Date(),
                                 source: 'purchasedBooks'
                             });
                         }
-                    });
+                    }
                 });
+            });
 
-                console.log(`Found ${allTransactions.length} transactions from users' purchasedBooks`);
-            }
+            console.log(`✅ Total unique transactions: ${allTransactions.length}`);
 
             // Sort by date, newest first
             allTransactions.sort((a, b) => b.createdAtDate - a.createdAtDate);
 
-            console.log(`Total transactions loaded: ${allTransactions.length}`);
             setTransactions(allTransactions);
 
             // Fetch withdrawals
@@ -188,42 +208,82 @@ export default function SellerAccount() {
                 };
             });
 
-            // Sort by date, newest first
             withdrawalsList.sort((a, b) => b.requestedAtDate - a.requestedAtDate);
-
-            console.log(`Loaded ${withdrawalsList.length} withdrawals`);
+            console.log(`✅ Loaded ${withdrawalsList.length} withdrawals`);
             setWithdrawals(withdrawalsList);
 
-            // IMPORTANT: If seller document doesn't have accurate data, recalculate from transactions
+            // Calculate totals from transactions
             if (allTransactions.length > 0) {
-                const calculatedEarnings = allTransactions.reduce((sum, txn) => sum + (txn.sellerAmount || txn.amount * 0.85), 0);
+                const calculatedEarnings = allTransactions.reduce((sum, txn) => {
+                    const earning = txn.sellerAmount || (txn.amount * 0.85);
+                    return sum + earning;
+                }, 0);
                 const calculatedBooksSold = allTransactions.length;
 
-                console.log(`Calculated from transactions: ${calculatedBooksSold} books sold, ₦${calculatedEarnings} total earnings`);
+                console.log(`📊 Calculated Totals:`);
+                console.log(`   - Books Sold: ${calculatedBooksSold}`);
+                console.log(`   - Total Earnings: ₦${calculatedEarnings.toLocaleString()}`);
 
-                // Update local state if calculated values differ significantly
+                // Calculate current balance (earnings minus withdrawals)
+                const totalWithdrawn = withdrawalsList
+                    .filter(w => w.status === 'completed')
+                    .reduce((sum, w) => sum + (w.amount || 0), 0);
+
+                const calculatedBalance = calculatedEarnings - totalWithdrawn;
+
+                console.log(`   - Total Withdrawn: ₦${totalWithdrawn.toLocaleString()}`);
+                console.log(`   - Current Balance: ₦${calculatedBalance.toLocaleString()}`);
+
+                // Update local state
                 setTotalEarnings(calculatedEarnings);
                 setBooksSold(calculatedBooksSold);
+                setAccountBalance(calculatedBalance);
 
-                // Optionally update Firestore seller document with correct values
+                // Update Firestore seller document
                 const sellerDocRef = doc(db, "sellers", uid);
                 const sellerDoc = await getDoc(sellerDocRef);
 
                 if (sellerDoc.exists()) {
                     const currentData = sellerDoc.data();
-                    // Only update if values are different
-                    if (currentData.totalEarnings !== calculatedEarnings || currentData.booksSold !== calculatedBooksSold) {
-                        console.log("Updating seller document with calculated values...");
+
+                    // Check if update is needed
+                    const needsUpdate =
+                        Math.abs(currentData.totalEarnings - calculatedEarnings) > 0.01 ||
+                        currentData.booksSold !== calculatedBooksSold ||
+                        Math.abs((currentData.accountBalance || 0) - calculatedBalance) > 0.01;
+
+                    if (needsUpdate) {
+                        console.log('📝 Updating seller document with calculated values...');
                         await updateDoc(sellerDocRef, {
                             totalEarnings: calculatedEarnings,
                             booksSold: calculatedBooksSold,
+                            accountBalance: calculatedBalance,
                             updatedAt: serverTimestamp()
                         });
+                        console.log('✅ Seller document updated');
+                    } else {
+                        console.log('✓ Seller document already up to date');
                     }
+                } else {
+                    console.warn('⚠️ Seller document does not exist, creating it...');
+                    await setDoc(sellerDocRef, {
+                        sellerId: uid,
+                        totalEarnings: calculatedEarnings,
+                        booksSold: calculatedBooksSold,
+                        accountBalance: calculatedBalance,
+                        totalWithdrawn: totalWithdrawn,
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                    });
+                    console.log('✅ New seller document created');
                 }
+            } else {
+                console.log('ℹ️ No transactions found for this seller');
             }
+
         } catch (error) {
-            console.error("Error fetching transactions:", error);
+            console.error("❌ Error fetching transactions:", error);
+            console.error("Error details:", error.message);
         }
     };
 
@@ -340,6 +400,8 @@ export default function SellerAccount() {
             setWithdrawing(false);
         }
     };
+
+    
 
     if (loading) {
         return (

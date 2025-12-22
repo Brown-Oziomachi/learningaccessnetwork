@@ -427,7 +427,7 @@ export default function Navbar() {
                         {menuCategories.education.books.map((book) => (
                           <Link
                             key={book.id}
-                            href={`/book/preview?id=${book.title}`}
+                            href={`/book/preview?id=${book.id}`}
                             onClick={() => setActiveDropdown(null)}
                             className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
                           >
@@ -487,7 +487,7 @@ export default function Navbar() {
                         {menuCategories.business.books.map((book) => (
                           <Link
                             key={book.id}
-                            href={`/book/preview?id=${book.title}`}
+                            href={`/book/preview?id=${book.id}`}
                             onClick={() => setActiveDropdown(null)}
                             className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
                           >

@@ -11,34 +11,34 @@ import { PaymentForm } from '@/components/PaymentForm';
 import { OrderSummary } from '@/components/OrderSummary';
 import Navbar from '@/components/NavBar';
 import { usePayment } from '../hooks/usePayment';
-import { fetchBookDetails, validateBookForPurchase } from '@/utils/bookUtils';
+import { fetchBookDetails, validateBookForPurchase, fetchSellerDetails } from '@/utils/bookUtils';
 
 // Helper function to generate thumbnail from PDF
 const getThumbnailUrl = (book) => {
-    if (!book) return 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-
-    if (book.driveFileId) {
-        return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
+  if (!book) return 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+  
+  if (book.driveFileId) {
+    return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
+  }
+  
+  if (book.embedUrl) {
+    const match = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
+    if (match) {
+      const fileId = match[1] || match[2] || match[3];
+      if (fileId) {
+        return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
+      }
     }
-
-    if (book.embedUrl) {
-        const match = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
-        if (match) {
-            const fileId = match[1] || match[2] || match[3];
-            if (fileId) {
-                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
-            }
-        }
+  }
+  
+  if (book.pdfUrl && book.pdfUrl.includes('drive.google.com')) {
+    const match = book.pdfUrl.match(/[-\w]{25,}/);
+    if (match) {
+      return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
     }
-
-    if (book.pdfUrl && book.pdfUrl.includes('drive.google.com')) {
-        const match = book.pdfUrl.match(/[-\w]{25,}/);
-        if (match) {
-            return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
-        }
-    }
-
-    return book.image || book.coverImage || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+  }
+  
+  return book.image || book.coverImage || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
 };
 
 export default function PaymentClient() {
@@ -66,6 +66,10 @@ export default function PaymentClient() {
     } = usePayment(book, formData, sellerDetails);
 
     // Fetch book data and seller details
+    // In your payment/page.js - Replace the useEffect that loads book data
+
+
+    // Replace the entire loadBook function with this:
     useEffect(() => {
         const loadBook = async () => {
             if (!bookId) {
@@ -79,22 +83,18 @@ export default function PaymentClient() {
                 console.log("=== PAYMENT PAGE DEBUG ===");
                 console.log("Loading book for payment. BookId:", bookId, "Type:", typeof bookId);
 
+                // 1. Fetch book data
                 const bookData = await fetchBookDetails(bookId);
                 console.log("fetchBookDetails returned:", bookData);
 
                 if (!bookData) {
                     console.error("Book not found with ID:", bookId);
-                    const localBook = booksData.find(b =>
-                        b.id === bookId ||
-                        b.id === parseInt(bookId) ||
-                        b.id === String(bookId)
-                    );
-                    console.log("Direct booksData check:", localBook);
                     setError("Book not found");
                     setLoading(false);
                     return;
                 }
 
+                // 2. Validate book
                 const validation = validateBookForPurchase(bookData);
                 console.log("Validation result:", validation);
 
@@ -107,45 +107,17 @@ export default function PaymentClient() {
                 console.log("Book loaded successfully:", bookData.title);
                 setBook(bookData);
 
-                const sellerId = bookData.sellerId;
-                if (sellerId) {
-                    try {
-                        console.log("Fetching seller details for:", sellerId);
-                        const sellerDocRef = doc(db, 'users', sellerId);
-                        const sellerDoc = await getDoc(sellerDocRef);
+                // 3. CRITICAL FIX: Use new fetchSellerDetails function
+                const sellerInfo = await fetchSellerDetails(bookData);
 
-                        if (sellerDoc.exists()) {
-                            const sellerData = sellerDoc.data();
-                            setSellerDetails({
-                                id: sellerId,
-                                name: sellerData.displayName || sellerData.name || bookData.sellerName || 'Unknown Seller',
-                                email: sellerData.email || bookData.sellerEmail,
-                                phone: sellerData.phone || sellerData.phoneNumber || bookData.sellerPhone,
-                                accountDetails: sellerData.accountDetails || null,
-                                walletId: sellerData.walletId,
-                                bankAccount: sellerData.bankAccount
-                            });
-                            console.log('Seller details fetched from Firestore');
-                        } else {
-                            console.warn('Seller not found in users collection, using book data');
-                            setSellerDetails({
-                                id: sellerId,
-                                name: bookData.sellerName || 'Unknown Seller',
-                                email: bookData.sellerEmail,
-                                phone: bookData.sellerPhone
-                            });
-                        }
-                    } catch (sellerError) {
-                        console.error('Error fetching seller details:', sellerError);
-                        setSellerDetails({
-                            id: sellerId,
-                            name: bookData.sellerName || 'Unknown Seller',
-                            email: bookData.sellerEmail,
-                            phone: bookData.sellerPhone
-                        });
-                    }
+                if (sellerInfo) {
+                    console.log('✅ Seller details loaded:', sellerInfo);
+                    setSellerDetails(sellerInfo);
                 } else {
-                    console.warn('No seller ID found for book');
+                    console.error('❌ Failed to load seller details');
+                    setError("Seller information unavailable");
+                    setLoading(false);
+                    return;
                 }
 
             } catch (err) {
@@ -159,25 +131,15 @@ export default function PaymentClient() {
         loadBook();
     }, [bookId]);
 
-    // Key fix in PaymentClient - Update the redirect logic in useEffect
 
     useEffect(() => {
-        if (paymentSuccess && book) {
+        if (paymentSuccess) {
             setTimeout(() => {
-                // Use the ORIGINAL bookId from URL, not the modified one
-                const redirectBookId = bookId; // Keep original format from URL
-                router.push(`/book/preview?id=${redirectBookId}&purchased=true`);
+                router.push(`/book/preview?id=${bookId}&purchased=true`);
             }, 3000);
         }
-    }, [paymentSuccess, bookId, book, router]);
+    }, [paymentSuccess, bookId, router]);
 
-    // Also update the "View Your Book" link in the success message:
-    <Link
-        href={`/book/preview?id=${bookId}&purchased=true`}
-        className="inline-block bg-blue-950 text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors"
-    >
-        View Your Book
-    </Link>
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });

@@ -1,136 +1,177 @@
-// /utils/bookUtils.js
-import { db } from "@/lib/firebaseConfig";
-import { doc, getDoc } from 'firebase/firestore';
-import { booksData } from "@/lib/booksData";
+// app/utils/bookUtils.js
+import { db } from '@/lib/firebaseConfig';
+import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
+import { booksData } from '@/lib/booksData';
 
 /**
- * Fetch book details from either booksData or Firestore
- * @param {string|number} bookId - The book ID to fetch
- * @returns {Object|null} - Book data or null if not found
+ * Fetch book details from both Firestore and static data
  */
-export async function fetchBookDetails(bookId) {
+export const fetchBookDetails = async (bookId) => {
+    console.log('fetchBookDetails called with:', bookId, typeof bookId);
+
     try {
-        console.log('Fetching book with ID:', bookId, 'Type:', typeof bookId);
+        // Try Firestore first (advertMyBook collection)
+        const booksRef = collection(db, 'advertMyBook');
+        const snapshot = await getDocs(booksRef);
 
-        // Clean the bookId - remove 'firestore-' prefix if present for local search
-        let cleanId = bookId;
-        if (String(bookId).startsWith('firestore-')) {
-            cleanId = String(bookId).replace('firestore-', '');
-            console.log('Cleaned ID from firestore prefix:', cleanId);
-        }
+        const firestoreBook = snapshot.docs.find(doc => {
+            const data = doc.data();
+            return doc.id === bookId ||
+                doc.id === String(bookId) ||
+                data.id === bookId ||
+                data.id === String(bookId) ||
+                data.id === parseInt(bookId);
+        });
 
-        // First, check local booksData array with both original and cleaned ID
-        const localBook = booksData.find(b =>
-            b.id === bookId ||
-            b.id === parseInt(bookId) ||
-            b.id === String(bookId) ||
-            b.id === cleanId ||
-            b.id === parseInt(cleanId) ||
-            b.id === String(cleanId)
-        );
-
-        if (localBook) {
-            console.log('Found book in booksData:', localBook.title);
+        if (firestoreBook) {
+            const data = firestoreBook.data();
+            console.log('Found in Firestore:', data.title);
             return {
-                ...localBook,
-                source: 'platform',
-                // Ensure all required fields are present
-                image: localBook.image || localBook.coverImage,
-                coverImage: localBook.coverImage || localBook.image,
-            };
-        }
-
-        // If not found locally, check Firestore
-        // Handle Firestore IDs (both with and without 'firestore-' prefix)
-        let firestoreId = bookId;
-        if (String(bookId).startsWith('firestore-')) {
-            firestoreId = String(bookId).replace('firestore-', '');
-        }
-
-        console.log('Checking Firestore with ID:', firestoreId);
-        const bookDocRef = doc(db, 'advertMyBook', firestoreId);
-        const bookDoc = await getDoc(bookDocRef);
-
-        if (bookDoc.exists()) {
-            const data = bookDoc.data();
-            console.log('Found book in Firestore:', data.bookTitle);
-
-            return {
-                id: `firestore-${firestoreId}`,
-                firestoreId: firestoreId,
-                title: data.bookTitle,
-                author: data.author || data.name,
-                category: data.category,
-                price: data.price,
-                pages: data.pages,
-                format: data.format || 'PDF',
-                image: data.coverImage,
-                coverImage: data.coverImage,
-                description: data.description,
-                message: data.message,
-                pdfUrl: data.pdfLink,
-                driveFileId: data.driveFileId,
-                sellerId: data.sellerId || data.userId,
-                sellerName: data.sellerName,
-                sellerEmail: data.sellerEmail,
-                oldPrice: data.oldPrice || null,
-                discount: data.discount || null,
+                ...data,
+                id: data.id || firestoreBook.id,
+                firestoreId: firestoreBook.id,
                 source: 'firestore'
             };
         }
 
-        console.error('Book not found in booksData or Firestore');
+        // Try static booksData
+        const staticBook = booksData.find(b =>
+            b.id === bookId ||
+            b.id === parseInt(bookId) ||
+            b.id === String(bookId)
+        );
+
+        if (staticBook) {
+            console.log('Found in static data:', staticBook.title);
+            return {
+                ...staticBook,
+                source: 'platform'
+            };
+        }
+
+        console.error('Book not found in Firestore or static data');
         return null;
 
     } catch (error) {
         console.error('Error in fetchBookDetails:', error);
+
+        // Fallback to static data on error
+        const staticBook = booksData.find(b =>
+            b.id === bookId ||
+            b.id === parseInt(bookId) ||
+            b.id === String(bookId)
+        );
+
+        if (staticBook) {
+            console.log('Fallback: Found in static data');
+            return {
+                ...staticBook,
+                source: 'platform'
+            };
+        }
+
         return null;
     }
-}
+};
 
 /**
- * Validate that a book has all required information for purchase
- * @param {Object} bookData - The book data to validate
- * @returns {Object} - {valid: boolean, error: string|null}
+ * Validate book has all required fields for purchase
  */
-export function validateBookForPurchase(bookData) {
-    if (!bookData) {
-        return { valid: false, error: 'Book data is missing' };
+export const validateBookForPurchase = (book) => {
+    if (!book) {
+        return { valid: false, error: 'Book not found' };
     }
 
-    // Check required fields
-    const requiredFields = ['title', 'author', 'price'];
-    for (const field of requiredFields) {
-        if (!bookData[field]) {
-            return { valid: false, error: `Missing required field: ${field}` };
+    if (!book.price || book.price <= 0) {
+        return { valid: false, error: 'Invalid book price' };
+    }
+
+    if (!book.sellerId) {
+        return { valid: false, error: 'Seller information missing' };
+    }
+
+    if (!book.title) {
+        return { valid: false, error: 'Book title missing' };
+    }
+
+    return { valid: true };
+};
+
+/**
+ * Fetch seller details with fallback strategy
+ * CRITICAL FIX: Ensures seller is always found
+ */
+export const fetchSellerDetails = async (book) => {
+    const sellerId = book.sellerId;
+
+    if (!sellerId) {
+        console.error('No sellerId provided');
+        return null;
+    }
+
+    console.log('Fetching seller details for:', sellerId);
+
+    try {
+        // STRATEGY 1: Try users collection first
+        const userDocRef = doc(db, 'users', sellerId);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+            const userData = userDoc.data();
+            console.log('✅ Found seller in users collection');
+            return {
+                id: sellerId,
+                name: userData.displayName || userData.name || book.sellerName || 'Unknown Seller',
+                email: userData.email || book.sellerEmail,
+                phone: userData.phone || userData.phoneNumber || book.sellerPhone,
+                accountDetails: userData.accountDetails || null,
+                walletId: userData.walletId,
+                bankAccount: userData.bankAccount
+            };
         }
+
+        // STRATEGY 2: Try sellers collection
+        const sellerDocRef = doc(db, 'sellers', sellerId);
+        const sellerDoc = await getDoc(sellerDocRef);
+
+        if (sellerDoc.exists()) {
+            const sellerData = sellerDoc.data();
+            console.log('✅ Found seller in sellers collection');
+            return {
+                id: sellerId,
+                name: sellerData.sellerName || book.sellerName || 'Unknown Seller',
+                email: sellerData.sellerEmail || book.sellerEmail,
+                phone: sellerData.sellerPhone || book.sellerPhone,
+                accountDetails: null,
+                walletId: null,
+                bankAccount: null
+            };
+        }
+
+        // STRATEGY 3: Use book data as fallback (CRITICAL FOR STATIC BOOKS)
+        console.warn('⚠️ Seller not found in Firestore, using book data');
+        return {
+            id: sellerId,
+            name: book.sellerName || 'Unknown Seller',
+            email: book.sellerEmail,
+            phone: book.sellerPhone,
+            accountDetails: null,
+            walletId: null,
+            bankAccount: null
+        };
+
+    } catch (error) {
+        console.error('❌ Error fetching seller:', error);
+
+        // Final fallback: Always return seller info from book
+        return {
+            id: sellerId,
+            name: book.sellerName || 'Unknown Seller',
+            email: book.sellerEmail,
+            phone: book.sellerPhone,
+            accountDetails: null,
+            walletId: null,
+            bankAccount: null
+        };
     }
-
-    // Validate price
-    if (typeof bookData.price !== 'number' || bookData.price <= 0) {
-        return { valid: false, error: 'Invalid price' };
-    }
-
-    // Check seller information (optional but recommended)
-    if (!bookData.sellerId) {
-        console.warn('Warning: Book has no seller ID');
-        // Don't fail validation, but log warning
-    }
-
-    return { valid: true, error: null };
-}
-
-/**
- * Get book by ID (alias for fetchBookDetails for backwards compatibility)
- */
-export function getBookById(bookId) {
-    return fetchBookDetails(bookId);
-}
-
-/**
- * Check if a book exists
- */
-export async function bookExists(bookId) {
-    const book = await fetchBookDetails(bookId);
-    return book !== null;
-}
+};
