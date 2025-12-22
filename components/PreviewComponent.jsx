@@ -10,25 +10,20 @@ import {
   Share2,
   Bookmark,
   MoreVertical,
-  ThumbsUp,
   Lock,
   Search,
   Menu,
   X,
   Eye,
   FileText,
-  ChevronDown,
   ChevronRight,
-  Star,
-  Users,
-  Calendar,
   Layers,
   ThumbsDown,
   Flag,
   CheckCircle,
   Upload,
-  Globe,
   HelpCircle,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -50,6 +45,37 @@ export default function BookPreviewPage() {
   const [previewContent, setPreviewContent] = useState("");
   const [checkingSeller, setCheckingSeller] = useState(true);
   const [isSeller, setIsSeller] = useState(false);
+
+  // Helper function to get thumbnail from PDF
+  const getThumbnailUrl = (book) => {
+    if (book.driveFileId) {
+      return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
+    }
+
+    if (book.embedUrl) {
+      const match = book.embedUrl.match(
+        /\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/
+      );
+      if (match) {
+        const fileId = match[1] || match[2] || match[3];
+        if (fileId) {
+          return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
+        }
+      }
+    }
+
+    if (book.pdfUrl && book.pdfUrl.includes("drive.google.com")) {
+      const match = book.pdfUrl.match(/[-\w]{25,}/);
+      if (match) {
+        return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
+      }
+    }
+
+    return (
+      book.image ||
+      "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"
+    );
+  };
 
   const categories = [
     {
@@ -94,18 +120,14 @@ export default function BookPreviewPage() {
   const checkSellerStatus = async (userId) => {
     try {
       setCheckingSeller(true);
-      console.log("Checking seller status for user:", userId);
-
       const userDocRef = doc(db, "users", userId);
       const userDoc = await getDoc(userDocRef);
 
       if (userDoc.exists()) {
         const userData = userDoc.data();
         const isUserSeller = userData.isSeller === true;
-        console.log("User is seller:", isUserSeller);
         setIsSeller(isUserSeller);
       } else {
-        console.log("User document not found");
         setIsSeller(false);
       }
     } catch (error) {
@@ -122,6 +144,8 @@ export default function BookPreviewPage() {
       if (currentUser) {
         setUser(currentUser);
         await checkSellerStatus(currentUser.uid);
+        await checkPurchaseStatus(currentUser.uid);
+        await checkSavedStatus(currentUser.uid);
       } else {
         router.push("/auth/signin");
       }
@@ -132,35 +156,17 @@ export default function BookPreviewPage() {
 
   // Handle upload button click
   const HandleClick = () => {
-    console.log("Button clicked, isSeller:", isSeller);
-
     if (!user) {
       router.push("/auth/signin");
       return;
     }
 
     if (isSeller) {
-      // User is already a seller, go to upload page
       router.push("/advertise");
     } else {
-      // User is not a seller, go to become seller page
       router.push("/become-seller");
     }
   };
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        await checkPurchaseStatus(currentUser.uid);
-        await checkSavedStatus(currentUser.uid);
-      } else {
-        router.push("/auth/signin");
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   useEffect(() => {
     const handleVisibilityChange = async () => {
@@ -197,7 +203,7 @@ export default function BookPreviewPage() {
               price: data.price,
               pages: data.pages,
               format: data.format || "PDF",
-              image: data.coverImage,
+              image: getThumbnailUrl(data),
               description: data.description,
               message: data.message,
               rating: 4.5,
@@ -220,7 +226,10 @@ export default function BookPreviewPage() {
         } else {
           const foundBook = booksData.find((b) => b.id === parseInt(bookId));
           if (foundBook) {
-            setBook(foundBook);
+            setBook({
+              ...foundBook,
+              image: getThumbnailUrl(foundBook),
+            });
             setPreviewContent(
               foundBook.previewText ||
                 foundBook.introduction ||
@@ -241,61 +250,92 @@ export default function BookPreviewPage() {
     }
   }, [bookId]);
 
- const checkPurchaseStatus = async (userId) => {
-  try {
-    const userDocRef = doc(db, "users", userId);
-    const userDoc = await getDoc(userDocRef);
+  // Improved checkPurchaseStatus function for BookPreviewPage
 
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      const purchasedBooks = userData.purchasedBooks || {};
+  const checkPurchaseStatus = async (userId) => {
+    try {
+      console.log("=== CHECKING PURCHASE STATUS ===");
+      console.log("User ID:", userId);
+      console.log("Book ID from URL:", bookId);
 
-      // Clean the bookId for comparison
-      const cleanBookId = bookId?.replace("firestore-", "");
-      
-      // Check if the book exists in purchasedBooks object
-      // purchasedBooks is stored as an object/map, not an array
-      let purchased = false;
-      
-      // Method 1: Direct key check
-      if (purchasedBooks[bookId] || purchasedBooks[cleanBookId]) {
-        purchased = true;
+      const userDocRef = doc(db, "users", userId);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const purchasedBooks = userData.purchasedBooks || {};
+
+        console.log("Purchased books keys:", Object.keys(purchasedBooks));
+
+        // Clean the book ID (remove firestore- prefix if present)
+        const cleanBookId = bookId?.replace("firestore-", "");
+
+        // Check all possible variations
+        let purchased = false;
+
+        // Direct match with original bookId
+        if (purchasedBooks[bookId]) {
+          purchased = true;
+          console.log("✓ Found purchase with original ID:", bookId);
+        }
+
+        // Match with cleaned bookId
+        if (!purchased && purchasedBooks[cleanBookId]) {
+          purchased = true;
+          console.log("✓ Found purchase with cleaned ID:", cleanBookId);
+        }
+
+        // Check with firestore- prefix added
+        if (!purchased && purchasedBooks[`firestore-${cleanBookId}`]) {
+          purchased = true;
+          console.log("✓ Found purchase with firestore- prefix");
+        }
+
+        // Deep search through all keys
+        if (!purchased) {
+          const bookKeys = Object.keys(purchasedBooks);
+          purchased = bookKeys.some((key) => {
+            const cleanKey = key.replace("firestore-", "");
+            const match =
+              key === bookId ||
+              key === cleanBookId ||
+              cleanKey === bookId ||
+              cleanKey === cleanBookId ||
+              key === `firestore-${bookId}` ||
+              key === `firestore-${cleanBookId}`;
+
+            if (match) {
+              console.log("✓ Found purchase with key:", key);
+            }
+            return match;
+          });
+        }
+
+        console.log(
+          "Purchase status:",
+          purchased ? "PURCHASED" : "NOT PURCHASED"
+        );
+        setIsPurchased(purchased);
+
+        // Show success message if just purchased
+        if (purchased && searchParams.get("purchased") === "true") {
+          showToastMessage("Purchase successful! You now have full access.");
+
+          // Clean up URL
+          const url = new URL(window.location);
+          url.searchParams.delete("purchased");
+          window.history.replaceState({}, "", url);
+        }
+      } else {
+        console.log("User document does not exist");
+        setIsPurchased(false);
       }
-      
-      // Method 2: Check all keys in the purchasedBooks object
-      if (!purchased) {
-        const bookKeys = Object.keys(purchasedBooks);
-        purchased = bookKeys.some(key => {
-          const cleanKey = key.replace("firestore-", "");
-          return (
-            key === bookId ||
-            key === cleanBookId ||
-            cleanKey === bookId ||
-            cleanKey === cleanBookId
-          );
-        });
-      }
-
-      console.log('Purchase check:', { bookId, cleanBookId, purchased, purchasedBooks });
-      setIsPurchased(purchased);
-
-      // Show success message if coming from payment
-      if (purchased && searchParams.get("purchased") === "true") {
-        showToastMessage("Purchase successful! You now have full access.");
-        
-        // Clean up URL
-        const url = new URL(window.location);
-        url.searchParams.delete("purchased");
-        window.history.replaceState({}, "", url);
-      }
+    } catch (error) {
+      console.error("Error checking purchase status:", error);
+      setIsPurchased(false);
     }
-  } catch (error) {
-    console.error("Error checking purchase status:", error);
-    setIsPurchased(false);
-  }
-};
+  };
 
-// Also update checkSavedStatus to handle both array and object formats
   const checkSavedStatus = async (userId) => {
     try {
       const userDocRef = doc(db, "users", userId);
@@ -304,18 +344,15 @@ export default function BookPreviewPage() {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         const savedBooks = userData.savedBooks || [];
-      
-        // Check if savedBooks is an array or object
+
         let saved = false;
-      
+
         if (Array.isArray(savedBooks)) {
-          // Handle array format
           saved = savedBooks.some((b) => b.id === bookId);
-        } else if (typeof savedBooks === 'object') {
-          // Handle object format
+        } else if (typeof savedBooks === "object") {
           saved = savedBooks[bookId] !== undefined;
         }
-      
+
         setIsSaved(saved);
       }
     } catch (error) {
@@ -436,7 +473,6 @@ export default function BookPreviewPage() {
       </div>
     );
   }
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -624,6 +660,7 @@ export default function BookPreviewPage() {
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Sidebar */}
+          {/* Left Sidebar */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm p-6 sticky top-24">
               <div className="flex items-center gap-2 mb-4">
@@ -634,25 +671,24 @@ export default function BookPreviewPage() {
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
                 {book.title}
               </h1>
-              <img
-                src={book.image}
-                alt={book.title}
-                className="w-full h-48 object-cover rounded-lg mb-3"
-              />
-              <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                {book.description}
-              </p>
 
-              {book.introduction && (
-                <div className="mb-4">
-                  <h2 className="font-bold text-blue-950 mb-2">
-                    Introduction:
-                  </h2>
-                  <p className="text-gray-600 text-sm leading-relaxed">
-                    {book.introduction}
-                  </p>
-                </div>
-              )}
+              {/* Book Cover/Thumbnail - FIXED */}
+              <div className="mb-4">
+                <img
+                  src={getThumbnailUrl(book)}
+                  alt={"Cover of " + book.title}
+                  className="w-full h-auto rounded-lg shadow-md object-cover border border-gray-200"
+                  onError={(e) => {
+                    e.target.src =
+                      "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+                  }}
+                />
+              </div>
+
+              <div className="text-gray-600 text-sm mb-4">
+                <h2 className="font-bold text-blue-950 mb-2">Introduction:</h2>
+                {book.description}
+              </div>
 
               <div className="mb-6">
                 <p className="text-sm text-gray-500">Uploaded by</p>
@@ -783,12 +819,14 @@ export default function BookPreviewPage() {
 
                         {book.introduction && (
                           <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-6">
-                            <h4 className="font-bold text-lg mb-3 text-gray-900">
-                              Introduction
-                            </h4>
-                            <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                              {book.introduction}
-                            </p>
+                            <div>
+                              <h4 className="font-bold text-lg mb-3 text-gray-900">
+                                Introduction
+                              </h4>
+                              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                                {book.introduction}
+                              </p>
+                            </div>
                           </div>
                         )}
 
@@ -835,9 +873,9 @@ export default function BookPreviewPage() {
                             </div>
                           ) : (
                             <div className="space-y-4">
-                              <p className="text-gray-700 leading-relaxed">
-                                {book.description}
-                              </p>
+                              <div className="text-gray-700 leading-relaxed">
+                                <p>{book.description}</p>
+                              </div>
                               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                                 <p className="text-sm text-gray-600">
                                   <strong>Pages:</strong> {book.pages} |{" "}
@@ -906,15 +944,22 @@ export default function BookPreviewPage() {
                 className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
               >
                 <img
-                  src={relatedBook.image}
+                  src={getThumbnailUrl(relatedBook)}
                   alt={relatedBook.title}
-                  className="w-full h-48 object-cover"
+                  className="w-full h-48 object-cover bg-gray-200"
+                  onError={(e) => {
+                    e.target.src =
+                      "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+                  }}
+                  loading="lazy"
                 />
                 <div className="p-3">
                   <h4 className="font-semibold text-sm line-clamp-2 mb-1">
                     {relatedBook.title}
                   </h4>
-                  <p className="text-xs text-gray-500">{relatedBook.author}</p>
+                  <p className="text-xs text-gray-500">
+                    By: {relatedBook.author}
+                  </p>
                 </div>
               </Link>
             ))}

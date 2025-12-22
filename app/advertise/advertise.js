@@ -18,8 +18,6 @@ export default function AdvertiseClient() {
     const [userData, setUserData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState("");
-    const [coverImage, setCoverImage] = useState(null);
-    const [coverImagePreview, setCoverImagePreview] = useState(null);
     const [formData, setFormData] = useState({
         name: "",
         email: "",
@@ -44,7 +42,19 @@ export default function AdvertiseClient() {
         'Health & Wellness',
         'History',
         'Arts & Culture',
-        'Relationship'
+        'Relationship',
+        'Self-Help',
+        'Finance',
+        'Marketing',
+        'Programming',
+        'Psychology',
+        'Fiction',
+        'Non-Fiction',
+        'Philosophy',
+        'Travel',
+        'Cooking',
+        'Religion & Spirituality',
+        'Sex education',
     ];
 
     // ImgBB API Key (Get free from https://api.imgbb.com/)
@@ -99,109 +109,7 @@ export default function AdvertiseClient() {
         setFormData({ ...formData, [name]: value });
     };
 
-    const compressImage = (file, maxSizeMB = 1) => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-
-            reader.onload = (event) => {
-                const img = new window.Image();
-                img.src = event.target.result;
-
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-
-                    const maxWidth = 1200;
-                    if (width > maxWidth) {
-                        height = (height * maxWidth) / width;
-                        width = maxWidth;
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    let quality = 0.8;
-                    let result = canvas.toDataURL('image/jpeg', quality);
-
-                    while (result.length > maxSizeMB * 1024 * 1024 * 1.37 && quality > 0.3) {
-                        quality -= 0.1;
-                        result = canvas.toDataURL('image/jpeg', quality);
-                    }
-
-                    resolve(result);
-                };
-
-                img.onerror = reject;
-            };
-
-            reader.onerror = reject;
-        });
-    };
-
-    // Upload image to ImgBB
-    const uploadImageToImgBB = async (base64Image) => {
-        try {
-            const formData = new FormData();
-            // Remove data:image/jpeg;base64, prefix
-            const base64Data = base64Image.split(',')[1];
-            formData.append('image', base64Data);
-
-            const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                return data.data.url; // Returns the direct image URL
-            } else {
-                throw new Error(data.error?.message || 'Upload failed');
-            }
-        } catch (error) {
-            console.error('ImgBB upload error:', error);
-            throw error;
-        }
-    };
-
-    const handleCoverImageChange = async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            if (!file.type.startsWith('image/')) {
-                alert('Please upload an image file (JPG, PNG, etc.)');
-                return;
-            }
-            if (file.size > 10 * 1024 * 1024) {
-                alert('Image size must be less than 10MB');
-                return;
-            }
-
-            setCoverImage(file);
-
-            try {
-                const compressed = await compressImage(file, 1);
-                setCoverImagePreview(compressed);
-            } catch (error) {
-                console.error("Error compressing image:", error);
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    setCoverImagePreview(reader.result);
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-    };
-
-    const removeCoverImage = () => {
-        setCoverImage(null);
-        setCoverImagePreview(null);
-    };
-
+   
     const handleSubmit = async () => {
         // Validation
         if (!formData.name || !formData.email || !formData.bookTitle ||
@@ -216,11 +124,6 @@ export default function AdvertiseClient() {
             return;
         }
 
-        if (!coverImage) {
-            alert("Please upload a cover image for your book");
-            return;
-        }
-
         // Validate URL
         try {
             new URL(formData.driveLink);
@@ -229,21 +132,11 @@ export default function AdvertiseClient() {
             return;
         }
 
-        // Check if API key is set
-        if (IMGBB_API_KEY === "YOUR_IMGBB_API_KEY") {
-            alert("Please configure ImgBB API key. Get free key from https://api.imgbb.com/");
-            return;
-        }
-
+      
         try {
             setLoading(true);
-            setUploadProgress("Uploading cover image...");
-
             // Upload image to ImgBB
-            const coverImageUrl = await uploadImageToImgBB(coverImagePreview);
-
-            console.log("Image uploaded successfully:", coverImageUrl);
-
+          
             setUploadProgress("Saving book details...");
 
             // Prepare seller information
@@ -259,7 +152,6 @@ export default function AdvertiseClient() {
                 sellerEmail: user.email,
                 sellerName: displayName,
                 sellerPhone: userData?.phoneNumber || null,
-                sellerProfilePic: user.photoURL || userData?.photoBase64 || null,
 
                 // Book info
                 bookTitle: formData.bookTitle,
@@ -273,8 +165,6 @@ export default function AdvertiseClient() {
 
                 // Files - Only store the URL (not base64)
                 pdfLink: formData.driveLink,
-                coverImage: coverImageUrl, // Just the URL!
-                coverImageUrl: coverImageUrl, // Same as above for compatibility
 
                 // Metadata
                 status: "pending",
@@ -288,7 +178,6 @@ export default function AdvertiseClient() {
                 sellerId: bookData.sellerId,
                 sellerEmail: bookData.sellerEmail,
                 sellerName: bookData.sellerName,
-                coverImageUrl: coverImageUrl
             });
 
             const docRef = await addDoc(collection(db, "advertMyBook"), bookData);
@@ -310,8 +199,6 @@ export default function AdvertiseClient() {
                 message: "",
                 driveLink: "",
             });
-            setCoverImage(null);
-            setCoverImagePreview(null);
             setUploadProgress("");
 
             router.replace("/home");
@@ -528,51 +415,6 @@ export default function AdvertiseClient() {
                         <p className="mt-1 text-xs text-gray-500">
                             Make sure the link is set to "Anyone with the link can view"
                         </p>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Book Cover Image * (Uploaded to free hosting)
-                        </label>
-
-                        {!coverImage ? (
-                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
-                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                    <Image className="w-10 h-10 mb-2 text-gray-400" />
-                                    <p className="mb-2 text-sm text-gray-500">
-                                        <span className="font-semibold">Click to upload cover</span>
-                                    </p>
-                                    <p className="text-xs text-gray-500">JPG, PNG (Max 10MB)</p>
-                                </div>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleCoverImageChange}
-                                    className="hidden"
-                                />
-                            </label>
-                        ) : (
-                            <div className="border-2 border-blue-300 bg-blue-50 rounded-lg p-4">
-                                <div className="flex items-start gap-4">
-                                    <img
-                                        src={coverImagePreview}
-                                        alt="Cover preview"
-                                        className="w-24 h-32 object-cover rounded border-2 border-gray-300"
-                                    />
-                                    <div className="flex-1">
-                                        <p className="text-sm font-medium text-gray-900">{coverImage.name}</p>
-                                        <p className="text-xs text-green-600 mt-1">✓ Image ready for upload</p>
-                                        <button
-                                            onClick={removeCoverImage}
-                                            disabled={loading}
-                                            className="mt-2 text-sm text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
-                                        >
-                                            Remove Image
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
 
                     <div>

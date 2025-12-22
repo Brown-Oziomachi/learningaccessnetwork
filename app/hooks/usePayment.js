@@ -24,12 +24,13 @@ export const usePayment = (book, formData, sellerDetails) => {
 
     /**
      * Save transaction to Firestore database
-     * @param {Object} paymentData - Payment response data
-     * @param {string} status - Transaction status (completed, pending, failed)
-     * @returns {Promise<string>} Transaction ID
      */
     const saveTransaction = async (paymentData, status = 'completed') => {
         try {
+            console.log('=== SAVING TRANSACTION ===');
+            console.log('Book ID:', book.id);
+            console.log('Seller Details:', sellerDetails);
+
             const transactionData = {
                 // Transaction details
                 transactionId: paymentData.transaction_id || paymentData.tx_ref,
@@ -54,7 +55,7 @@ export const usePayment = (book, formData, sellerDetails) => {
                 buyerName: formData.name,
                 buyerPhone: formData.phone,
 
-                // Seller details - CRITICAL for crediting seller
+                // Seller details
                 sellerId: sellerDetails?.id || null,
                 sellerName: sellerDetails?.name || 'Unknown Seller',
                 sellerEmail: sellerDetails?.email || null,
@@ -63,8 +64,8 @@ export const usePayment = (book, formData, sellerDetails) => {
                 sellerWalletId: sellerDetails?.walletId || null,
 
                 // Platform commission
-                platformFee: book.price * 0.15, // 15% platform fee
-                sellerAmount: book.price * 0.85, // 85% to seller
+                platformFee: book.price * 0.15,
+                sellerAmount: book.price * 0.85,
 
                 // Timestamps
                 createdAt: serverTimestamp(),
@@ -81,88 +82,118 @@ export const usePayment = (book, formData, sellerDetails) => {
 
             // Save to transactions collection
             const transactionRef = await addDoc(collection(db, 'transactions'), transactionData);
-            console.log('Transaction saved with ID:', transactionRef.id);
-            console.log('Seller will be credited:', {
-                sellerId: sellerDetails?.id,
-                sellerName: sellerDetails?.name,
-                amount: book.price,
-                sellerEarnings: book.price * 0.85
-            });
+            console.log('✓ Transaction saved with ID:', transactionRef.id);
 
             // Update buyer's purchased books
             if (auth.currentUser) {
-                const userRef = doc(db, 'users', auth.currentUser.uid);
+                try {
+                    const userRef = doc(db, 'users', auth.currentUser.uid);
+                    const userDoc = await getDoc(userRef);
 
-                // Store under both the original bookId and cleaned firestoreId for compatibility
-                const updates = {
-                    updatedAt: serverTimestamp()
-                };
+                    const updates = {
+                        updatedAt: serverTimestamp()
+                    };
 
-                // Add purchase record with the bookId as key
-                const purchaseData = {
-                    id: book.id, // Include id field for backward compatibility
-                    bookId: book.id,
-                    firestoreId: book.firestoreId || null,
-                    title: book.title,
-                    author: book.author,
-                    purchaseDate: new Date().toISOString(),
-                    transactionId: transactionRef.id,
-                    amount: book.price,
-                    sellerId: sellerDetails?.id,
-                    sellerName: sellerDetails?.name,
-                    pdfUrl: book.pdfUrl || null,
-                };
+                    const purchaseData = {
+                        id: book.id,
+                        bookId: book.id,
+                        firestoreId: book.firestoreId || null,
+                        title: book.title,
+                        author: book.author,
+                        purchaseDate: new Date().toISOString(),
+                        transactionId: transactionRef.id,
+                        amount: book.price,
+                        sellerId: sellerDetails?.id,
+                        sellerName: sellerDetails?.name,
+                        pdfUrl: book.pdfUrl || null,
+                    };
 
-                updates[`purchasedBooks.${book.id}`] = purchaseData;
+                    // Store under original book ID
+                    updates[`purchasedBooks.${book.id}`] = purchaseData;
 
-                // Also store under firestoreId if different
-                if (book.firestoreId && book.firestoreId !== book.id) {
-                    updates[`purchasedBooks.${book.firestoreId}`] = purchaseData;
+                    // Also store under firestoreId if different
+                    if (book.firestoreId && book.firestoreId !== book.id) {
+                        updates[`purchasedBooks.${book.firestoreId}`] = purchaseData;
+                    }
+
+                    // Initialize purchasedBooks if it doesn't exist
+                    if (!userDoc.exists() || !userDoc.data().purchasedBooks) {
+                        updates.purchasedBooks = {};
+                        updates[`purchasedBooks.${book.id}`] = purchaseData;
+                    }
+
+                    await updateDoc(userRef, updates);
+                    console.log('✓ Buyer purchase record updated');
+                } catch (buyerError) {
+                    console.error('✗ Error updating buyer record:', buyerError);
+                    // Don't throw - transaction is saved
                 }
-
-                await updateDoc(userRef, updates);
-                console.log('Buyer purchase record updated for:', book.id);
             }
 
-            // Update seller's sales record and balance
+            // Update seller's records
             if (sellerDetails?.id) {
+                const sellerAmount = book.price * 0.85;
+                const platformFee = book.price * 0.15;
+
                 try {
-                    const sellerAmount = book.price * 0.85; // Seller gets 85%
-                    const platformFee = book.price * 0.15; // Platform gets 15%
-
-                    // Update the users collection (for seller profile)
+                    // 1. Update users collection (seller profile)
                     const userSellerRef = doc(db, 'users', sellerDetails.id);
-                    await updateDoc(userSellerRef, {
-                        // Add individual sale record
-                        [`sales.${transactionRef.id}`]: {
-                            transactionId: transactionRef.id,
-                            bookId: book.id,
-                            bookTitle: book.title,
-                            amount: book.price,
-                            sellerEarnings: sellerAmount,
-                            platformFee: platformFee,
-                            buyerId: auth.currentUser?.uid,
-                            buyerName: formData.name,
-                            buyerEmail: formData.email,
-                            saleDate: new Date().toISOString(),
-                            status: status,
-                        },
-                        // Update seller's total sales and earnings
-                        totalSales: increment(1),
-                        totalRevenue: increment(book.price),
-                        totalEarnings: increment(sellerAmount),
-                        lastSaleDate: serverTimestamp(),
-                        updatedAt: serverTimestamp()
-                    });
+                    const sellerSnapshot = await getDoc(userSellerRef);
 
-                    // Update the sellers collection (for account balance and withdrawals)
+                    if (sellerSnapshot.exists()) {
+                        const sellerData = sellerSnapshot.data();
+
+                        // Initialize fields if they don't exist
+                        const sellerUpdates = {
+                            [`sales.${transactionRef.id}`]: {
+                                transactionId: transactionRef.id,
+                                bookId: book.id,
+                                bookTitle: book.title,
+                                amount: book.price,
+                                sellerEarnings: sellerAmount,
+                                platformFee: platformFee,
+                                buyerId: auth.currentUser?.uid,
+                                buyerName: formData.name,
+                                buyerEmail: formData.email,
+                                saleDate: new Date().toISOString(),
+                                status: status,
+                            },
+                            totalSales: increment(1),
+                            totalRevenue: increment(book.price),
+                            totalEarnings: increment(sellerAmount),
+                            lastSaleDate: serverTimestamp(),
+                            updatedAt: serverTimestamp()
+                        };
+
+                        // Initialize sales object if it doesn't exist
+                        if (!sellerData.sales) {
+                            sellerUpdates.sales = {};
+                            sellerUpdates[`sales.${transactionRef.id}`] = {
+                                transactionId: transactionRef.id,
+                                bookId: book.id,
+                                bookTitle: book.title,
+                                amount: book.price,
+                                sellerEarnings: sellerAmount,
+                                platformFee: platformFee,
+                                buyerId: auth.currentUser?.uid,
+                                buyerName: formData.name,
+                                buyerEmail: formData.email,
+                                saleDate: new Date().toISOString(),
+                                status: status,
+                            };
+                        }
+
+                        await updateDoc(userSellerRef, sellerUpdates);
+                        console.log('✓ Seller user profile updated');
+                    } else {
+                        console.warn('⚠ Seller user document does not exist');
+                    }
+
+                    // 2. Update sellers collection (for withdrawals)
                     const sellersRef = doc(db, 'sellers', sellerDetails.id);
-
-                    // Check if seller document exists
                     const sellerDoc = await getDoc(sellersRef);
 
                     if (sellerDoc.exists()) {
-                        // Update existing seller document
                         await updateDoc(sellersRef, {
                             accountBalance: increment(sellerAmount),
                             totalEarnings: increment(sellerAmount),
@@ -170,8 +201,9 @@ export const usePayment = (book, formData, sellerDetails) => {
                             lastSaleDate: serverTimestamp(),
                             updatedAt: serverTimestamp()
                         });
+                        console.log('✓ Seller account balance updated');
                     } else {
-                        // Create new seller document if it doesn't exist
+                        // Create new seller document
                         await setDoc(sellersRef, {
                             sellerId: sellerDetails.id,
                             sellerName: sellerDetails.name,
@@ -183,20 +215,20 @@ export const usePayment = (book, formData, sellerDetails) => {
                             lastSaleDate: serverTimestamp(),
                             updatedAt: serverTimestamp()
                         });
+                        console.log('✓ New seller document created');
                     }
 
-                    console.log('Seller credited:', {
+                    console.log('✓ Seller credited:', {
                         sellerId: sellerDetails.id,
                         amount: sellerAmount,
                         bookTitle: book.title
                     });
                 } catch (sellerUpdateError) {
-                    console.error('Error updating seller record:', sellerUpdateError);
-                    // Log the error but don't throw - transaction is still saved
-                    console.error('Seller update failed for:', {
-                        sellerId: sellerDetails?.id,
-                        amount: book.price * 0.85
-                    });
+                    console.error('✗ Error updating seller record:', sellerUpdateError);
+                    console.error('Error code:', sellerUpdateError.code);
+                    console.error('Error message:', sellerUpdateError.message);
+                    console.error('Seller ID:', sellerDetails?.id);
+                    // Don't throw - transaction is still saved
                 }
             }
 
@@ -204,29 +236,32 @@ export const usePayment = (book, formData, sellerDetails) => {
             if (book.firestoreId) {
                 try {
                     const bookRef = doc(db, 'advertMyBook', book.firestoreId);
-                    await updateDoc(bookRef, {
-                        salesCount: increment(1),
-                        lastPurchaseDate: serverTimestamp(),
-                        updatedAt: serverTimestamp()
-                    });
-                    console.log('Book sales count updated');
+                    const bookDoc = await getDoc(bookRef);
+
+                    if (bookDoc.exists()) {
+                        await updateDoc(bookRef, {
+                            salesCount: increment(1),
+                            lastPurchaseDate: serverTimestamp(),
+                            updatedAt: serverTimestamp()
+                        });
+                        console.log('✓ Book sales count updated');
+                    }
                 } catch (bookUpdateError) {
-                    console.error('Error updating book sales count:', bookUpdateError);
+                    console.error('✗ Error updating book sales count:', bookUpdateError);
                 }
             }
 
             return transactionRef.id;
         } catch (err) {
-            console.error('Error saving transaction:', err);
+            console.error('✗ Error saving transaction:', err);
             throw err;
         }
     };
 
     /**
-     * Process Flutterwave payment using inline script
+     * Process Flutterwave payment
      */
     const processFlutterwavePayment = () => {
-        // Validate required data
         if (!book) {
             setError({ message: 'Book information is missing' });
             return;
@@ -250,12 +285,9 @@ export const usePayment = (book, formData, sellerDetails) => {
         setProcessing(true);
         setError(null);
 
-        console.log('Initiating Flutterwave payment with seller details:', {
-            sellerId: sellerDetails.id,
-            sellerName: sellerDetails.name,
-            amount: book.price,
-            bookTitle: book.title
-        });
+        console.log('=== INITIATING PAYMENT ===');
+        console.log('Book:', book.id, book.title);
+        console.log('Seller:', sellerDetails.id, sellerDetails.name);
 
         const paymentConfig = {
             public_key: process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY,
@@ -285,17 +317,19 @@ export const usePayment = (book, formData, sellerDetails) => {
                 transactionType: 'book_purchase',
             },
             callback: async (response) => {
-                console.log('Flutterwave payment response:', response);
+                console.log('=== PAYMENT CALLBACK ===');
+                console.log('Status:', response.status);
 
                 if (response.status === 'successful') {
                     try {
                         const transactionId = await saveTransaction(response, 'completed');
-                        console.log('Payment processed successfully. Transaction ID:', transactionId);
+                        console.log('✓ Payment processed successfully');
+                        console.log('Transaction ID:', transactionId);
                         setPaymentSuccess(true);
                     } catch (err) {
-                        console.error('Error processing successful payment:', err);
+                        console.error('✗ Error processing payment:', err);
                         setError({
-                            message: 'Payment successful but failed to save transaction. Please contact support with your transaction reference: ' + response.tx_ref
+                            message: 'Payment successful but failed to save transaction. Please contact support with reference: ' + response.tx_ref
                         });
                     } finally {
                         setProcessing(false);
@@ -309,27 +343,22 @@ export const usePayment = (book, formData, sellerDetails) => {
                 }
             },
             onclose: () => {
-                console.log('Payment modal closed');
                 if (!paymentSuccess) {
                     setProcessing(false);
                 }
             },
         };
 
-        // Add subaccount for split payment if seller has walletId
         if (sellerDetails?.walletId) {
             paymentConfig.subaccounts = [{
                 id: sellerDetails.walletId,
-                transaction_split_ratio: 0.85, // Seller gets 85%
+                transaction_split_ratio: 0.85,
             }];
         }
 
         window.FlutterwaveCheckout(paymentConfig);
     };
 
-    /**
-     * Process PayPal payment (placeholder for future implementation)
-     */
     const processPayPalPayment = async () => {
         if (!book || !sellerDetails) {
             setError({ message: 'Book or seller information is missing' });
@@ -340,11 +369,6 @@ export const usePayment = (book, formData, sellerDetails) => {
         setError(null);
 
         try {
-            console.log('Processing PayPal payment with seller details:', sellerDetails);
-
-            // TODO: Implement actual PayPal integration
-
-            // Simulate payment processing
             await new Promise(resolve => setTimeout(resolve, 2000));
 
             const mockPayPalResponse = {

@@ -1,8 +1,3 @@
-// ===========================
-// FILE: app/category/[slug]/page.jsx
-// UPDATED WITH BOOK COUNT AND FIREBASE INTEGRATION
-// ===========================
-
 "use client"
 import React, { useState, useEffect } from 'react';
 import { Globe, ArrowLeft } from 'lucide-react';
@@ -25,7 +20,86 @@ export default function CategoryPage() {
     const [allBooks, setAllBooks] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Shared categories data - matches homepage
+    const getThumbnailUrl = (book) => {
+        console.log('Getting thumbnail for book:', book.title, {
+            driveFileId: book.driveFileId,
+            embedUrl: book.embedUrl,
+            pdfUrl: book.pdfUrl
+        });
+
+        // PRIORITY 1: If book has driveFileId, generate thumbnail from PDF first page
+        if (book.driveFileId) {
+            const thumbnail = `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
+            console.log('✅ Using driveFileId thumbnail:', thumbnail);
+            return thumbnail;
+        }
+
+        // PRIORITY 2: Extract driveFileId from embedUrl if available
+        if (book.embedUrl) {
+            const match = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
+            if (match) {
+                const fileId = match[1] || match[2] || match[3];
+                if (fileId) {
+                    const thumbnail = `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
+                    console.log('✅ Using embedUrl thumbnail:', thumbnail);
+                    return thumbnail;
+                }
+            }
+        }
+
+        // PRIORITY 3: Extract from pdfUrl if it's a Google Drive link
+        if (book.pdfUrl && book.pdfUrl.includes('drive.google.com')) {
+            const match = book.pdfUrl.match(/[-\w]{25,}/);
+            if (match) {
+                const thumbnail = `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
+                console.log('✅ Using pdfUrl thumbnail:', thumbnail);
+                return thumbnail;
+            }
+        }
+
+        // LAST RESORT: Fallback to existing image or default
+        console.log('⚠️ Using fallback image - no Drive ID found');
+        return book.image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+    };
+
+    // Fetch Purchased Books - FIXED to handle object format
+    useEffect(() => {
+        const fetchPurchasedBooks = async () => {
+            try {
+                const user = auth.currentUser;
+                if (user) {
+                    const userDocRef = doc(db, 'users', user.uid);
+                    const userDoc = await getDoc(userDocRef);
+
+                    if (userDoc.exists()) {
+                        const userData = userDoc.data();
+                        const purchasedBooks = userData.purchasedBooks || {};
+
+                        // Handle both object and array formats
+                        let bookIds = [];
+
+                        if (Array.isArray(purchasedBooks)) {
+                            // If it's an array
+                            bookIds = purchasedBooks.map(book => book.id || book);
+                        } else if (typeof purchasedBooks === 'object') {
+                            // If it's an object/map
+                            bookIds = Object.keys(purchasedBooks);
+                        }
+
+                        console.log('Purchased book IDs:', bookIds);
+                        setPurchasedBookIds(new Set(bookIds));
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching purchased books:', error);
+            }
+        };
+
+        if (user) {
+            fetchPurchasedBooks();
+        }
+    }, [user]);
+
     const categoriesData = [
         {
             name: 'Education',
@@ -72,9 +146,9 @@ export default function CategoryPage() {
             slug: 'arts-culture',
             image: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=400'
         },
-          {
+        {
             name: 'Relation & Marriage',
-            slug: 'relationships',
+            slug: 'relationship',
             image: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=400'
         }
     ];
@@ -95,17 +169,27 @@ export default function CategoryPage() {
         return () => unsubscribe();
     }, [router]);
 
-    // Fetch Firestore Books
+    // Fetch books with PDF thumbnails
     useEffect(() => {
         const fetchFirestoreBooks = async () => {
             try {
+                // Process booksData to use PDF thumbnails
+                const processedBooksData = booksData.map(book => ({
+                    ...book,
+                    image: getThumbnailUrl(book)
+                }));
+
+                console.log('Processed booksData:', processedBooksData.length);
+
+                // Fetch Firestore books
                 const q = query(collection(db, 'advertMyBook'), where('status', '==', 'approved'));
                 const querySnapshot = await getDocs(q);
-                
+
                 const books = [];
                 querySnapshot.forEach((docSnap) => {
                     const data = docSnap.data();
-                    books.push({
+
+                    const bookData = {
                         id: `firestore-${docSnap.id}`,
                         firestoreId: docSnap.id,
                         title: data.bookTitle,
@@ -114,7 +198,6 @@ export default function CategoryPage() {
                         price: data.price,
                         pages: data.pages,
                         format: data.format || 'PDF',
-                        image: data.coverImage || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400',
                         description: data.description,
                         rating: 4.5,
                         reviews: 0,
@@ -123,14 +206,23 @@ export default function CategoryPage() {
                         previewUrl: data.previewUrl,
                         embedUrl: data.embedUrl,
                         isFromFirestore: true
-                    });
+                    };
+
+                    // Use thumbnail from PDF first page
+                    bookData.image = getThumbnailUrl(bookData);
+                    books.push(bookData);
                 });
-                
+
+                console.log('Firestore books:', books.length);
                 setFirestoreBooks(books);
-                setAllBooks([...booksData, ...books]);
+                setAllBooks([...processedBooksData, ...books]);
             } catch (error) {
                 console.error('Error fetching Firestore books:', error);
-                setAllBooks(booksData);
+                const processedBooksData = booksData.map(book => ({
+                    ...book,
+                    image: getThumbnailUrl(book)
+                }));
+                setAllBooks(processedBooksData);
             } finally {
                 setLoading(false);
             }
@@ -139,7 +231,7 @@ export default function CategoryPage() {
         fetchFirestoreBooks();
     }, []);
 
-    // Fetch Purchased Books
+    // Fetch Purchased Books - FIXED
     useEffect(() => {
         const fetchPurchasedBooks = async () => {
             try {
@@ -150,8 +242,21 @@ export default function CategoryPage() {
 
                     if (userDoc.exists()) {
                         const userData = userDoc.data();
-                        const purchased = userData.purchasedBooks || [];
-                        setPurchasedBookIds(new Set(purchased.map(book => book.id)));
+                        const purchasedBooks = userData.purchasedBooks || {};
+
+                        // Handle both object and array formats
+                        let bookIds = [];
+
+                        if (Array.isArray(purchasedBooks)) {
+                            // If it's an array
+                            bookIds = purchasedBooks.map(book => book.id || book);
+                        } else if (typeof purchasedBooks === 'object') {
+                            // If it's an object/map
+                            bookIds = Object.keys(purchasedBooks);
+                        }
+
+                        console.log('Purchased book IDs:', bookIds);
+                        setPurchasedBookIds(new Set(bookIds));
                     }
                 }
             } catch (error) {
@@ -181,7 +286,7 @@ export default function CategoryPage() {
     // Sort books
     const sortBooks = (books) => {
         const sorted = [...books];
-        switch(sortBy) {
+        switch (sortBy) {
             case 'price-low':
                 return sorted.sort((a, b) => a.price - b.price);
             case 'price-high':
@@ -209,10 +314,10 @@ export default function CategoryPage() {
         );
     }
 
+    
     return (
         <div className="min-h-screen bg-white">
-            {/* Header */}
-            <Navbar/>
+            <Navbar />
 
             {/* Breadcrumb */}
             <div className="bg-gray-50 border-b border-gray-200">
@@ -232,7 +337,7 @@ export default function CategoryPage() {
                 {/* Category Header */}
                 <div className="mb-8">
                     <div className="flex items-center gap-3 mb-3">
-                        <button 
+                        <button
                             onClick={() => router.back()}
                             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                         >
@@ -243,7 +348,7 @@ export default function CategoryPage() {
                         </h1>
                     </div>
                     <p className="text-gray-600 ml-14">
-                        Explore {displayBooks.length} document{displayBooks.length !== 1 ? 's' : ''} in {categoryName}. 
+                        Explore {displayBooks.length} document{displayBooks.length !== 1 ? 's' : ''} in {categoryName}.
                         Access on your web browser, Android, or iOS device.
                     </p>
                 </div>
@@ -257,7 +362,7 @@ export default function CategoryPage() {
                     </div>
                     <div className="flex items-center gap-2">
                         <span className="text-gray-700 text-sm">Sort by:</span>
-                        <select 
+                        <select
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value)}
                             className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-950"
@@ -277,16 +382,21 @@ export default function CategoryPage() {
                         <div className="overflow-x-auto scrollbar-hide p-1">
                             <div className="flex gap-2 pb-4">
                                 {displayBooks.map((book) => (
-                                    <Link 
-                                        key={book.id} 
-                                        href={`/book/preview?id=${book.id}`} 
+                                    <Link
+                                        key={book.id}
+                                        href={`/book/preview?id=${book.id}`}
                                         className="flex-none w-[200px] sm:w-[300px] bg-gray-50 px-3 py-5 border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
                                     >
                                         <div className="relative">
-                                            <img 
-                                                src={book.image} 
-                                                alt={book.title} 
-                                                className="w-full max-lg:h-48 lg:h-90 lg:p-5 object-cover" 
+                                            <img
+                                                src={book.image}
+                                                alt={book.title}
+                                                className="w-full max-lg:h-48 lg:h-90 lg:p-5 object-cover bg-gray-200"
+                                                onError={(e) => {
+                                                    console.log('Image failed to load for:', book.title);
+                                                    e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+                                                }}
+                                                loading="lazy"
                                             />
                                             {isPurchased(book.id) && (
                                                 <span className="absolute top-2 right-2 bg-green-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
