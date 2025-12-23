@@ -56,7 +56,7 @@ export default function HomePage() {
             description: 'Classic and contemporary literary works'
         },
         {
-            name: 'Health & Wellness',
+            name: 'Health & Fitness',
             subcategories: 6,
             image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=400',
             description: 'Medical, fitness, and mental health'

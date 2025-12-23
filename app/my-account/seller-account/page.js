@@ -1,9 +1,9 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { DollarSign, TrendingUp, ShoppingBag, CreditCard, Download, Book, Globe, Settings, X, Camera, Save, Mail, CheckCircle, AlertCircle } from "lucide-react";
+import { DollarSign, TrendingUp, ShoppingBag, CreditCard, Download, Book, Globe, Settings, X, Camera, Save, Mail, CheckCircle, AlertCircle, ChevronRight, User, MapPin, Phone, Calendar, Building } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, increment } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, increment, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
@@ -19,16 +19,19 @@ export default function SellerAccount() {
     const [transactions, setTransactions] = useState([]);
     const [withdrawals, setWithdrawals] = useState([]);
     const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [showTransactionHistory, setShowTransactionHistory] = useState(false);
     const [withdrawAmount, setWithdrawAmount] = useState("");
     const [withdrawing, setWithdrawing] = useState(false);
-    const [activeTab, setActiveTab] = useState("overview");
     const [withdrawalError, setWithdrawalError] = useState("");
     const router = useRouter();
 
     const [formData, setFormData] = useState({
         firstName: "",
         surname: "",
-        dateOfBirth: ""
+        dateOfBirth: "",
+        phone: "",
+        address: ""
     });
 
     useEffect(() => {
@@ -45,8 +48,6 @@ export default function SellerAccount() {
     const fetchUserData = async (uid) => {
         try {
             setLoading(true);
-
-            // Fetch user document
             const userDoc = await getDoc(doc(db, "users", uid));
 
             if (userDoc.exists()) {
@@ -57,7 +58,6 @@ export default function SellerAccount() {
                     return;
                 }
 
-                // Fetch seller document
                 const sellerDoc = await getDoc(doc(db, "sellers", uid));
                 let bankDetails = null;
 
@@ -65,20 +65,10 @@ export default function SellerAccount() {
                     const sellerData = sellerDoc.data();
                     bankDetails = sellerData.bankDetails || null;
 
-                    // Set initial values from Firestore (prevents flash of 0)
-                    console.log("Initial Seller Data:", {
-                        accountBalance: sellerData.accountBalance || 0,
-                        totalEarnings: sellerData.totalEarnings || 0,
-                        booksSold: sellerData.booksSold || 0
-                    });
-
                     setAccountBalance(sellerData.accountBalance || 0);
                     setTotalEarnings(sellerData.totalEarnings || 0);
                     setBooksSold(sellerData.booksSold || 0);
                 } else {
-                    console.warn("Seller document does not exist for UID:", uid);
-
-                    // Create seller document if it doesn't exist
                     const sellerDocRef = doc(db, "sellers", uid);
                     await setDoc(sellerDocRef, {
                         sellerId: uid,
@@ -106,34 +96,27 @@ export default function SellerAccount() {
                 setFormData({
                     firstName: userData.firstName || "",
                     surname: userData.surname || "",
-                    dateOfBirth: userData.dateOfBirth || ""
+                    dateOfBirth: userData.dateOfBirth || "",
+                    phone: userData.phone || "",
+                    address: userData.address || ""
                 });
 
-                // Fetch and recalculate transactions
-                // This will update state again with accurate calculated values
                 await fetchSellerTransactions(uid);
             }
         } catch (error) {
             console.error("Error fetching user data:", error);
-            console.error("Error details:", error.message);
-            console.error("Error stack:", error.stack);
         } finally {
             setLoading(false);
         }
     };
-    // Replace the fetchSellerTransactions function in your seller-account/page.js
 
     const fetchSellerTransactions = async (uid) => {
         try {
             let allTransactions = [];
 
-            console.log('=== FETCHING SELLER TRANSACTIONS ===');
-            console.log('Seller UID:', uid);
-
-            // METHOD 1: Query transactions collection (FIXED QUERY)
             const transactionsQuery = query(
                 collection(db, "transactions"),
-                where("sellerId", "==", uid)  // ✅ Only query by sellerId
+                where("sellerId", "==", uid)
             );
 
             const transactionsSnapshot = await getDocs(transactionsQuery);
@@ -147,22 +130,16 @@ export default function SellerAccount() {
                 };
             });
 
-            console.log(`✅ Found ${txnsFromCollection.length} transactions in transactions collection`);
             allTransactions = [...txnsFromCollection];
 
-            // METHOD 2: Also check users' purchasedBooks as backup
-            console.log("🔍 Scanning users' purchasedBooks for additional transactions...");
             const usersSnapshot = await getDocs(collection(db, "users"));
 
             usersSnapshot.docs.forEach(userDoc => {
                 const userData = userDoc.data();
                 const purchasedBooks = userData.purchasedBooks || {};
 
-                // Loop through each purchased book
                 Object.values(purchasedBooks).forEach(purchase => {
-                    // Check if this purchase is from our seller
                     if (purchase.sellerId === uid) {
-                        // Check if we already have this transaction
                         const existingTxn = allTransactions.find(
                             t => t.id === purchase.transactionId ||
                                 t.bookTitle === purchase.title && t.buyerEmail === userData.email
@@ -186,14 +163,9 @@ export default function SellerAccount() {
                 });
             });
 
-            console.log(`✅ Total unique transactions: ${allTransactions.length}`);
-
-            // Sort by date, newest first
             allTransactions.sort((a, b) => b.createdAtDate - a.createdAtDate);
-
             setTransactions(allTransactions);
 
-            // Fetch withdrawals
             const withdrawalsQuery = query(
                 collection(db, "withdrawals"),
                 where("sellerId", "==", uid)
@@ -209,10 +181,8 @@ export default function SellerAccount() {
             });
 
             withdrawalsList.sort((a, b) => b.requestedAtDate - a.requestedAtDate);
-            console.log(`✅ Loaded ${withdrawalsList.length} withdrawals`);
             setWithdrawals(withdrawalsList);
 
-            // Calculate totals from transactions
             if (allTransactions.length > 0) {
                 const calculatedEarnings = allTransactions.reduce((sum, txn) => {
                     const earning = txn.sellerAmount || (txn.amount * 0.85);
@@ -220,70 +190,40 @@ export default function SellerAccount() {
                 }, 0);
                 const calculatedBooksSold = allTransactions.length;
 
-                console.log(`📊 Calculated Totals:`);
-                console.log(`   - Books Sold: ${calculatedBooksSold}`);
-                console.log(`   - Total Earnings: ₦${calculatedEarnings.toLocaleString()}`);
-
-                // Calculate current balance (earnings minus withdrawals)
                 const totalWithdrawn = withdrawalsList
                     .filter(w => w.status === 'completed')
                     .reduce((sum, w) => sum + (w.amount || 0), 0);
 
                 const calculatedBalance = calculatedEarnings - totalWithdrawn;
 
-                console.log(`   - Total Withdrawn: ₦${totalWithdrawn.toLocaleString()}`);
-                console.log(`   - Current Balance: ₦${calculatedBalance.toLocaleString()}`);
-
-                // Update local state
                 setTotalEarnings(calculatedEarnings);
                 setBooksSold(calculatedBooksSold);
                 setAccountBalance(calculatedBalance);
 
-                // Update Firestore seller document
                 const sellerDocRef = doc(db, "sellers", uid);
                 const sellerDoc = await getDoc(sellerDocRef);
 
                 if (sellerDoc.exists()) {
                     const currentData = sellerDoc.data();
 
-                    // Check if update is needed
                     const needsUpdate =
                         Math.abs(currentData.totalEarnings - calculatedEarnings) > 0.01 ||
                         currentData.booksSold !== calculatedBooksSold ||
                         Math.abs((currentData.accountBalance || 0) - calculatedBalance) > 0.01;
 
                     if (needsUpdate) {
-                        console.log('📝 Updating seller document with calculated values...');
                         await updateDoc(sellerDocRef, {
                             totalEarnings: calculatedEarnings,
                             booksSold: calculatedBooksSold,
                             accountBalance: calculatedBalance,
                             updatedAt: serverTimestamp()
                         });
-                        console.log('✅ Seller document updated');
-                    } else {
-                        console.log('✓ Seller document already up to date');
                     }
-                } else {
-                    console.warn('⚠️ Seller document does not exist, creating it...');
-                    await setDoc(sellerDocRef, {
-                        sellerId: uid,
-                        totalEarnings: calculatedEarnings,
-                        booksSold: calculatedBooksSold,
-                        accountBalance: calculatedBalance,
-                        totalWithdrawn: totalWithdrawn,
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp()
-                    });
-                    console.log('✅ New seller document created');
                 }
-            } else {
-                console.log('ℹ️ No transactions found for this seller');
             }
 
         } catch (error) {
-            console.error("❌ Error fetching transactions:", error);
-            console.error("Error details:", error.message);
+            console.error("Error fetching transactions:", error);
         }
     };
 
@@ -326,7 +266,6 @@ export default function SellerAccount() {
         const amount = parseFloat(withdrawAmount);
         setWithdrawalError("");
 
-        // Validation
         if (!amount || isNaN(amount)) {
             setWithdrawalError("Please enter a valid amount");
             return;
@@ -350,10 +289,8 @@ export default function SellerAccount() {
         try {
             setWithdrawing(true);
 
-            // Generate unique reference
             const withdrawalRef = `WD-${Date.now()}-${user.uid.substring(0, 8)}`;
 
-            // Create withdrawal record with COMPLETED status (automatic)
             const withdrawalData = {
                 sellerId: user.uid,
                 sellerName: user.displayName || `${user.firstName} ${user.surname}`,
@@ -374,7 +311,6 @@ export default function SellerAccount() {
 
             await addDoc(collection(db, "withdrawals"), withdrawalData);
 
-            // Deduct from seller's balance immediately
             const newBalance = accountBalance - amount;
             await updateDoc(doc(db, "sellers", user.uid), {
                 accountBalance: newBalance,
@@ -383,14 +319,12 @@ export default function SellerAccount() {
                 updatedAt: serverTimestamp()
             });
 
-            // Update local state immediately
             setAccountBalance(newBalance);
             setWithdrawAmount("");
             setShowWithdrawModal(false);
 
             alert(`✅ Withdrawal successful!\n\nAmount: ₦${amount.toLocaleString()}\nReference: ${withdrawalRef}\n\nFunds will be sent to:\n${user.bankDetails.accountName}\n${user.bankDetails.accountNumber}\n${user.bankDetails.bankName}`);
 
-            // Refresh withdrawal list
             await fetchSellerTransactions(user.uid);
 
         } catch (error) {
@@ -401,304 +335,421 @@ export default function SellerAccount() {
         }
     };
 
-    
-
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-950"></div>
+            <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
             </div>
         );
     }
 
+    const handleButton = () => {
+        router.push("/lan/net/help-center")
+    }
+     const handleGo = () => {
+        router.push("/advertise")
+    }
+
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-200 text-white pb-20">
             <Navbar />
-            <header className="bg-blue-950 text-white shadow-lg">
-                <div className="max-w-7xl mx-auto px-4 py-4">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <div className="flex items-center gap-4">
-                            <div>
-                                <h1 className="text-2xl font-bold">Seller Dashboard</h1>
-                                <p className="text-blue-200 text-sm">Manage your sales</p>
+            
+            {/* Header */}
+            <div className="bg-gray-200 px-4 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => setShowProfileModal(true)}
+                        className="relative"
+                    >
+                        <img
+                            src={user?.photoBase64 || "/api/placeholder/48/48"}
+                            className="w-12 h-12 rounded-full object-cover border-2 border-blue-950"
+                            alt="Profile"
+                        />
+                      
+                    </button>
+                    <div>
+                        <p className="text-sm text-blue-950">Hi, {user?.firstName || 'Seller'}</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <button 
+                    onClick={handleButton}
+                    className="relative">
+                        <div className="bg-pink-500 text-xs font-bold px-2 py-1 rounded-full">HELP</div>
+                    </button>
+                  
+                </div>
+            </div>
+
+            {/* Balance Card */}
+            <div className="mx-4 mt-4  rounded-2xl p-6 shadow-lg bg-blue-950">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-white font-semibold">₦ Available Balance</span>
+                        <button>
+                            <CheckCircle size={16} className="text-white" />
+                        </button>
+                    </div>
+                    <button 
+                        onClick={() => setShowTransactionHistory(true)}
+                        className="text-white font-semibold flex items-center gap-1 text-sm"
+                    >
+                        Transaction History <ChevronRight size={16} />
+                    </button>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-4xl font-bold text-gray-400">₦{accountBalance.toLocaleString()}</p>
+                        <button className="text-green-900 text-sm mt-1 flex items-center gap-1">
+                            <ChevronRight size={14} />
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => setShowWithdrawModal(true)}
+                        disabled={accountBalance < 1000}
+                        className="bg-white text-blue-950 px-6 py-3 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        + Withdraw
+                    </button>
+                </div>
+            </div>
+
+            {/* Recent Transactions */}
+            <div className="mx-4 mt-4">
+                {transactions.slice(0, 2).map((txn) => (
+                    <div key={txn.id} className="bg-blue-950 rounded-xl p-4 mb-2 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-white p-2 rounded-full">
+                                <ShoppingBag size={20} className="text-blue-950" />
                             </div>
-                            <button
+                            <div>
+                                <p className="font-semibold">{txn.bookTitle}</p>
+                                <p className="text-xs text-gray-400">{txn.createdAtDate?.toLocaleDateString()}</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-gray-300 font-bold">+₦{(txn.sellerAmount || (txn.amount * 0.85)).toLocaleString()}</p>
+                            <p className="text-xs bg-white px-1 text-blue-950">Successful</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mx-4 mt-6 grid grid-cols-3 gap-4">
+                <Link href="/my-books" className="bg-blue-950 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:bg-gray-700">
+                    <div className="bg-white p-3 rounded-full">
+                        <Book className="text-blue-950" size={24} />
+                    </div>
+                    <span className="text-sm font-semibold text-center">My Books</span>
+                </Link>
+                
+                <Link href="/pdf" className="bg-blue-950 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:bg-gray-700">
+                    <div className="bg-white p-3 rounded-full">
+                        <Globe className="text-blue-950" size={24} />
+                    </div>
+                    <span className="text-sm font-semibold text-center">Browse Books</span>
+                </Link>
+                
+                <Link href="/advertise" className="bg-blue-950 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:bg-gray-700">
+                    <div className="bg-white p-3 rounded-full">
+                        <TrendingUp className="text-blue-950" size={24} />
+                    </div>
+                    <span className="text-sm font-semibold text-center">Advertise</span>
+                </Link>
+            </div>
+
+            {/* Stats Section */}
+            <div className="mx-4 mt-6 bg-blue-950 rounded-2xl p-4">
+                <h3 className="font-bold text-lg mb-4">Quick Stats</h3>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white rounded-xl p-4">
+                        <p className="text-sm text-gray-900">Total Earnings</p>
+                        <p className="text-2xl font-bold text-blue-950">₦{totalEarnings.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-4">
+                        <p className="text-sm text-gray-900">Books Sold</p>
+                        <p className="text-2xl font-bold text-blue-950">{booksSold}</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Special Bonus Section */}
+            <div className="mx-4 mt-6 mb-6">
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-bold text-lg text-blue-950">Special Bonus For You</h3>
+                    <span className="text-xs bg-pink-500 px-2 py-1 rounded-full">Up to 6%</span>
+                </div>
+                <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white p-3 rounded-full">
+                            <TrendingUp className="text-purple-600" size={24} />
+                        </div>
+                        <div>
+                            <p className="font-bold">Up to ₦5600</p>
+                            <p className="text-xs text-purple-200">Earn more by selling</p>
+                        </div>
+                    </div>
+                    <button 
+                    onClick={handleGo}
+                    className="bg-blue-950 text-white px-6 py-2 rounded-xl font-bold">
+                        GO
+                    </button>
+                </div>
+            </div>
+
+            {/* Profile Modal */}
+            {showProfileModal && (
+                <div className="fixed inset-0 bg-white z-50 flex flex-col">
+                    <div className="bg-blue-950 p-6 text-center relative">
+                        <button 
+                            onClick={() => setShowProfileModal(false)}
+                            className="absolute top-4 right-4 text-gray-50"
+                        >
+                            <X size={24} />
+                        </button>
+                        <div className="flex flex-col items-center">
+                            <div className="relative mb-3">
+                                <img
+                                    src={user?.photoBase64 || "/api/placeholder/80/80"}
+                                    className="w-20 h-20 rounded-full object-cover border-4 border-white"
+                                    alt="Profile"
+                                />
+                            </div>
+                            <p className="text-2xl font-bold text-gray-50">{user?.displayName || `${user?.firstName} ${user?.surname}`}</p>
+                            <p className="text-sm text-gray-800">+234{user?.phone || '0000000000'}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 bg-gray-400 overflow-y-auto">
+                        <div className="p-4 space-y-2">
+                            {/* My Profile */}
+                            <button 
+                                onClick={() => {
+                                    setShowProfileModal(false);
+                                    setIsEditing(true);
+                                }}
+                                className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-white p-2 rounded-lg">
+                                        <User size={20}  className="text-blue-950"/>
+                                    </div>
+                                    <span className="font-semibold">My Profile</span>
+                                </div>
+                                <ChevronRight size={20} className="text-gray-400" />
+                            </button>
+
+                            {/* Bank Details */}
+                            <button 
                                 onClick={() => router.push('/my-account')}
-                                className="bg-blue-800 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                                className="w-full  bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700"
                             >
-                                Regular View
-                            </button>
-                        </div>
-                        <div className="flex items-center gap-4 w-full sm:w-auto">
-                            <div className="text-right flex-1 sm:flex-initial">
-                                <p className="text-sm text-blue-200">Balance</p>
-                                <p className="text-xl sm:text-2xl font-bold">₦{accountBalance.toLocaleString()}</p>
-                            </div>
-                            <button
-                                onClick={() => setShowWithdrawModal(true)}
-                                disabled={accountBalance < 1000}
-                                className="bg-green-600 hover:bg-green-700 px-4 sm:px-6 py-2 rounded-lg font-semibold whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Withdraw
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            <main className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
-                {/* Info Banner */}
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 flex items-start gap-3">
-                    <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
-                    <div className="text-sm text-green-900">
-                        <p className="font-semibold mb-1">Automatic Payments & Withdrawals</p>
-                        <p>All payments are credited instantly. Withdrawals are processed automatically without approval.</p>
-                    </div>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <p className="text-sm text-gray-600">Balance</p>
-                                <p className="text-xl sm:text-2xl font-bold text-green-600">₦{accountBalance.toLocaleString()}</p>
-                            </div>
-                            <div className="bg-green-100 p-3 rounded-full">
-                                <DollarSign className="text-green-600" size={24} />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <p className="text-sm text-gray-600">Total Earnings</p>
-                                <p className="text-xl sm:text-2xl font-bold text-blue-600">₦{totalEarnings.toLocaleString()}</p>
-                            </div>
-                            <div className="bg-blue-100 p-3 rounded-full">
-                                <TrendingUp className="text-blue-600" size={24} />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <p className="text-sm text-gray-600">Books Sold</p>
-                                <p className="text-xl sm:text-2xl font-bold text-purple-600">{booksSold}</p>
-                            </div>
-                            <div className="bg-purple-100 p-3 rounded-full">
-                                <ShoppingBag className="text-purple-600" size={24} />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <p className="text-sm text-gray-600">Platform Fee</p>
-                                <p className="text-xl sm:text-2xl font-bold text-orange-600">15%</p>
-                            </div>
-                            <div className="bg-orange-100 p-3 rounded-full">
-                                <CreditCard className="text-orange-600" size={24} />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Profile Card */}
-                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-                    <div className="bg-gradient-to-r from-blue-950 to-blue-800 p-6 sm:p-8 text-white">
-                        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-                            <img
-                                src={user?.photoBase64 || "/api/placeholder/100/100"}
-                                className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white object-cover"
-                                alt="Profile"
-                            />
-                            <div className="text-center sm:text-left flex-1">
-                                <h2 className="text-2xl sm:text-3xl font-bold">{user?.displayName || `${user?.firstName} ${user?.surname}`}</h2>
-                                <p className="text-blue-200 flex items-center gap-2 justify-center sm:justify-start mt-1">
-                                    <Mail size={16} />
-                                    {user?.email}
-                                </p>
-                                <span className="inline-flex items-center gap-1 bg-green-600 px-3 py-1 rounded-full text-sm mt-2">
-                                    <CheckCircle size={14} /> Verified Seller
-                                </span>
-                            </div>
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className="bg-white text-blue-950 px-4 sm:px-6 py-2 rounded-lg font-semibold hover:bg-blue-50 flex items-center gap-2"
-                            >
-                                <Settings size={18} />
-                                Edit Profile
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Tabs */}
-                    <div className="border-b">
-                        <div className="flex overflow-x-auto">
-                            {["overview", "transactions", "withdrawals"].map(tab => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab)}
-                                    className={`px-4 sm:px-6 py-3 font-semibold whitespace-nowrap ${activeTab === tab ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600 hover:text-blue-600"}`}
-                                >
-                                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Tab Content */}
-                    <div className="p-4 sm:p-8 text-blue-950">
-                        {activeTab === "overview" && (
-                            <div>
-                                <h3 className="text-xl font-bold mb-4">Account Information</h3>
-                                <div className="grid sm:grid-cols-2 gap-4 mb-8">
-                                    <div>
-                                        <label className="font-semibold text-gray-700">First Name</label>
-                                        <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user?.firstName || 'Not set'}</p>
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-white p-2 rounded-lg">
+                                        <Building size={20}  className="text-blue-950"/>
                                     </div>
-                                    <div>
-                                        <label className="font-semibold text-gray-700">Surname</label>
-                                        <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user?.surname || 'Not set'}</p>
-                                    </div>
-                                    <div>
-                                        <label className="font-semibold text-gray-700">Email</label>
-                                        <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user?.email}</p>
-                                    </div>
-                                    <div>
-                                        <label className="font-semibold text-gray-700">Date of Birth</label>
-                                        <p className="bg-gray-50 px-4 py-3 rounded-lg mt-1">{user?.dateOfBirth || 'Not set'}</p>
+                                    <span className="font-semibold">Bank Details</span>
+                                </div>
+                                <ChevronRight size={20} className="text-gray-400" />
+                            </button>
+
+                            {/* Other Information */}
+                            <div className="w-full  bg-blue-950 rounded-xl p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-white p-2 rounded-lg">
+                                            <Settings size={20} className="text-blue-950"/>
+                                        </div>
+                                        <span className="font-semibold">Other Information</span>
                                     </div>
                                 </div>
-
-                                {/* Bank Details */}
-                                {user?.bankDetails ? (
-                                    <div className="mb-8">
-                                        <h3 className="text-xl font-bold mb-4">Bank Details</h3>
-                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
-                                            <p><strong>Account Name:</strong> {user.bankDetails.accountName}</p>
-                                            <p><strong>Account Number:</strong> {user.bankDetails.accountNumber}</p>
-                                            <p><strong>Bank:</strong> {user.bankDetails.bankName}</p>
-                                        </div>
+                                <div className="space-y-3 pl-11 text-sm">
+                                    <div className="flex justify-between py-2 border-b border-gray-700">
+                                        <span className="text-gray-400">Email</span>
+                                        <span className="text-right break-all">{user?.email}</span>
                                     </div>
-                                ) : (
-                                    <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                                        <div className="flex items-start gap-3">
-                                            <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
-                                            <div>
-                                                <p className="font-semibold text-yellow-900 mb-1">Bank Details Required</p>
-                                                <p className="text-sm text-yellow-800">Please add your bank details to receive withdrawals.</p>
+                                    <div className="flex justify-between py-2 border-b border-gray-700">
+                                        <span className="text-gray-400">Date of Birth</span>
+                                        <span>{user?.dateOfBirth || 'Not set'}</span>
+                                    </div>
+                                    <div className="flex justify-between py-2 border-b border-gray-700">
+                                        <span className="text-gray-400">Address</span>
+                                        <span className="text-right">{user?.address || 'Not set'}</span>
+                                    </div>
+                                    <div className="flex justify-between py-2">
+                                        <span className="text-gray-400">Account Type</span>
+                                        <span className="text-blue-950 px-2 rounded-md font-semibold bg-white">Verified Seller</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Message
+                            <button className="w-full bg-gray-800 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-green-500 p-2 rounded-lg">
+                                        <Mail size={20} />
+                                    </div>
+                                    <span className="font-semibold">Message</span>
+                                </div>
+                                <ChevronRight size={20} className="text-gray-400" />
+                            </button> */}
+
+                            {/* Help */}
+                            <button className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-white p-2 rounded-lg">
+                                        <AlertCircle size={20} className="text-blue-950"/>
+                                    </div>
+                                    <span className="font-semibold">Help</span>
+                                </div>
+                                <ChevronRight size={20} className="text-gray-400" />
+                            </button>
+
+                            {/* About */}
+                            <button className="w-full  bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-white p-2 rounded-lg">
+                                        <Settings size={20} className="text-blue-950"/>
+                                    </div>
+                                    <span className="font-semibold">About</span>
+                                </div>
+                                <ChevronRight size={20} className="text-gray-400" />
+                            </button>
+
+                            {/* Contact Us */}
+                            <button className="w-full  bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-white p-2 rounded-lg">
+                                        <Phone size={20} className="text-blue-950"/>
+                                    </div>
+                                    <span className="font-semibold">Contact Us</span>
+                                </div>
+                                <ChevronRight size={20} className="text-gray-400" />
+                            </button>
+
+                            {/* History */}
+                            <button 
+                                onClick={() => {
+                                    setShowProfileModal(false);
+                                    setShowTransactionHistory(true);
+                                }}
+                                className="w-full  bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-white p-2 rounded-lg">
+                                        <TrendingUp size={20} className="text-blue-950"/>
+                                    </div>
+                                    <span className="font-semibold">History</span>
+                                </div>
+                                <ChevronRight size={20} className="text-gray-400" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Transaction History Modal */}
+            {showTransactionHistory && (
+                <div className="fixed inset-0 bg-gray-400 z-50 flex flex-col">
+                    <div className="bg-blue-950 p-4 flex items-center gap-4">
+                        <button onClick={() => setShowTransactionHistory(false)}>
+                            <X size={24} />
+                        </button>
+                        <h2 className="text-xl font-bold">Transaction History</h2>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-4">
+                        {transactions.length === 0 ? (
+                            <div className="text-center py-12">
+                                <ShoppingBag size={48} className="mx-auto text-gray-600 mb-4" />
+                                <p className="text-gray-400">No transactions yet</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {transactions.map((txn) => (
+                                    <div key={txn.id} className=" bg-blue-950 rounded-xl p-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-white p-2 rounded-full">
+                                                    <ShoppingBag size={16} className="text-blue-950" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold">{txn.bookTitle}</p>
+                                                    <p className="text-xs text-gray-400">
+                                                        {txn.createdAtDate?.toLocaleDateString()} at {txn.createdAtDate?.toLocaleTimeString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-white font-bold">
+                                                    +₦{(txn.sellerAmount || (txn.amount * 0.85)).toLocaleString()}
+                                                </p>
+                                                <p className="text-xs text-blue-950 px-1 bg-white">Successful</p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-white text-blue-950 rounded-lg p-3 mt-2 text-sm space-y-1">
+                                            <div className="flex justify-between">
+                                                <span className="text-blue-950">Buyer:</span>
+                                                <span>{txn.buyerName}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-blue-950">Price:</span>
+                                                <span>₦{txn.amount?.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-blue-950">Platform Fee (15%):</span>
+                                                <span>-₦{((txn.amount || 0) * 0.15).toLocaleString()}</span>
                                             </div>
                                         </div>
                                     </div>
-                                )}
-
-                                <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
-                                <div className="grid sm:grid-cols-3 gap-4">
-                                    <Link href="/my-books" className="p-4 border-2 rounded-lg hover:border-blue-600 hover:bg-blue-50 flex items-center gap-3">
-                                        <Book className="text-blue-600" size={24} />
-                                        <span className="font-semibold">My Books</span>
-                                    </Link>
-                                    <Link href="/pdf" className="p-4 border-2 rounded-lg hover:border-blue-600 hover:bg-blue-50 flex items-center gap-3">
-                                        <Globe className="text-blue-600" size={24} />
-                                        <span className="font-semibold">Browse Books</span>
-                                    </Link>
-                                    <Link href="/advertise" className="p-4 border-2 rounded-lg hover:border-blue-600 hover:bg-blue-50 flex items-center gap-3">
-                                        <TrendingUp className="text-blue-600" size={24} />
-                                        <span className="font-semibold">Advertise</span>
-                                    </Link>
-                                </div>
+                                ))}
                             </div>
                         )}
 
-                        {activeTab === "transactions" && (
-                            <div>
-                                <h3 className="text-xl font-bold mb-4">Recent Transactions</h3>
-                                {transactions.length === 0 ? (
-                                    <div className="text-center py-12">
-                                        <ShoppingBag size={48} className="mx-auto text-gray-400 mb-4" />
-                                        <p className="text-gray-600">No transactions yet</p>
-                                    </div>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full">
-                                            <thead className="bg-gray-50">
-                                                <tr>
-                                                    <th className="px-4 py-3 text-left text-sm font-semibold">Date</th>
-                                                    <th className="px-4 py-3 text-left text-sm font-semibold">Book</th>
-                                                    <th className="px-4 py-3 text-left text-sm font-semibold">Buyer</th>
-                                                    <th className="px-4 py-3 text-right text-sm font-semibold">Price</th>
-                                                    <th className="px-4 py-3 text-right text-sm font-semibold">Your Earning</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y">
-                                                {transactions.map((txn) => (
-                                                    <tr key={txn.id} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 text-sm">
-                                                            {txn.createdAtDate?.toLocaleDateString() || 'N/A'}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm font-medium">{txn.bookTitle}</td>
-                                                        <td className="px-4 py-3 text-sm">{txn.buyerName}</td>
-                                                        <td className="px-4 py-3 text-sm text-right">₦{txn.amount?.toLocaleString()}</td>
-                                                        <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">
-                                                            ₦{txn.sellerAmount?.toLocaleString() || ((txn.amount || 0) * 0.85).toLocaleString()}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {activeTab === "withdrawals" && (
-                            <div>
-                                <h3 className="text-xl font-bold mb-4">Withdrawal History</h3>
-                                {withdrawals.length === 0 ? (
-                                    <div className="text-center py-12">
-                                        <DollarSign size={48} className="mx-auto text-gray-400 mb-4" />
-                                        <p className="text-gray-600">No withdrawals yet</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {withdrawals.map((w) => (
-                                            <div key={w.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                <div className="flex justify-between items-start mb-2">
+                        {/* Withdrawals Section */}
+                        {withdrawals.length > 0 && (
+                            <div className="mt-6">
+                                <h3 className="font-bold text-lg mb-3">Withdrawal History</h3>
+                                <div className="space-y-3">
+                                    {withdrawals.map((w) => (
+                                        <div key={w.id} className="bg-gray-800 rounded-xl p-4">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-red-500 p-2 rounded-full">
+                                                        <Download size={16} className="text-white" />
+                                                    </div>
                                                     <div>
-                                                        <p className="font-semibold text-lg">₦{w.amount?.toLocaleString()}</p>
-                                                        <p className="text-sm text-gray-600">
+                                                        <p className="font-semibold">Withdrawal</p>
+                                                        <p className="text-xs text-gray-400">
                                                             {w.requestedAtDate?.toLocaleDateString()} at {w.requestedAtDate?.toLocaleTimeString()}
                                                         </p>
-                                                        {w.reference && (
-                                                            <p className="text-xs text-gray-500 mt-1">Ref: {w.reference}</p>
-                                                        )}
                                                     </div>
-                                                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold">
-                                                        Completed
-                                                    </span>
                                                 </div>
-                                                {w.bankDetails && (
-                                                    <div className="bg-gray-50 rounded p-3 mt-3 text-sm">
-                                                        <p><strong>Sent to:</strong> {w.bankDetails.accountName}</p>
-                                                        <p>{w.bankDetails.accountNumber} - {w.bankDetails.bankName}</p>
-                                                    </div>
-                                                )}
+                                                <div className="text-right">
+                                                    <p className="text-red-400 font-bold">-₦{w.amount?.toLocaleString()}</p>
+                                                    <p className="text-xs text-green-500">Completed</p>
+                                                </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
+                                            {w.reference && (
+                                                <p className="text-xs text-gray-500 mt-2">Ref: {w.reference}</p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>
                 </div>
-            </main>
+            )}
 
+            {/* Withdraw Modal */}
             {showWithdrawModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white text-blue-950 rounded-lg w-full max-w-md">
-                        <div className="bg-blue-950 text-white p-6 flex justify-between items-center rounded-t-lg">
+                <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50">
+                    <div className="bg-gray-200 rounded-t-3xl w-full max-w-md pb-8">
+                        <div className="bg-blue-950 p-6 flex justify-between items-center rounded-t-3xl">
                             <h2 className="text-2xl font-bold">Withdraw Funds</h2>
                             <button onClick={() => {
                                 setShowWithdrawModal(false);
@@ -709,43 +760,43 @@ export default function SellerAccount() {
                             </button>
                         </div>
 
-                        <div className="p-6 border-b space-y-2 bg-green-50">
-                            <div className="flex items-center gap-2 text-green-900 mb-2">
+                        <div className="p-6 border-b border-gray-800 bg-white">
+                            <div className="flex items-center gap-2 text-blue-950 mb-2">
                                 <CheckCircle size={18} />
                                 <p className="text-sm font-semibold">Instant Withdrawal - No Approval Needed</p>
                             </div>
                         </div>
 
                         {user?.bankDetails ? (
-                            <div className="p-6 border-b space-y-2 bg-gray-50">
-                                <p className="text-sm font-semibold text-gray-600">Withdrawal will be sent to:</p>
-                                <p><strong>Account Name:</strong> {user.bankDetails.accountName}</p>
-                                <p><strong>Account Number:</strong> {user.bankDetails.accountNumber}</p>
-                                <p><strong>Bank:</strong> {user.bankDetails.bankName}</p>
+                            <div className="p-6 border-b border-gray-800 bg-blue-950">
+                                <p className="text-sm font-semibold text-gray-400 mb-2">Withdrawal will be sent to:</p>
+                                <p className="text-sm"><strong>Account Name:</strong> {user.bankDetails.accountName}</p>
+                                <p className="text-sm"><strong>Account Number:</strong> {user.bankDetails.accountNumber}</p>
+                                <p className="text-sm"><strong>Bank:</strong> {user.bankDetails.bankName}</p>
                             </div>
                         ) : (
-                            <div className="p-6 border-b bg-yellow-50">
+                            <div className="p-6 border-b border-gray-800 bg-yellow-500/10">
                                 <div className="flex items-start gap-2">
-                                    <AlertCircle size={18} className="text-yellow-600 flex-shrink-0 mt-0.5" />
-                                    <p className="text-sm text-yellow-900">Please add bank details to your profile first</p>
+                                    <AlertCircle size={18} className="text-yellow-500 flex-shrink-0 mt-0.5" />
+                                    <p className="text-sm text-yellow-500">Please add bank details to your profile first</p>
                                 </div>
                             </div>
                         )}
 
                         <div className="p-6">
-                            <div className="bg-blue-50 p-4 rounded-lg mb-4">
-                                <p className="text-sm text-gray-600">Available Balance</p>
-                                <p className="text-3xl font-bold text-blue-950">₦{accountBalance.toLocaleString()}</p>
+                            <div className=" bg-blue-950 p-4 rounded-xl mb-4">
+                                <p className="text-sm text-gray-400">Available Balance</p>
+                                <p className="text-3xl font-bold text-white">₦{accountBalance.toLocaleString()}</p>
                             </div>
 
                             {withdrawalError && (
-                                <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
-                                    <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
-                                    <p className="text-sm text-red-900">{withdrawalError}</p>
+                                <div className="mb-4 bg-red-500/10 border border-red-500 rounded-xl p-3 flex items-start gap-2">
+                                    <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+                                    <p className="text-sm text-red-500">{withdrawalError}</p>
                                 </div>
                             )}
 
-                            <label className="font-semibold block mb-2">Amount</label>
+                            <label className="font-semibold block mb-2 text-blue-950">Amount</label>
                             <input
                                 type="number"
                                 value={withdrawAmount}
@@ -754,11 +805,11 @@ export default function SellerAccount() {
                                     setWithdrawalError("");
                                 }}
                                 placeholder="Enter amount"
-                                className="w-full border-2 px-4 py-3 rounded-lg mb-2 focus:border-blue-600 focus:outline-none"
+                                className="w-full  bg-blue-950 text-white border-2 border-gray-700 px-4 py-3 rounded-xl mb-2 focus:border-green-500 focus:outline-none text-white"
                                 min="1000"
                                 max={accountBalance}
                             />
-                            <p className="text-sm text-gray-500 mb-4">Minimum: ₦1,000</p>
+                            <p className="text-sm text-blue-950 mb-4">Minimum: ₦1,000</p>
 
                             <div className="flex gap-3">
                                 <button
@@ -767,18 +818,18 @@ export default function SellerAccount() {
                                         setWithdrawalError("");
                                         setWithdrawAmount("");
                                     }}
-                                    className="flex-1 border-2 px-6 py-3 rounded-lg font-semibold hover:bg-gray-50"
+                                    className="flex-1 bg-gray-800 px-6 py-3 rounded-xl font-semibold hover:bg-gray-700"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleWithdraw}
                                     disabled={withdrawing || !user?.bankDetails}
-                                    className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:bg-green-700"
+                                    className="flex-1 bg-blue-950 text-white px-6 py-3 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:bg-green-600"
                                 >
                                     {withdrawing ? (
                                         <>
-                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
                                             Processing...
                                         </>
                                     ) : (
@@ -794,41 +845,49 @@ export default function SellerAccount() {
                 </div>
             )}
 
-            {/* Edit Modal */}
+            {/* Edit Profile Modal */}
             {isEditing && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white text-blue-950 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="sticky top-0 bg-white text-blue-950 border-b px-6 py-4 flex justify-between items-center">
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <div className="sticky top-0  bg-blue-950 border-b border-gray-700 px-6 py-4 flex justify-between items-center rounded-t-2xl">
                             <h2 className="text-2xl font-bold">Edit Profile</h2>
                             <button onClick={() => setIsEditing(false)}><X size={24} /></button>
                         </div>
                         <div className="p-6">
                             <div className="flex justify-center mb-6">
                                 <div className="relative">
-                                    <img src={user?.photoBase64 || "/api/placeholder/128/128"} className="w-32 h-32 rounded-full border-4 border-gray-200 object-cover" alt="profile" />
-                                    <label className="absolute bottom-0 right-0 bg-blue-600 p-3 rounded-full cursor-pointer hover:bg-blue-700">
+                                    <img src={user?.photoBase64 || "/api/placeholder/128/128"} className="w-32 h-32 rounded-full border-4 border-green-500 object-cover" alt="profile" />
+                                    <label className="absolute bottom-0 right-0 bg-green-500 p-3 rounded-full cursor-pointer hover:bg-green-600">
                                         <Camera size={18} className="text-white" />
                                         <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                                     </label>
                                 </div>
                             </div>
-                            <div className="grid sm:grid-cols-2 gap-4">
+                            <div className="grid sm:grid-cols-2 gap-4 text-blue-950">
                                 <div>
                                     <label className="font-semibold block mb-2">First Name</label>
-                                    <input value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} className="w-full border px-4 py-3 rounded-lg" />
+                                    <input value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} className="w-full  bg-blue-950 border border-gray-50 px-4 py-3 rounded-xl text-white focus:border-green-500 focus:outline-none" />
                                 </div>
                                 <div>
                                     <label className="font-semibold block mb-2">Surname</label>
-                                    <input value={formData.surname} onChange={(e) => setFormData({ ...formData, surname: e.target.value })} className="w-full border px-4 py-3 rounded-lg" />
+                                    <input value={formData.surname} onChange={(e) => setFormData({ ...formData, surname: e.target.value })} className="w-full  bg-blue-950 border border-gray-50 px-4 py-3 rounded-xl text-white focus:border-green-500 focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label className="font-semibold block mb-2">Phone</label>
+                                    <input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full  bg-blue-950 border border-gray-50 px-4 py-3 rounded-xl text-white focus:border-green-500 focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label className="font-semibold block mb-2">Date of Birth</label>
+                                    <input type="date" value={formData.dateOfBirth} onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })} className="w-full  bg-blue-950 border border-gray-50 px-4 py-3 rounded-xl text-white focus:border-green-500 focus:outline-none" />
                                 </div>
                                 <div className="sm:col-span-2">
-                                    <label className="font-semibold block mb-2">Date of Birth</label>
-                                    <input type="date" value={formData.dateOfBirth} onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })} className="w-full border px-4 py-3 rounded-lg" />
+                                    <label className="font-semibold block mb-2">Address</label>
+                                    <input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full  bg-blue-950 border border-gray-50 px-4 py-3 rounded-xl text-white focus:border-green-500 focus:outline-none" />
                                 </div>
                             </div>
                             <div className="mt-6 flex gap-3">
-                                <button onClick={() => setIsEditing(false)} className="flex-1 border px-6 py-3 rounded-lg font-semibold">Cancel</button>
-                                <button onClick={handleSave} className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2">
+                                <button onClick={() => setIsEditing(false)} className="flex-1 bg-gray-800 px-6 py-3 rounded-xl font-semibold hover:bg-gray-700">Cancel</button>
+                                <button onClick={handleSave} className="flex-1  bg-blue-950 text-gray-50 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-600">
                                     <Save size={18} />Save
                                 </button>
                             </div>
@@ -836,6 +895,33 @@ export default function SellerAccount() {
                     </div>
                 </div>
             )}
+
+            {/* Bottom Navigation */}
+            <div className="fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 flex justify-around items-center py-3">
+                <button className="flex flex-col items-center gap-1">
+                    <DollarSign size={24} className="text-green-500" />
+                    <span className="text-xs text-green-500 font-semibold">Home</span>
+                </button>
+                <button className="flex flex-col items-center gap-1">
+                    <TrendingUp size={24} className="text-gray-400" />
+                    <span className="text-xs text-gray-400">Rewards</span>
+                </button>
+                <button className="flex flex-col items-center gap-1">
+                    <CreditCard size={24} className="text-gray-400" />
+                    <span className="text-xs text-gray-400">Finance</span>
+                </button>
+                <button className="flex flex-col items-center gap-1">
+                    <CreditCard size={24} className="text-gray-400" />
+                    <span className="text-xs text-gray-400">Cards</span>
+                </button>
+                <button 
+                    onClick={() => setShowProfileModal(true)}
+                    className="flex flex-col items-center gap-1"
+                >
+                    <User size={24} className="text-gray-400" />
+                    <span className="text-xs text-gray-400">Me</span>
+                </button>
+            </div>
         </div>
     );
 }
