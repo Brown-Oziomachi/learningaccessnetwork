@@ -350,7 +350,7 @@ const handleSaveBook = async (book) => {
                     <h3 className="text-2xl font-bold text-gray-900 mb-4">Featured Books</h3>
                     <div className="overflow-x-auto scrollbar-hide p-1">
                         <div className="flex gap-2 pb-4">
-                            {displayBooks.slice(0, 9).map((book) => (
+                            {displayBooks.slice(0, 4).map((book) => (
                                 <Link key={book.id} href={`/book/preview?id=${book.id}`} className="flex-none w-[200px] sm:w-[300px] bg-gray-50 px-3 py-5 border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
                                     <div className="relative">
                                         <img src={book.image} alt={book.title} className="w-full max-lg:h-48 lg:h-90 lg:p-5" />
@@ -369,10 +369,10 @@ const handleSaveBook = async (book) => {
                     </div>
                 </div>
                  <div className="lg:-mx-60 px-1 py-8">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Featured Books</h3>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Recents Books</h3>
                     <div className="overflow-x-auto scrollbar-hide p-1">
                         <div className="flex gap-2 pb-4">
-                            {displayBooks.slice(10, 19).map((book) => (
+                            {displayBooks.slice(5, 10).map((book) => (
                                 <Link key={book.id} href={`/book/preview?id=${book.id}`} className="flex-none w-[200px] sm:w-[300px] bg-gray-50 px-3 py-5 border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
                                     <div className="relative">
                                         <img src={book.image} alt={book.title} className="w-full max-lg:h-48 lg:h-90 lg:p-5" />

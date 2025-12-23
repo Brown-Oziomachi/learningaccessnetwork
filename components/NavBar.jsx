@@ -16,6 +16,7 @@ import {
   Globe,
   Book,
   ChevronRight,
+  HelpCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { signOut } from "firebase/auth";
@@ -175,6 +176,18 @@ export default function Navbar() {
         "Improve yourself with self-help books, productivity guides, and wellness resources",
       books: getBooksByCategory("personal"),
     },
+    sexeducation: {
+      title: "Sex Education",
+      description:
+        "Learn everything you need to know about sex eduction through peoples experience",
+      books: getBooksByCategory("sex education"),
+    },
+    relationship: {
+      title: "Relationships",
+      description:
+        "Discover the book written by relation therapist on LAN Library",
+      books: getBooksByCategory("relationship"),
+    },
   };
 
   const handleLogout = async () => {
@@ -273,7 +286,7 @@ export default function Navbar() {
               href="/home"
               className="flex items-center gap-2 flex-shrink-0"
             >
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-50">
+              <h1 className="text-4xl sm:text-3xl font-bold text-gray-50">
                 [LAN Library]
               </h1>
             </Link>
@@ -333,7 +346,7 @@ export default function Navbar() {
               <button
                 onClick={HandleClick}
                 disabled={checkingSeller}
-                className="bg-blue-950 hover:bg-blue-800 transition-colors text-white font-semibold px-8 py-4 rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="text-blue-950 hover:bg-blue-800 transition-colors bg-white font-semibold px-8 py-2 hover:text-white rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {checkingSeller ? (
                   <>
@@ -351,7 +364,7 @@ export default function Navbar() {
               </button>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
+                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 bg-red-800 text-white hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
               >
                 <LogOut size={18} className="lg:w-5 lg:h-5" />
                 <span className=" lg:inline">Logout</span>
@@ -631,6 +644,124 @@ export default function Navbar() {
                   )}
               </div>
 
+              <div
+                className="relative group"
+                onMouseEnter={() => setActiveDropdown("sex-education")}
+                onMouseLeave={() => setActiveDropdown(null)}
+              >
+                <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
+                  Sex Education{" "}
+                  <ChevronDown
+                    size={14}
+                    className={
+                      activeDropdown === "sex-education" ? "rotate-180" : ""
+                    }
+                  />
+                </button>
+                {activeDropdown === "sex education" &&
+                  menuCategories.sexeducation.books.length > 0 && (
+                    <div className="absolute lg:-left-70 top-full w-screen lg:max-w-7xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-bold text-gray-900">
+                          {menuCategories.sexeducation.title}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {menuCategories.sexeducation.description}
+                        </p>
+                      </div>
+
+                      <h4 className="font-semibold text-gray-900 mb-3">
+                        Documents recommended for you
+                      </h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        {menuCategories.sexeducation.books.map((book) => (
+                          <Link
+                            key={book.id}
+                            href={`/book/preview?id=${book.id}`}
+                            onClick={() => setActiveDropdown(null)}
+                            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                          >
+                            <div className="p-3">
+                              <h5 className="font-semibold text-sm line-clamp-2 mb-1">
+                                {book.title}
+                              </h5>
+                              <p className="text-xs text-gray-600">
+                                Added by {book.author}
+                              </p>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                      <Link
+                        href="/category/sex-education"
+                        className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
+                      >
+                        All Science Documents{" "}
+                        <ChevronRight size={14} className="inline" />
+                      </Link>
+                    </div>
+                  )}
+              </div>
+
+              <div
+                className="relative group"
+                onMouseEnter={() => setActiveDropdown("relationship")}
+                onMouseLeave={() => setActiveDropdown(null)}
+              >
+                <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
+                  Relationship{" "}
+                  <ChevronDown
+                    size={14}
+                    className={
+                      activeDropdown === "relationship" ? "rotate-180" : ""
+                    }
+                  />
+                </button>
+                {activeDropdown === "relationship" &&
+                  menuCategories.relationship.books.length > 0 && (
+                    <div className="absolute lg:-left-70 top-full w-screen lg:max-w-7xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-bold text-gray-900">
+                          {menuCategories.relationship.title}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {menuCategories.relationship.description}
+                        </p>
+                      </div>
+
+                      <h4 className="font-semibold text-gray-900 mb-3">
+                        Documents recommended for you
+                      </h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        {menuCategories.relationship.books.map((book) => (
+                          <Link
+                            key={book.id}
+                            href={`/book/preview?id=${book.id}`}
+                            onClick={() => setActiveDropdown(null)}
+                            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                          >
+                            <div className="p-3">
+                              <h5 className="font-semibold text-sm line-clamp-2 mb-1">
+                                {book.title}
+                              </h5>
+                              <p className="text-xs text-gray-600">
+                                Added by {book.author}
+                              </p>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                      <Link
+                        href="/category/relationship"
+                        className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
+                      >
+                        All Science Documents{" "}
+                        <ChevronRight size={14} className="inline" />
+                      </Link>
+                    </div>
+                  )}
+              </div>
+
               {/* Personal Development Dropdown */}
               <div
                 className="relative group"
@@ -692,7 +823,7 @@ export default function Navbar() {
               </div>
 
               <Link
-                href="/pdf"
+                href="/documents"
                 className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 whitespace-nowrap"
               >
                 All Documents
@@ -707,7 +838,7 @@ export default function Navbar() {
         <div className="fixed inset-0 bg-white z-50 md:hidden overflow-y-auto text-blue-950">
           <div className="p-4">
             <div className="flex items-center justify-between mb-6">
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-gray-900">
                 [LAN Library]
               </h1>
               <button
@@ -719,7 +850,7 @@ export default function Navbar() {
             </div>
 
             {mobileSubmenu === null ? (
-              <div className="space-y-2 text-blue-950">
+              <div className="space-y-5 text-blue-950">
                 <button
                   onClick={HandleClick}
                   disabled={checkingSeller}
@@ -764,18 +895,11 @@ export default function Navbar() {
                   href="/lan/net/help-center"
                   className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-100 rounded-lg"
                 >
-                  <User size={20} />
+                  <HelpCircle size={20} />
                   <span>FAQ and support</span>
                 </Link>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-1 lg:gap-2 px-5 bg-red-700 lg:px-3 py-2 text-white hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
-                >
-                  <LogOut size={18} className="lg:w-5 lg:h-5" />
-                  <span>Logout</span>
-                </button>
 
-                <div className="border-t border-gray-200 my-4 pt-4">
+                <div className="border-t border-blue-950 my-4 pt-4">
                   <button
                     onClick={() => router.push("/lan/net/help-center")}
                     className="text-sm font-semibold text-gray-500 mb-2 px-4"
@@ -797,12 +921,19 @@ export default function Navbar() {
                   ))}
 
                   <Link
-                    href="/pdf"
+                    href="/documents"
                     className="block px-4 py-3 hover:bg-gray-100 rounded-lg"
                   >
                     All Documents
                   </Link>
                 </div>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-1 mt-10 lg:gap-2 px-5 bg-red-700 lg:px-3 py-2  text-white hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
+                >
+                  <LogOut size={18} className="lg:w-5 lg:h-5" />
+                  <span>Logout</span>
+                </button>
               </div>
             ) : (
               <div>

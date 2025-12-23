@@ -64,11 +64,8 @@ export default function PaymentClient() {
         processFlutterwavePayment,
         processPayPalPayment
     } = usePayment(book, formData, sellerDetails);
-
-    // Fetch book data and seller details
-    // In your payment/page.js - Replace the useEffect that loads book data
-
-
+  
+    
     // Replace the entire loadBook function with this:
     useEffect(() => {
         const loadBook = async () => {
@@ -165,13 +162,14 @@ export default function PaymentClient() {
         }
     };
 
+  
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-950 mx-auto mb-4"></div>
                     <p className="text-gray-600">Loading book details...</p>
-                    <p className="text-sm text-gray-500 mt-2">Book ID: {bookId}</p>
                 </div>
             </div>
         );
@@ -188,12 +186,8 @@ export default function PaymentClient() {
                     </div>
                     <h2 className="text-2xl font-bold mb-2 text-gray-900">Book Not Found</h2>
                     <p className="text-gray-600 mb-4">{error || "The book you're looking for doesn't exist."}</p>
-                    <div className="text-left bg-gray-50 p-4 rounded mb-4">
-                        <p className="text-sm font-mono text-gray-700">
-                            <strong>Debug Info:</strong><br />
-                            Book ID: {bookId}<br />
-                            Type: {typeof bookId}
-                        </p>
+                    <div className="text-left bg-blue-950 p-4 rounded mb-4">
+                       
                     </div>
                     <button
                         onClick={() => window.history.back()}
@@ -288,7 +282,7 @@ export default function PaymentClient() {
                             </p>
                             {book.source === 'firestore' && (
                                 <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded mt-2">
-                                    User Book
+                                    {book.author}
                                 </span>
                             )}
                             {book.source === 'platform' && (
@@ -301,22 +295,14 @@ export default function PaymentClient() {
                 </div>
 
                 {/* Debug Info (Remove in production) */}
-                <div className="bg-gray-100 rounded-lg p-4 mb-6">
+                <div className="bg-blue-950 rounded-lg p-4 mb-6">
                     <details>
-                        <summary className="cursor-pointer font-semibold mb-2">Debug Info (Check Console for more details)</summary>
+                        <summary className="cursor-pointer font-semibold mb-2">Book Info |  <>{book.title}</></summary>
                         <pre className="text-xs overflow-auto">
-                            {JSON.stringify({
-                                bookId: book.id,
-                                originalBookId: bookId,
-                                sellerId: book.sellerId,
-                                sellerName: book.sellerName,
-                                sellerEmail: book.sellerEmail,
-                                sellerPhone: book.sellerPhone,
-                                price: book.price,
-                                source: book.source,
-                                sellerDetailsLoaded: !!sellerDetails,
-                                sellerDetailsData: sellerDetails
-                            }, null, 2)}
+                            <div className='p-5 bg-white text-blue-950 rounded-lg'>
+                            <p className=" mb-2 text-xl">{book.description || 'N/A'}</p>
+                            </div>
+
                         </pre>
                     </details>
                 </div>
@@ -341,13 +327,27 @@ export default function PaymentClient() {
                                 book={book}
                             />
 
-                            {/* Payment Info Note */}
-                            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <p className="text-sm text-blue-950">
-                                    When you complete payment, the seller ({book.sellerName || sellerDetails?.name})
-                                    will receive 85% (₦{(book.price * 0.85).toLocaleString()})
-                                </p>
-                            </div>
+                            {/* Payment Info Note - REPLACE THE OLD ONE WITH THIS */}
+                            {book && (
+                                book.isPlatformBook ? (
+                                    <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                        <p className="text-sm text-blue-950">
+                                            <strong>Platform Book:</strong> {book.sellerName} will receive
+                                            ₦{book.price.toLocaleString()} (100%)
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
+                                        <p className="text-sm text-green-950">
+                                            <strong>Note:</strong> {book.sellerName}, you will receive
+                                            ₦{(book.price * 0.85).toLocaleString()} (85% of ₦{book.price.toLocaleString()})
+                                        </p>
+                                        <p className="text-xs text-green-800 mt-1">
+                                            LAN Library fee: ₦{(book.price * 0.15).toLocaleString()} (15%)
+                                        </p>
+                                    </div>
+                                )
+                            )}
                         </div>
                     </div>
 

@@ -26,6 +26,7 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
+import { fetchBookDetails } from "@/utils/bookUtils";
 
 export default function BookPreviewPage() {
   const router = useRouter();
@@ -46,51 +47,33 @@ export default function BookPreviewPage() {
   const [checkingSeller, setCheckingSeller] = useState(true);
   const [isSeller, setIsSeller] = useState(false);
 
-  // FIXED: Helper function to get thumbnail from PDF
+  // Helper function to get thumbnail from PDF
   const getThumbnailUrl = (book) => {
-    console.log("Getting thumbnail for:", book?.title, book);
-
-    // Priority 1: driveFileId
-    if (book?.driveFileId) {
-      const url = `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
-      console.log("Using driveFileId:", url);
-      return url;
+    if (book.driveFileId) {
+      return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
     }
 
-    // Priority 2: Extract from embedUrl
-    if (book?.embedUrl) {
+    if (book.embedUrl) {
       const match = book.embedUrl.match(
-        /\/d\/([\w-]+)|\/file\/d\/([\w-]+)|id=([\w-]+)/
+        /\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/
       );
       if (match) {
         const fileId = match[1] || match[2] || match[3];
         if (fileId) {
-          const url = `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
-          console.log("Using embedUrl fileId:", url);
-          return url;
+          return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
         }
       }
     }
 
-    // Priority 3: Extract from pdfUrl
-    if (book?.pdfUrl && book.pdfUrl.includes("drive.google.com")) {
-      const match = book.pdfUrl.match(
-        /\/d\/([\w-]+)|\/file\/d\/([\w-]+)|id=([\w-]+)/
-      );
+    if (book.pdfUrl && book.pdfUrl.includes("drive.google.com")) {
+      const match = book.pdfUrl.match(/[-\w]{25,}/);
       if (match) {
-        const fileId = match[1] || match[2] || match[3];
-        if (fileId) {
-          const url = `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
-          console.log("Using pdfUrl fileId:", url);
-          return url;
-        }
+        return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
       }
     }
 
-    // Fallback
-    console.log("Using fallback image");
     return (
-      book?.image ||
+      book.image ||
       "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"
     );
   };
@@ -172,6 +155,7 @@ export default function BookPreviewPage() {
     return () => unsubscribe();
   }, [router]);
 
+  // Handle upload button click
   const HandleClick = () => {
     if (!user) {
       router.push("/auth/signin");
@@ -203,88 +187,51 @@ export default function BookPreviewPage() {
     }
   }, [user, bookId]);
 
-  // FIXED: Fetch book with proper embedUrl handling
-  useEffect(() => {
-    const fetchBook = async () => {
-      try {
-        console.log("Fetching book with ID:", bookId);
+  // First, add this import at the top of your file (around line 20)
 
-        if (bookId?.startsWith("firestore-")) {
-          const firestoreId = bookId.replace("firestore-", "");
-          console.log("Fetching from Firestore:", firestoreId);
+  // Then replace the entire useEffect with this:
 
-          const bookDoc = await getDoc(doc(db, "advertMyBook", firestoreId));
+useEffect(() => {
+  const fetchBook = async () => {
+    try {
+      setLoading(true);
 
-          if (bookDoc.exists()) {
-            const data = bookDoc.data();
-            console.log("Firestore book data:", data);
+      const bookData = await fetchBookDetails(bookId);
 
-            const bookData = {
-              id: bookId,
-              firestoreId: firestoreId,
-              title: data.bookTitle,
-              author: data.author,
-              category: data.category,
-              price: data.price,
-              pages: data.pages,
-              format: data.format || "PDF",
-              description: data.description,
-              message: data.message,
-              rating: 4.5,
-              reviews: 0,
-              driveFileId: data.driveFileId,
-              pdfUrl: data.pdfUrl,
-              previewUrl: data.previewUrl,
-              embedUrl: data.embedUrl, // ✅ CRITICAL: Include embedUrl
-              introduction: data.introduction || data.message,
-              previewText: data.previewText || data.description,
-              source: "firestore",
-            };
+      if (bookData) {
+        // 🔍 ADD THESE DEBUG LINES
+        console.log("📚 Full bookData:", bookData);
+        console.log("📄 embedUrl:", bookData.embedUrl);
+        console.log("📄 pdfUrl:", bookData.pdfUrl);
+        console.log("📄 driveFileId:", bookData.driveFileId);
 
-            // Generate thumbnail
-            bookData.image = getThumbnailUrl(bookData);
+        setBook({
+          ...bookData,
+          image: getThumbnailUrl(bookData),
+        });
 
-            console.log("Final book data:", bookData);
-            setBook(bookData);
-
-            setPreviewContent(
-              data.previewText ||
-                data.introduction ||
-                data.message ||
-                data.description
-            );
-          } else {
-            console.error("Book document not found");
-          }
-        } else {
-          const foundBook = booksData.find((b) => b.id === parseInt(bookId));
-          if (foundBook) {
-            setBook({
-              ...foundBook,
-              image: getThumbnailUrl(foundBook),
-              source: "platform",
-            });
-            setPreviewContent(
-              foundBook.previewText ||
-                foundBook.introduction ||
-                foundBook.message ||
-                foundBook.description
-            );
-          }
-        }
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching book:", error);
-        setLoading(false);
+        setPreviewContent(
+          bookData.previewText ||
+            bookData.introduction ||
+            bookData.message ||
+            bookData.description
+        );
       }
-    };
 
-    if (bookId) {
-      fetchBook();
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching book:", error);
+      setLoading(false);
     }
-  }, [bookId]);
+  };
 
-  // FIXED: Check purchase status
+  if (bookId) {
+    fetchBook();
+  }
+}, [bookId]);
+
+  // Improved checkPurchaseStatus function for BookPreviewPage
+
   const checkPurchaseStatus = async (userId) => {
     try {
       console.log("=== CHECKING PURCHASE STATUS ===");
@@ -298,54 +245,50 @@ export default function BookPreviewPage() {
         const userData = userDoc.data();
         const purchasedBooks = userData.purchasedBooks || {};
 
-        console.log("Purchased books:", purchasedBooks);
+        console.log("Purchased books keys:", Object.keys(purchasedBooks));
 
-        // Clean the book ID
+        // Clean the book ID (remove firestore- prefix if present)
         const cleanBookId = bookId?.replace("firestore-", "");
 
         // Check all possible variations
         let purchased = false;
 
-        // Check with original ID
+        // Direct match with original bookId
         if (purchasedBooks[bookId]) {
           purchased = true;
-          console.log("✓ Found with original ID:", bookId);
+          console.log("✓ Found purchase with original ID:", bookId);
         }
 
-        // Check with cleaned ID
-        if (!purchased && cleanBookId && purchasedBooks[cleanBookId]) {
+        // Match with cleaned bookId
+        if (!purchased && purchasedBooks[cleanBookId]) {
           purchased = true;
-          console.log("✓ Found with cleaned ID:", cleanBookId);
+          console.log("✓ Found purchase with cleaned ID:", cleanBookId);
         }
 
-        // Check with firestore- prefix
-        if (
-          !purchased &&
-          cleanBookId &&
-          purchasedBooks[`firestore-${cleanBookId}`]
-        ) {
+        // Check with firestore- prefix added
+        if (!purchased && purchasedBooks[`firestore-${cleanBookId}`]) {
           purchased = true;
-          console.log("✓ Found with firestore- prefix");
+          console.log("✓ Found purchase with firestore- prefix");
         }
 
-        // Deep search
+        // Deep search through all keys
         if (!purchased) {
-          const keys = Object.keys(purchasedBooks);
-          for (const key of keys) {
+          const bookKeys = Object.keys(purchasedBooks);
+          purchased = bookKeys.some((key) => {
             const cleanKey = key.replace("firestore-", "");
-            if (
+            const match =
               key === bookId ||
               key === cleanBookId ||
               cleanKey === bookId ||
               cleanKey === cleanBookId ||
               key === `firestore-${bookId}` ||
-              key === `firestore-${cleanBookId}`
-            ) {
-              purchased = true;
-              console.log("✓ Found with key:", key);
-              break;
+              key === `firestore-${cleanBookId}`;
+
+            if (match) {
+              console.log("✓ Found purchase with key:", key);
             }
-          }
+            return match;
+          });
         }
 
         console.log(
@@ -354,8 +297,11 @@ export default function BookPreviewPage() {
         );
         setIsPurchased(purchased);
 
+        // Show success message if just purchased
         if (purchased && searchParams.get("purchased") === "true") {
           showToastMessage("Purchase successful! You now have full access.");
+
+          // Clean up URL
           const url = new URL(window.location);
           url.searchParams.delete("purchased");
           window.history.replaceState({}, "", url);
@@ -445,9 +391,22 @@ export default function BookPreviewPage() {
   };
 
   const handlePurchase = () => {
-    // Ensure we're passing the correct ID format
-    const paymentBookId = bookId;
-    console.log("Redirecting to payment with bookId:", paymentBookId);
+    // If it's already a Firestore book (has firestore- prefix), use as-is
+    // If it's from lib/booksData (numeric ID), don't add prefix
+    let paymentBookId;
+
+    if (bookId?.startsWith("firestore-")) {
+      // Already has prefix, use as-is
+      paymentBookId = bookId;
+    } else if (book?.source === "firestore" && book?.firestoreId) {
+      // Firestore book but ID doesn't have prefix yet
+      paymentBookId = `firestore-${book.firestoreId}`;
+    } else {
+      // Platform book from lib/booksData - use numeric ID
+      paymentBookId = bookId;
+    }
+
+    console.log("Navigating to payment with bookId:", paymentBookId);
     router.push(`/payment?bookId=${paymentBookId}`);
   };
 
@@ -485,6 +444,9 @@ export default function BookPreviewPage() {
     setShowOptionsModal(false);
   };
 
+  const handleReport = () => {
+    router.push('/lan/customer-care')
+  }
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -521,7 +483,9 @@ export default function BookPreviewPage() {
             </button>
 
             <Link href="/home" className="flex items-center gap-2">
-              <div className="text-2xl font-bold text-blue-50">LAN Library</div>
+              <div className="text-4xl font-bold text-blue-50">
+                [LAN Library]
+              </div>
             </Link>
 
             <div className="flex items-center gap-2">
@@ -546,8 +510,8 @@ export default function BookPreviewPage() {
           <div className="fixed left-0 top-0 bottom-0 w-80 bg-white text-blue-950 z-[70] overflow-y-auto animate-slideRight">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <div className="text-2xl font-bold text-blue-950">
-                  LAN Library
+                <div className="text-3xl font-bold text-blue-950">
+                  [LAN Library]
                 </div>
                 <button onClick={() => setShowNavMenu(false)}>
                   <X size={24} />
@@ -588,38 +552,18 @@ export default function BookPreviewPage() {
                 <ChevronRight />
               </Link>
 
-              <div className="border-t border-gray-200 my-4"></div>
-
-              <div className="space-y-2">
-                <button
-                  onClick={HandleClick}
-                  disabled={checkingSeller}
-                  className="bg-blue-950 hover:bg-blue-800 transition-colors text-white font-semibold px-8 py-2 rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {checkingSeller ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      Loading...
-                    </>
-                  ) : isSeller ? (
-                    <>
-                      <Upload size={20} />
-                      Upload Document
-                    </>
-                  ) : (
-                    <>Become a Seller</>
-                  )}
-                </button>
-
+              <div className="">
                 <Link
                   href="/lan/net/help-center"
-                  className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg"
+                  className="flex mx-auto items-center gap-3 p-3 hover:bg-gray-50 "
                 >
                   <HelpCircle size={20} />
                   <span>FAQ and support</span>
+                  <ChevronRight className="ml-auto"/>
                 </Link>
               </div>
 
+              <div className="border-t border-blue-950 my-4"></div>
               <div className="mt-6">
                 <Link href="/about/lan">
                   <h3 className="font-bold text-gray-900 mb-3">What is LAN?</h3>
@@ -685,6 +629,25 @@ export default function BookPreviewPage() {
                   All Documents
                 </Link>
               </div>
+              <button
+                onClick={HandleClick}
+                disabled={checkingSeller}
+                className="bg-blue-950 hover:bg-blue-800 mt-5 transition-colors text-white font-semibold px-8 py-2 rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {checkingSeller ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    Loading...
+                  </>
+                ) : isSeller ? (
+                  <>
+                    <Upload size={20} />
+                    Upload Document
+                  </>
+                ) : (
+                  <>Become a Seller</>
+                )}
+              </button>
             </div>
           </div>
         </>
@@ -878,18 +841,28 @@ export default function BookPreviewPage() {
                   <div>
                     {/* PDF Preview (First Page/Beginning) */}
                     <div className="relative">
-                      {book.embedUrl || book.pdfUrl ? (
+                      {book.embedUrl ? (
+                        // ✅ FIXED: Show embedUrl for Firestore books
                         <div className="h-[600px] overflow-hidden">
                           <iframe
-                            src={`${
-                              book.embedUrl || book.pdfUrl
-                            }#view=FitH&page=1&toolbar=0`}
+                            src={book.embedUrl}
+                            className="w-full h-full border-none pointer-events-none"
+                            title={`${book.title} - Preview`}
+                            scrolling="no"
+                          />
+                        </div>
+                      ) : book.pdfUrl ? (
+                        // ✅ Show pdfUrl for platform books
+                        <div className="h-[600px] overflow-hidden">
+                          <iframe
+                            src={`${book.pdfUrl}#view=FitH&page=1&toolbar=0`}
                             className="w-full h-full border-none pointer-events-none"
                             title={`${book.title} - Preview`}
                             scrolling="no"
                           />
                         </div>
                       ) : (
+                        // Fallback: Show text preview if no PDF URL
                         <div className="h-[600px] p-8 bg-white">
                           <h3 className="text-2xl font-bold mb-6 text-gray-900">
                             {book.title}
@@ -1048,7 +1021,9 @@ export default function BookPreviewPage() {
                   </span>
                 </button>
 
-                <button className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left">
+                <button
+                  onClick={handleReport}
+                  className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left">
                   <Flag size={24} className="text-gray-700" />
                   <span className="font-medium text-gray-900 text-lg">
                     Report

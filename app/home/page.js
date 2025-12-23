@@ -317,7 +317,7 @@ export default function HomePage() {
                 {/* Explore All Link */}
                 <div className="text-center mt-12">
                     <a
-                        href="/pdf"
+                        href="/documents"
                         className="inline-flex items-center text-blue-950 font-semibold text-lg hover:underline"
                     >
                         Explore all of our categories
@@ -404,7 +404,7 @@ export default function HomePage() {
                             <ul className="space-y-2 text-sm">
                                 <li><a href="/category/education" className="text-gray-400 hover:text-white">Education</a></li>
                                 <li><a href="/category/business" className="text-gray-400 hover:text-white">Business</a></li>
-                                <li><a href="/pdf" className="text-gray-400 hover:text-white">All Books</a></li>
+                                <li><a href="/documents" className="text-gray-400 hover:text-white">All Books</a></li>
                             </ul>
                         </div>
                         <div>

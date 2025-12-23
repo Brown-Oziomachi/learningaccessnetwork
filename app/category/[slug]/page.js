@@ -325,7 +325,7 @@ export default function CategoryPage() {
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Link href="/home" className="hover:text-blue-600">Home</Link>
                         <span>&gt;</span>
-                        <Link href="/pdf" className="hover:text-blue-600">All Books</Link>
+                        <Link href="/documents" className="hover:text-blue-600">All Books</Link>
                         <span>&gt;</span>
                         <span className="text-gray-900 font-semibold">{categoryName}</span>
                     </div>

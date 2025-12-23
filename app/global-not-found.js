@@ -27,7 +27,7 @@ export default function GlobalNotFound() {
 
           {/* Description */}
          <p className="text-gray-600 mb-8">
-                LAN Library is a digital platform for accessing premium books and learning resources anytime, anywhere.
+               Why wasting time searching for a page that doesn't exist in LAN Library. Go to help-center and learn how to use our system.
         </p>
           <GoHomeButton/>
           </div>

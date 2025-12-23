@@ -53,15 +53,24 @@ export default function SearchClient() {
   // SEARCH LOGIC
   // =========================
   useEffect(() => {
-    if (!q) return setSearchResults([]);
+    const performSearch = async () => {
+      if (!q) return setSearchResults([]);
 
-    const filtered = booksData.filter(
-      book =>
-        book.title?.toLowerCase().includes(q) ||
-        book.author?.toLowerCase().includes(q) ||
-        book.category?.toLowerCase().includes(q)
-    );
-    setSearchResults(filtered);
+      // Search in platform books
+      const filtered = booksData.filter(
+        book =>
+          book.title?.toLowerCase().includes(q) ||
+          book.author?.toLowerCase().includes(q) ||
+          book.category?.toLowerCase().includes(q)
+      );
+
+      // TODO: Also search Firestore books if needed
+      // const firestoreBooks = await searchFirestoreBooks(q);
+
+      setSearchResults(filtered);
+    };
+
+    performSearch();
   }, [q]);
 
   // =========================

@@ -103,7 +103,7 @@ export const articlesP1 = {
     content: [
       {
         type: 'intro',
-        text: 'Learning Access Network offers thousands of PDF books across various categories. Learn how to efficiently browse and find the books you need.'
+        text: 'LAN library (Learning Access Network) offers thousands of PDF books across various categories. Learn how to efficiently browse and find the books you need.'
       },
       {
         type: 'heading',
