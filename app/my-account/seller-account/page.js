@@ -338,7 +338,10 @@ export default function SellerAccount() {
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 text-blue-950 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+                <div className="text-center">
+                    <div className="animate-spin h-12 w-12 border-b-2 border-blue-950 rounded-full mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading...</p>
+                </div>
             </div>
         );
     }
@@ -346,157 +349,218 @@ export default function SellerAccount() {
     const handleButton = () => {
         router.push("/lan/net/help-center")
     }
-     const handleGo = () => {
+    const handleGo = () => {
         router.push("/advertise")
     }
 
     return (
-        <div className="min-h-screen bg-gray-200 text-white pb-20">
+        <div className="min-h-screen bg-gray-100">
             <Navbar />
-            
-            {/* Header */}
-            <div className="bg-gray-200 px-4 py-4 flex items-center justify-between shadow-2xl bg-white">
-                <div className="flex items-center gap-3">
-                    <button 
-                        onClick={() => setShowProfileModal(true)}
-                        className="relative flex items-center gap-3"
-                    >
-                        <img
-                            src={user?.photoBase64 || "/api/placeholder/48/48"}
-                            className="w-12 h-12 rounded-full object-cover border-2 border-blue-950"
-                            alt="Profile"
-                        />
-                      
-                    <div>
-                        <p className="text-sm text-blue-950">Hi, {user?.firstName || 'Seller'}</p>
-                    </div>
-                    </button>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button 
-                    onClick={handleButton}
-                    className="relative">
-                        <div className="bg-pink-500 text-xs font-bold px-2 py-1 rounded-full">HELP</div>
-                    </button>
-                  
-                </div>
-            </div>
 
-            {/* Balance Card */}
-            <div className="mx-4 mt-4  rounded-2xl p-6 shadow-lg bg-blue-950">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                        <span className="text-white font-semibold">₦ Available Balance</span>
-                        <button>
-                            <CheckCircle size={16} className="text-white" />
-                        </button>
-                    </div>
-                    <button 
-                        onClick={() => setShowTransactionHistory(true)}
-                        className="text-white font-semibold flex items-center gap-1 text-sm"
-                    >
-                        Transaction History <ChevronRight size={16} />
-                    </button>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-4xl font-bold text-gray-400">₦{accountBalance.toLocaleString()}</p>
-                        <button className="text-green-900 text-sm mt-1 flex items-center gap-1">
-                            <ChevronRight size={14} />
-                        </button>
-                    </div>
-                    <button
-                        onClick={() => setShowWithdrawModal(true)}
-                        disabled={accountBalance < 1000}
-                        className="bg-white text-blue-950 px-6 py-3 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        + Withdraw
-                    </button>
-                </div>
-            </div>
-
-            {/* Recent Transactions */}
-            <div className="mx-4 mt-4">
-                {transactions.slice(0, 2).map((txn) => (
-                    <div key={txn.id} className="bg-blue-950 rounded-xl p-4 mb-2 flex items-center justify-between">
+            {/* Main Container - Responsive Layout */}
+            <div className="max-w-7xl mx-auto px-4 py-6">
+                {/* Header */}
+                <div className="bg-white rounded-xl shadow-sm px-6 py-4 mb-6">
+                    <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="bg-white p-2 rounded-full">
-                                <ShoppingBag size={20} className="text-blue-950" />
-                            </div>
-                            <div>
-                                <p className="font-semibold">{txn.bookTitle}</p>
-                                <p className="text-xs text-gray-400">{txn.createdAtDate?.toLocaleDateString()}</p>
-                            </div>
+                            <button
+                                onClick={() => setShowProfileModal(true)}
+                                className="relative flex items-center gap-3 hover:opacity-80 transition-opacity"
+                            >
+                                <img
+                                    src={user?.photoBase64 || "/api/placeholder/48/48"}
+                                    className="w-12 h-12 lg:w-14 lg:h-14 rounded-full object-cover border-2 border-blue-950"
+                                    alt="Profile"
+                                />
+                                <div>
+                                    <p className="text-sm lg:text-base font-semibold text-blue-950">Hi, {user?.firstName || 'Seller'}</p>
+                                    <p className="text-xs text-gray-500">Verified Seller</p>
+                                </div>
+                            </button>
                         </div>
-                        <div className="text-right">
-                            <p className="text-gray-300 font-bold">+₦{(txn.sellerAmount || (txn.amount * 0.85)).toLocaleString()}</p>
-                            <p className="text-xs bg-white px-1 text-blue-950">Successful</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Action Buttons
-            <div className="mx-4 mt-6 grid grid-cols-3 gap-4">
-                <Link href="/my-books" className="bg-blue-950 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:bg-gray-700">
-                    <div className="bg-white p-3 rounded-full">
-                        <Book className="text-blue-950" size={24} />
-                    </div>
-                    <span className="text-sm font-semibold text-center">My Books</span>
-                </Link>
-                
-                <Link href="/pdf" className="bg-blue-950 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:bg-gray-700">
-                    <div className="bg-white p-3 rounded-full">
-                        <Globe className="text-blue-950" size={24} />
-                    </div>
-                    <span className="text-sm font-semibold text-center">Browse Books</span>
-                </Link>
-                
-                <Link href="/advertise" className="bg-blue-950 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:bg-gray-700">
-                    <div className="bg-white p-3 rounded-full">
-                        <TrendingUp className="text-blue-950" size={24} />
-                    </div>
-                    <span className="text-sm font-semibold text-center">Advertise</span>
-                </Link>
-            </div> */}
-
-            {/* Stats Section */}
-            <div className="mx-4 mt-6 bg-blue-950 rounded-2xl p-4">
-                <h3 className="font-bold text-lg mb-4">Quick Stats</h3>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white rounded-xl p-4">
-                        <p className="text-sm text-gray-900">Total Earnings</p>
-                        <p className="text-2xl font-bold text-blue-950">₦{totalEarnings.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-white rounded-xl p-4">
-                        <p className="text-sm text-gray-900">Books Sold</p>
-                        <p className="text-2xl font-bold text-blue-950">{booksSold}</p>
+                        <button
+                            onClick={handleButton}
+                            className="bg-pink-500 hover:bg-pink-600 text-white text-xs lg:text-sm font-bold px-4 py-2 rounded-full transition-colors"
+                        >
+                            HELP
+                        </button>
                     </div>
                 </div>
-            </div>
 
-            {/* Special Bonus Section */}
-            <div className="mx-4 mt-6 mb-6">
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-bold text-lg text-blue-950">Special Bonus For You</h3>
-                    <span className="text-xs bg-pink-500 px-2 py-1 rounded-full">Up to 6%</span>
-                </div>
-                <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-white p-3 rounded-full">
-                            <TrendingUp className="text-purple-600" size={24} />
+                {/* Desktop Grid Layout - Mobile Stack */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left Column - Balance & Actions */}
+                    <div className="lg:col-span-2 space-y-6">
+                        {/* Balance Card */}
+                        <div className="bg-gradient-to-br from-blue-950 to-blue-800 rounded-2xl p-6 shadow-lg text-white">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-2">
+                                    <DollarSign size={20} />
+                                    <span className="font-semibold">Available Balance</span>
+                                </div>
+                                <button
+                                    onClick={() => setShowTransactionHistory(true)}
+                                    className="text-sm font-medium flex items-center gap-1 hover:opacity-80"
+                                >
+                                    History <ChevronRight size={16} />
+                                </button>
+                            </div>
+
+                            <div className="flex items-end justify-between">
+                                <div>
+                                    <p className="text-4xl lg:text-5xl font-bold mb-2">₦{accountBalance.toLocaleString()}</p>
+                                    <p className="text-sm text-blue-200">Total earnings: ₦{totalEarnings.toLocaleString()}</p>
+                                </div>
+                                <button
+                                    onClick={() => setShowWithdrawModal(true)}
+                                    disabled={accountBalance < 1000}
+                                    className="bg-white text-blue-950 px-6 py-3 rounded-xl font-bold hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Withdraw
+                                </button>
+                            </div>
                         </div>
-                        <div>
-                            <p className="font-bold">Up to ₦5,000,000.00</p>
-                            <p className="text-xs text-purple-200">Earn more by selling</p>
+
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-white rounded-xl p-6 shadow-sm">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="bg-blue-100 p-3 rounded-lg">
+                                        <TrendingUp size={24} className="text-blue-950" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">Total Earnings</p>
+                                        <p className="text-2xl font-bold text-blue-950">₦{totalEarnings.toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white rounded-xl p-6 shadow-sm">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="bg-green-100 p-3 rounded-lg">
+                                        <ShoppingBag size={24} className="text-green-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">Books Sold</p>
+                                        <p className="text-2xl font-bold text-blue-950">{booksSold}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Recent Transactions */}
+                        <div className="bg-white rounded-xl shadow-sm p-6">
+                            <h3 className="font-bold text-lg text-blue-950 mb-4">Recent Transactions</h3>
+                            <div className="space-y-3">
+                                {transactions.slice(0, 5).map((txn) => (
+                                    <div key={txn.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-blue-100 p-2 rounded-lg">
+                                                <ShoppingBag size={20} className="text-blue-950" />
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-blue-950 text-sm lg:text-base">{txn.bookTitle}</p>
+                                                <p className="text-xs text-gray-500">{txn.createdAtDate?.toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-green-600 font-bold">+₦{(txn.sellerAmount || (txn.amount * 0.85)).toLocaleString()}</p>
+                                            <p className="text-xs text-gray-500">Success</p>
+                                        </div>
+                                    </div>
+                                ))}
+                                {transactions.length === 0 && (
+                                    <div className="text-center py-8">
+                                        <ShoppingBag size={48} className="mx-auto text-gray-300 mb-3" />
+                                        <p className="text-gray-500">No transactions yet</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
-                    <button 
-                    onClick={handleGo}
-                    className="bg-blue-950 text-white px-6 py-2 rounded-xl font-bold">
-                        GO
-                    </button>
+
+                    {/* Right Column - Quick Actions & Bonus */}
+                    <div className="space-y-6">
+                        {/* Quick Actions */}
+                        <div className="bg-white rounded-xl shadow-sm p-6">
+                            <h3 className="font-bold text-lg text-blue-950 mb-4">Quick Actions</h3>
+                            <div className="space-y-3">
+                                <Link href="/my-books" className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                                    <div className="bg-blue-950 p-3 rounded-lg">
+                                        <Book className="text-white" size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-blue-950">My Books</p>
+                                        <p className="text-xs text-gray-600">View purchased books</p>
+                                    </div>
+                                    <ChevronRight size={20} className="text-gray-400" />
+                                </Link>
+
+                                <Link href="/pdf" className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                                    <div className="bg-blue-950 p-3 rounded-lg">
+                                        <Globe className="text-white" size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-blue-950">Browse Books</p>
+                                        <p className="text-xs text-gray-600">Explore library</p>
+                                    </div>
+                                    <ChevronRight size={20} className="text-gray-400" />
+                                </Link>
+
+                                <Link href="/advertise" className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                                    <div className="bg-blue-950 p-3 rounded-lg">
+                                        <TrendingUp className="text-white" size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-blue-950">Upload Books</p>
+                                        <p className="text-xs text-gray-600">Add new document</p>
+                                    </div>
+                                    <ChevronRight size={20} className="text-gray-400" />
+                                </Link>
+                            </div>
+                        </div>
+
+                        {/* Special Bonus */}
+                        <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl p-6 text-white">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="font-bold text-lg">Special Bonus</h3>
+                                <span className="text-xs bg-white/20 px-3 py-1 rounded-full font-semibold">Up to 6%</span>
+                            </div>
+                            <div className="mb-4">
+                                <div className="bg-white/20 p-3 rounded-lg inline-block mb-2">
+                                    <TrendingUp size={24} />
+                                </div>
+                                <p className="text-2xl font-bold mb-1">Up to ₦5,000,000</p>
+                                <p className="text-sm text-purple-100">Earn more by selling more books</p>
+                            </div>
+                            <button
+                                onClick={handleGo}
+                                className="w-full bg-white text-purple-600 font-bold py-3 rounded-xl hover:bg-gray-100 transition-colors"
+                            >
+                                Get Started
+                            </button>
+                        </div>
+
+                        {/* Bank Details Card */}
+                        {user?.bankDetails && (
+                            <div className="bg-white rounded-xl shadow-sm p-6">
+                                <h3 className="font-bold text-lg text-blue-950 mb-4">Bank Details</h3>
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Account Name:</span>
+                                        <span className="font-semibold text-blue-950">{user.bankDetails.accountName}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Account Number:</span>
+                                        <span className="font-semibold text-blue-950">{user.bankDetails.accountNumber}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Bank:</span>
+                                        <span className="font-semibold text-blue-950">{user.bankDetails.bankName}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -504,149 +568,114 @@ export default function SellerAccount() {
             {showProfileModal && (
                 <div className="fixed inset-0 bg-white z-50 flex flex-col">
                     <div className="bg-blue-950 p-6 text-center relative">
-                        <button 
+                        <button
                             onClick={() => setShowProfileModal(false)}
-                            className="absolute top-4 right-4 text-gray-50"
+                            className="absolute top-4 right-4 text-gray-50 hover:text-gray-300"
                         >
                             <X size={24} />
                         </button>
                         <Link href="/my-account">
-                        <div className="flex flex-col items-center">
-                            <div className="relative mb-3">
-                                <img
-                                    src={user?.photoBase64 || "/api/placeholder/80/80"}
-                                    className="w-20 h-20 rounded-full object-cover border-4 border-white"
-                                    alt="Profile"
-                                />
+                            <div className="flex flex-col items-center">
+                                <div className="relative mb-3">
+                                    <img
+                                        src={user?.photoBase64 || "/api/placeholder/80/80"}
+                                        className="w-20 h-20 rounded-full object-cover border-4 border-white"
+                                        alt="Profile"
+                                    />
+                                </div>
+                                <p className="text-2xl font-bold text-gray-50">{user?.displayName || `${user?.firstName} ${user?.surname}`}</p>
+                                <p className="text-sm text-gray-300">+234{user?.phone || '0000000000'}</p>
                             </div>
-                            <p className="text-2xl font-bold text-gray-50">{user?.displayName || `${user?.firstName} ${user?.surname}`}</p>
-                            <p className="text-sm text-gray-800">+234{user?.phone || '0000000000'}</p>
-                        </div>
                         </Link>
                     </div>
 
-                    <div className="flex-1 bg-gray-400 overflow-y-auto">
+                    <div className="flex-1 bg-gray-100 overflow-y-auto">
                         <div className="p-4 space-y-2">
-                            {/* My Profile */}
-                            <button 
+                            <button
                                 onClick={() => {
                                     setShowProfileModal(false);
                                     setIsEditing(true);
                                 }}
-                                className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700"
+                                className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
                             >
                                 <div className="flex items-center gap-3">
                                     <div className="bg-white p-2 rounded-lg">
-                                        <User size={20}  className="text-blue-950"/>
+                                        <User size={20} className="text-blue-950" />
                                     </div>
-                                    <span className="font-semibold">My Profile</span>
+                                    <span className="font-semibold text-white">My Profile</span>
                                 </div>
-                                <ChevronRight size={20} className="text-gray-400" />
+                                <ChevronRight size={20} className="text-gray-300" />
                             </button>
 
-                            {/* Bank Details */}
-                            <button 
+                            <button
                                 onClick={() => router.push('/my-account')}
-                                className="w-full  bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700"
+                                className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
                             >
                                 <div className="flex items-center gap-3">
                                     <div className="bg-white p-2 rounded-lg">
-                                        <Building size={20}  className="text-blue-950"/>
+                                        <Building size={20} className="text-blue-950" />
                                     </div>
-                                    <span className="font-semibold">Bank Details</span>
+                                    <span className="font-semibold text-white">Bank Details</span>
                                 </div>
-                                <ChevronRight size={20} className="text-gray-400" />
+                                <ChevronRight size={20} className="text-gray-300" />
                             </button>
 
-                            {/* Other Information */}
-                            <div className="w-full  bg-blue-950 rounded-xl p-4">
+                            <div className="w-full bg-blue-950 rounded-xl p-4">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-3">
                                         <div className="bg-white p-2 rounded-lg">
-                                            <Settings size={20} className="text-blue-950"/>
+                                            <Settings size={20} className="text-blue-950" />
                                         </div>
-                                        <span className="font-semibold">Other Information</span>
+                                        <span className="font-semibold text-white">Other Information</span>
                                     </div>
                                 </div>
-                                <div className="space-y-3 pl-11 text-sm">
-                                    <div className="flex justify-between py-2 border-b border-gray-700">
-                                        <span className="text-gray-400">Email</span>
+                                <div className="space-y-3 pl-11 text-sm text-white">
+                                    <div className="flex justify-between py-2 border-b border-blue-800">
+                                        <span className="text-gray-300">Email</span>
                                         <span className="text-right break-all">{user?.email}</span>
                                     </div>
-                                    <div className="flex justify-between py-2 border-b border-gray-700">
-                                        <span className="text-gray-400">Date of Birth</span>
+                                    <div className="flex justify-between py-2 border-b border-blue-800">
+                                        <span className="text-gray-300">Date of Birth</span>
                                         <span>{user?.dateOfBirth || 'Not set'}</span>
                                     </div>
-                                    <div className="flex justify-between py-2 border-b border-gray-700">
-                                        <span className="text-gray-400">Address</span>
+                                    <div className="flex justify-between py-2 border-b border-blue-800">
+                                        <span className="text-gray-300">Address</span>
                                         <span className="text-right">{user?.address || 'Not set'}</span>
                                     </div>
                                     <div className="flex justify-between py-2">
-                                        <span className="text-gray-400">Account Type</span>
-                                        <span className="text-blue-950 px-2 rounded-md font-semibold bg-white">Verified Seller</span>
+                                        <span className="text-gray-300">Account Type</span>
+                                        <span className="bg-white text-blue-950 px-2 py-1 rounded font-semibold text-xs">Verified Seller</span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Message
-                            <button className="w-full bg-gray-800 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700">
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-green-500 p-2 rounded-lg">
-                                        <Mail size={20} />
-                                    </div>
-                                    <span className="font-semibold">Message</span>
-                                </div>
-                                <ChevronRight size={20} className="text-gray-400" />
-                            </button> */}
-
-                            {/* Help */}
-                            <button className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700">
+                            <button
+                                onClick={handleButton}
+                                className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
+                            >
                                 <div className="flex items-center gap-3">
                                     <div className="bg-white p-2 rounded-lg">
-                                        <AlertCircle size={20} className="text-blue-950"/>
+                                        <AlertCircle size={20} className="text-blue-950" />
                                     </div>
-                                    <span className="font-semibold">Help</span>
+                                    <span className="font-semibold text-white">Help</span>
                                 </div>
-                                <ChevronRight size={20} className="text-gray-400" />
+                                <ChevronRight size={20} className="text-gray-300" />
                             </button>
 
-                            {/* About */}
-                            <button className="w-full  bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700">
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-white p-2 rounded-lg">
-                                        <Settings size={20} className="text-blue-950"/>
-                                    </div>
-                                    <span className="font-semibold">About</span>
-                                </div>
-                                <ChevronRight size={20} className="text-gray-400" />
-                            </button>
-
-                            {/* Contact Us */}
-                            <button className="w-full  bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700">
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-white p-2 rounded-lg">
-                                        <Phone size={20} className="text-blue-950"/>
-                                    </div>
-                                    <span className="font-semibold">Contact Us</span>
-                                </div>
-                                <ChevronRight size={20} className="text-gray-400" />
-                            </button>
-
-                            {/* History */}
-                            <button 
+                            <button
                                 onClick={() => {
                                     setShowProfileModal(false);
                                     setShowTransactionHistory(true);
                                 }}
-                                className="w-full  bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-gray-700"
+                                className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
                             >
                                 <div className="flex items-center gap-3">
                                     <div className="bg-white p-2 rounded-lg">
-                                        <TrendingUp size={20} className="text-blue-950"/>
+                                        <TrendingUp size={20} className="text-blue-950" />
                                     </div>
-                                    <span className="font-semibold">History</span>
+                                    <span className="font-semibold text-white">History</span>
                                 </div>
-                                <ChevronRight size={20} className="text-gray-400" />
+                                <ChevronRight size={20} className="text-gray-300" />
                             </button>
                         </div>
                     </div>
@@ -655,55 +684,55 @@ export default function SellerAccount() {
 
             {/* Transaction History Modal */}
             {showTransactionHistory && (
-                <div className="fixed inset-0 bg-gray-400 z-50 flex flex-col">
-                    <div className="bg-blue-950 p-4 flex items-center gap-4">
+                <div className="fixed inset-0 bg-white z-50 flex flex-col">
+                    <div className="bg-blue-950 p-4 flex items-center gap-4 text-white">
                         <button onClick={() => setShowTransactionHistory(false)}>
                             <X size={24} />
                         </button>
                         <h2 className="text-xl font-bold">Transaction History</h2>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4">
+                    <div className="flex-1 overflow-y-auto p-4 bg-gray-100">
                         {transactions.length === 0 ? (
                             <div className="text-center py-12">
-                                <ShoppingBag size={48} className="mx-auto text-gray-600 mb-4" />
-                                <p className="text-gray-400">No transactions yet</p>
+                                <ShoppingBag size={48} className="mx-auto text-gray-400 mb-4" />
+                                <p className="text-gray-600">No transactions yet</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
                                 {transactions.map((txn) => (
-                                    <div key={txn.id} className=" bg-blue-950 rounded-xl p-4">
-                                        <div className="flex items-center justify-between mb-2">
+                                    <div key={txn.id} className="bg-white rounded-xl p-4 shadow-sm">
+                                        <div className="flex items-center justify-between mb-3">
                                             <div className="flex items-center gap-3">
-                                                <div className="bg-white p-2 rounded-full">
-                                                    <ShoppingBag size={16} className="text-blue-950" />
+                                                <div className="bg-blue-100 p-2 rounded-lg">
+                                                    <ShoppingBag size={18} className="text-blue-950" />
                                                 </div>
                                                 <div>
-                                                    <p className="font-semibold">{txn.bookTitle}</p>
-                                                    <p className="text-xs text-gray-400">
+                                                    <p className="font-semibold text-blue-950">{txn.bookTitle}</p>
+                                                    <p className="text-xs text-gray-500">
                                                         {txn.createdAtDate?.toLocaleDateString()} at {txn.createdAtDate?.toLocaleTimeString()}
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-white font-bold">
+                                                <p className="text-green-600 font-bold">
                                                     +₦{(txn.sellerAmount || (txn.amount * 0.85)).toLocaleString()}
                                                 </p>
-                                                <p className="text-xs text-blue-950 px-1 bg-white">Successful</p>
+                                                <p className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">Success</p>
                                             </div>
                                         </div>
-                                        <div className="bg-white text-blue-950 rounded-lg p-3 mt-2 text-sm space-y-1">
+                                        <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
                                             <div className="flex justify-between">
-                                                <span className="text-blue-950">Buyer:</span>
-                                                <span>{txn.buyerName}</span>
+                                                <span className="text-gray-600">Buyer:</span>
+                                                <span className="text-blue-950 font-medium">{txn.buyerName}</span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span className="text-blue-950">Price:</span>
-                                                <span>₦{txn.amount?.toLocaleString()}</span>
+                                                <span className="text-gray-600">Price:</span>
+                                                <span className="text-blue-950 font-medium">₦{txn.amount?.toLocaleString()}</span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span className="text-blue-950">Platform Fee (15%):</span>
-                                                <span>-₦{((txn.amount || 0) * 0.15).toLocaleString()}</span>
+                                                <span className="text-gray-600">Platform Fee (15%):</span>
+                                                <span className="text-red-600 font-medium">-₦{((txn.amount || 0) * 0.15).toLocaleString()}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -711,32 +740,31 @@ export default function SellerAccount() {
                             </div>
                         )}
 
-                        {/* Withdrawals Section */}
                         {withdrawals.length > 0 && (
                             <div className="mt-6">
-                                <h3 className="font-bold text-lg mb-3">Withdrawal History</h3>
+                                <h3 className="font-bold text-lg mb-3 text-blue-950">Withdrawal History</h3>
                                 <div className="space-y-3">
                                     {withdrawals.map((w) => (
-                                        <div key={w.id} className="bg-gray-800 rounded-xl p-4">
+                                        <div key={w.id} className="bg-white rounded-xl p-4 shadow-sm">
                                             <div className="flex items-center justify-between mb-2">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="bg-red-500 p-2 rounded-full">
-                                                        <Download size={16} className="text-white" />
+                                                    <div className="bg-red-100 p-2 rounded-lg">
+                                                        <Download size={18} className="text-red-600" />
                                                     </div>
                                                     <div>
-                                                        <p className="font-semibold">Withdrawal</p>
-                                                        <p className="text-xs text-gray-400">
+                                                        <p className="font-semibold text-blue-950">Withdrawal</p>
+                                                        <p className="text-xs text-gray-500">
                                                             {w.requestedAtDate?.toLocaleDateString()} at {w.requestedAtDate?.toLocaleTimeString()}
                                                         </p>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-red-400 font-bold">-₦{w.amount?.toLocaleString()}</p>
-                                                    <p className="text-xs text-green-500">Completed</p>
+                                                    <p className="text-red-600 font-bold">-₦{w.amount?.toLocaleString()}</p>
+                                                    <p className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">Completed</p>
                                                 </div>
                                             </div>
                                             {w.reference && (
-                                                <p className="text-xs text-gray-500 mt-2">Ref: {w.reference}</p>
+                                                <p className="text-xs text-gray-500 mt-2 bg-gray-50 p-2 rounded">Ref: {w.reference}</p>
                                             )}
                                         </div>
                                     ))}
@@ -749,9 +777,9 @@ export default function SellerAccount() {
 
             {/* Withdraw Modal */}
             {showWithdrawModal && (
-                <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50">
-                    <div className="bg-gray-200 rounded-t-3xl w-full max-w-md pb-8">
-                        <div className="bg-blue-950 p-6 flex justify-between items-center rounded-t-3xl">
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+                        <div className="bg-blue-950 p-6 flex justify-between items-center rounded-t-2xl text-white sticky top-0">
                             <h2 className="text-2xl font-bold">Withdraw Funds</h2>
                             <button onClick={() => {
                                 setShowWithdrawModal(false);
@@ -762,43 +790,45 @@ export default function SellerAccount() {
                             </button>
                         </div>
 
-                        <div className="p-6 border-b border-gray-800 bg-white">
-                            <div className="flex items-center gap-2 text-blue-950 mb-2">
+                        <div className="p-6 border-b border-gray-200">
+                            <div className="flex items-center gap-2 text-green-600 mb-2">
                                 <CheckCircle size={18} />
                                 <p className="text-sm font-semibold">Instant Withdrawal - No Approval Needed</p>
                             </div>
                         </div>
 
                         {user?.bankDetails ? (
-                            <div className="p-6 border-b border-gray-800 bg-blue-950">
-                                <p className="text-sm font-semibold text-gray-400 mb-2">Withdrawal will be sent to:</p>
-                                <p className="text-sm"><strong>Account Name:</strong> {user.bankDetails.accountName}</p>
-                                <p className="text-sm"><strong>Account Number:</strong> {user.bankDetails.accountNumber}</p>
-                                <p className="text-sm"><strong>Bank:</strong> {user.bankDetails.bankName}</p>
+                            <div className="p-6 border-b border-gray-200 bg-blue-50">
+                                <p className="text-sm font-semibold text-gray-700 mb-2">Withdrawal will be sent to:</p>
+                                <div className="space-y-1 text-sm text-gray-600">
+                                    <p><strong>Account Name:</strong> {user.bankDetails.accountName}</p>
+                                    <p><strong>Account Number:</strong> {user.bankDetails.accountNumber}</p>
+                                    <p><strong>Bank:</strong> {user.bankDetails.bankName}</p>
+                                </div>
                             </div>
                         ) : (
-                            <div className="p-6 border-b border-gray-800 bg-yellow-500/10">
+                            <div className="p-6 border-b border-gray-200 bg-yellow-50">
                                 <div className="flex items-start gap-2">
-                                    <AlertCircle size={18} className="text-yellow-500 flex-shrink-0 mt-0.5" />
-                                    <p className="text-sm text-yellow-500">Please add bank details to your profile first</p>
+                                    <AlertCircle size={18} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+                                    <p className="text-sm text-yellow-600">Please add bank details to your profile first</p>
                                 </div>
                             </div>
                         )}
 
                         <div className="p-6">
-                            <div className=" bg-blue-950 p-4 rounded-xl mb-4">
-                                <p className="text-sm text-gray-400">Available Balance</p>
+                            <div className="bg-blue-950 p-4 rounded-xl mb-4">
+                                <p className="text-sm text-gray-300">Available Balance</p>
                                 <p className="text-3xl font-bold text-white">₦{accountBalance.toLocaleString()}</p>
                             </div>
 
                             {withdrawalError && (
-                                <div className="mb-4 bg-red-500/10 border border-red-500 rounded-xl p-3 flex items-start gap-2">
-                                    <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
-                                    <p className="text-sm text-red-500">{withdrawalError}</p>
+                                <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+                                    <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                                    <p className="text-sm text-red-600">{withdrawalError}</p>
                                 </div>
                             )}
 
-                            <label className="font-semibold block mb-2 text-blue-950">Amount</label>
+                            <label className="font-semibold block mb-2 text-gray-700">Amount</label>
                             <input
                                 type="number"
                                 value={withdrawAmount}
@@ -807,11 +837,11 @@ export default function SellerAccount() {
                                     setWithdrawalError("");
                                 }}
                                 placeholder="Enter amount"
-                                className="w-full  bg-blue-950 text-white border-2 border-gray-700 px-4 py-3 rounded-xl mb-2 focus:border-green-500 focus:outline-none text-white"
+                                className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl mb-2 focus:border-blue-950 focus:outline-none"
                                 min="1000"
                                 max={accountBalance}
                             />
-                            <p className="text-sm text-blue-950 mb-4">Minimum: ₦1,000</p>
+                            <p className="text-sm text-gray-600 mb-4">Minimum: ₦1,000</p>
 
                             <div className="flex gap-3">
                                 <button
@@ -820,18 +850,18 @@ export default function SellerAccount() {
                                         setWithdrawalError("");
                                         setWithdrawAmount("");
                                     }}
-                                    className="flex-1 bg-gray-800 px-6 py-3 rounded-xl font-semibold hover:bg-gray-700"
+                                    className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleWithdraw}
                                     disabled={withdrawing || !user?.bankDetails}
-                                    className="flex-1 bg-blue-950 text-white px-6 py-3 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:bg-green-600"
+                                    className="flex-1 bg-blue-950 text-white px-6 py-3 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:bg-blue-900 transition-colors"
                                 >
                                     {withdrawing ? (
                                         <>
-                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                                             Processing...
                                         </>
                                     ) : (
@@ -851,45 +881,45 @@ export default function SellerAccount() {
             {isEditing && (
                 <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="sticky top-0  bg-blue-950 border-b border-gray-700 px-6 py-4 flex justify-between items-center rounded-t-2xl">
+                        <div className="sticky top-0 bg-blue-950 border-b border-gray-700 px-6 py-4 flex justify-between items-center rounded-t-2xl text-white">
                             <h2 className="text-2xl font-bold">Edit Profile</h2>
                             <button onClick={() => setIsEditing(false)}><X size={24} /></button>
                         </div>
                         <div className="p-6">
                             <div className="flex justify-center mb-6">
                                 <div className="relative">
-                                    <img src={user?.photoBase64 || "/api/placeholder/128/128"} className="w-32 h-32 rounded-full border-4 border-green-500 object-cover" alt="profile" />
-                                    <label className="absolute bottom-0 right-0 bg-green-500 p-3 rounded-full cursor-pointer hover:bg-green-600">
+                                    <img src={user?.photoBase64 || "/api/placeholder/128/128"} className="w-32 h-32 rounded-full border-4 border-blue-950 object-cover" alt="profile" />
+                                    <label className="absolute bottom-0 right-0 bg-blue-950 p-3 rounded-full cursor-pointer hover:bg-blue-900">
                                         <Camera size={18} className="text-white" />
                                         <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                                     </label>
                                 </div>
                             </div>
-                            <div className="grid sm:grid-cols-2 gap-4 text-blue-950">
+                            <div className="grid sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="font-semibold block mb-2">First Name</label>
-                                    <input value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} className="w-full  bg-blue-950 border border-gray-50 px-4 py-3 rounded-xl text-white focus:border-green-500 focus:outline-none" />
+                                    <label className="font-semibold block mb-2 text-gray-700">First Name</label>
+                                    <input value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
                                 </div>
                                 <div>
-                                    <label className="font-semibold block mb-2">Surname</label>
-                                    <input value={formData.surname} onChange={(e) => setFormData({ ...formData, surname: e.target.value })} className="w-full  bg-blue-950 border border-gray-50 px-4 py-3 rounded-xl text-white focus:border-green-500 focus:outline-none" />
+                                    <label className="font-semibold block mb-2 text-gray-700">Surname</label>
+                                    <input value={formData.surname} onChange={(e) => setFormData({ ...formData, surname: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
                                 </div>
                                 <div>
-                                    <label className="font-semibold block mb-2">Phone</label>
-                                    <input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full  bg-blue-950 border border-gray-50 px-4 py-3 rounded-xl text-white focus:border-green-500 focus:outline-none" />
+                                    <label className="font-semibold block mb-2 text-gray-700">Phone</label>
+                                    <input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
                                 </div>
                                 <div>
-                                    <label className="font-semibold block mb-2">Date of Birth</label>
-                                    <input type="date" value={formData.dateOfBirth} onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })} className="w-full  bg-blue-950 border border-gray-50 px-4 py-3 rounded-xl text-white focus:border-green-500 focus:outline-none" />
+                                    <label className="font-semibold block mb-2 text-gray-700">Date of Birth</label>
+                                    <input type="date" value={formData.dateOfBirth} onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
                                 </div>
                                 <div className="sm:col-span-2">
-                                    <label className="font-semibold block mb-2">Address</label>
-                                    <input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full  bg-blue-950 border border-gray-50 px-4 py-3 rounded-xl text-white focus:border-green-500 focus:outline-none" />
+                                    <label className="font-semibold block mb-2 text-gray-700">Address</label>
+                                    <input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
                                 </div>
                             </div>
                             <div className="mt-6 flex gap-3">
-                                <button onClick={() => setIsEditing(false)} className="flex-1 bg-gray-800 px-6 py-3 rounded-xl font-semibold hover:bg-gray-700">Cancel</button>
-                                <button onClick={handleSave} className="flex-1  bg-blue-950 text-gray-50 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-600">
+                                <button onClick={() => setIsEditing(false)} className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-300">Cancel</button>
+                                <button onClick={handleSave} className="flex-1 bg-blue-950 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-900">
                                     <Save size={18} />Save
                                 </button>
                             </div>
@@ -898,41 +928,46 @@ export default function SellerAccount() {
                 </div>
             )}
 
-            {/* Bottom Navigation */}
-            <div className="fixed bottom-0 left-0 right-0 bg-blue-950 border-t border-gray-700 flex justify-around items-center py-3">
-               <Link href="/home">
-                <button className="flex flex-col items-center gap-1">
-                    <DollarSign size={24} className="text-gray-400" />
-                    <span className="text-xs text-gray-400 font-semibold">Home</span>
-                </button>
-               </Link>
-               <Link href="/my-books">
-                <button className="flex flex-col items-center gap-1" title="Check the books you bought on LAN">
-                    <TrendingUp size={24} className="text-gray-400" />
-                    <span className="text-xs text-gray-400">My Books</span>
-                </button>
-               </Link>
-                <Link href="/documents" title="Browse the latest book posted by other sellers">
-                <button className="flex flex-col items-center gap-1">
-                    <CreditCard size={24} className="text-gray-400" />
-                    <span className="text-xs text-gray-400">Browse Books</span>
-                </button>
-                </Link>
-                 <Link href="/advertise">
-                <button className="flex flex-col items-center gap-1" title="Upload your books and make more sales">
-                    <CreditCard size={24} className="text-gray-400" />
-                    <span className="text-xs text-gray-400">Upload Doc..</span>
-                </button>
-                 </Link>
-                <button 
-                    onClick={() => setShowProfileModal(true)}
-                    className="flex flex-col items-center gap-1"
-                    title="My profile"
-                >
-                    <User size={24} className="text-gray-400" />
-                    <span className="text-xs text-gray-400">Me</span>
-                </button>
+            {/* Bottom Navigation - Mobile Only */}
+            <div className="fixed bottom-0 left-0 right-0 bg-blue-950 border-t border-blue-800 lg:hidden">
+                <div className="flex justify-around items-center py-3 px-2">
+                    <Link href="/home">
+                        <button className="flex flex-col items-center gap-1">
+                            <DollarSign size={24} className="text-gray-300" />
+                            <span className="text-xs text-gray-300 font-medium">Home</span>
+                        </button>
+                    </Link>
+                    <Link href="/my-account/seller-account/my-books">
+                        <button className="flex flex-col items-center gap-1" title="Check the books you bought on LAN">
+                            <Book size={24} className="text-gray-300" />
+                            <span className="text-xs text-gray-300">My Books</span>
+                        </button>
+                    </Link>
+                    <Link href="/documents" title="Browse the latest book posted by other sellers">
+                        <button className="flex flex-col items-center gap-1">
+                            <Globe size={24} className="text-gray-300" />
+                            <span className="text-xs text-gray-300">Browse</span>
+                        </button>
+                    </Link>
+                    <Link href="/advertise">
+                        <button className="flex flex-col items-center gap-1" title="Upload your books and make more sales">
+                            <TrendingUp size={24} className="text-gray-300" />
+                            <span className="text-xs text-gray-300">Upload</span>
+                        </button>
+                    </Link>
+                    <button
+                        onClick={() => setShowProfileModal(true)}
+                        className="flex flex-col items-center gap-1"
+                        title="My profile"
+                    >
+                        <User size={24} className="text-gray-300" />
+                        <span className="text-xs text-gray-300">Me</span>
+                    </button>
+                </div>
             </div>
+
+            {/* Bottom Padding for Mobile Nav */}
+            <div className="h-20 lg:hidden"></div>
         </div>
     );
 }
