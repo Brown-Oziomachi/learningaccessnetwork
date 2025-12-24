@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import AuthLayout from '@/components/auth/AuthLayout';
-import { validateDOB } from '@/lib/auth/authValidation';
+import { validateDateOfBirth } from '@/lib/auth/authValidation';
 
 export default function DOBClient() {
     const router = useRouter();
@@ -22,7 +22,7 @@ export default function DOBClient() {
     }, [searchParams]);
 
     const handleNext = () => {
-        const validation = validateDOB(dateOfBirth);
+        const validation = validateDateOfBirth(dateOfBirth);
 
         if (!validation.isValid) {
             setErrors(validation.errors);

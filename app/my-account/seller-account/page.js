@@ -337,7 +337,7 @@ export default function SellerAccount() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+            <div className="min-h-screen bg-gray-50 text-blue-950 flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
             </div>
         );
@@ -355,11 +355,11 @@ export default function SellerAccount() {
             <Navbar />
             
             {/* Header */}
-            <div className="bg-gray-200 px-4 py-4 flex items-center justify-between">
+            <div className="bg-gray-200 px-4 py-4 flex items-center justify-between shadow-2xl bg-white">
                 <div className="flex items-center gap-3">
                     <button 
                         onClick={() => setShowProfileModal(true)}
-                        className="relative"
+                        className="relative flex items-center gap-3"
                     >
                         <img
                             src={user?.photoBase64 || "/api/placeholder/48/48"}
@@ -367,10 +367,10 @@ export default function SellerAccount() {
                             alt="Profile"
                         />
                       
-                    </button>
                     <div>
                         <p className="text-sm text-blue-950">Hi, {user?.firstName || 'Seller'}</p>
                     </div>
+                    </button>
                 </div>
                 <div className="flex items-center gap-3">
                     <button 
@@ -437,7 +437,7 @@ export default function SellerAccount() {
                 ))}
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons
             <div className="mx-4 mt-6 grid grid-cols-3 gap-4">
                 <Link href="/my-books" className="bg-blue-950 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:bg-gray-700">
                     <div className="bg-white p-3 rounded-full">
@@ -459,7 +459,7 @@ export default function SellerAccount() {
                     </div>
                     <span className="text-sm font-semibold text-center">Advertise</span>
                 </Link>
-            </div>
+            </div> */}
 
             {/* Stats Section */}
             <div className="mx-4 mt-6 bg-blue-950 rounded-2xl p-4">
@@ -488,7 +488,7 @@ export default function SellerAccount() {
                             <TrendingUp className="text-purple-600" size={24} />
                         </div>
                         <div>
-                            <p className="font-bold">Up to ₦5600</p>
+                            <p className="font-bold">Up to ₦5,000,000.00</p>
                             <p className="text-xs text-purple-200">Earn more by selling</p>
                         </div>
                     </div>
@@ -510,6 +510,7 @@ export default function SellerAccount() {
                         >
                             <X size={24} />
                         </button>
+                        <Link href="/my-account">
                         <div className="flex flex-col items-center">
                             <div className="relative mb-3">
                                 <img
@@ -521,6 +522,7 @@ export default function SellerAccount() {
                             <p className="text-2xl font-bold text-gray-50">{user?.displayName || `${user?.firstName} ${user?.surname}`}</p>
                             <p className="text-sm text-gray-800">+234{user?.phone || '0000000000'}</p>
                         </div>
+                        </Link>
                     </div>
 
                     <div className="flex-1 bg-gray-400 overflow-y-auto">
@@ -897,26 +899,35 @@ export default function SellerAccount() {
             )}
 
             {/* Bottom Navigation */}
-            <div className="fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 flex justify-around items-center py-3">
+            <div className="fixed bottom-0 left-0 right-0 bg-blue-950 border-t border-gray-700 flex justify-around items-center py-3">
+               <Link href="/home">
                 <button className="flex flex-col items-center gap-1">
-                    <DollarSign size={24} className="text-green-500" />
-                    <span className="text-xs text-green-500 font-semibold">Home</span>
+                    <DollarSign size={24} className="text-gray-400" />
+                    <span className="text-xs text-gray-400 font-semibold">Home</span>
                 </button>
-                <button className="flex flex-col items-center gap-1">
+               </Link>
+               <Link href="/my-books">
+                <button className="flex flex-col items-center gap-1" title="Check the books you bought on LAN">
                     <TrendingUp size={24} className="text-gray-400" />
-                    <span className="text-xs text-gray-400">Rewards</span>
+                    <span className="text-xs text-gray-400">My Books</span>
                 </button>
+               </Link>
+                <Link href="/documents" title="Browse the latest book posted by other sellers">
                 <button className="flex flex-col items-center gap-1">
                     <CreditCard size={24} className="text-gray-400" />
-                    <span className="text-xs text-gray-400">Finance</span>
+                    <span className="text-xs text-gray-400">Browse Books</span>
                 </button>
-                <button className="flex flex-col items-center gap-1">
+                </Link>
+                 <Link href="/advertise">
+                <button className="flex flex-col items-center gap-1" title="Upload your books and make more sales">
                     <CreditCard size={24} className="text-gray-400" />
-                    <span className="text-xs text-gray-400">Cards</span>
+                    <span className="text-xs text-gray-400">Upload Doc..</span>
                 </button>
+                 </Link>
                 <button 
                     onClick={() => setShowProfileModal(true)}
                     className="flex flex-col items-center gap-1"
+                    title="My profile"
                 >
                     <User size={24} className="text-gray-400" />
                     <span className="text-xs text-gray-400">Me</span>

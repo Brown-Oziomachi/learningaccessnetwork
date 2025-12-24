@@ -118,6 +118,9 @@ const [allBooks, setAllBooks] = useState([]);
     },
   ];
 
+  const handleReport = () => {
+    router.push(`/report/book?bookId=${bookId}`);
+}
   // Check seller status
   const checkSellerStatus = async (userId) => {
     try {
@@ -307,9 +310,6 @@ useEffect(() => {
 
   const checkPurchaseStatus = async (userId) => {
     try {
-      console.log("=== CHECKING PURCHASE STATUS ===");
-      console.log("User ID:", userId);
-      console.log("Book ID from URL:", bookId);
 
       const userDocRef = doc(db, "users", userId);
       const userDoc = await getDoc(userDocRef);
@@ -517,9 +517,6 @@ useEffect(() => {
     setShowOptionsModal(false);
   };
 
-  const handleReport = () => {
-    router.push('/lan/customer-care')
-  }
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">

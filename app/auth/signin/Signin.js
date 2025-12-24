@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Globe } from 'lucide-react';
+import { Globe, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import AuthLayout from '@/components/auth/AuthLayout';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
@@ -13,6 +13,7 @@ export default function SignInClient() {
     const router = useRouter();
     const { loading: authLoading } = useAuth(true);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
     const [loginData, setLoginData] = useState({
         email: '',
         password: ''
@@ -20,11 +21,13 @@ export default function SignInClient() {
 
     const handleLogin = async () => {
         if (!loginData.email || !loginData.password) {
-            alert('Please fill in all fields');
+            setError('Please fill in all fields');
             return;
         }
 
         setLoading(true);
+        setError(null);
+        
         const result = await handleEmailPasswordSignIn(loginData.email, loginData.password);
 
         if (result.success) {
@@ -32,18 +35,29 @@ export default function SignInClient() {
         } else {
             const error = result.error;
             switch (error.code) {
+                case 'auth/account-suspended':
+                    setError('Your account has been suspended. Please contact support at support@lanlibrary.com for assistance.');
+                    break;
+                case 'auth/account-pending':
+                    setError('Your account is under review. Please contact support at support@lanlibrary.com for assistance.');
+                    break;
                 case 'auth/user-not-found':
-                    alert('No account found with this email. Create a new account?');
-                    router.push(`/auth/signup?email=${encodeURIComponent(loginData.email)}`);
+                    setError('No account found with this email.');
+                    setTimeout(() => {
+                        router.push(`/auth/signup?email=${encodeURIComponent(loginData.email)}`);
+                    }, 2000);
                     break;
                 case 'auth/wrong-password':
-                    alert('Incorrect password. Try again or reset your password.');
+                    setError('Incorrect password. Try again or reset your password.');
                     break;
                 case 'auth/invalid-email':
-                    alert('Invalid email address.');
+                    setError('Invalid email address.');
+                    break;
+                case 'auth/too-many-requests':
+                    setError('Too many failed login attempts. Please try again later or reset your password.');
                     break;
                 default:
-                    alert('Failed to sign in. Please try again later.');
+                    setError('Failed to sign in. Please try again later.');
             }
             setLoading(false);
         }
@@ -66,6 +80,21 @@ export default function SignInClient() {
                     </div>
                 </div>
 
+                {/* Error Message */}
+                {error && (
+                    <div className="w-full max-w-md mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                            <p className="text-red-800 text-sm">{error}</p>
+                            {(error.includes('suspended') || error.includes('pending')) && (
+                                <Link href="/lan/customer-care" className="text-red-600 hover:underline text-sm font-semibold mt-2 inline-block">
+                                    Contact Support →
+                                </Link>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 <div className="w-full max-w-md mb-8">
                     <GoogleSignInButton />
                 </div>
@@ -86,14 +115,20 @@ export default function SignInClient() {
                         type="email"
                         placeholder="Email address"
                         value={loginData.email}
-                        onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                        onChange={(e) => {
+                            setLoginData(prev => ({ ...prev, email: e.target.value }));
+                            setError(null);
+                        }}
                         className="w-full px-4 py-4 border text-black border-gray-300 rounded-lg focus:outline-none focus:border-blue-950"
                     />
                     <input
                         type="password"
                         placeholder="Password"
                         value={loginData.password}
-                        onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                        onChange={(e) => {
+                            setLoginData(prev => ({ ...prev, password: e.target.value }));
+                            setError(null);
+                        }}
                         onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                         className="w-full px-4 py-4 border text-black border-gray-300 rounded-lg focus:outline-none focus:border-blue-950"
                     />

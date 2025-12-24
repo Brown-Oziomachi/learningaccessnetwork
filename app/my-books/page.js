@@ -352,22 +352,6 @@ export default function MyBooksPage() {
                                 }}
                                 allow="autoplay"
                             />
-
-                            {/* Fallback button if PDF doesn't load */}
-                            <div className="absolute bottom-4 right-4">
-                                <button
-                                    onClick={() => {
-                                        const fileId = extractFileId(selectedBook.pdfUrl || selectedBook.pdfLink);
-                                        if (fileId) {
-                                            window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
-                                        }
-                                    }}
-                                    className="bg-blue-950 text-white px-4 py-2 rounded-lg hover:bg-blue-900 shadow-lg flex items-center gap-2 text-sm"
-                                >
-                                    <ExternalLink size={16} />
-                                    Open in Full Screen
-                                </button>
-                            </div>
                         </div>
                     ) : (
                         <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
@@ -386,18 +370,7 @@ export default function MyBooksPage() {
                                         <Download size={20} />
                                         Download PDF
                                     </button>
-                                    <button
-                                        onClick={() => {
-                                            const fileId = extractFileId(selectedBook.pdfUrl || selectedBook.pdfLink);
-                                            if (fileId) {
-                                                window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
-                                            }
-                                        }}
-                                        className="w-full bg-white border-2 border-blue-950 text-blue-950 px-6 py-3 rounded-lg hover:bg-blue-50 flex items-center justify-center gap-2"
-                                    >
-                                        <ExternalLink size={20} />
-                                        Open in Browser
-                                    </button>
+                                  
                                 </div>
                             </div>
                         </div>

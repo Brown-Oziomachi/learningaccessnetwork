@@ -484,9 +484,9 @@ export default function AllBooksPage() {
                 ) : (
                     <>
                         {/* Featured Books Carousel */}
-                        <div className="lg:-mx-60 px-1 py-8 p-10">
-                            <h3 className="text-2xl font-bold text-gray-900 mb-4">Featured Books</h3>
-                            <div className="overflow-x-auto scrollbar-hide p-1">
+                        <div className="lg:-mx-60 px-1 py-8 p-10 lg:overflow-hidden ">
+                            <h3 className="text-xl font-bold text-gray-900 max-md:mb-4">Documents recommended for you</h3>
+                            <div className="overflow-x-auto scrollbar-hide lg:p-20">
                                 <div className="flex gap-2 pb-4">
                                     {displayBooks.slice(0, 5).map((book) => (
                                         <Link 
@@ -530,8 +530,8 @@ export default function AllBooksPage() {
 
                         {/* Recent Books Carousel 1 */}
                         <div className="lg:-mx-60 px-1 py-8">
-                            <h3 className="text-2xl font-bold text-gray-900 mb-4">Recent Books</h3>
-                            <div className="overflow-x-auto scrollbar-hide p-1">
+                            <h3 className="text-xl font-bold text-gray-900 max-md:mb-4">Trending in LAN Lib's</h3>
+                            <div className="overflow-x-auto scrollbar-hide lg:p-20">
                                 <div className="flex gap-2 pb-4">
                                     {displayBooks.slice(6, 11).map((book) => (
                                         <Link 
@@ -575,8 +575,8 @@ export default function AllBooksPage() {
 
                         {/* Recent Books Carousel 2 */}
                         <div className="lg:-mx-60 px-1 py-8">
-                            <h3 className="text-2xl font-bold text-gray-900 mb-4">More Books</h3>
-                            <div className="overflow-x-auto scrollbar-hide p-1">
+                            <h3 className="text-2xl font-bold text-gray-900 max-md:mb-4">More Books</h3>
+                            <div className="overflow-x-auto scrollbar-hide lg:p-20">
                                 <div className="flex gap-2 pb-4">
                                     {displayBooks.slice(7, 13).map((book) => (
                                         <Link 
