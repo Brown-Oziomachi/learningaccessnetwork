@@ -84,7 +84,7 @@ export default function CategoryPage() {
             image: 'https://images.unsplash.com/photo-1524578271613-d550eacf6090?w=400'
         },
         {
-            name: 'Health & Wellness',
+            name: 'Health & Fitness',
             slug: 'health-wellness',
             image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=400'
         },

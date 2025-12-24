@@ -50,6 +50,7 @@ export default function CreateAccountNameClient() {
                     <input
                         type="text"
                         placeholder="First name"
+                        required
                         value={formData.firstName}
                         onChange={(e) => {
                             setFormData(prev => ({ ...prev, firstName: e.target.value }));
@@ -62,6 +63,7 @@ export default function CreateAccountNameClient() {
                     <input
                         type="text"
                         placeholder="Surname"
+                        required
                         value={formData.surname}
                         onChange={(e) => {
                             setFormData(prev => ({ ...prev, surname: e.target.value }));

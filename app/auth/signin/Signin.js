@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Globe, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation'; // Added useSearchParams
+import { Globe, AlertCircle, CheckCircle } from 'lucide-react'; // Added CheckCircle
 import Link from 'next/link';
 import AuthLayout from '@/components/auth/AuthLayout';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
@@ -11,13 +11,27 @@ import { useAuth } from '@/hooks/useAuth';
 
 export default function SignInClient() {
     const router = useRouter();
+    const searchParams = useSearchParams(); // Added this line
     const { loading: authLoading } = useAuth(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [successMessage, setSuccessMessage] = useState(null); // Added this state
     const [loginData, setLoginData] = useState({
         email: '',
         password: ''
     });
+
+    // Check if redirected after password reset
+    useEffect(() => {
+        const passwordReset = searchParams.get('passwordReset');
+        if (passwordReset === 'success') {
+            setSuccessMessage('Password reset successful! Please sign in with your new password.');
+            // Clear the URL parameter after 5 seconds
+            setTimeout(() => {
+                router.replace('/auth/signin', { scroll: false });
+            }, 100);
+        }
+    }, [searchParams, router]);
 
     const handleLogin = async () => {
         if (!loginData.email || !loginData.password) {
@@ -27,34 +41,38 @@ export default function SignInClient() {
 
         setLoading(true);
         setError(null);
-        
-        const result = await handleEmailPasswordSignIn(loginData.email, loginData.password);
+        setSuccessMessage(null); // Clear success message when attempting login
+
+        const result = await handleEmailPasswordSignIn(
+            loginData.email.toLowerCase().trim(),
+            loginData.password
+        );
 
         if (result.success) {
             router.push('/home');
         } else {
-            const error = result.error;
-            switch (error.code) {
+            const errorCode = result.error?.code || result.error;
+
+            switch (errorCode) {
                 case 'auth/account-suspended':
                     setError('Your account has been suspended. Please contact support at support@lanlibrary.com for assistance.');
                     break;
                 case 'auth/account-pending':
                     setError('Your account is under review. Please contact support at support@lanlibrary.com for assistance.');
                     break;
-                case 'auth/user-not-found':
-                    setError('No account found with this email.');
-                    setTimeout(() => {
-                        router.push(`/auth/signup?email=${encodeURIComponent(loginData.email)}`);
-                    }, 2000);
-                    break;
+                case 'auth/invalid-credential':
                 case 'auth/wrong-password':
-                    setError('Incorrect password. Try again or reset your password.');
+                case 'auth/user-not-found':
+                    setError('Incorrect email or password. Please try again.');
                     break;
                 case 'auth/invalid-email':
-                    setError('Invalid email address.');
+                    setError('Invalid email address format.');
                     break;
                 case 'auth/too-many-requests':
                     setError('Too many failed login attempts. Please try again later or reset your password.');
+                    break;
+                case 'auth/user-disabled':
+                    setError('This account has been disabled. Please contact support.');
                     break;
                 default:
                     setError('Failed to sign in. Please try again later.');
@@ -79,6 +97,14 @@ export default function SignInClient() {
                         <Globe className="w-12 h-12 text-blue-950" />
                     </div>
                 </div>
+
+                {/* Success Message for Password Reset */}
+                {successMessage && (
+                    <div className="w-full max-w-md mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                        <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-green-800 text-sm font-semibold">{successMessage}</p>
+                    </div>
+                )}
 
                 {/* Error Message */}
                 {error && (
@@ -118,6 +144,7 @@ export default function SignInClient() {
                         onChange={(e) => {
                             setLoginData(prev => ({ ...prev, email: e.target.value }));
                             setError(null);
+                            setSuccessMessage(null);
                         }}
                         className="w-full px-4 py-4 border text-black border-gray-300 rounded-lg focus:outline-none focus:border-blue-950"
                     />
@@ -128,6 +155,7 @@ export default function SignInClient() {
                         onChange={(e) => {
                             setLoginData(prev => ({ ...prev, password: e.target.value }));
                             setError(null);
+                            setSuccessMessage(null);
                         }}
                         onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                         className="w-full px-4 py-4 border text-black border-gray-300 rounded-lg focus:outline-none focus:border-blue-950"

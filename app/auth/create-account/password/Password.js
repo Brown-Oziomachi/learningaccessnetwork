@@ -54,6 +54,7 @@ export default function PasswordClient() {
                 <input
                     type="password"
                     placeholder="Password"
+                    required
                     value={password}
                     onChange={(e) => {
                         setPassword(e.target.value);

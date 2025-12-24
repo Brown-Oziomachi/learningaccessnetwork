@@ -39,7 +39,7 @@ export default function AdvertiseClient() {
         'Technology',
         'Science',
         'Literature',
-        'Health & Wellness',
+        'Health & Fitness',
         'History',
         'Arts & Culture',
         'Relationship',

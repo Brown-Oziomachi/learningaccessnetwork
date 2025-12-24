@@ -86,6 +86,7 @@ export default function EmailClient() {
                     type="email"
                     placeholder="yourname@gmail.com"
                     value={email}
+                    required
                     onChange={(e) => {
                         setEmail(e.target.value.toLowerCase().trim());
                         setErrors({});

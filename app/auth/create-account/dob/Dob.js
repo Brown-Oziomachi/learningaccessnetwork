@@ -56,6 +56,7 @@ export default function DOBClient() {
                 <input
                     type="date"
                     value={dateOfBirth}
+                    required
                     onChange={(e) => {
                         setDateOfBirth(e.target.value);
                         setErrors({});

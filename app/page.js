@@ -170,7 +170,7 @@ export default function LearningAccessNetwork() {
                 Help Center?
               </button>
             </Link>
-            <Link href="/joins/how-it-works">
+            <Link href="/learn/make-money">
               <button
                 className="text-blue-950 hover:underline mb-12"
               >
