@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs  } from "firebase/firestore";
 import { auth, db } from "@/lib/firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { booksData } from "@/lib/booksData";
@@ -46,6 +46,7 @@ export default function BookPreviewPage() {
   const [previewContent, setPreviewContent] = useState("");
   const [checkingSeller, setCheckingSeller] = useState(true);
   const [isSeller, setIsSeller] = useState(false);
+const [allBooks, setAllBooks] = useState([]);
 
   // Helper function to get thumbnail from PDF
   const getThumbnailUrl = (book) => {
@@ -229,6 +230,78 @@ useEffect(() => {
     fetchBook();
   }
 }, [bookId]);
+
+
+// Add this useEffect after your existing useEffects (around line 200):
+useEffect(() => {
+  const fetchAllBooks = async () => {
+    try {
+      console.log('🔍 Fetching all books for related section...');
+      
+      // Process booksData with thumbnails FIRST (immediate fallback)
+      const processedBooksData = booksData.map(book => ({
+        ...book,
+        image: getThumbnailUrl(book)
+      }));
+
+      // Set immediately so books show right away
+      setAllBooks(processedBooksData);
+      console.log('✅ Set initial books from booksData:', processedBooksData.length);
+
+      // Then try to fetch Firestore books to add more variety
+      try {
+        const q = query(collection(db, 'advertMyBook'), where('status', '==', 'approved'));
+        const querySnapshot = await getDocs(q);
+
+        const firestoreBooks = [];
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          const bookData = {
+            id: `firestore-${docSnap.id}`,
+            firestoreId: docSnap.id,
+            title: data.bookTitle,
+            author: data.author,
+            category: data.category,
+            price: data.price,
+            pages: data.pages,
+            format: data.format || 'PDF',
+            description: data.description,
+            driveFileId: data.driveFileId,
+            pdfUrl: data.pdfUrl,
+            previewUrl: data.previewUrl,
+            embedUrl: data.embedUrl,
+            isFromFirestore: true
+          };
+
+          // Use thumbnail from PDF
+          bookData.image = getThumbnailUrl(bookData);
+          firestoreBooks.push(bookData);
+        });
+
+        console.log('✅ Fetched Firestore books:', firestoreBooks.length);
+
+        // Combine and shuffle for variety
+        const combined = [...processedBooksData, ...firestoreBooks];
+        const shuffled = combined.sort(() => Math.random() - 0.5);
+        setAllBooks(shuffled);
+        console.log('✅ Total books available:', shuffled.length);
+      } catch (firestoreError) {
+        console.warn('⚠️ Could not fetch Firestore books, using booksData only:', firestoreError);
+        // Keep the booksData we already set
+      }
+    } catch (error) {
+      console.error('❌ Error in fetchAllBooks:', error);
+      // Emergency fallback - use booksData with thumbnails
+      const processedBooksData = booksData.map(book => ({
+        ...book,
+        image: getThumbnailUrl(book)
+      }));
+      setAllBooks(processedBooksData);
+    }
+  };
+
+  fetchAllBooks();
+}, []);
 
   // Improved checkPurchaseStatus function for BookPreviewPage
 
@@ -939,39 +1012,45 @@ useEffect(() => {
         </div>
 
         {/* Related Books */}
-        <div className="mt-12">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6">
-            You might also like
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 text-blue-950">
-            {booksData.slice(0, 4).map((relatedBook) => (
-              <Link
-                key={relatedBook.id}
-                href={`/book/preview?id=${relatedBook.id}`}
-                className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-              >
-                <img
-                  src={getThumbnailUrl(relatedBook)}
-                  alt={relatedBook.title}
-                  className="w-full h-48 object-cover bg-gray-200"
-                  onError={(e) => {
-                    e.target.src =
-                      "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-                  }}
-                  loading="lazy"
-                />
-                <div className="p-3">
-                  <h4 className="font-semibold text-sm line-clamp-2 mb-1">
-                    {relatedBook.title}
-                  </h4>
-                  <p className="text-xs text-gray-500">
-                    By: {relatedBook.author}
-                  </p>
-                </div>
-              </Link>
-            ))}
+      <div className="mt-12">
+  <h3 className="text-2xl font-bold text-gray-900 mb-6">
+    You might also like
+  </h3>
+  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 text-blue-950">
+    {(allBooks.length > 0 ? allBooks : booksData)
+      .filter(relatedBook => relatedBook.id !== bookId) // Don't show current book
+      .slice(0, 8)
+      .map((relatedBook) => (
+        <Link
+          key={relatedBook.id}
+          href={`/book/preview?id=${relatedBook.id}`}
+          className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+        >
+          <img
+            src={getThumbnailUrl(relatedBook)}
+            alt={relatedBook.title}
+            className="w-full h-48 object-cover bg-gray-200"
+            onError={(e) => {
+              e.target.src =
+                "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+            }}
+            loading="lazy"
+          />
+          <div className="p-3">
+            <h4 className="font-semibold text-sm line-clamp-2 mb-1">
+              {relatedBook.title}
+            </h4>
+            <p className="text-xs text-gray-500 mb-1">
+              By: {relatedBook.author}
+            </p>
+            <p className="text-blue-950 font-bold text-sm">
+              ₦{relatedBook.price?.toLocaleString()}
+            </p>
           </div>
-        </div>
+        </Link>
+      ))}
+  </div>
+</div>
       </div>
 
       {/* Options Modal */}

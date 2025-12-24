@@ -150,6 +150,12 @@ export default function HomePage() {
             subcategories: 4,
             image: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=400',
             description: 'Sexual health, relationships, and wellness'
+        },
+         {
+            name: 'Social Media',
+            subcategories: 4,
+            image: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=400',
+            description: 'Growing Your media account, marketing on socia media'
         }
     ];
 
@@ -294,10 +300,7 @@ export default function HomePage() {
                                     {category.subcategories} categories
                                 </p>
 
-                                <div className="flex items-center text-blue-950 font-medium group-hover:gap-3 transition-all">
-                                    View all
-                                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                                </div>
+                              
                             </div>
 
                             <div className="relative h-48 overflow-hidden">
@@ -385,7 +388,7 @@ export default function HomePage() {
                         <div>
                             <div className="flex items-center gap-2 mb-4">
                                 <Globe className="w-8 h-8" />
-                                <h3 className="text-xl font-bold">LEARNING ACCESS</h3>
+                                <h3 className="text-xl font-bold">LAN Library</h3>
                             </div>
                             <p className="text-gray-400 text-sm">
                                 Digital PDF library making knowledge accessible to everyone.

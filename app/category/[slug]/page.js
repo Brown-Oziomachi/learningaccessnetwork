@@ -20,85 +20,37 @@ export default function CategoryPage() {
     const [allBooks, setAllBooks] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // ✅ DEFINE getThumbnailUrl HERE - BEFORE all useEffects
     const getThumbnailUrl = (book) => {
-        console.log('Getting thumbnail for book:', book.title, {
-            driveFileId: book.driveFileId,
-            embedUrl: book.embedUrl,
-            pdfUrl: book.pdfUrl
-        });
-
-        // PRIORITY 1: If book has driveFileId, generate thumbnail from PDF first page
+        if (!book) return 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+        
+        // PRIORITY 1: Direct driveFileId
         if (book.driveFileId) {
-            const thumbnail = `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
-            console.log('✅ Using driveFileId thumbnail:', thumbnail);
-            return thumbnail;
+            return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
         }
 
-        // PRIORITY 2: Extract driveFileId from embedUrl if available
+        // PRIORITY 2: Extract from embedUrl
         if (book.embedUrl) {
-            const match = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
+            const match = book.embedUrl.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})/);
             if (match) {
-                const fileId = match[1] || match[2] || match[3];
-                if (fileId) {
-                    const thumbnail = `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
-                    console.log('✅ Using embedUrl thumbnail:', thumbnail);
-                    return thumbnail;
-                }
+                const fileId = match[1] || match[2];
+                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
             }
         }
 
-        // PRIORITY 3: Extract from pdfUrl if it's a Google Drive link
-        if (book.pdfUrl && book.pdfUrl.includes('drive.google.com')) {
-            const match = book.pdfUrl.match(/[-\w]{25,}/);
+        // PRIORITY 3: Extract from pdfUrl OR pdfLink
+        const pdfSource = book.pdfUrl || book.pdfLink;
+        if (pdfSource && pdfSource.includes('drive.google.com')) {
+            const match = pdfSource.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})/);
             if (match) {
-                const thumbnail = `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
-                console.log('✅ Using pdfUrl thumbnail:', thumbnail);
-                return thumbnail;
+                const fileId = match[1] || match[2];
+                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
             }
         }
 
-        // LAST RESORT: Fallback to existing image or default
-        console.log('⚠️ Using fallback image - no Drive ID found');
-        return book.image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+        // FALLBACK
+        return book.image || book.coverImage || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
     };
-
-    // Fetch Purchased Books - FIXED to handle object format
-    useEffect(() => {
-        const fetchPurchasedBooks = async () => {
-            try {
-                const user = auth.currentUser;
-                if (user) {
-                    const userDocRef = doc(db, 'users', user.uid);
-                    const userDoc = await getDoc(userDocRef);
-
-                    if (userDoc.exists()) {
-                        const userData = userDoc.data();
-                        const purchasedBooks = userData.purchasedBooks || {};
-
-                        // Handle both object and array formats
-                        let bookIds = [];
-
-                        if (Array.isArray(purchasedBooks)) {
-                            // If it's an array
-                            bookIds = purchasedBooks.map(book => book.id || book);
-                        } else if (typeof purchasedBooks === 'object') {
-                            // If it's an object/map
-                            bookIds = Object.keys(purchasedBooks);
-                        }
-
-                        console.log('Purchased book IDs:', bookIds);
-                        setPurchasedBookIds(new Set(bookIds));
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching purchased books:', error);
-            }
-        };
-
-        if (user) {
-            fetchPurchasedBooks();
-        }
-    }, [user]);
 
     const categoriesData = [
         {
@@ -179,7 +131,7 @@ export default function CategoryPage() {
                     image: getThumbnailUrl(book)
                 }));
 
-                console.log('Processed booksData:', processedBooksData.length);
+                console.log('✅ Processed booksData:', processedBooksData.length);
 
                 // Fetch Firestore books
                 const q = query(collection(db, 'advertMyBook'), where('status', '==', 'approved'));
@@ -188,6 +140,18 @@ export default function CategoryPage() {
                 const books = [];
                 querySnapshot.forEach((docSnap) => {
                     const data = docSnap.data();
+
+                    // 🔍 DEBUG: Log the raw Firestore data
+                    console.log('🔥 Raw Firestore data for:', data.bookTitle, {
+                        driveFileId: data.driveFileId,
+                        embedUrl: data.embedUrl,
+                        pdfUrl: data.pdfUrl,
+                        previewUrl: data.previewUrl,
+                        // Check alternative field names
+                        fileId: data.fileId,
+                        driveId: data.driveId,
+                        googleDriveId: data.googleDriveId
+                    });
 
                     const bookData = {
                         id: `firestore-${docSnap.id}`,
@@ -201,23 +165,28 @@ export default function CategoryPage() {
                         description: data.description,
                         rating: 4.5,
                         reviews: 0,
-                        driveFileId: data.driveFileId,
-                        pdfUrl: data.pdfUrl,
+                        // ✅ TRY MULTIPLE FIELD NAMES
+                        driveFileId: data.driveFileId || data.fileId || data.driveId || data.googleDriveId,
+                        pdfUrl: data.pdfUrl || data.pdf || data.documentUrl,
                         previewUrl: data.previewUrl,
-                        embedUrl: data.embedUrl,
+                        embedUrl: data.embedUrl || data.embed,
                         isFromFirestore: true
                     };
 
                     // Use thumbnail from PDF first page
-                    bookData.image = getThumbnailUrl(bookData);
+                    const thumbnail = getThumbnailUrl(bookData);
+                    bookData.image = thumbnail;
+                    
+                    console.log('✅ Firestore book processed:', bookData.title, '-> Thumbnail:', thumbnail);
+                    
                     books.push(bookData);
                 });
 
-                console.log('Firestore books:', books.length);
+                console.log('✅ Total Firestore books:', books.length);
                 setFirestoreBooks(books);
                 setAllBooks([...processedBooksData, ...books]);
             } catch (error) {
-                console.error('Error fetching Firestore books:', error);
+                console.error('❌ Error fetching Firestore books:', error);
                 const processedBooksData = booksData.map(book => ({
                     ...book,
                     image: getThumbnailUrl(book)
@@ -231,7 +200,7 @@ export default function CategoryPage() {
         fetchFirestoreBooks();
     }, []);
 
-    // Fetch Purchased Books - FIXED
+    // Fetch Purchased Books
     useEffect(() => {
         const fetchPurchasedBooks = async () => {
             try {
@@ -244,18 +213,14 @@ export default function CategoryPage() {
                         const userData = userDoc.data();
                         const purchasedBooks = userData.purchasedBooks || {};
 
-                        // Handle both object and array formats
                         let bookIds = [];
 
                         if (Array.isArray(purchasedBooks)) {
-                            // If it's an array
                             bookIds = purchasedBooks.map(book => book.id || book);
                         } else if (typeof purchasedBooks === 'object') {
-                            // If it's an object/map
                             bookIds = Object.keys(purchasedBooks);
                         }
 
-                        console.log('Purchased book IDs:', bookIds);
                         setPurchasedBookIds(new Set(bookIds));
                     }
                 }
@@ -314,9 +279,8 @@ export default function CategoryPage() {
         );
     }
 
-    
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-white overflow-x-hidden">
             <Navbar />
 
             {/* Breadcrumb */}
@@ -378,22 +342,21 @@ export default function CategoryPage() {
 
                 {/* Books Display */}
                 {displayBooks.length > 0 ? (
-                    <div className="lg:-mx-60 px-1 py-8">
-                        <div className="overflow-x-auto scrollbar-hide p-1">
-                            <div className="flex gap-2 pb-4">
+                    <div className="w-full overflow-hidden">
+                        <div className="overflow-x-auto scrollbar-hide">
+                            <div className="flex gap-4 pb-4 px-1">
                                 {displayBooks.map((book) => (
                                     <Link
                                         key={book.id}
                                         href={`/book/preview?id=${book.id}`}
-                                        className="flex-none w-[200px] sm:w-[300px] bg-gray-50 px-3 py-5 border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                                        className="flex-none w-[180px] sm:w-[220px] md:w-[280px] bg-gray-50 px-3 py-5 border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
                                     >
                                         <div className="relative">
                                             <img
                                                 src={book.image}
                                                 alt={book.title}
-                                                className="w-full max-lg:h-48 lg:h-90 lg:p-5 object-cover bg-gray-200"
+                                                className="w-full h-[240px] sm:h-[280px] md:h-[320px] object-cover bg-gray-200 rounded"
                                                 onError={(e) => {
-                                                    console.log('Image failed to load for:', book.title);
                                                     e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
                                                 }}
                                                 loading="lazy"
@@ -409,7 +372,7 @@ export default function CategoryPage() {
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="p-3 py-7">
+                                        <div className="p-3 py-5">
                                             <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2 hover:text-blue-950">
                                                 {book.title}
                                             </h4>

@@ -5,16 +5,41 @@ import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebaseConfig';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { Bookmark, Trash2, Lock, ArrowLeft, X, Download } from 'lucide-react';
+import { Bookmark, Trash2, Lock, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 export default function SavedBooksPage() {
     const router = useRouter();
     const [savedBooks, setSavedBooks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
-    const [selectedBook, setSelectedBook] = useState(null);
-    const [showPurchaseModal, setShowPurchaseModal] = useState(false);
-    const [showPopup, setShowPopup] = useState(false)
+    const [showPopup, setShowPopup] = useState(false);
+
+    // ✅ THUMBNAIL HELPER FUNCTION
+    const getThumbnailUrl = (book) => {
+        if (book.driveFileId) {
+            return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
+        }
+
+        if (book.embedUrl) {
+            const match = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
+            if (match) {
+                const fileId = match[1] || match[2] || match[3];
+                if (fileId) {
+                    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
+                }
+            }
+        }
+
+        if (book.pdfUrl && book.pdfUrl.includes('drive.google.com')) {
+            const match = book.pdfUrl.match(/[-\w]{25,}/);
+            if (match) {
+                return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
+            }
+        }
+
+        return book.image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+    };
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -29,6 +54,7 @@ export default function SavedBooksPage() {
         return () => unsubscribe();
     }, [router]);
 
+    // ✅ FETCH AND PROCESS SAVED BOOKS WITH THUMBNAILS
     const fetchSavedBooks = async (userId) => {
         try {
             setLoading(true);
@@ -38,7 +64,14 @@ export default function SavedBooksPage() {
             if (userDoc.exists()) {
                 const userData = userDoc.data();
                 const saved = userData.savedBooks || [];
-                setSavedBooks(saved);
+                
+                // ✅ Process each saved book to ensure proper thumbnail
+                const processedSavedBooks = saved.map(book => ({
+                    ...book,
+                    image: getThumbnailUrl(book) // Generate thumbnail from embedUrl/driveFileId
+                }));
+                
+                setSavedBooks(processedSavedBooks);
             }
         } catch (error) {
             console.error('Error fetching saved books:', error);
@@ -58,21 +91,11 @@ export default function SavedBooksPage() {
 
             setSavedBooks(updatedBooks);
             setShowPopup(true);
-            setTimeout(() => setShowPopup(false), 2000);        } catch (error) {
+            setTimeout(() => setShowPopup(false), 2000);
+        } catch (error) {
             console.error('Error removing book:', error);
             alert('Error removing book. Please try again.');
         }
-    };
-
-    const handlePurchase = (book) => {
-        setSelectedBook(book);
-        setShowPurchaseModal(true);
-    };
-
-    const handleProceedToPayment = () => {
-        if (!selectedBook) return;
-        setShowPurchaseModal(false);
-        router.push(`/payment?bookId=${selectedBook.id}`);
     };
 
     const formatDate = (dateString) => {
@@ -137,7 +160,6 @@ export default function SavedBooksPage() {
                     <div className="bg-white rounded-lg shadow-lg p-2">
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-xl font-bold text-gray-900">Your Saved Books</h2>
-                          
                         </div>
 
                         {/* Horizontal Scrolling Container */}
@@ -148,21 +170,36 @@ export default function SavedBooksPage() {
                                         key={book.id}
                                         className="flex-none w-[200px] sm:w-[220px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-xl transition-shadow"
                                     >
-                                        <div className="relative">
-                                            <img
-                                                src={book.image}
-                                                alt={book.title}
-                                                className="w-full h-64 object-cover"
-                                            />
-                                            <span className="absolute top-3 right-3 bg-blue-950 text-white px-2 py-1 rounded-full">
-                                                <Bookmark size={14} className="fill-white" />
-                                            </span>
-                                        </div>
+                                        {/* ✅ Make image clickable to preview */}
+                                        <Link href={`/book/preview?id=${book.id}`}>
+                                            <div className="relative cursor-pointer">
+                                                <img
+                                                    src={book.image}
+                                                    alt={book.title}
+                                                    className="w-full h-64 object-cover bg-gray-200"
+                                                    onError={(e) => {
+                                                        e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+                                                    }}
+                                                />
+                                                <span className="absolute top-3 right-3 bg-blue-950 text-white px-2 py-1 rounded-full">
+                                                    <Bookmark size={14} className="fill-white" />
+                                                </span>
+                                                {/* ✅ Show "New" badge for Firestore books */}
+                                                {book.isFromFirestore && (
+                                                    <span className="absolute top-3 left-3 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">
+                                                        New
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </Link>
 
                                         <div className="p-4">
-                                            <h3 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2">
-                                                {book.title}
-                                            </h3>
+                                            {/* ✅ Make title clickable to preview */}
+                                            <Link href={`/book/preview?id=${book.id}`}>
+                                                <h3 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 hover:text-blue-950 cursor-pointer">
+                                                    {book.title}
+                                                </h3>
+                                            </Link>
                                             <p className="text-xs text-gray-600 mb-2 line-clamp-1">{book.author}</p>
                                             
                                             <div className="mb-2">
@@ -176,13 +213,14 @@ export default function SavedBooksPage() {
                                             </p>
 
                                             <div className="space-y-2">
-                                                <button
-                                                    onClick={() => handlePurchase(book)}
+                                                {/* ✅ Preview button instead of Purchase */}
+                                                <Link 
+                                                    href={`/book/preview?id=${book.id}`}
                                                     className="w-full bg-blue-950 text-white py-2 rounded-lg hover:bg-blue-900 transition-colors flex items-center justify-center gap-2 text-xs font-semibold"
                                                 >
                                                     <Lock size={14} />
-                                                    Purchase
-                                                </button>
+                                                    View & Purchase
+                                                </Link>
                                                 
                                                 <button
                                                     onClick={() => handleRemoveFromSaved(book.id)}
@@ -210,58 +248,14 @@ export default function SavedBooksPage() {
                 )}
             </main>
 
- 
-{showPopup && (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fadeIn">
-        Removed from saved later
-    </div>
- )}
-            {/* Purchase Modal */}
-            {showPurchaseModal && selectedBook && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg max-w-md w-full p-6">
-                        <div className="flex justify-between items-start mb-4">
-                            <h3 className="text-xl font-bold text-gray-900">Purchase PDF Book</h3>
-                            <button onClick={() => setShowPurchaseModal(false)}>
-                                <X size={24} className="text-gray-600 hover:text-gray-900" />
-                            </button>
-                        </div>
-
-                        <div className="mb-4">
-                            <img
-                                src={selectedBook.image}
-                                alt={selectedBook.title}
-                                className="w-full h-48 object-cover rounded-lg mb-4"
-                            />
-                            <h4 className="font-bold text-lg text-blue-950">{selectedBook.title}</h4>
-                            <p className="text-gray-600">{selectedBook.author}</p>
-                            <p className="text-2xl font-bold text-blue-950 mt-2">
-                                ₦ {selectedBook.price?.toLocaleString()}
-                            </p>
-                        </div>
-
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                            <div className="flex items-start gap-3">
-                                <Lock className="w-5 h-5 text-blue-950 mt-1" />
-                                <div className="text-sm text-blue-950">
-                                    <p className="font-semibold mb-1">Instant PDF Access</p>
-                                    <p>After payment, the PDF will be sent to: <strong>{user?.email}</strong></p>
-                                    <p className="mt-2">You can also download it from "My Books" section anytime.</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={handleProceedToPayment}
-                            className="w-full bg-blue-950 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors font-semibold"
-                        >
-                            Proceed to Payment
-                        </button>
-                    </div>
+            {/* Popup Notification */}
+            {showPopup && (
+                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fadeIn">
+                    Removed from saved books
                 </div>
             )}
 
-            {/* Custom Scrollbar Styles */}
+            {/* Custom Scrollbar Styles & Animations */}
             <style jsx>{`
                 .scrollbar-hide {
                     -ms-overflow-style: none;
@@ -269,6 +263,19 @@ export default function SavedBooksPage() {
                 }
                 .scrollbar-hide::-webkit-scrollbar {
                     display: none;
+                }
+                @keyframes fadeIn {
+                    from {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(0);
+                    }
+                }
+                .animate-fadeIn {
+                    animation: fadeIn 0.3s ease-out;
                 }
             `}</style>
         </div>

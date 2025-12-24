@@ -152,17 +152,7 @@ export default function MobileCategoriesCarousel() {
         <div className="text-center mt-3 text-sm text-gray-600">
           {currentSlide + 1} / {totalSlides}
         </div>
-      </div>
-
-      {/* View All Button */}
-      <div className="mt-6 text-center">
-        <Link
-          href="/pdf"
-          className="inline-block bg-blue-950 text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors font-semibold"
-        >
-          View All Categories
-        </Link>
-      </div>
+      </div>    
     </div>
   );
 }
