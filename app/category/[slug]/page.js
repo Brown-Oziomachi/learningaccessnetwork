@@ -421,7 +421,7 @@ export default function CategoryPage() {
                         <div>
                             <div className="flex items-center gap-2 mb-4">
                                 <Globe className="w-8 h-8" />
-                                <h3 className="text-xl font-bold">LEARNING ACCESS</h3>
+                                <h3 className="text-xl font-bold">LAN Library</h3>
                             </div>
                             <p className="text-gray-300 text-sm">
                                 Digital PDF library making knowledge easily accessible to everyone.

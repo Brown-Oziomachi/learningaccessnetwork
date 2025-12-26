@@ -11,11 +11,14 @@ import {
   TrendingUp,
   CheckCircle,
   ArrowRight,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 
 export default function MakeMoneyPage() {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState(null);
 
   const videos = [
     {
@@ -25,7 +28,7 @@ export default function MakeMoneyPage() {
         "Learn the basics of setting up your account and understanding the platform",
       thumbnail:
         "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800",
-      videoUrl: "#", // Replace with actual video URL
+      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ", // Replace with actual video URL
       duration: "5:30",
     },
     {
@@ -35,7 +38,7 @@ export default function MakeMoneyPage() {
         "Step-by-step guide to uploading your books and setting prices",
       thumbnail:
         "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=800",
-      videoUrl: "#",
+      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
       duration: "8:45",
     },
     {
@@ -45,7 +48,7 @@ export default function MakeMoneyPage() {
         "Discover the best pricing strategies to maximize your earnings",
       thumbnail:
         "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=800",
-      videoUrl: "#",
+      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
       duration: "6:20",
     },
     {
@@ -54,7 +57,7 @@ export default function MakeMoneyPage() {
       description: "Learn how to promote your books and reach more buyers",
       thumbnail:
         "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800",
-      videoUrl: "#",
+      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
       duration: "10:15",
     },
     {
@@ -63,7 +66,7 @@ export default function MakeMoneyPage() {
       description: "How the payment system works and when you get paid",
       thumbnail:
         "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800",
-      videoUrl: "#",
+      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
       duration: "7:10",
     },
     {
@@ -72,7 +75,7 @@ export default function MakeMoneyPage() {
       description: "Real sellers sharing their success stories and tips",
       thumbnail:
         "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800",
-      videoUrl: "#",
+      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
       duration: "12:30",
     },
   ];
@@ -122,21 +125,29 @@ export default function MakeMoneyPage() {
     return visible;
   };
 
+  const handleVideoClick = (video) => {
+    setSelectedVideo(video);
+    setShowVideoModal(true);
+  };
+
+  const closeVideoModal = () => {
+    setShowVideoModal(false);
+    setSelectedVideo(null);
+  };
+
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-white text-blue-950">
       {/* Header */}
-      <header className="border-b border-gray-800 sticky top-0 z-50 bg-black/95 backdrop-blur">
+      <header className="border-b border-gray-800 sticky top-0 z-50 bg-blue-950 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/home" className="flex items-center gap-2">
-            <div className="text-2xl font-bold text-white">
+            <div className="lg:text-5xl text-2xl font-bold text-white">
               [LAN Library]{" "}
-              <span className="text-xs bg-blue-600 px-2 py-1 rounded">
-                ACADEMY
-              </span>
+              
             </div>
           </Link>
           <Link href="/become-seller">
-            <button className="bg-blue-600 text-white px-6 py-2 rounded-full font-semibold hover:bg-blue-700 transition-colors">
+            <button className="text-blue-950 bg-white lg:px-6 lg:py-2 max-md:text-sm max-lg:px-5 rounded-full font-semibold hover:bg-blue-700 transition-colors">
               BECOME A SELLER
             </button>
           </Link>
@@ -145,7 +156,7 @@ export default function MakeMoneyPage() {
 
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-4 py-16 text-center">
-        <div className="inline-block bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-semibold mb-4">
+        <div className="inline-block bg-blue-950 text-white px-4 py-1 rounded-full text-sm font-semibold mb-4">
           New
         </div>
         <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
@@ -153,7 +164,7 @@ export default function MakeMoneyPage() {
           <br />
           Selling Books
         </h1>
-        <p className="text-gray-400 text-xl mb-8 max-w-2xl mx-auto">
+        <p className="text-gray-900 text-xl mb-8 max-w-2xl mx-auto">
           Learn how to turn your knowledge into income. Get the latest updates
           from successful sellers and start earning today.
         </p>
@@ -167,10 +178,12 @@ export default function MakeMoneyPage() {
             return (
               <div
                 key={index}
-                className="bg-gray-900 rounded-xl p-6 text-center border border-gray-800 hover:border-blue-600 transition-colors"
+                className="bg-blue-950 text-whiterounded-xl p-6 text-center border border-gray-800 hover:border-blue-600 transition-colors"
               >
-                <Icon className="w-8 h-8 mx-auto mb-3 text-blue-600" />
-                <div className="text-3xl font-bold mb-2">{stat.value}</div>
+                <Icon className="w-8 h-8 mx-auto mb-3 text-blue-950 bg-white px-2 py-1 rounded-full" />
+                <div className="text-3xl font-bold mb-2 text-white">
+                  {stat.value}
+                </div>
                 <div className="text-gray-400 text-sm">{stat.label}</div>
               </div>
             );
@@ -179,8 +192,10 @@ export default function MakeMoneyPage() {
       </section>
 
       {/* Video Carousel Section */}
-      <section className="max-w-7xl mx-auto px-4 py-16">
-        <h2 className="text-4xl font-bold mb-4 text-center">Watch & Learn</h2>
+      <section className="max-w-7xl mx-auto px-4 py-16 shadow-2xl  border border-gray-800 bg-blue-950/90">
+        <h2 className="text-4xl font-bold mb-4 text-center text-white ">
+          Watch & Learn
+        </h2>
         <p className="text-gray-400 text-center mb-12">
           Step-by-step video tutorials to help you succeed
         </p>
@@ -195,12 +210,15 @@ export default function MakeMoneyPage() {
                   index === 1 ? "scale-105" : "scale-95 opacity-70"
                 }`}
               >
-                <div className="bg-gray-900 rounded-2xl overflow-hidden border border-gray-800 hover:border-blue-600 transition-all group">
-                  <div className="relative aspect-video bg-gradient-to-br from-blue-900 to-purple-900">
+                <div className=" rounded-2xl overflow-hidden border border-gray-800 hover:border-blue-600 transition-all group cursor-pointer">
+                  <div
+                    className="relative aspect-video "
+                    onClick={() => handleVideoClick(video)}
+                  >
                     <img
                       src={video.thumbnail}
                       alt={video.title}
-                      className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
+                      className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity "
                     />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <button className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-colors group-hover:scale-110 transform duration-300">
@@ -211,9 +229,11 @@ export default function MakeMoneyPage() {
                       {video.duration}
                     </div>
                   </div>
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold mb-2">{video.title}</h3>
-                    <p className="text-gray-400 text-sm">{video.description}</p>
+                  <div className="p-6 bg-white">
+                    <h3 className="text-xl font-bold mb-2 text-blue-950">
+                      {video.title}
+                    </h3>
+                    <p className="text-gray-950 text-sm">{video.description}</p>
                   </div>
                 </div>
               </div>
@@ -244,8 +264,11 @@ export default function MakeMoneyPage() {
             <div className="flex gap-4" style={{ width: "max-content" }}>
               {videos.map((video) => (
                 <div key={video.id} className="w-[280px] snap-start">
-                  <div className="bg-gray-900 rounded-2xl overflow-hidden border border-gray-800">
-                    <div className="relative aspect-video bg-gradient-to-br from-blue-900 to-purple-900">
+                  <div className="bg-gray-900  overflow-hidden border border-gray-800 cursor-pointer">
+                    <div
+                      className="relative aspect-video bg-gradient-to-br from-blue-900 to-purple-900"
+                      onClick={() => handleVideoClick(video)}
+                    >
                       <img
                         src={video.thumbnail}
                         alt={video.title}
@@ -260,9 +283,11 @@ export default function MakeMoneyPage() {
                         {video.duration}
                       </div>
                     </div>
-                    <div className="p-4">
-                      <h3 className="text-lg font-bold mb-2">{video.title}</h3>
-                      <p className="text-gray-400 text-sm">
+                    <div className="p-4 bg-white">
+                      <h3 className="text-lg font-bold text-blue-950 mb-2">
+                        {video.title}
+                      </h3>
+                      <p className="text-gray-950 text-sm">
                         {video.description}
                       </p>
                     </div>
@@ -287,17 +312,18 @@ export default function MakeMoneyPage() {
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="max-w-7xl mx-auto px-4 py-16">
+          {/* How It Works Section */}
+          <div className="bg-blue-950 text-white">
+      <section className="max-w-7xl mx-auto px-4 py-16 mt-10">
         <h2 className="text-4xl font-bold mb-4 text-center">How It Works</h2>
         <p className="text-gray-400 text-center mb-12">
           Three simple steps to start earning
         </p>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className=" md:grid-cols-3 gap-1 flex overflow-x-auto max-md:w-full space-x-2 px-  md:space-x-0  md:overflow-visible  md:flex-none  md:px-0">
           {steps.map((step, index) => (
-            <div key={index} className="relative">
-              <div className="bg-gradient-to-br from-blue-900/50 to-purple-900/50 rounded-2xl p-8 border border-blue-600/30 hover:border-blue-600 transition-all group">
+            <div key={index} className="relative w-80 md:w-auto flex-shrink-0 md:flex-shrink md:mx-0">
+              <div className="bg-gradient-to-br from-blue-900/50 to-purple-900/50  p-5 border border-blue-600/30 hover:border-blue-600 transition-all group">
                 <div className="text-6xl font-bold text-blue-600/30 mb-4">
                   {step.number}
                 </div>
@@ -344,6 +370,8 @@ export default function MakeMoneyPage() {
           </div>
         </div>
       </section>
+              
+          </div>
 
       {/* CTA Section */}
       <section className="max-w-7xl mx-auto px-4 py-16 text-center">
@@ -374,6 +402,39 @@ export default function MakeMoneyPage() {
           <p>&copy; 2025 LAN Library. All rights reserved.</p>
         </div>
       </footer>
+
+      {/* Full Screen Video Modal */}
+      {showVideoModal && selectedVideo && (
+        <div className="fixed inset-0 bg-black z-[100] flex items-center justify-center">
+          {/* Close Button */}
+          <button
+            onClick={closeVideoModal}
+            className="absolute top-4 right-4 z-[110] w-12 h-12 bg-white/10 backdrop-blur-sm hover:bg-white/20 rounded-full flex items-center justify-center transition-colors group"
+          >
+            <X className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
+          </button>
+
+          {/* Video Title */}
+          <div className="absolute top-4 left-4 z-[110] bg-black/50 backdrop-blur-sm px-4 py-2 rounded-lg">
+            <h3 className="text-white font-semibold text-lg">
+              {selectedVideo.title}
+            </h3>
+          </div>
+
+          {/* Video Container */}
+          <div className="w-full h-full flex items-center justify-center p-4 md:p-8">
+            <div className="w-full h-full max-w-7xl max-h-full">
+              <iframe
+                src={selectedVideo.videoUrl}
+                title={selectedVideo.title}
+                className="w-full h-full rounded-lg"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              ></iframe>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .overflow-x-auto::-webkit-scrollbar {

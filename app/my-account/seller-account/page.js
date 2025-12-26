@@ -289,47 +289,50 @@ export default function SellerAccount() {
         try {
             setWithdrawing(true);
 
-            const withdrawalRef = `WD-${Date.now()}-${user.uid.substring(0, 8)}`;
+            // ✅ IMPROVED: More unique reference with timestamp + random string
+            const timestamp = Date.now();
+            const randomStr = Math.random().toString(36).substring(2, 9);
+            const userShort = user.uid.substring(0, 6);
+            const withdrawalRef = `WD-${timestamp}-${randomStr}-${userShort}`;
 
             const withdrawalData = {
                 sellerId: user.uid,
                 sellerName: user.displayName || `${user.firstName} ${user.surname}`,
                 sellerEmail: user.email,
+                sellerPhone: user.phone || user.phoneNumber || null,
                 amount: amount,
-                status: "completed",
+                status: "pending",
                 requestedAt: serverTimestamp(),
-                processedAt: serverTimestamp(),
+                processedAt: null,
                 reference: withdrawalRef,
                 bankDetails: {
                     accountName: user.bankDetails.accountName,
                     accountNumber: user.bankDetails.accountNumber,
                     bankName: user.bankDetails.bankName,
+                    bankCode: user.bankDetails.bankCode || null,
                 },
-                processingMethod: "automatic",
-                processingNote: "Automatic withdrawal - no approval required",
+                flutterwaveTransferId: null,
+                processingMethod: "admin_approval_required",
+                processingNote: "Awaiting admin approval",
             };
 
             await addDoc(collection(db, "withdrawals"), withdrawalData);
 
-            const newBalance = accountBalance - amount;
             await updateDoc(doc(db, "sellers", user.uid), {
-                accountBalance: newBalance,
-                totalWithdrawn: increment(amount),
-                lastWithdrawalDate: serverTimestamp(),
+                lastWithdrawalRequestDate: serverTimestamp(),
                 updatedAt: serverTimestamp()
             });
 
-            setAccountBalance(newBalance);
             setWithdrawAmount("");
             setShowWithdrawModal(false);
 
-            alert(`✅ Withdrawal successful!\n\nAmount: ₦${amount.toLocaleString()}\nReference: ${withdrawalRef}\n\nFunds will be sent to:\n${user.bankDetails.accountName}\n${user.bankDetails.accountNumber}\n${user.bankDetails.bankName}`);
+            alert(`✅ Withdrawal request submitted!\n\nAmount: ₦${amount.toLocaleString()}\nReference: ${withdrawalRef}\n\nYour request is pending admin approval. You will be notified once processed.`);
 
             await fetchSellerTransactions(user.uid);
 
         } catch (error) {
             console.error("Withdrawal error:", error);
-            setWithdrawalError("Failed to process withdrawal: " + error.message);
+            setWithdrawalError("Failed to submit withdrawal request: " + error.message);
         } finally {
             setWithdrawing(false);
         }
@@ -361,8 +364,8 @@ export default function SellerAccount() {
             <div className="max-w-7xl mx-auto px-4 py-6">
                 {/* Header */}
                 <div className="bg-white rounded-xl shadow-sm px-6 py-4 mb-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center">
+                        <div className="flex items-center justify-center gap-3">
                             <button
                                 onClick={() => setShowProfileModal(true)}
                                 className="relative flex items-center gap-3 hover:opacity-80 transition-opacity"
@@ -378,12 +381,15 @@ export default function SellerAccount() {
                                 </div>
                             </button>
                         </div>
+                        <div className="bg-blue-950 rounded-xl shadow-sm px-6 py-4 ml-auto">
                         <button
                             onClick={handleButton}
                             className="bg-pink-500 hover:bg-pink-600 text-white text-xs lg:text-sm font-bold px-4 py-2 rounded-full transition-colors"
                         >
                             HELP
                         </button>
+
+                        </div>
                     </div>
                 </div>
 
@@ -423,10 +429,10 @@ export default function SellerAccount() {
 
                         {/* Stats Grid */}
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white rounded-xl p-6 shadow-sm">
+                            <div className="bg-white rounded-xl p-6  shadow-sm">
                                 <div className="flex items-center gap-3 mb-3">
                                     <div className="bg-blue-100 p-3 rounded-lg">
-                                        <TrendingUp size={24} className="text-blue-950" />
+                                        <TrendingUp size={24} className="text-blue-950 " />
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-600">Total Earnings</p>
@@ -440,7 +446,7 @@ export default function SellerAccount() {
                                         <ShoppingBag size={24} className="text-green-600" />
                                     </div>
                                     <div>
-                                        <p className="text-sm text-gray-600">Books Sold</p>
+                                        <p className="text-sm text-gray-600">Documents Sold</p>
                                         <p className="text-2xl font-bold text-blue-950">{booksSold}</p>
                                     </div>
                                 </div>
@@ -484,23 +490,23 @@ export default function SellerAccount() {
                         <div className="bg-white rounded-xl shadow-sm p-6">
                             <h3 className="font-bold text-lg text-blue-950 mb-4">Quick Actions</h3>
                             <div className="space-y-3">
-                                <Link href="/my-books" className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                                <Link href="/my-account/seller-account/my-books" className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
                                     <div className="bg-blue-950 p-3 rounded-lg">
                                         <Book className="text-white" size={20} />
                                     </div>
                                     <div className="flex-1">
-                                        <p className="font-semibold text-blue-950">My Books</p>
-                                        <p className="text-xs text-gray-600">View purchased books</p>
+                                        <p className="font-semibold text-blue-950">My documents</p>
+                                        <p className="text-xs text-gray-600">View uploaded documents</p>
                                     </div>
                                     <ChevronRight size={20} className="text-gray-400" />
                                 </Link>
 
-                                <Link href="/pdf" className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                                <Link href="/documents" className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
                                     <div className="bg-blue-950 p-3 rounded-lg">
                                         <Globe className="text-white" size={20} />
                                     </div>
                                     <div className="flex-1">
-                                        <p className="font-semibold text-blue-950">Browse Books</p>
+                                        <p className="font-semibold text-blue-950">Browse documents</p>
                                         <p className="text-xs text-gray-600">Explore library</p>
                                     </div>
                                     <ChevronRight size={20} className="text-gray-400" />
@@ -511,7 +517,7 @@ export default function SellerAccount() {
                                         <TrendingUp className="text-white" size={20} />
                                     </div>
                                     <div className="flex-1">
-                                        <p className="font-semibold text-blue-950">Upload Books</p>
+                                        <p className="font-semibold text-blue-950">Upload documents</p>
                                         <p className="text-xs text-gray-600">Add new document</p>
                                     </div>
                                     <ChevronRight size={20} className="text-gray-400" />
@@ -748,23 +754,55 @@ export default function SellerAccount() {
                                         <div key={w.id} className="bg-white rounded-xl p-4 shadow-sm">
                                             <div className="flex items-center justify-between mb-2">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="bg-red-100 p-2 rounded-lg">
-                                                        <Download size={18} className="text-red-600" />
+                                                    <div className={`p-2 rounded-lg ${w.status === 'pending' ? 'bg-yellow-100' :
+                                                            w.status === 'completed' ? 'bg-red-100' :
+                                                                w.status === 'rejected' ? 'bg-red-100' :
+                                                                    'bg-gray-100'
+                                                        }`}>
+                                                        <Download size={18} className={
+                                                            w.status === 'pending' ? 'text-yellow-600' :
+                                                                w.status === 'completed' ? 'text-red-600' :
+                                                                    w.status === 'rejected' ? 'text-red-600' :
+                                                                        'text-gray-600'
+                                                        } />
                                                     </div>
                                                     <div>
-                                                        <p className="font-semibold text-blue-950">Withdrawal</p>
+                                                        <p className="font-semibold text-blue-950">Withdrawal Request</p>
                                                         <p className="text-xs text-gray-500">
                                                             {w.requestedAtDate?.toLocaleDateString()} at {w.requestedAtDate?.toLocaleTimeString()}
                                                         </p>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-red-600 font-bold">-₦{w.amount?.toLocaleString()}</p>
-                                                    <p className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">Completed</p>
+                                                    <p className="text-red-600 font-bold">₦{w.amount?.toLocaleString()}</p>
+                                                    <p className={`text-xs px-2 py-1 rounded ${w.status === 'pending' ? 'text-yellow-600 bg-yellow-50' :
+                                                            w.status === 'completed' ? 'text-green-600 bg-green-50' :
+                                                                w.status === 'rejected' ? 'text-red-600 bg-red-50' :
+                                                                    'text-gray-600 bg-gray-50'
+                                                        }`}>
+                                                        {w.status === 'pending' ? '⏳ Pending Approval' :
+                                                            w.status === 'completed' ? '✅ Completed' :
+                                                                w.status === 'rejected' ? '❌ Rejected' : w.status}
+                                                    </p>
                                                 </div>
                                             </div>
                                             {w.reference && (
-                                                <p className="text-xs text-gray-500 mt-2 bg-gray-50 p-2 rounded">Ref: {w.reference}</p>
+                                                <p className="text-xs text-gray-500 mt-2 bg-gray-50 p-2 rounded">
+                                                    Ref: {w.reference}
+                                                </p>
+                                            )}
+                                            {w.adminNote && (
+                                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mt-2">
+                                                    <p className="text-xs font-semibold text-blue-900 mb-1">Admin Note:</p>
+                                                    <p className="text-xs text-blue-700">{w.adminNote}</p>
+                                                </div>
+                                            )}
+                                            {w.status === 'pending' && (
+                                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mt-2">
+                                                    <p className="text-xs text-yellow-700">
+                                                        ⏳ Your withdrawal request is being reviewed by our team. You'll receive an email notification once it's processed.
+                                                    </p>
+                                                </div>
                                             )}
                                         </div>
                                     ))}
@@ -791,12 +829,14 @@ export default function SellerAccount() {
                         </div>
 
                         <div className="p-6 border-b border-gray-200">
-                            <div className="flex items-center gap-2 text-green-600 mb-2">
-                                <CheckCircle size={18} />
-                                <p className="text-sm font-semibold">Instant Withdrawal - No Approval Needed</p>
+                            <div className="flex items-center gap-2 text-yellow-600 mb-2">
+                                <AlertCircle size={18} />
+                                <p className="text-sm font-semibold">Admin Approval Required</p>
                             </div>
+                            <p className="text-xs text-gray-600 mt-2">
+                                Your withdrawal request will be reviewed and processed within 24-48 hours. You'll receive an email notification once approved.
+                            </p>
                         </div>
-
                         {user?.bankDetails ? (
                             <div className="p-6 border-b border-gray-200 bg-blue-50">
                                 <p className="text-sm font-semibold text-gray-700 mb-2">Withdrawal will be sent to:</p>

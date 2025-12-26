@@ -6,7 +6,7 @@ export default function GoHomeButton() {
     <button
       onClick={() => {
         window.location.href =
-          "/lan/net/help-center/article/browsing-the-library";
+          "/learn/make-money";
       }}
       className="inline-flex items-center justify-center bg-blue-950 text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition"
     >

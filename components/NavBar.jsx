@@ -16,6 +16,7 @@ import {
   Globe,
   Book,
   ChevronRight,
+  Sparkles,
   HelpCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -268,14 +269,14 @@ export default function Navbar() {
 
   return (
     <>
+      
       <header className="bg-blue-950 border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <Link href="/documents">
+        <Link href="/latest/documentations" className="no-underline">
           <div className="bg-white flex items-center justify-center gap-2 text-blue-950 py-2">
-            <h1 className="text-sm">2026 latest book</h1>
+            <h1 className="text-sm">2026 Latest Documentations</h1>
             <ChevronRight size={16} />
           </div>
         </Link>
-
         <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2 sm:gap-4">
             <button
@@ -429,7 +430,7 @@ export default function Navbar() {
                 </button>
                 {activeDropdown === "education" &&
                   menuCategories.education.books.length > 0 && (
-                    <div className="absolute lg:-left-0 top-full mx-auto w-screen lg:max-w-7xl bg-white text-blue-950 border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
+                    <div className="absolute lg:-left-50 top-full mx-auto w-screen lg:max-w-4xl bg-white text-blue-950 border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
                       <div className="mb-4">
                         <h3 className="text-lg font-bold text-gray-900">
                           {menuCategories.education.title}
@@ -472,258 +473,269 @@ export default function Navbar() {
                   )}
               </div>
 
-                                  <div
-                        className="relative group"
-                        onMouseEnter={() => setActiveDropdown("business")}
-                        onMouseLeave={() => setActiveDropdown(null)}
-                      >
-                        <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
-                          Business{" "}
-                          <ChevronDown
-                            size={14}
-                            className={activeDropdown === "business" ? "rotate-180" : ""}
-                          />
-                        </button>
-                        
-                        {/* Remove the books.length check here */}
-                        {activeDropdown === "business" && (
-                          <div className="absolute lg:-left-50 top-full w-screen lg:max-w-7xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
-                            <div className="mb-4">
-                              <h3 className="text-lg font-bold text-gray-900">
-                                {menuCategories.business.title}
-                              </h3>
-                              <p className="text-sm text-gray-600 mt-1">
-                                {menuCategories.business.description}
-                              </p>
-                            </div>
+              <div
+                className="relative group"
+                onMouseEnter={() => setActiveDropdown("business")}
+                onMouseLeave={() => setActiveDropdown(null)}
+              >
+                <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
+                  Business{" "}
+                  <ChevronDown
+                    size={14}
+                    className={
+                      activeDropdown === "business" ? "rotate-180" : ""
+                    }
+                  />
+                </button>
 
-                            {/* Check length inside the dropdown */}
-                            {menuCategories.business.books.length > 0 ? (
-                              <>
-                                <h4 className="font-semibold text-gray-900 mb-3">
-                                  Documents recommended for you
-                                </h4>
-                                <div className="grid grid-cols-3 gap-4">
-                                  {menuCategories.business.books.map((book) => (
-                                    <Link
-                                      key={book.id}
-                                      href={`/book/preview?id=${book.id}`}
-                                      onClick={() => setActiveDropdown(null)}
-                                      className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                                    >
-                                      <div className="p-3">
-                                        <h5 className="font-semibold text-sm line-clamp-2 mb-1">
-                                          {book.title}
-                                        </h5>
-                                        <p className="text-xs text-gray-600">
-                                          Added by {book.author}
-                                        </p>
-                                      </div>
-                                    </Link>
-                                  ))}
-                                </div>
-                                <Link
-                                  href="/category/business"
-                                  className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
-                                >
-                                  All Business Documents <ChevronRight size={14} className="inline" />
-                                </Link>
-                              </>
-                            ) : (
-                              <p className="text-sm text-gray-500">No documents available in this category yet.</p>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                {/* Remove the books.length check here */}
+                {activeDropdown === "business" && (
+                  <div className="absolute lg:-left-50 top-full w-screen lg:max-w-4xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-bold text-gray-900">
+                        {menuCategories.business.title}
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {menuCategories.business.description}
+                      </p>
+                    </div>
 
-                    <div
-                        className="relative group"
-                        onMouseEnter={() => setActiveDropdown("technology")}
-                        onMouseLeave={() => setActiveDropdown(null)}
-                      >
-                        <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
-                          Technology{" "}
-                          <ChevronDown
-                            size={14}
-                            className={activeDropdown === "technology" ? "rotate-180" : ""}
-                          />
-                        </button>
-                        
-                        {/* Remove the books.length check here */}
-                        {activeDropdown === "technology" && (
-                          <div className="absolute lg:-left-60 top-full w-screen lg:max-w-7xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
-                            <div className="mb-4">
-                              <h3 className="text-lg font-bold text-gray-900">
-                                {menuCategories.technology.title}
-                              </h3>
-                              <p className="text-sm text-gray-600 mt-1">
-                                {menuCategories.technology.description}
-                              </p>
-                            </div>
-
-                            {/* Check length inside the dropdown */}
-                            {menuCategories.technology.books.length > 0 ? (
-                              <>
-                                <h4 className="font-semibold text-gray-900 mb-3">
-                                  Documents recommended for you
-                                </h4>
-                                <div className="grid grid-cols-3 gap-4">
-                                  {menuCategories.technology.books.map((book) => (
-                                    <Link
-                                      key={book.id}
-                                      href={`/book/preview?id=${book.id}`}
-                                      onClick={() => setActiveDropdown(null)}
-                                      className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                                    >
-                                      <div className="p-3">
-                                        <h5 className="font-semibold text-sm line-clamp-2 mb-1">
-                                          {book.title}
-                                        </h5>
-                                        <p className="text-xs text-gray-600">
-                                          Added by {book.author}
-                                        </p>
-                                      </div>
-                                    </Link>
-                                  ))}
-                                </div>
-                                <Link
-                                  href="/category/technology"
-                                  className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
-                                >
-                                  All Technology Documents <ChevronRight size={14} className="inline" />
-                                </Link>
-                              </>
-                            ) : (
-                              <p className="text-sm text-gray-500">No documents available in this category yet.</p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                    <div
-                        className="relative group"
-                        onMouseEnter={() => setActiveDropdown("science")}
-                        onMouseLeave={() => setActiveDropdown(null)}
-                      >
-                        <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
-                          Science{" "}
-                          <ChevronDown
-                            size={14}
-                            className={activeDropdown === "science" ? "rotate-180" : ""}
-                          />
-                        </button>
-                        
-                        {/* Remove the books.length check here */}
-                        {activeDropdown === "science" && (
-                          <div className="absolute lg:-left-70 top-full w-screen lg:max-w-7xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
-                            <div className="mb-4">
-                              <h3 className="text-lg font-bold text-gray-900">
-                                {menuCategories.science.title}
-                              </h3>
-                              <p className="text-sm text-gray-600 mt-1">
-                                {menuCategories.science.description}
-                              </p>
-                            </div>
-
-                            {/* Check length inside the dropdown */}
-                            {menuCategories.science.books.length > 0 ? (
-                              <>
-                                <h4 className="font-semibold text-gray-900 mb-3">
-                                  Documents recommended for you
-                                </h4>
-                                <div className="grid grid-cols-3 gap-4">
-                                  {menuCategories.science.books.map((book) => (
-                                    <Link
-                                      key={book.id}
-                                      href={`/book/preview?id=${book.id}`}
-                                      onClick={() => setActiveDropdown(null)}
-                                      className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                                    >
-                                      <div className="p-3">
-                                        <h5 className="font-semibold text-sm line-clamp-2 mb-1">
-                                          {book.title}
-                                        </h5>
-                                        <p className="text-xs text-gray-600">
-                                          Added by {book.author}
-                                        </p>
-                                      </div>
-                                    </Link>
-                                  ))}
-                                </div>
-                                <Link
-                                  href="/category/science"
-                                  className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
-                                >
-                                  All Science Documents <ChevronRight size={14} className="inline" />
-                                </Link>
-                              </>
-                            ) : (
-                              <p className="text-sm text-gray-500">No documents available in this category yet.</p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-             
-
-                                    <div
-                          className="relative group"
-                          onMouseEnter={() => setActiveDropdown("sex-education")}
-                          onMouseLeave={() => setActiveDropdown(null)}
-                        >
-                          <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
-                            Sex Education{" "}
-                            <ChevronDown
-                              size={14}
-                              className={
-                                activeDropdown === "sex-education" ? "rotate-180" : ""
-                              }
-                            />
-                          </button>
-                          {activeDropdown === "sex-education" && // ✅ Fixed here
-                            menuCategories.sexeducation.books.length > 0 && (
-                              <div className="absolute lg:-left-90 top-full w-screen lg:max-w-7xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
-                                <div className="mb-4">
-                                  <h3 className="text-lg font-bold text-gray-900">
-                                    {menuCategories.sexeducation.title}
-                                  </h3>
-                                  <p className="text-sm text-gray-600 mt-1">
-                                    {menuCategories.sexeducation.description}
-                                  </p>
-                                </div>
-
-                                <h4 className="font-semibold text-gray-900 mb-3">
-                                  Documents recommended for you
-                                </h4>
-                                <div className="grid grid-cols-3 gap-4">
-                                  {menuCategories.sexeducation.books.map((book) => (
-                                    <Link
-                                      key={book.id}
-                                      href={`/book/preview?id=${book.id}`}
-                                      onClick={() => setActiveDropdown(null)}
-                                      className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                                    >
-                                      <div className="p-3">
-                                        <h5 className="font-semibold text-sm line-clamp-2 mb-1">
-                                          {book.title}
-                                        </h5>
-                                        <p className="text-xs text-gray-600">
-                                          Added by {book.author}
-                                        </p>
-                                      </div>
-                                    </Link>
-                                  ))}
-                                </div>
-                                <Link
-                                  href="/category/sex-education"
-                                  className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
-                                >
-                                  All Sex Education Documents{" "}
-                                  <ChevronRight size={14} className="inline" />
-                                </Link>
+                    {/* Check length inside the dropdown */}
+                    {menuCategories.business.books.length > 0 ? (
+                      <>
+                        <h4 className="font-semibold text-gray-900 mb-3">
+                          Documents recommended for you
+                        </h4>
+                        <div className="grid grid-cols-3 gap-4">
+                          {menuCategories.business.books.map((book) => (
+                            <Link
+                              key={book.id}
+                              href={`/book/preview?id=${book.id}`}
+                              onClick={() => setActiveDropdown(null)}
+                              className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                            >
+                              <div className="p-3">
+                                <h5 className="font-semibold text-sm line-clamp-2 mb-1">
+                                  {book.title}
+                                </h5>
+                                <p className="text-xs text-gray-600">
+                                  Added by {book.author}
+                                </p>
                               </div>
-                            )}
+                            </Link>
+                          ))}
                         </div>
+                        <Link
+                          href="/category/business"
+                          className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
+                        >
+                          All Business Documents{" "}
+                          <ChevronRight size={14} className="inline" />
+                        </Link>
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-500">
+                        No documents available in this category yet.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div
+                className="relative group"
+                onMouseEnter={() => setActiveDropdown("technology")}
+                onMouseLeave={() => setActiveDropdown(null)}
+              >
+                <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
+                  Technology{" "}
+                  <ChevronDown
+                    size={14}
+                    className={
+                      activeDropdown === "technology" ? "rotate-180" : ""
+                    }
+                  />
+                </button>
+
+                {/* Remove the books.length check here */}
+                {activeDropdown === "technology" && (
+                  <div className="absolute lg:-left-60 top-full w-screen lg:max-w-4xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-bold text-gray-900">
+                        {menuCategories.technology.title}
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {menuCategories.technology.description}
+                      </p>
+                    </div>
+
+                    {/* Check length inside the dropdown */}
+                    {menuCategories.technology.books.length > 0 ? (
+                      <>
+                        <h4 className="font-semibold text-gray-900 mb-3">
+                          Documents recommended for you
+                        </h4>
+                        <div className="grid grid-cols-3 gap-4">
+                          {menuCategories.technology.books.map((book) => (
+                            <Link
+                              key={book.id}
+                              href={`/book/preview?id=${book.id}`}
+                              onClick={() => setActiveDropdown(null)}
+                              className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                            >
+                              <div className="p-3">
+                                <h5 className="font-semibold text-sm line-clamp-2 mb-1">
+                                  {book.title}
+                                </h5>
+                                <p className="text-xs text-gray-600">
+                                  Added by {book.author}
+                                </p>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                        <Link
+                          href="/category/technology"
+                          className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
+                        >
+                          All Technology Documents{" "}
+                          <ChevronRight size={14} className="inline" />
+                        </Link>
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-500">
+                        No documents available in this category yet.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div
+                className="relative group"
+                onMouseEnter={() => setActiveDropdown("science")}
+                onMouseLeave={() => setActiveDropdown(null)}
+              >
+                <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
+                  Science{" "}
+                  <ChevronDown
+                    size={14}
+                    className={activeDropdown === "science" ? "rotate-180" : ""}
+                  />
+                </button>
+
+                {/* Remove the books.length check here */}
+                {activeDropdown === "science" && (
+                  <div className="absolute lg:-left-70 top-full w-screen lg:max-w-4xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-bold text-gray-900">
+                        {menuCategories.science.title}
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {menuCategories.science.description}
+                      </p>
+                    </div>
+
+                    {/* Check length inside the dropdown */}
+                    {menuCategories.science.books.length > 0 ? (
+                      <>
+                        <h4 className="font-semibold text-gray-900 mb-3">
+                          Documents recommended for you
+                        </h4>
+                        <div className="grid grid-cols-3 gap-4">
+                          {menuCategories.science.books.map((book) => (
+                            <Link
+                              key={book.id}
+                              href={`/book/preview?id=${book.id}`}
+                              onClick={() => setActiveDropdown(null)}
+                              className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                            >
+                              <div className="p-3">
+                                <h5 className="font-semibold text-sm line-clamp-2 mb-1">
+                                  {book.title}
+                                </h5>
+                                <p className="text-xs text-gray-600">
+                                  Added by {book.author}
+                                </p>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                        <Link
+                          href="/category/science"
+                          className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
+                        >
+                          All Science Documents{" "}
+                          <ChevronRight size={14} className="inline" />
+                        </Link>
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-500">
+                        No documents available in this category yet.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div
+                className="relative group"
+                onMouseEnter={() => setActiveDropdown("sex-education")}
+                onMouseLeave={() => setActiveDropdown(null)}
+              >
+                <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
+                  Sex Education{" "}
+                  <ChevronDown
+                    size={14}
+                    className={
+                      activeDropdown === "sex-education" ? "rotate-180" : ""
+                    }
+                  />
+                </button>
+                {activeDropdown === "sex-education" && // ✅ Fixed here
+                  menuCategories.sexeducation.books.length > 0 && (
+                    <div className="absolute lg:-left-90 top-full w-screen lg:max-w-4xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-bold text-gray-900">
+                          {menuCategories.sexeducation.title}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {menuCategories.sexeducation.description}
+                        </p>
+                      </div>
+
+                      <h4 className="font-semibold text-gray-900 mb-3">
+                        Documents recommended for you
+                      </h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        {menuCategories.sexeducation.books.map((book) => (
+                          <Link
+                            key={book.id}
+                            href={`/book/preview?id=${book.id}`}
+                            onClick={() => setActiveDropdown(null)}
+                            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                          >
+                            <div className="p-3">
+                              <h5 className="font-semibold text-sm line-clamp-2 mb-1">
+                                {book.title}
+                              </h5>
+                              <p className="text-xs text-gray-600">
+                                Added by {book.author}
+                              </p>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                      <Link
+                        href="/category/sex-education"
+                        className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
+                      >
+                        All Sex Education Documents{" "}
+                        <ChevronRight size={14} className="inline" />
+                      </Link>
+                    </div>
+                  )}
+              </div>
 
               <div
                 className="relative group"
@@ -741,7 +753,7 @@ export default function Navbar() {
                 </button>
                 {activeDropdown === "relationship" &&
                   menuCategories.relationship.books.length > 0 && (
-                    <div className="absolute lg:-left-140 top-full w-screen lg:max-w-7xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
+                    <div className="absolute lg:-left-140 top-full w-screen lg:max-w-4xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
                       <div className="mb-4">
                         <h3 className="text-lg font-bold text-gray-900">
                           {menuCategories.relationship.title}
@@ -801,7 +813,7 @@ export default function Navbar() {
                 </button>
                 {activeDropdown === "personal" &&
                   menuCategories.personal.books.length > 0 && (
-                    <div className="absolute lg:-left-150 top-full w-screen lg:max-w-7xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
+                    <div className="absolute lg:-left-150 top-full w-screen lg:max-w-4xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
                       <div className="mb-4">
                         <h3 className="text-lg font-bold text-gray-900">
                           {menuCategories.personal.title}

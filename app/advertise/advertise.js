@@ -1,5 +1,5 @@
 // app/advertise/AdvertiseClient.jsx
-// UPDATED: Uses ImgBB free image hosting (no Firebase Storage needed)
+// UPDATED: Includes Institutional Categories
 
 "use client";
 
@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
 import { addDoc, collection, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { Upload, X, FileText, Image, AlertCircle } from "lucide-react";
+import { Upload, X, FileText, Image, AlertCircle, Building2 } from "lucide-react";
 
 export default function AdvertiseClient() {
     const router = useRouter();
@@ -24,6 +24,7 @@ export default function AdvertiseClient() {
         bookTitle: "",
         author: "",
         category: "",
+        institutionalCategory: "", // NEW FIELD
         price: "",
         format: "PDF",
         pages: "",
@@ -54,12 +55,26 @@ export default function AdvertiseClient() {
         'Travel',
         'Cooking',
         'Religion & Spirituality',
-        'Sex education',
+        'Sex Education',
+        'Social Media'
     ];
 
-    // ImgBB API Key (Get free from https://api.imgbb.com/)
-    // This is just an example - GET YOUR OWN FREE API KEY from imgbb.com
-    const IMGBB_API_KEY = "b1dca0e473db0c33831f460354763f20"; // Replace with your actual key
+    // Institutional categories
+    const institutionalCategories = [
+    { value: '', label: 'None (General Library)' },
+    { value: 'university', label: 'Universities' },
+    { value: 'islamic-institutions', label: 'Islamic Institutions' },
+    { value: 'christian-institutions', label: 'Christian Institutions' },
+    { value: 'jewish-institutions', label: 'Jewish Institutions' },
+    { value: 'secondary-school', label: 'Secondary School' },
+    { value: 'primary-school', label: 'Primary School' },
+    { value: 'exam-prep', label: 'WAEC/NECO/JAMB' },
+    { value: 'polytechnic', label: 'Polytechnics' },
+    { value: 'college-of-education', label: 'Colleges of Education' },
+    { value: 'professional-cert', label: 'Professional Certifications' },
+    { value: 'postgraduate', label: 'Postgraduate Studies' }
+  ];
+
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -109,7 +124,16 @@ export default function AdvertiseClient() {
         setFormData({ ...formData, [name]: value });
     };
 
-   
+    // Extract Google Drive file ID from various URL formats
+    const extractDriveFileId = (url) => {
+        if (!url) return '';
+        const match = url.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})|id=([\w-]{25,})/);
+        if (match) {
+            return match[1] || match[2] || match[3];
+        }
+        return '';
+    };
+
     const handleSubmit = async () => {
         // Validation
         if (!formData.name || !formData.email || !formData.bookTitle ||
@@ -132,12 +156,18 @@ export default function AdvertiseClient() {
             return;
         }
 
-      
         try {
             setLoading(true);
-            // Upload image to ImgBB
-          
-            setUploadProgress("Saving book details...");
+            setUploadProgress("Processing your submission...");
+
+            // Extract Drive file ID for thumbnail generation
+            const driveFileId = extractDriveFileId(formData.driveLink);
+
+            // Create embed URL if it's a Google Drive link
+            let embedUrl = formData.driveLink;
+            if (formData.driveLink.includes('drive.google.com') && driveFileId) {
+                embedUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
+            }
 
             // Prepare seller information
             const displayName = userData?.displayName ||
@@ -157,14 +187,18 @@ export default function AdvertiseClient() {
                 bookTitle: formData.bookTitle,
                 author: formData.author,
                 category: formData.category,
+                institutionalCategory: formData.institutionalCategory || null, // NEW FIELD
                 price: Number(formData.price),
                 format: formData.format,
                 pages: Number(formData.pages),
                 description: formData.description,
                 message: formData.message,
 
-                // Files - Only store the URL (not base64)
+                // Files - Store multiple formats for compatibility
                 pdfLink: formData.driveLink,
+                pdfUrl: formData.driveLink,
+                embedUrl: embedUrl,
+                driveFileId: driveFileId || null, // For thumbnail generation
 
                 // Metadata
                 status: "pending",
@@ -174,12 +208,17 @@ export default function AdvertiseClient() {
                 updatedAt: serverTimestamp(),
             };
 
-            console.log("Submitting book with seller info:", {
+            console.log("Submitting book with data:", {
                 sellerId: bookData.sellerId,
                 sellerEmail: bookData.sellerEmail,
                 sellerName: bookData.sellerName,
+                category: bookData.category,
+                institutionalCategory: bookData.institutionalCategory,
+                driveFileId: bookData.driveFileId,
+                embedUrl: bookData.embedUrl
             });
 
+            setUploadProgress("Saving book details...");
             const docRef = await addDoc(collection(db, "advertMyBook"), bookData);
 
             console.log("Document saved with ID:", docRef.id);
@@ -192,6 +231,7 @@ export default function AdvertiseClient() {
                 bookTitle: "",
                 author: "",
                 category: "",
+                institutionalCategory: "",
                 price: "",
                 format: "PDF",
                 pages: "",
@@ -206,9 +246,7 @@ export default function AdvertiseClient() {
             console.error("Error:", error);
             let errorMessage = "Something went wrong. Please try again.";
 
-            if (error.message.includes('ImgBB') || error.message.includes('Upload')) {
-                errorMessage = "Failed to upload cover image. Please try again or use a smaller image.";
-            } else if (error.code === 'permission-denied') {
+            if (error.code === 'permission-denied') {
                 errorMessage = "Permission denied. Please check your authentication.";
             } else if (error.message) {
                 errorMessage = error.message;
@@ -264,6 +302,7 @@ export default function AdvertiseClient() {
                                 <li>Upload your PDF to <strong>Google Drive</strong> or <strong>Dropbox</strong></li>
                                 <li>Set the file sharing to "Anyone with the link can view"</li>
                                 <li>Copy the sharing link and paste it below</li>
+                                <li>Choose if it belongs to an institutional category (optional)</li>
                             </ol>
                             <p className="mt-2 text-green-700 font-semibold">
                                 💰 You'll earn 80% on every sale (Platform takes 20%)
@@ -350,6 +389,31 @@ export default function AdvertiseClient() {
                             </select>
                         </div>
 
+                        {/* NEW: Institutional Category */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                                <Building2 className="w-4 h-4" />
+                                Institutional Category
+                            </label>
+                            <select
+                                name="institutionalCategory"
+                                value={formData.institutionalCategory}
+                                onChange={handleChange}
+                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
+                            >
+                                {institutionalCategories.map((cat) => (
+                                    <option key={cat.value} value={cat.value}>
+                                        {cat.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Optional: Select if for a specific institution
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Price (₦) *
@@ -365,6 +429,20 @@ export default function AdvertiseClient() {
                             <p className="text-xs text-green-600 mt-1">
                                 You'll earn ₦{formData.price ? (Number(formData.price) * 0.8).toLocaleString() : '0'} per sale
                             </p>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Number of Pages *
+                            </label>
+                            <input
+                                type="number"
+                                name="pages"
+                                placeholder="e.g., 224"
+                                value={formData.pages}
+                                onChange={handleChange}
+                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
+                            />
                         </div>
                     </div>
 
@@ -385,19 +463,23 @@ export default function AdvertiseClient() {
                             </select>
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Number of Pages *
-                            </label>
-                            <input
-                                type="number"
-                                name="pages"
-                                placeholder="e.g., 224"
-                                value={formData.pages}
-                                onChange={handleChange}
-                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
-                            />
-                        </div>
+                        {/* Show extracted Drive File ID if available */}
+                        {formData.driveLink && extractDriveFileId(formData.driveLink) && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Extracted File ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={extractDriveFileId(formData.driveLink)}
+                                    readOnly
+                                    className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg bg-gray-50 text-sm"
+                                />
+                                <p className="text-xs text-green-600 mt-1">
+                                    ✓ File ID extracted for thumbnails
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     <div>
@@ -472,7 +554,7 @@ export default function AdvertiseClient() {
                 </div>
 
                 <p className="text-center text-xs text-gray-500 mt-4">
-                    Images hosted on free ImgBB service • We typically respond within 24-48 hours
+                    We typically respond within 24-48 hours • Thumbnails auto-generated from PDFs
                 </p>
             </div>
         </div>

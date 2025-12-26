@@ -648,7 +648,7 @@ export default function AllBooksPage() {
                                 <p className="text-gray-300 text-sm">
                                     Digital PDF library making knowledge easily accessible to everyone.
                                 </p>
-                            </div>
+                            </div>  
                             <div>
                                 <h4 className="font-bold mb-4">Quick Links</h4>
                                 <ul className="space-y-2 text-sm">

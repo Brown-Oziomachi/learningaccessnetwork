@@ -3,11 +3,13 @@ import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, addDoc, serverTimestamp, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '@/lib/firebaseConfig';
-import { 
-  FileText, Trash2, Check, X, Search, Calendar, User, Shield, 
+import {
+  FileText, Trash2, Check, X, Search, Calendar, User, Shield,
   Eye, Mail, MessageSquare, AlertCircle, TrendingUp,
   DollarSign, Users, BookOpen, ChevronRight, Send, RefreshCw, BarChart3,
-  Settings, Flag, XCircle, AlertTriangle, UserX, Lock
+  Settings, Flag, XCircle, AlertTriangle, UserX, Lock, ExternalLink,
+  Download, Book, Phone, MapPin, CreditCard, Building,
+  Clock
 } from 'lucide-react';
 
 export default function ComprehensiveAdminPanel() {
@@ -22,6 +24,8 @@ export default function ComprehensiveAdminPanel() {
   const [transactions, setTransactions] = useState([]);
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [processingWithdrawal, setProcessingWithdrawal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
@@ -29,8 +33,9 @@ export default function ComprehensiveAdminPanel() {
   const [sending, setSending] = useState(false);
   const [pdfUrl, setPdfUrl] = useState('');
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+  const [pdfViewMode, setPdfViewMode] = useState('embed'); // 'embed' or 'fullscreen'
 
-  const ADMIN_EMAILS = ['browncemmanuel@gmail.com', 'chigozirimv35@gmail.com'];
+  const ADMIN_EMAILS = ['browncemmanuel@gmail.com', 'lanlibrarydocs@gmail.com'];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -74,7 +79,14 @@ export default function ComprehensiveAdminPanel() {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      await Promise.all([fetchAdvertisements(), fetchSupportTickets(), fetchBookReports(), fetchTransactions(), fetchUsers()]);
+      await Promise.all([
+        fetchAdvertisements(),
+        fetchSupportTickets(),
+        fetchBookReports(),
+        fetchTransactions(),
+        fetchUsers(),
+        fetchWithdrawals() // ✅ ADDED
+      ]);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -111,6 +123,20 @@ export default function ComprehensiveAdminPanel() {
     setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
   };
 
+  const fetchWithdrawals = async () => {
+    try {
+      const q = query(collection(db, 'withdrawals'), orderBy('requestedAt', 'desc'));
+      const snapshot = await getDocs(q);
+      setWithdrawals(snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        requestedAtDate: doc.data().requestedAt?.toDate() || new Date()
+      })));
+    } catch (error) {
+      console.error('Error fetching withdrawals:', error);
+    }
+  };
+
   const checkPdfDuplicate = async (pdfUrl) => {
     if (!pdfUrl) return false;
     setCheckingDuplicate(true);
@@ -130,13 +156,13 @@ export default function ComprehensiveAdminPanel() {
     if (status === 'approved') {
       const isDuplicate = await checkPdfDuplicate(ad.pdfUrl);
       if (isDuplicate) {
-        alert('This PDF already exists in the database. Cannot approve duplicate.');
+        alert('⚠️ This PDF already exists in the database. Cannot approve duplicate.');
         return;
       }
     }
     await updateDoc(doc(db, 'advertMyBook', id), { status, reviewedAt: serverTimestamp() });
     setAdvertisements(advertisements.map(a => a.id === id ? { ...a, status } : a));
-    alert(`Book ${status} successfully`);
+    alert(`✅ Book ${status} successfully`);
     setShowModal(false);
   };
 
@@ -172,84 +198,299 @@ export default function ComprehensiveAdminPanel() {
     }
   };
 
- const sendEmailReply = async () => {
-  if (!replyMessage.trim() || !selectedItem) {
-    alert('Please write a message');
-    return;
-  }
-  
-  console.log('=== STARTING REPLY PROCESS ===');
-  console.log('📧 Current user:', user);
-  console.log('📧 User email:', user?.email);
-  console.log('📧 Selected item:', selectedItem);
-  console.log('📧 Active section:', activeSection);
-  
-  setSending(true);
-  
-  try {
-    // Step 1: Prepare reply data
-    const replyData = {
-      to: selectedItem.email || selectedItem.reporterEmail,
-      subject: `Re: ${selectedItem.subject || selectedItem.reason || 'Your inquiry'}`,
-      message: replyMessage,
-      from: user.email,
-      sentAt: serverTimestamp(),
-      originalTicketId: selectedItem.id,
-      type: activeSection
-    };
-    
-    console.log('📝 Reply data prepared:', replyData);
-    
-    // Step 2: Try to save to adminReplies
-    console.log('💾 Attempting to save to adminReplies...');
-    const replyRef = await addDoc(collection(db, 'adminReplies'), replyData);
-    console.log('✅ Reply saved successfully! Doc ID:', replyRef.id);
-    
-    // Step 3: Update the original ticket/report
-    const collectionName = activeSection === 'support' ? 'supportTickets' : 'bookReports';
-    console.log(`📝 Updating ${collectionName} with ID: ${selectedItem.id}`);
-    
-    await updateDoc(doc(db, collectionName, selectedItem.id), {
-      adminResponse: replyMessage,
-      status: 'resolved',
-      resolvedAt: serverTimestamp()
-    });
-    
-    console.log('✅ Status updated successfully!');
-    
-    alert('Reply sent successfully!');
-    setShowModal(false);
-    setReplyMessage('');
-    setSelectedItem(null);
-    
-    // Refresh the appropriate list
-    if (activeSection === 'support') {
-      await fetchSupportTickets();
-    } else {
-      await fetchBookReports();
+  //  FLUTTERWAVE TRANSFER FUNCTION
+  const processFlutterwaveTransfer = async (withdrawal) => {
+    try {
+      setProcessingWithdrawal(true);
+
+      console.log(' Initiating transfer via API route...');
+
+      //  Call our Next.js API route instead of Flutterwave directly
+      const response = await fetch('/api/flutterwave-transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ withdrawal })
+      });
+
+      const result = await response.json();
+
+      console.log(' API response:', result);
+
+      if (result.success) {
+        return {
+          success: true,
+          transferId: result.transferId,
+          reference: result.reference,
+          status: result.status
+        };
+      } else {
+        throw new Error(result.error || 'Transfer failed');
+      }
+
+    } catch (error) {
+      console.error(' Transfer error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to process transfer'
+      };
+    } finally {
+      setProcessingWithdrawal(false);
     }
-    
-    console.log('✅ Data refreshed!');
-    
-  } catch (error) {
-    console.error('❌ ===== ERROR DETAILS =====');
-    console.error('Error object:', error);
-    console.error('Error code:', error.code);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    
-    // Show detailed error message
-    alert(`Failed to send reply: ${error.message}\n\nCheck console for details.`);
-  } finally {
-    setSending(false);
-    console.log('=== REPLY PROCESS ENDED ===');
-  }
-};
+  };
+
+  //  APPROVE WITHDRAWAL FUNCTION
+  const approveWithdrawal = async (withdrawal) => {
+    // ✅ VALIDATION: Check if bank details exist
+    if (!withdrawal.bankDetails) {
+      alert('❌ Error: This withdrawal request is missing bank details.\n\nThis usually happens for old requests created before bank details were added.\n\nPlease ask the seller to submit a new withdrawal request.');
+      return;
+    }
+
+    // ✅ VALIDATION: Check if bank code exists
+    if (!withdrawal.bankDetails.bankCode) {
+      alert('❌ Error: Bank code is missing!\n\nThis withdrawal was created before bank codes were added to the system.\n\nSolution:\n1. Ask the seller to cancel this request\n2. Have them submit a new withdrawal request\n3. The new request will include the bank code');
+      return;
+    }
+
+    // ✅ VALIDATION: Check required fields
+    if (!withdrawal.bankDetails.accountNumber || !withdrawal.bankDetails.accountName) {
+      alert('❌ Error: Incomplete bank details. Account number or name is missing.');
+      return;
+    }
+
+    // Show confirmation with all details
+    const confirmMessage = `
+⚠️ CONFIRM WITHDRAWAL APPROVAL
+
+Amount: ₦${withdrawal.amount.toLocaleString()}
+Seller: ${withdrawal.sellerName}
+
+Bank Details:
+• Bank: ${withdrawal.bankDetails.bankName}
+• Bank Code: ${withdrawal.bankDetails.bankCode}
+• Account: ${withdrawal.bankDetails.accountNumber}
+• Account Name: ${withdrawal.bankDetails.accountName}
+
+This will process the payment via Flutterwave.
+
+Click OK to approve or Cancel to go back.
+  `.trim();
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      setProcessingWithdrawal(true);
+
+      console.log('🔄 Starting withdrawal approval process...');
+      console.log('📋 Withdrawal details:', {
+        id: withdrawal.id,
+        amount: withdrawal.amount,
+        seller: withdrawal.sellerName,
+        bankCode: withdrawal.bankDetails.bankCode,
+        accountNumber: withdrawal.bankDetails.accountNumber
+      });
+
+      // Step 1: Process Flutterwave transfer
+      const transferResult = await processFlutterwaveTransfer(withdrawal);
+
+      console.log('📡 Transfer result:', transferResult);
+
+      if (!transferResult.success) {
+        console.error('❌ Transfer failed:', transferResult);
+
+        // Enhanced error messages
+        let errorMessage = transferResult.error || 'Unknown error occurred';
+        let helpText = '';
+
+        // Specific error guidance
+        if (errorMessage.toLowerCase().includes('insufficient')) {
+          helpText = '\n\n💡 Solution:\n1. Go to dashboard.flutterwave.com\n2. Click "Transfers" in the sidebar\n3. Fund your wallet with at least ₦' + withdrawal.amount.toLocaleString();
+        } else if (errorMessage.toLowerCase().includes('invalid') && errorMessage.toLowerCase().includes('key')) {
+          helpText = '\n\n💡 Solution:\n1. Check your .env.local file\n2. Make sure FLUTTERWAVE_SECRET_KEY starts with FLWSECK-\n3. Copy the SECRET KEY from Flutterwave dashboard\n4. Restart your dev server';
+        } else if (errorMessage.toLowerCase().includes('bank code')) {
+          helpText = '\n\n💡 Solution:\n1. Verify bank code: ' + withdrawal.bankDetails.bankCode + '\n2. Check if this is the correct code for ' + withdrawal.bankDetails.bankName + '\n3. You can find correct codes at https://developer.flutterwave.com/docs/resources/banks';
+        } else if (errorMessage.toLowerCase().includes('account')) {
+          helpText = '\n\n💡 Solution:\n1. Verify account number: ' + withdrawal.bankDetails.accountNumber + '\n2. Confirm it matches ' + withdrawal.bankDetails.bankName + '\n3. Check account name: ' + withdrawal.bankDetails.accountName;
+        } else if (errorMessage.includes('HTML') || errorMessage.includes('JSON')) {
+          helpText = '\n\n💡 Solution:\n1. Your API key is invalid or wrong\n2. Go to https://dashboard.flutterwave.com/settings/apis\n3. Copy your SECRET KEY (starts with FLWSECK-)\n4. Update .env.local\n5. Restart server: npm run dev';
+        }
+
+        alert(`❌ Transfer Failed\n\n${errorMessage}${helpText}`);
+        return;
+      }
+
+      console.log('✅ Transfer successful!');
+
+      // Step 2: Update withdrawal status in Firestore
+      await updateDoc(doc(db, 'withdrawals', withdrawal.id), {
+        status: 'completed',
+        processedAt: serverTimestamp(),
+        flutterwaveTransferId: transferResult.transferId,
+        flutterwaveReference: transferResult.reference,
+        adminNote: 'Approved and processed via Flutterwave',
+        processedBy: user.email
+      });
+
+      console.log('✅ Withdrawal status updated in Firestore');
+
+      // Step 3: Update seller balance
+      const sellerDocRef = doc(db, 'sellers', withdrawal.sellerId);
+      const sellerDoc = await getDoc(sellerDocRef);
+
+      if (sellerDoc.exists()) {
+        const currentBalance = sellerDoc.data().accountBalance || 0;
+        const newBalance = currentBalance - withdrawal.amount;
+
+        await updateDoc(sellerDocRef, {
+          accountBalance: newBalance,
+          totalWithdrawn: (sellerDoc.data().totalWithdrawn || 0) + withdrawal.amount,
+          lastWithdrawalDate: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+
+        console.log('✅ Seller balance updated:', {
+          oldBalance: currentBalance,
+          newBalance: newBalance,
+          withdrawn: withdrawal.amount
+        });
+      }
+
+      // Step 4: Send notification
+      await addDoc(collection(db, 'notifications'), {
+        userId: withdrawal.sellerId,
+        type: 'withdrawal_approved',
+        title: 'Withdrawal Approved ✅',
+        message: `Your withdrawal of ₦${withdrawal.amount.toLocaleString()} has been approved and processed. The funds should arrive in your bank account within 24 hours.\n\nBank: ${withdrawal.bankDetails.bankName}\nAccount: ${withdrawal.bankDetails.accountNumber}\n\nFlutterwave Reference: ${transferResult.reference}`,
+        reference: withdrawal.reference,
+        createdAt: serverTimestamp(),
+        read: false
+      });
+
+      console.log('✅ Notification sent to seller');
+
+      // Success message
+      alert(`✅ Withdrawal Approved Successfully!
+
+        Amount: ₦${withdrawal.amount.toLocaleString()}
+        Seller: ${withdrawal.sellerName}
+        Bank: ${withdrawal.bankDetails.bankName}
+        Account: ${withdrawal.bankDetails.accountNumber}
+
+        Flutterwave Transfer ID: ${transferResult.transferId}
+        Reference: ${transferResult.reference}
+
+        The seller has been notified via email and in-app notification.`);
+
+      // Refresh withdrawal list
+      await fetchWithdrawals();
+
+    } catch (error) {
+      console.error('❌ Unexpected error:', error);
+      alert(`❌ Failed to approve withdrawal\n\nError: ${error.message}\n\nPlease check the console for more details.`);
+    } finally {
+      setProcessingWithdrawal(false);
+    }
+  };
+
+  //  REJECT WITHDRAWAL FUNCTION
+  const rejectWithdrawal = async (withdrawalId, sellerId, amount) => {
+    const reason = prompt('Enter rejection reason (will be shown to seller):');
+
+    if (!reason || reason.trim() === '') {
+      alert('Please provide a rejection reason');
+      return;
+    }
+
+    if (!confirm(`Reject withdrawal of ₦${amount.toLocaleString()}?`)) return;
+
+    try {
+      setProcessingWithdrawal(true);
+
+      await updateDoc(doc(db, 'withdrawals', withdrawalId), {
+        status: 'rejected',
+        processedAt: serverTimestamp(),
+        adminNote: reason,
+        processedBy: user.email
+      });
+
+      // Send notification to seller
+      await addDoc(collection(db, 'notifications'), {
+        userId: sellerId,
+        type: 'withdrawal_rejected',
+        title: 'Withdrawal Request Rejected',
+        message: `Your withdrawal request for ₦${amount.toLocaleString()} was rejected.\n\nReason: ${reason}\n\nPlease contact support if you have questions.`,
+        createdAt: serverTimestamp(),
+        read: false
+      });
+
+      alert(' Withdrawal rejected. The seller has been notified.');
+      await fetchWithdrawals();
+
+    } catch (error) {
+      console.error('Error rejecting withdrawal:', error);
+      alert(` Failed to reject withdrawal: ${error.message}`);
+    } finally {
+      setProcessingWithdrawal(false);
+    }
+  };
+
+  const sendEmailReply = async () => {
+    if (!replyMessage.trim() || !selectedItem) {
+      alert('Please write a message');
+      return;
+    }
+
+    setSending(true);
+
+    try {
+      const replyData = {
+        to: selectedItem.email || selectedItem.reporterEmail,
+        subject: `Re: ${selectedItem.subject || selectedItem.reason || 'Your inquiry'}`,
+        message: replyMessage,
+        from: user.email,
+        sentAt: serverTimestamp(),
+        originalTicketId: selectedItem.id,
+        type: activeSection
+      };
+
+      await addDoc(collection(db, 'adminReplies'), replyData);
+
+      const collectionName = activeSection === 'support' ? 'supportTickets' : 'bookReports';
+
+      await updateDoc(doc(db, collectionName, selectedItem.id), {
+        adminResponse: replyMessage,
+        status: 'resolved',
+        resolvedAt: serverTimestamp()
+      });
+
+      alert('Reply sent successfully!');
+      setShowModal(false);
+      setReplyMessage('');
+      setSelectedItem(null);
+
+      if (activeSection === 'support') {
+        await fetchSupportTickets();
+      } else {
+        await fetchBookReports();
+      }
+
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      alert(`Failed to send reply: ${error.message}`);
+    } finally {
+      setSending(false);
+    }
+  };
 
   const openModal = (type, item) => {
     setModalType(type);
     setSelectedItem(item);
     setShowModal(true);
+    setPdfViewMode('embed');
   };
 
   const closeModal = () => {
@@ -258,6 +499,7 @@ export default function ComprehensiveAdminPanel() {
     setSelectedItem(null);
     setReplyMessage('');
     setPdfUrl('');
+    setPdfViewMode('embed');
   };
 
   const formatDate = (timestamp) => {
@@ -327,7 +569,7 @@ export default function ComprehensiveAdminPanel() {
             <h1 className="text-2xl font-bold">LAN Library Admin Panel</h1>
             <p className="text-sm text-blue-300">{user.email}</p>
           </div>
-          <button onClick={fetchAllData} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
+          <button onClick={fetchAllData} className="flex items-center gap-2 bg-white text-blue-950 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
             <RefreshCw className="w-4 h-4" />
             Refresh
           </button>
@@ -339,6 +581,7 @@ export default function ComprehensiveAdminPanel() {
           {[
             { id: 'overview', icon: BarChart3, label: 'Overview' },
             { id: 'advertisements', icon: BookOpen, label: 'Books', badge: stats.pendingAds },
+            { id: 'withdrawals', icon: Download, label: 'Withdrawals', badge: withdrawals.filter(w => w.status === 'pending').length }, // ✅ ADDED
             { id: 'support', icon: MessageSquare, label: 'Support', badge: stats.openTickets },
             { id: 'reports', icon: Flag, label: 'Reports', badge: stats.pendingReports },
             { id: 'transactions', icon: DollarSign, label: 'Sales' },
@@ -412,28 +655,50 @@ export default function ComprehensiveAdminPanel() {
         {activeSection === 'advertisements' && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-white">Book Advertisements</h2>
-            <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4 text-blue-950">
               <input type="text" placeholder="Search books..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {advertisements.filter(ad => ad.bookTitle?.toLowerCase().includes(searchTerm.toLowerCase())).map((ad) => (
-                <div key={ad.id} className="bg-white rounded-lg shadow-sm p-6">
+                <div key={ad.id} className="bg-white rounded-lg shadow-sm p-6 hover:shadow-lg transition-shadow">
                   <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="font-bold text-gray-900">{ad.bookTitle}</h3>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-gray-900 text-lg mb-1">{ad.bookTitle}</h3>
                       <p className="text-sm text-gray-600">by {ad.author}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(ad.status)}`}>{ad.status}</span>
                   </div>
-                  <div className="space-y-2 mb-4 text-sm">
-                    <p><span className="text-gray-600">Email:</span> {ad.email}</p>
-                    <p><span className="text-gray-600">Price:</span> ₦{ad.price?.toLocaleString()}</p>
-                    <p><span className="text-gray-600">Category:</span> {ad.category}</p>
-                    <p><span className="text-gray-600">Date:</span> {formatDate(ad.createdAt)}</p>
-                    {ad.pdfUrl && <p className="text-xs text-blue-600 truncate">PDF Available</p>}
+
+                  <div className="space-y-2 mb-4 text-sm bg-gray-50 p-3 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-gray-500" />
+                      <span className="text-gray-600 truncate">{ad.sellerEmail}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-gray-500" />
+                      <span className="font-semibold text-green-600">₦{ad.price?.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Book className="w-4 h-4 text-gray-500" />
+                      <span className="text-gray-700 capitalize">{ad.category}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-gray-500" />
+                      <span className="text-gray-500 text-xs">{formatDate(ad.createdAt)}</span>
+                    </div>
+                    {ad.pages && (
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-gray-500" />
+                        <span className="text-gray-700">{ad.pages} pages</span>
+                      </div>
+                    )}
+                    <span className="text-gray-700 capitalize text-xl">{ad.sellerName}</span>
+
                   </div>
-                  <button onClick={() => openModal('advertisement', ad)} className="w-full bg-blue-950 text-white py-2 rounded-lg hover:bg-blue-900 flex items-center justify-center gap-2 mb-2">
-                    <Eye className="w-4 h-4" />View Details & PDF
+
+                  <button onClick={() => openModal('advertisement', ad)} className="w-full bg-blue-950 text-white py-3 rounded-lg hover:bg-blue-900 flex items-center justify-center gap-2 font-semibold transition-colors">
+                    <Eye className="w-5 h-5" />
+                    Review & Approve
                   </button>
                 </div>
               ))}
@@ -539,6 +804,37 @@ export default function ComprehensiveAdminPanel() {
           </div>
         )}
 
+        {activeSection === 'support' && (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-white">Support Tickets</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {supportTickets.map((ticket) => (
+                <div key={ticket.id} className="bg-white rounded-lg shadow-sm p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-bold text-gray-900">{ticket.subject || 'No Subject'}</h3>
+                      <p className="text-sm text-gray-600">{ticket.name}</p>
+                      <p className="text-xs text-gray-500">{ticket.email}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(ticket.status)}`}>{ticket.status}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-blue-950 mb-2">Category: {ticket.category}</p>
+                  <p className="text-sm text-gray-700 mb-4">{ticket.message}</p>
+                  <p className="text-xs text-gray-500 mb-4">{formatDate(ticket.createdAt)}</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => openModal('reply', ticket)} className="flex-1 bg-blue-950 text-white py-2 rounded-lg hover:bg-blue-900 flex items-center justify-center gap-1">
+                      <Mail className="w-4 h-4" />Reply
+                    </button>
+                    <button onClick={() => updateTicketStatus(ticket.id, 'resolved')} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-1">
+                      <Check className="w-4 h-4" />Resolve
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {activeSection === 'reports' && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-white">Book Reports</h2>
@@ -570,11 +866,194 @@ export default function ComprehensiveAdminPanel() {
           </div>
         )}
 
-        {activeSection === 'settings' && (
+        {activeSection === 'withdrawals' && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">Admin Settings</h2>
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <p className="text-gray-600">Admin settings and configuration options coming soon...</p>
+            <h2 className="text-2xl font-bold text-white">Withdrawal Requests</h2>
+
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <Clock className="w-6 h-6 text-yellow-600" />
+                  <p className="text-yellow-600 font-semibold">Pending</p>
+                </div>
+                <p className="text-3xl font-bold text-yellow-900">
+                  {withdrawals.filter(w => w.status === 'pending').length}
+                </p>
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <Check className="w-6 h-6 text-green-600" />
+                  <p className="text-green-600 font-semibold">Completed</p>
+                </div>
+                <p className="text-3xl font-bold text-green-900">
+                  {withdrawals.filter(w => w.status === 'completed').length}
+                </p>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <X className="w-6 h-6 text-red-600" />
+                  <p className="text-red-600 font-semibold">Rejected</p>
+                </div>
+                <p className="text-3xl font-bold text-red-900">
+                  {withdrawals.filter(w => w.status === 'rejected').length}
+                </p>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <DollarSign className="w-6 h-6 text-blue-600" />
+                  <p className="text-blue-600 font-semibold">Total Amount</p>
+                </div>
+                <p className="text-3xl font-bold text-blue-900">
+                  ₦{withdrawals.filter(w => w.status === 'pending').reduce((sum, w) => sum + (w.amount || 0), 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {/* Withdrawal List */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {withdrawals.length === 0 ? (
+                <div className="col-span-2 bg-white rounded-lg shadow-sm p-12 text-center">
+                  <Download className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">No Withdrawal Requests</h3>
+                  <p className="text-gray-600">Withdrawal requests from sellers will appear here</p>
+                </div>
+              ) : (
+                withdrawals.map((withdrawal) => (
+                  <div key={withdrawal.id} className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-yellow-500">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="font-bold text-gray-900 text-lg">{withdrawal.sellerName}</h3>
+                        <p className="text-sm text-gray-600">{withdrawal.sellerEmail}</p>
+                        {withdrawal.sellerPhone && (
+                          <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                            <Phone className="w-3 h-3" />
+                            {withdrawal.sellerPhone}
+                          </p>
+                        )}
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(withdrawal.status)}`}>
+                        {withdrawal.status === 'pending' && '⏳ '}
+                        {withdrawal.status === 'completed' && '✅ '}
+                        {withdrawal.status === 'rejected' && '❌ '}
+                        {withdrawal.status}
+                      </span>
+                    </div>
+
+                    {/* Amount Display */}
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 mb-4 border border-green-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 text-sm font-medium">Withdrawal Amount</span>
+                        <span className="text-3xl font-bold text-green-600">
+                          ₦{withdrawal.amount?.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-2 space-y-1">
+                        <p className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          Requested: {formatDate(withdrawal.requestedAt)}
+                        </p>
+                        <p className="font-mono">Ref: {withdrawal.reference}</p>
+                      </div>
+                    </div>
+
+                    {/* Bank Details */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Building className="w-4 h-4 text-blue-900" />
+                        <p className="text-xs font-semibold text-blue-900">Bank Details</p>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Account Name:</span>
+                          <span className="font-semibold text-gray-900">{withdrawal.bankDetails?.accountName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Account Number:</span>
+                          <span className="font-mono font-semibold text-gray-900">{withdrawal.bankDetails?.accountNumber}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Bank:</span>
+                          <span className="font-semibold text-gray-900">{withdrawal.bankDetails?.bankName}</span>
+                        </div>
+                        {withdrawal.bankDetails?.bankCode && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Bank Code:</span>
+                            <span className="font-mono text-xs text-gray-700">{withdrawal.bankDetails?.bankCode}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons for Pending */}
+                    {withdrawal.status === 'pending' && (
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => approveWithdrawal(withdrawal)}
+                          disabled={processingWithdrawal}
+                          className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold transition-colors"
+                        >
+                          {processingWithdrawal ? (
+                            <>
+                              <div className="animate-spin h-5 w-5 border-b-2 border-white rounded-full"></div>
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-5 h-5" />
+                              Approve & Transfer via Flutterwave
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => rejectWithdrawal(withdrawal.id, withdrawal.sellerId, withdrawal.amount)}
+                          disabled={processingWithdrawal}
+                          className="w-full bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                          Reject Request
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Completed Status */}
+                    {withdrawal.status === 'completed' && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-green-900 font-semibold text-sm mb-2">
+                              ✅ Payment Processed Successfully
+                            </p>
+                            {withdrawal.flutterwaveTransferId && (
+                              <div className="text-xs text-gray-700 space-y-1">
+                                <p>Transfer ID: <span className="font-mono">{withdrawal.flutterwaveTransferId}</span></p>
+                                <p>Processed: {formatDate(withdrawal.processedAt)}</p>
+                                <p>By: {withdrawal.processedBy}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Rejected Status */}
+                    {withdrawal.status === 'rejected' && withdrawal.adminNote && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-red-900 font-semibold text-sm mb-1">Rejection Reason:</p>
+                            <p className="text-red-700 text-xs">{withdrawal.adminNote}</p>
+                            <p className="text-xs text-gray-500 mt-2">Rejected: {formatDate(withdrawal.processedAt)} by {withdrawal.processedBy}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -626,8 +1105,8 @@ export default function ComprehensiveAdminPanel() {
                       <p className="font-semibold text-gray-900">{selectedItem.author}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 mb-1">Email</p>
-                      <p className="font-semibold text-gray-900">{selectedItem.email}</p>
+                      <p className="text-xs text-gray-500 mb-1">Seller Email</p>
+                      <p className="font-semibold text-gray-900">{selectedItem.sellerEmail}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500 mb-1">Price</p>
@@ -636,6 +1115,14 @@ export default function ComprehensiveAdminPanel() {
                     <div>
                       <p className="text-xs text-gray-500 mb-1">Category</p>
                       <p className="font-semibold text-gray-900">{selectedItem.category}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Institutional-Category</p>
+                      <p className="font-semibold text-gray-900">{selectedItem.institutionalCategory}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Seller Name</p>
+                      <p className="font-semibold text-gray-900">{selectedItem.sellerName}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500 mb-1">Status</p>
@@ -653,16 +1140,41 @@ export default function ComprehensiveAdminPanel() {
                     </div>
                   </div>
 
-                  {selectedItem.pdfUrl && (
+                  {(selectedItem.embedUrl || selectedItem.pdfUrl || selectedItem.pdfLink) && (
                     <div className="space-y-3">
+                      {/* Thumbnail Preview */}
+                      {selectedItem.driveFileId && (
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <p className="text-sm font-semibold text-gray-700 mb-2">PDF Thumbnail:</p>
+                          <img
+                            src={`https://drive.google.com/thumbnail?id=${selectedItem.driveFileId}&sz=w400`}
+                            alt="PDF Thumbnail"
+                            className="w-full max-w-md mx-auto rounded-lg shadow-md"
+                            onError={(e) => {
+                              e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* PDF Preview */}
                       <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg">
                         <p className="font-semibold text-blue-950">PDF Preview</p>
-                        <a href={selectedItem.pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm flex items-center gap-1">
+                        <a
+                          href={selectedItem.embedUrl || selectedItem.pdfUrl || selectedItem.pdfLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline text-sm flex items-center gap-1"
+                        >
                           <FileText className="w-4 h-4" />
-                          Open in New Tab
+                          View Full PDF
                         </a>
                       </div>
-                      <iframe src={selectedItem.pdfUrl} className="w-full h-96 border border-gray-300 rounded-lg" title="PDF Preview" />
+                      <iframe
+                        src={selectedItem.embedUrl || selectedItem.pdfUrl || selectedItem.pdfLink}
+                        className="w-full h-96 border border-gray-300 rounded-lg"
+                        title="PDF Preview"
+                      />
                     </div>
                   )}
 
@@ -675,7 +1187,7 @@ export default function ComprehensiveAdminPanel() {
 
                   <div className="flex gap-3">
                     {selectedItem.status !== 'approved' && (
-                      <button onClick={() => updateAdvertisementStatus(selectedItem.id, 'approved', selectedItem)} disabled={checkingDuplicate} className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                      <button onClick={() => updateAdvertisementStatus(selectedItem.id, 'approved', selectedItem)} disabled={checkingDuplicate} className="flex-1 bg-blue-950 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
                         <Check className="w-5 h-5" />
                         Approve Book
                       </button>

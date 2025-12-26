@@ -223,7 +223,7 @@ export default function MyAccount() {
                 <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">
                     <div className="text-red-500 text-6xl mb-4">⚠️</div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Profile</h2>
-                    <p className="text-gray-600 mb-6">{error}</p>
+                    <p className="text-gray-600 mb-6">{error}. It is not your fault, nor our fault. We guess it is network. Please try again later.</p>
                     <div className="flex gap-4 justify-center">
                         <button
                             onClick={() => window.location.reload()}
@@ -354,7 +354,7 @@ export default function MyAccount() {
                         <div className="mt-8">
                             <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
                             <div className="grid sm:grid-cols-2 gap-4">
-                                <Link href="/pdf" className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-600 hover:bg-blue-50 transition-all flex items-center gap-3">
+                                <Link href="/documents" className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-600 hover:bg-blue-50 transition-all flex items-center gap-3">
                                     <Globe className="text-blue-600" size={24} />
                                     <span className="font-semibold">Browse Books</span>
                                 </Link>

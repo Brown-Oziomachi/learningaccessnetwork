@@ -8,6 +8,7 @@ import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc } from 'firebase/firestore';
 import HomeLoading from './loading';
 import MobileCategoriesCarousel from '@/components/MobileCategoriesCarousel';
+import InstitutionalLibraryPage from '@/components/InstitutionalLib';
 
 export default function HomePage() {
     const [user, setUser] = useState(null);
@@ -151,13 +152,40 @@ export default function HomePage() {
             image: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=400',
             description: 'Sexual health, relationships, and wellness'
         },
-         {
+        {
             name: 'Social Media',
             subcategories: 4,
             image: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=400',
             description: 'Growing Your media account, marketing on socia media'
         }
     ];
+
+    const Institutionalcategories = [
+        {
+            name: 'Universities',
+            subcategories: 8,
+            image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400',
+            description: 'Academic resources and learning materials'
+        },
+        {
+            name: 'Secondary School',
+            subcategories: 12,
+            image: 'https://images.unsplash.com/photo-1516397281156-ca07cf9746fc?w=400',
+            description: 'Self-improvement and personal growth'
+        },
+        {
+            name: 'Primary School',
+            subcategories: 12,
+            image: 'https://images.unsplash.com/photo-1516397281156-ca07cf9746fc?w=400',
+            description: 'Self-improvement and personal growth'
+        },
+        {
+            name: 'Weac/Neco Past Questions ',
+            subcategories: 12,
+            image: 'https://images.unsplash.com/photo-1516397281156-ca07cf9746fc?w=400',
+            description: 'Self-improvement and personal growth'
+        },
+    ]
 
     // Check seller status
     const checkSellerStatus = async (userId) => {
@@ -271,7 +299,7 @@ export default function HomePage() {
             <Navbar />
 
             {/* Hero Section */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 py-16">
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 py-16 shadow-2xl">
                 <div className="max-w-7xl mx-auto px-4">
                     <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 mb-6">
                         You've seen it all, now understand it all.
@@ -379,8 +407,10 @@ export default function HomePage() {
                         )}
                     </div>
                 </div>
+                <div>
+                    <InstitutionalLibraryPage />
+                </div>
             </div>
-
             {/* Footer */}
             <footer className="bg-blue-950 text-white py-12">
                 <div className="max-w-7xl mx-auto px-4">
@@ -388,7 +418,7 @@ export default function HomePage() {
                         <div>
                             <div className="flex items-center gap-2 mb-4">
                                 <Globe className="w-8 h-8" />
-                                <h3 className="text-xl font-bold">LAN Library</h3>
+                                <h3 className="text-2xl font-bold">[LAN Library]</h3>
                             </div>
                             <p className="text-gray-400 text-sm">
                                 Digital PDF library making knowledge accessible to everyone.
@@ -398,7 +428,7 @@ export default function HomePage() {
                             <h4 className="font-bold mb-4">Quick Links</h4>
                             <ul className="space-y-2 text-sm">
                                 <li><a href="/about/lan" className="text-gray-400 hover:text-white">About Us</a></li>
-                                <li><a href="/lan/explains/how-it-works" className="text-gray-400 hover:text-white">How It Works</a></li>
+                                <li><a href="/learn/make-money" className="text-gray-400 hover:text-white">How It Works</a></li>
                                 <li><a href="/lan/faqs" className="text-gray-400 hover:text-white">FAQs</a></li>
                             </ul>
                         </div>

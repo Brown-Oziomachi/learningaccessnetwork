@@ -25,6 +25,7 @@ export default function BecomeSeller() {
         email: "",
         phoneNumber: "",
         bankName: "",
+        bankCode: "", // ✅ ADDED
         accountNumber: "",
         accountName: "",
         businessName: "",
@@ -35,27 +36,28 @@ export default function BecomeSeller() {
     const [errors, setErrors] = useState({});
 
     const nigerianBanks = [
-        "Access Bank", "Zenith Bank", "GTBank", "First Bank", "UBA",
-        "Fidelity Bank", "Union Bank", "Sterling Bank", "Stanbic IBTC",
-        "Polaris Bank", "Wema Bank", "Ecobank", "Keystone Bank", "FCMB",
-        "Unity Bank", "Jaiz Bank", "Providus Bank", "Kuda Bank",
-        "Opay", "Moniepoint", "Palmpay"
+        { name: "Access Bank", code: "044" },
+        { name: "Citibank Nigeria", code: "023" },
+        { name: "Ecobank Nigeria", code: "050" },
+        { name: "Fidelity Bank", code: "070" },
+        { name: "First Bank of Nigeria", code: "011" },
+        { name: "First City Monument Bank (FCMB)", code: "214" },
+        { name: "Guaranty Trust Bank (GTBank)", code: "058" },
+        { name: "Heritage Bank", code: "030" },
+        { name: "Keystone Bank", code: "082" },
+        { name: "Polaris Bank", code: "076" },
+        { name: "Providus Bank", code: "101" },
+        { name: "Stanbic IBTC Bank", code: "221" },
+        { name: "Standard Chartered Bank", code: "068" },
+        { name: "Sterling Bank", code: "232" },
+        { name: "Union Bank of Nigeria", code: "032" },
+        { name: "United Bank for Africa (UBA)", code: "033" },
+        { name: "Unity Bank", code: "215" },
+        { name: "Wema Bank", code: "035" },
+        { name: "Zenith Bank", code: "057" }
     ];
 
-      useEffect(() => {
-                    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-                        if (currentUser) {
-                            setUser(currentUser);
-                            await fetchPurchasedBooks(currentUser.uid);
-                        } else {
-                            router.push('/auth/signin');
-                        }
-                    });
-            
-                    return () => unsubscribe();
-         }, [router]);
-        
-    
+    // FIXED: Removed duplicate useEffect, kept only one
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
@@ -179,6 +181,7 @@ export default function BecomeSeller() {
                     booksSold: 0,
                     bankDetails: {
                         bankName: formData.bankName,
+                        bankCode: formData.bankCode, // ✅ ADDED
                         accountNumber: formData.accountNumber,
                         accountName: formData.accountName
                     },
@@ -332,12 +335,21 @@ export default function BecomeSeller() {
                                 </label>
                                 <select
                                     value={formData.bankName}
-                                    onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                                    onChange={(e) => {
+                                        const selectedBankName = e.target.value;
+                                        const selectedBank = nigerianBanks.find(bank => bank.name === selectedBankName);
+                                        setFormData({
+                                            ...formData,
+                                            bankName: selectedBankName,
+                                            bankCode: selectedBank ? selectedBank.code : "" // ✅ AUTO-SET BANK CODE
+                                        });
+                                    }}
                                     className={`w-full border px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.bankName ? 'border-red-500' : 'border-gray-300'}`}
                                 >
                                     <option value="">Select your bank</option>
+                                    {/* FIXED: Use bank.code as key and bank.name as value */}
                                     {nigerianBanks.map(bank => (
-                                        <option key={bank} value={bank}>{bank}</option>
+                                        <option key={bank.code} value={bank.name}>{bank.name}</option>
                                     ))}
                                 </select>
                                 {errors.bankName && (
