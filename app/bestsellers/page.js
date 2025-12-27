@@ -8,11 +8,25 @@ import { auth, db } from "@/lib/firebaseConfig";
 import { booksData } from "@/lib/booksData";
 import Navbar from '@/components/NavBar';
 import Footer from '@/components/FooterComp';
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function BestsellersPage() {
     const router = useRouter();
     const [topSellers, setTopSellers] = useState([]);
     const [loading, setLoading] = useState(true);
+
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                await fetchUserData(currentUser.uid);
+            } else {
+                router.push('/auth/signin');
+            }
+        });
+
+        return () => unsubscribe();
+    }, [router]);
 
     // Fetch top sellers from Firebase
     useEffect(() => {

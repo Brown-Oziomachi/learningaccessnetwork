@@ -141,7 +141,7 @@ export default function MakeMoneyPage() {
             </div>
           </Link>
           <Link href="/become-seller">
-            <button className="text-blue-950 bg-white lg:px-6 lg:py-2 max-md:text-sm max-lg:px-5 rounded-full font-semibold hover:bg-blue-700 transition-colors">
+            <button className="text-blue-950 bg-white lg:px-6 lg:py-2 max-md:text-sm max-lg:px-5 max-lg:py-2 rounded-full font-semibold hover:bg-blue-700 transition-colors">
               BECOME A SELLER
             </button>
           </Link>
@@ -369,22 +369,16 @@ export default function MakeMoneyPage() {
 
       {/* CTA Section */}
       <section className="max-w-7xl mx-auto px-4 py-16 text-center">
-        <h2 className="text-5xl font-bold mb-6">Ready to Start Earning?</h2>
-        <p className="text-gray-400 text-xl mb-8 max-w-2xl mx-auto">
+        <h2 className="text-3xl font-bold mb-6">Ready to Start Earning?</h2>
+        <p className="text-gray-900 text-xl mb-8 max-w-2xl mx-auto">
           Join thousands of sellers who are already making money with their
           knowledge
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <div className="fle flex-col sm:flex-row gap-4 justify-center mx-auto">
           <Link href="/become-seller">
-            <button className="bg-blue-600 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+            <button className="bg-blue-950 text-white lg:px-6 lg:py-2 max-md:text-sm max-lg:px-5 max-lg:py-2 rounded-full font-semibold hover:bg-blue-700 transition-colors">
               BECOME A SELLER
-              <ArrowRight className="w-5 h-5" />
-            </button>
-          </Link>
-          <Link href="/lan/customer-care">
-            <button className="bg-gray-800 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-gray-700 transition-colors border border-gray-700">
-              CONTACT SUPPORT
             </button>
           </Link>
         </div>

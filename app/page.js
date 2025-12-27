@@ -11,6 +11,7 @@ export default function LearningAccessNetwork() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const currentYear = new Date().getFullYear()
 
   const bookImages = [
     '/image1.png',
@@ -117,8 +118,8 @@ export default function LearningAccessNetwork() {
               transition={{ duration: 0.8, delay: 0.2 }}
               className="bg-blue-950/90 backdrop-blur-sm text-white p-6 md:p-8 rounded-lg shadow-2xl"
             >
-              <p className="text-base md:text-lg leading-relaxed">
-                <span className="bg-white text-blue-950 px-2"> Learning Access Network</span> is a digital platform designed to make knowledge easily accessible to everyone.
+              <p className="text-base md:text-lg leading-relaxed">[LAN] 
+                <span className="bg-white text-blue-950 px-2 ml-2">Learning Access Network</span> is a digital platform designed to make knowledge easily accessible to everyone.
                 The website allows users to discover, read, and purchase books across various categories,
                 including education, personal development, business, technology, and more.
               </p>
@@ -163,13 +164,6 @@ export default function LearningAccessNetwork() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
             className='items-center justify-center flex gap-6 mt-5 right-0'>
-            <Link href="/lan/net/help-center">
-              <button
-                className="text-blue-950 hover:underline mb-12"
-              >
-                Help Center?
-              </button>
-            </Link>
             <Link href="/learn/make-money">
               <button
                 className="text-blue-950 hover:underline mb-12"
@@ -181,7 +175,7 @@ export default function LearningAccessNetwork() {
         </footer>
 
         {/* Carousel Indicators */}
-        <div className="fixed bottom-0 right-6 flex gap-5 z-20">
+        <div className="fixed bottom-0 right-6 flex gap-5 z-20 -pt-5">
           {bookImages.map((_, index) => (
             <button
               key={index}
@@ -195,6 +189,34 @@ export default function LearningAccessNetwork() {
           ))}
         </div>
       </div>
+       <div className="border-t border-gray-200 pt-7 pb-5 mx-auto ">
+                <div className=" flex-col md:flex-row max-md:grid justify-between items-center gap-4 text-sm text-gray-600">
+                  <p className="text-center md:text-left">
+                    &copy; {currentYear} Learning Access Network (LAN Library). <br className="lg:hidden"/> All
+                    rights reserved.
+                  </p>
+                  <div className="flex mx-auto gap-6 ">
+                    <Link
+                      href="/privacy-policy"
+                      className="hover:text-blue-950 transition-colors"
+                    >
+                      Privacy Policy
+                    </Link>
+                    <Link
+                      href="/terms-of-service"
+                      className="hover:text-blue-950 transition-colors"
+                    >
+                      Terms of Service
+                    </Link>
+                    <Link
+                      href="/cookie-policy"
+                      className="hover:text-blue-950 transition-colors"
+                    >
+                      Cookie Policy
+                    </Link>
+                  </div>
+                </div>
+              </div>
     </div>
   );
 }
