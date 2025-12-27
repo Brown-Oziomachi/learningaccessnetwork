@@ -31,11 +31,19 @@ export default function ForgotPasswordPage() {
         setError('');
 
         try {
+            console.log('🔐 Attempting password reset for:', email);
+            console.log('🌍 Current origin:', window.location.origin);
+            
             const result = await resetPassword(email.toLowerCase().trim());
 
+            console.log('📧 Reset password result:', result);
+
             if (result.success) {
+                console.log('✅ Password reset email sent successfully');
                 setSuccess(true);
             } else {
+                console.error('❌ Password reset failed:', result.error);
+                
                 // Handle specific Firebase errors
                 if (result.error?.code === 'auth/user-not-found') {
                     setError('No account found with this email address. Please check and try again.');
@@ -43,13 +51,19 @@ export default function ForgotPasswordPage() {
                     setError('Invalid email address format.');
                 } else if (result.error?.code === 'auth/too-many-requests') {
                     setError('Too many attempts. Please try again later.');
+                } else if (result.error?.code === 'auth/unauthorized-continue-uri') {
+                    setError('Configuration error. Please contact support.');
+                    console.error('⚠️ Unauthorized domain. Check Firebase Authorized Domains settings.');
+                } else if (result.error?.code === 'auth/invalid-continue-uri') {
+                    setError('Configuration error. Please contact support.');
+                    console.error('⚠️ Invalid continue URL. Check Firebase settings.');
                 } else {
-                    setError('Failed to send reset email. Please try again.');
+                    setError(`Failed to send reset email: ${result.error?.message || 'Unknown error'}`);
                 }
             }
         } catch (err) {
-            console.error('Password reset error:', err);
-            setError('An unexpected error occurred. Please try again.');
+            console.error('💥 Unexpected error during password reset:', err);
+            setError('An unexpected error occurred. Please try again or contact support.');
         } finally {
             setLoading(false);
         }

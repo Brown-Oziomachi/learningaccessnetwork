@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import Navbar from '@/components/NavBar';
 
 export default function BecomeSeller() {
     const [user, setUser] = useState(null);

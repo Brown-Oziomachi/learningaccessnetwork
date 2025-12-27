@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { onAuthStateChanged} from 'firebase/auth';
 import { auth } from "@/lib/firebaseConfig";
 import { useRouter } from 'next/navigation';
+import Navbar from '@/components/NavBar';
+import Footer from '@/components/FooterComp';
 
 export default function AboutPage() {
         const router = useRouter();
@@ -165,24 +167,20 @@ export default function AboutPage() {
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen">
             {/* Hero Section */}
+            <Navbar />
             <div
-                className="relative bg-blue-950 text-white py-24"
-                style={{
-                    backgroundImage: 'url(https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1920&q=80)',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    backgroundBlendMode: 'overlay'
-                }}
+                className="relative text-blue-950  py-24"
+               
             >
-                <div className="absolute inset-0 bg-blue-950/90"></div>
+                <div className="absolute inset-0 text-blue-950"></div>
                 <div className="max-w-7xl mx-auto px-4 relative z-10">
                     <div className="max-w-3xl">
                         <h1 className="text-5xl md:text-6xl font-bold mb-6">
                             Empowering Minds Through Digital Learning
                         </h1>
-                        <p className="text-xl text-blue-100 leading-relaxed">
+                        <p className="text-xl text-blue-950 leading-relaxed">
                             Learning Access Network (LAN) is revolutionizing how people access knowledge by providing a comprehensive digital library of high-quality educational content to learners worldwide.
                         </p>
                     </div>
@@ -323,6 +321,7 @@ export default function AboutPage() {
                     </div>
                 </div>
             </div>
+            <Footer />
         </div>
     );
 }

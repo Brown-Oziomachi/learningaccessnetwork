@@ -26,8 +26,7 @@ export default function Footer() {
           {/* Company Info */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <Globe className="w-8 h-8 text-blue-950" />
-              <h3 className="text-2xl font-bold text-blue-950">
+              <h3 className="text-3xl font-bold text-blue-950">
                 [LAN Library]
               </h3>
             </div>
@@ -54,6 +53,13 @@ export default function Footer() {
                 >
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   <span>About Us</span>
+                </Link>
+                <Link
+                  href="/contact/lan/4/enquiry"
+                  className="text-gray-600 hover:text-blue-950 mt-2 transition-colors flex items-center gap-2 group"
+                >
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <span>Contact Us</span>
                 </Link>
               </li>
               <li>

@@ -13,6 +13,7 @@ import { auth, db } from "@/lib/firebaseConfig";
 import { booksData } from "@/lib/booksData";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import Navbar from '@/components/NavBar';
+import Footer from '@/components/FooterComp';
 
 export default function AllBooksPage() {
     const router = useRouter();
@@ -637,50 +638,7 @@ export default function AllBooksPage() {
                 </main>
 
                 {/* Footer */}
-                <footer className="bg-blue-950 text-white mt-16">
-                    <div className="max-w-7xl mx-auto px-4 py-12">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                            <div>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Globe className="w-8 h-8" />
-                                    <h3 className="text-xl font-bold">LAN Library</h3>
-                                </div>
-                                <p className="text-gray-300 text-sm">
-                                    Digital PDF library making knowledge easily accessible to everyone.
-                                </p>
-                            </div>  
-                            <div>
-                                <h4 className="font-bold mb-4">Quick Links</h4>
-                                <ul className="space-y-2 text-sm">
-                                    <li><Link href="/about/lan" className="text-gray-300 hover:text-white">About Us</Link></li>
-                                    <li><Link href="lan/explains/how-it-works" className="text-gray-300 hover:text-white">How It Works</Link></li>
-                                    <li><Link href="/lan/faqs" className="text-gray-300 hover:text-white">FAQs</Link></li>
-                                    <li><Link href="/contact/lan/4/enquiry" className="text-gray-300 hover:text-white">Contact</Link></li>
-                                </ul>
-                            </div>
-                            <div>
-                                <h4 className="font-bold mb-4">Categories</h4>
-                                <ul className="space-y-2 text-sm">
-                                    <li><Link href="/category/education" className="text-gray-300 hover:text-white">Education</Link></li>
-                                    <li><Link href="/category/business" className="text-gray-300 hover:text-white">Business</Link></li>
-                                    <li><Link href="/category/technology" className="text-gray-300 hover:text-white">Technology</Link></li>
-                                    <li><Link href="/pdf" className="text-gray-300 hover:text-white">All Books</Link></li>
-                                </ul>
-                            </div>
-                            <div>
-                                <h4 className="font-bold mb-4">Customer Service</h4>
-                                <ul className="space-y-2 text-sm">
-                                    <li><Link href="/my-account" className="text-gray-300 hover:text-white">My Account</Link></li>
-                                    <li><Link href="/my-books" className="text-gray-300 hover:text-white">My Books</Link></li>
-                                    <li><Link href="lan/net/help-center" className="text-gray-300 hover:text-white">Help Center</Link></li>
-                                </ul>
-                            </div>
-                        </div>
-                        <div className="border-t border-blue-800 mt-8 pt-8 text-center text-sm text-gray-300">
-                            <p>&copy; 2025 Learning Access Network. All rights reserved.</p>
-                        </div>
-                    </div>
-                </footer>
+               <Footer />
             </div>
         </>
     );

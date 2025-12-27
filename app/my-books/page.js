@@ -204,42 +204,55 @@ export default function MyBooksPage() {
         return null;
     };
 
-    const handleOpenBook = async (book) => {
-        setLoadingPdf(true);
-        setSelectedBook(book);
+   const handleOpenBook = async (book) => {
+    setLoadingPdf(true);
+    setSelectedBook(book);
 
-        let url = null;
-        let fileId = null;
+    let url = null;
+    let fileId = null;
 
-        console.log("Opening book:", book);
+    console.log("Opening book:", book);
+    console.log("Book image:", book.image);
+    console.log("Book coverImage:", book.coverImage);
 
-        // Try embedUrl first (best for viewing)
-        if (book.embedUrl) {
-            url = book.embedUrl;
-        }
-        // Try to get file ID from various sources
-        else if (book.driveFileId) {
-            fileId = book.driveFileId;
-        } else if (book.pdfUrl) {
-            fileId = extractFileId(book.pdfUrl);
-        } else if (book.pdfLink) {
-            fileId = extractFileId(book.pdfLink);
-        } else if (book.previewUrl) {
-            fileId = extractFileId(book.previewUrl);
-        }
+    // Try embedUrl first (best for viewing)
+    if (book.embedUrl) {
+        url = book.embedUrl;
+        console.log("Using embedUrl:", url);
+    }
+    // Try to get file ID from various sources
+    else if (book.driveFileId) {
+        fileId = book.driveFileId;
+        console.log("Using driveFileId:", fileId);
+    } else if (book.pdfUrl) {
+        fileId = extractFileId(book.pdfUrl);
+        console.log("Extracted from pdfUrl:", fileId);
+    } else if (book.pdfLink) {
+        fileId = extractFileId(book.pdfLink);
+        console.log("Extracted from pdfLink:", fileId);
+    } else if (book.previewUrl) {
+        fileId = extractFileId(book.previewUrl);
+        console.log("Extracted from previewUrl:", fileId);
+    }
 
-        // Build the embed URL if we have a file ID
-        if (!url && fileId) {
-            url = `https://drive.google.com/file/d/${fileId}/preview`;
-        }
+    // Build the embed URL if we have a file ID
+    if (!url && fileId) {
+        url = `https://drive.google.com/file/d/${fileId}/preview`;
+        console.log("Built embed URL:", url);
+    }
 
-        console.log("PDF URL:", url);
-        setPdfUrl(url);
-        setLoadingPdf(false);
-        setShowOverview(false);
-        setShowRelatedModal(false);
-    };
+    // If still no URL, try direct pdfUrl
+    if (!url && book.pdfUrl) {
+        url = book.pdfUrl;
+        console.log("Using direct pdfUrl:", url);
+    }
 
+    console.log("Final PDF URL:", url);
+    setPdfUrl(url);
+    setLoadingPdf(false);
+    setShowOverview(false);
+    setShowRelatedModal(false);
+};
     const getRelatedBooks = (book) => {
         return booksData.filter(b =>
             b.category === book.category &&
@@ -559,19 +572,19 @@ export default function MyBooksPage() {
                         </Link>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {purchasedBooks.map((book, index) => (
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">                        
+                            {purchasedBooks.map((book, index) => (
                             <div
                                 key={book.id || book.transactionId || index}
                                 className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
                             >
                                 <div className="relative">
-                                    <img
+                                        <img
                                         src={book.image || book.coverImage || '/api/placeholder/400/320'}
                                         alt={book.title}
-                                        className="w-full h-64 object-cover"
+                                        className="w-full h-40 md:h-64 object-cover"
                                         onError={(e) => {
-                                            e.target.src = '/api/placeholder/400/320';
+                                            e.target.src = '/lan-logo.png';
                                         }}
                                     />
                                     <span className="absolute top-3 right-3 bg-blue-950 text-white px-3 py-1 rounded-full text-xs font-bold">
@@ -579,13 +592,12 @@ export default function MyBooksPage() {
                                     </span>
                                 </div>
 
-                                <div className="p-6">
-                                    <h3 className="font-bold text-lg text-gray-900 mb-2 line-clamp-2">
-                                        {book.title}
-                                    </h3>
-                                    <p className="text-sm text-gray-600 mb-4">{book.author}</p>
-
-                                    <div className="space-y-2 mb-4 text-sm">
+                                        <div className="p-3 md:p-6">                                        
+                                            <h3 className="font-bold text-sm md:text-lg text-gray-900 mb-2 line-clamp-2">  
+                                        <p className="text-xs md:text-sm text-gray-600  md:mb-4">{book.title}</p>
+                                  </h3>
+                                        <p className="text-xs md:text-sm text-gray-600 mb-2 md:mb-4">{book.author}</p>
+                                        <div className="hidden md:block space-y-2 mb-4 text-sm">  
                                         <div className="flex items-center gap-2 text-gray-600">
                                             <Calendar size={16} />
                                             <span>Purchased: {formatDate(book.purchaseDate)}</span>
@@ -601,26 +613,27 @@ export default function MyBooksPage() {
                                     </div>
 
                                     <div className="flex gap-2">
-                                        <button
-                                            onClick={() => handleOpenBook(book)}
-                                            className="flex-1 bg-blue-950 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors flex items-center justify-center gap-2 font-semibold"
-                                        >
-                                            <ExternalLink size={18} />
-                                            Open Book
-                                        </button>
-                                        <button
-                                            onClick={() => handleDownload(book)}
-                                            className="bg-white border-2 border-blue-950 text-blue-950 px-4 py-3 rounded-lg hover:bg-blue-950 hover:text-white transition-colors"
-                                        >
-                                            <Download size={18} />
-                                        </button>
+                                       <button
+                                        onClick={() => handleOpenBook(book)}
+                                        className="flex-1 bg-blue-950 text-white py-2 md:py-3 rounded-lg hover:bg-blue-900 transition-colors flex items-center justify-center gap-2 font-semibold text-xs md:text-base"
+                                    >
+                                        <ExternalLink className="w-4 h-4 md:w-5 md:h-5" />
+                                        <span className="hidden md:inline">Open Book</span>
+                                        <span className="md:hidden">Open</span>
+                                    </button>
+                                     <button
+                                        onClick={() => handleDownload(book)}
+                                        className="bg-white border-2 border-blue-950 text-blue-950 px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-blue-950 hover:text-white transition-colors"
+                                    >
+                                        <Download className="w-4 h-4 md:w-5 md:h-5" />
+                                    </button>
                                     </div>
 
-                                    {book.transactionId && (
-                                        <p className="text-xs text-gray-500 text-center mt-3">
-                                            Transaction ID: {book.transactionId}
-                                        </p>
-                                    )}
+                                   {book.transactionId && (
+                                    <p className="hidden md:block text-xs text-gray-500 text-center mt-3">
+                                        Transaction ID: {book.transactionId}
+                                    </p>
+                                )}
                                 </div>
                             </div>
                         ))}

@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Search, Globe, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
+import Navbar from '@/components/NavBar';
+import Footer from '@/components/FooterComp';
 
 export default function FAQPage() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -119,44 +121,17 @@ export default function FAQPage() {
     return (
         <div className="min-h-screen bg-white">
             {/* Header */}
-            <header className="bg-blue-950 text-white shadow-lg">
-                <div className="max-w-7xl mx-auto px-4 py-4">
-                    <div className="flex items-center justify-between">
-                        <Link href="/" className="flex items-center gap-2">
-                            <Globe className="w-8 h-8 text-white" />
-                            <h1 className="text-xl md:text-2xl font-bold">
-                                LEARNING <span className="text-blue-400">ACCESS NETWORK</span>
-                            </h1>
-                        </Link>
-                        <Link href="/" className="text-blue-400 hover:text-white transition-colors">
-                            Back to Home
-                        </Link>
-                    </div>
-                </div>
-            </header>
-
+                <Navbar />
             {/* Hero Section */}
-            <div className="bg-gradient-to-br from-blue-950 to-blue-950 text-white py-16">
+            <div className=" text-blue-950 py-16">
                 <div className="max-w-4xl mx-auto px-4 text-center">
                     <HelpCircle className="w-16 h-16 mx-auto mb-4" />
                     <h1 className="text-4xl md:text-5xl font-bold mb-4">
                         Frequently Asked Questions
                     </h1>
-                    <p className="text-xl text-blue-200 mb-8">
+                    <p className="text-xl text-blue-950 mb-8">
                         Find answers to common questions about Learning Access Network
                     </p>
-
-                    {/* Search Bar */}
-                    <div className="relative max-w-2xl mx-auto">
-                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                        <input
-                            type="text"
-                            placeholder="Search for answers..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-12 pr-4 py-4 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        />
-                    </div>
                 </div>
             </div>
 
@@ -258,49 +233,7 @@ export default function FAQPage() {
             </main>
 
             {/* Footer */}
-            <footer className="bg-blue-950 text-white mt-16">
-                <div className="max-w-7xl mx-auto px-4 py-12">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                        <div>
-                            <div className="flex items-center gap-2 mb-4">
-                                <Globe className="w-8 h-8" />
-                                <h3 className="text-xl font-bold">LEARNING ACCESS NETWORK</h3>
-                            </div>
-                            <p className="text-gray-300 text-sm">
-                                Digital PDF library making knowledge easily accessible to everyone.
-                            </p>
-                        </div>
-                        <div>
-                            <h4 className="font-bold mb-4">Quick Links</h4>
-                            <ul className="space-y-2 text-sm">
-                                <li><Link href="/about/lan" className="text-gray-300 hover:text-white">About Us</Link></li>
-                                <li><Link href="/lan/explains/how-it-works" className="text-gray-300 hover:text-white">How It Works</Link></li>
-                                <li><Link href="/lan/faqs" className="text-gray-300 hover:text-white">FAQs</Link></li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-bold mb-4">Categories</h4>
-                            <ul className="space-y-2 text-sm">
-                                <li><Link href="/category/education" className="text-gray-300 hover:text-white">Education</Link></li>
-                                <li><Link href="/category/business" className="text-gray-300 hover:text-white">Business</Link></li>
-                                <li><Link href="/category/technology" className="text-gray-300 hover:text-white">Technology</Link></li>
-                                <li><Link href="/category/personal-development" className="text-gray-300 hover:text-white">Personal Development</Link></li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-bold mb-4">Support</h4>
-                            <ul className="space-y-2 text-sm">
-                                <li><Link href="/lan/net/help-center" className="text-gray-300 hover:text-white">Help Center</Link></li>
-                                <li><Link href="/contact/lan/4/enquiry" className="text-gray-300 hover:text-white">Contact Us</Link></li>
-                                <li><Link href="/lan/faqs" className="text-gray-300 hover:text-white">FAQs</Link></li>
-                            </ul>
-                        </div>
-                    </div>
-                    <div className="border-t border-blue-800 mt-8 pt-8 text-center text-sm text-gray-300">
-                        <p>&copy; 2025 Learning Access Network. All rights reserved.</p>
-                    </div>
-                </div>
-            </footer>
+                <Footer />
         </div>
     );
 }
