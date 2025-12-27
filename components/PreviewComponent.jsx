@@ -744,7 +744,7 @@ useEffect(() => {
                 <img
                   src={getThumbnailUrl(book)}
                   alt={"Cover of " + book.title}
-                  className="w-full h-auto rounded-lg shadow-md object-cover border border-gray-200"
+                  className="w-full h-auto rounded-lg shadow-md object-cover border border-gray-200 p-5.5"
                   onError={(e) => {
                     e.target.src =
                       "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
@@ -759,7 +759,7 @@ useEffect(() => {
 
               <div className="mb-6">
                 <p className="text-sm text-gray-500">Uploaded by</p>
-                <p className="font-semibold text-gray-900">{book.author}</p>
+                <p className="font-semibold text-gray-900">{book.sellerName}</p>
               </div>
 
               {isPurchased ? (
@@ -1009,37 +1009,79 @@ useEffect(() => {
         </div>
 
         {/* Related Books */}
-      <div className="mt-12">
+     <div className="mt-12">
   <h3 className="text-2xl font-bold text-gray-900 mb-6">
     You might also like
   </h3>
-  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 text-blue-950">
+  
+  {/* Mobile/Tablet: Horizontal Scroll */}
+  <div className="md:hidden">
+    <div className="overflow-x-auto scrollbar-hide">
+      <div className="flex gap-4 pb-4">
+        {(allBooks.length > 0 ? allBooks : booksData)
+          .filter(relatedBook => relatedBook.id !== bookId)
+          .slice(0, 8)
+          .map((relatedBook) => (
+            <Link
+              key={relatedBook.id}
+              href={`/book/preview?id=${relatedBook.id}`}
+              className="flex-none w-[200px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-xl transition-shadow"
+            >
+              <div className="relative bg-gray-50 p-3">
+                <img
+                  src={getThumbnailUrl(relatedBook)}
+                  alt={relatedBook.title}
+                  className="w-full h-[240px] object-cover rounded p-8.5"
+                  onError={(e) => {
+                    e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+                  }}
+                  loading="lazy"
+                />
+                <span className="absolute top-5 left-5 bg-black text-white px-2 py-1 rounded text-xs font-bold">PDF</span>
+              </div>
+              <div className="p-4">
+                <h4 className="font-bold text-sm text-gray-900 mb-2 line-clamp-2 hover:text-blue-600">
+                  {relatedBook.title}
+                </h4>
+                <p className="text-gray-500 text-xs mb-2">By: {relatedBook.sellerName}</p>
+                <p className="text-blue-950 font-bold text-sm">
+                  ₦{relatedBook.price?.toLocaleString()}
+                </p>
+              </div>
+            </Link>
+          ))}
+      </div>
+    </div>
+  </div>
+
+  {/* Desktop: Grid */}
+  <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-4 gap-4">
     {(allBooks.length > 0 ? allBooks : booksData)
-      .filter(relatedBook => relatedBook.id !== bookId) // Don't show current book
+      .filter(relatedBook => relatedBook.id !== bookId)
       .slice(0, 8)
       .map((relatedBook) => (
         <Link
           key={relatedBook.id}
           href={`/book/preview?id=${relatedBook.id}`}
-          className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+          className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-xl transition-shadow"
         >
-          <img
-            src={getThumbnailUrl(relatedBook)}
-            alt={relatedBook.title}
-            className="w-full h-48 object-cover bg-gray-200"
-            onError={(e) => {
-              e.target.src =
-                "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-            }}
-            loading="lazy"
-          />
-          <div className="p-3">
-            <h4 className="font-semibold text-sm line-clamp-2 mb-1">
+          <div className="relative bg-gray-50 p-3">
+            <img
+              src={getThumbnailUrl(relatedBook)}
+              alt={relatedBook.title}
+              className="w-full h-[280px] object-cover rounded p-10.5"
+              onError={(e) => {
+                e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+              }}
+              loading="lazy"
+            />
+            <span className="absolute top-5 left-5 bg-black text-white px-2 py-1 rounded text-xs font-bold">PDF</span>
+          </div>
+          <div className="p-4">
+            <h4 className="font-bold text-sm text-gray-900 mb-2 line-clamp-2 hover:text-blue-600">
               {relatedBook.title}
             </h4>
-            <p className="text-xs text-gray-500 mb-1">
-              By: {relatedBook.author}
-            </p>
+            <p className="text-gray-500 text-xs mb-2">By: {relatedBook.author}</p>
             <p className="text-blue-950 font-bold text-sm">
               ₦{relatedBook.price?.toLocaleString()}
             </p>
@@ -1048,7 +1090,7 @@ useEffect(() => {
       ))}
   </div>
 </div>
-      </div>
+      </div> 
 
       {/* Options Modal */}
       {showOptionsModal && (

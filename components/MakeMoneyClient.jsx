@@ -26,8 +26,7 @@ export default function MakeMoneyPage() {
       title: "Getting Started with LAN Library",
       description:
         "Learn the basics of setting up your account and understanding the platform",
-      thumbnail:
-        "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800",
+      thumbnail: "/make.png",
       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ", // Replace with actual video URL
       duration: "5:30",
     },
@@ -36,8 +35,7 @@ export default function MakeMoneyPage() {
       title: "How to Upload and Sell Books",
       description:
         "Step-by-step guide to uploading your books and setting prices",
-      thumbnail:
-        "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=800",
+      thumbnail: "/make.png",
       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
       duration: "8:45",
     },
@@ -46,8 +44,7 @@ export default function MakeMoneyPage() {
       title: "Pricing Strategies That Work",
       description:
         "Discover the best pricing strategies to maximize your earnings",
-      thumbnail:
-        "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=800",
+      thumbnail: "/make.png",
       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
       duration: "6:20",
     },
@@ -55,8 +52,7 @@ export default function MakeMoneyPage() {
       id: 4,
       title: "Marketing Your Books Effectively",
       description: "Learn how to promote your books and reach more buyers",
-      thumbnail:
-        "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800",
+      thumbnail: "/make.png",
       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
       duration: "10:15",
     },
@@ -64,8 +60,7 @@ export default function MakeMoneyPage() {
       id: 5,
       title: "Understanding Your Earnings",
       description: "How the payment system works and when you get paid",
-      thumbnail:
-        "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800",
+      thumbnail: "/make.png",
       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
       duration: "7:10",
     },
@@ -73,8 +68,7 @@ export default function MakeMoneyPage() {
       id: 6,
       title: "Success Stories & Case Studies",
       description: "Real sellers sharing their success stories and tips",
-      thumbnail:
-        "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800",
+      thumbnail: "/make.png",
       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
       duration: "12:30",
     },
@@ -165,8 +159,8 @@ export default function MakeMoneyPage() {
           Selling Books
         </h1>
         <p className="text-gray-900 text-xl mb-8 max-w-2xl mx-auto">
-          Learn how to turn your knowledge into income. Get the latest updates
-          from successful sellers and start earning today.
+          Learn how to write and publish your first book with our comprehensive guide.
+          From developing ideas to marketing your finished work, we cover every step of the process
         </p>
       </section>
 

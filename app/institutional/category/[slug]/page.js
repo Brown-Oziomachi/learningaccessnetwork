@@ -6,6 +6,7 @@ import { db, auth } from '@/lib/firebaseConfig';
 import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import Navbar from '@/components/NavBar';
+import Footer from '@/components/FooterComp';
 
 export default function InstitutionalCategoryPage() {
     const params = useParams();
@@ -311,36 +312,29 @@ export default function InstitutionalCategoryPage() {
         <div className="min-h-screen ">
             {/* Hero Section */}
             <Navbar />
-            <div className={`relative bg-blue-950 text-white overflow-hidden`}>
-                <div className="absolute inset-0 opacity-20">
-                    <div className="absolute top-0 left-0 w-96 h-96 lg:bg-white rounded-full blur-3xl lg:animate-pulse "></div>
-                    <div className="absolute bottom-0 right-0 w-96 h-96 lg:bg-white rounded-full blur-3xl lg:animate-pulse delay-700"></div>
-                </div>
-
+            <div className={`relative  text-blue-950 text-center overflow-hidden`}>
+              
                 <div className="relative max-w-7xl mx-auto px-4 py-16">
                     {/* Back Button */}
                     <button
                         onClick={() => router.back()}
-                        className="flex items-center gap-2 text-white/90 hover:text-white mb-6 transition-colors"
+                        className="flex items-center gap-2 text-blue-95 hover:text-white mb-6 transition-colors"
                     >
                         <ArrowLeft className="w-5 h-5" />
                         <span>Back to Institutional Library</span>
                     </button>
 
                     {/* Category Info */}
-                    <div className="flex items-start gap-6 mb-8">
-                        <div className="bg-white/20 backdrop-blur-sm p-6 rounded-2xl">
-                            <IconComponent className="w-16 h-16" strokeWidth={1.5} />
-                        </div>
+                    <div className="flex items-start gap-6 mb-8 text-950"> 
                         <div className="flex-1">
                             <h1 className="text-4xl md:text-6xl font-black mb-4">
                                 {currentCategory.name}
                             </h1>
-                            <p className="text-xl text-white/90 max-w-3xl mb-6">
+                            <p className="text-xl text-blue-950 text-center mb-6">
                                 {currentCategory.description}
                             </p>
-                            <div className="flex items-center gap-6 text-sm">
-                                <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-6 text-sm justify-center">
+                                <div className="flex">
                                     <BookOpen className="w-5 h-5" />
                                     <span>{displayBooks.length} Documents Available</span>
                                 </div>
@@ -353,7 +347,7 @@ export default function InstitutionalCategoryPage() {
                     </div>
 
                     {/* Search Bar */}
-                    <div className="max-w-2xl relative">
+                    <div className="max-w-2xl relative mx-auto">
                         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                         <input
                             type="text"
@@ -381,7 +375,7 @@ export default function InstitutionalCategoryPage() {
                         <select
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value)}
-                            className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                            className="border border-gray-300 text-blue-950 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                         >
                             <option value="newest">Newest First</option>
                             <option value="price-low">Price: Low to High</option>
@@ -441,18 +435,6 @@ export default function InstitutionalCategoryPage() {
                                     </h3>
                                     <p className="text-gray-600 text-xs mb-2">by {book.author}</p>
 
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-blue-950 font-bold text-lg">
-                                            ₦{book.price?.toLocaleString()}
-                                        </span>
-                                        {book.rating && (
-                                            <div className="flex items-center gap-1">
-                                                <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                                                <span className="text-xs text-gray-600">{book.rating}</span>
-                                            </div>
-                                        )}
-                                    </div>
-
                                     {book.pages && (
                                         <p className="text-xs text-gray-500 mt-2">
                                             {book.pages} pages • {book.format}
@@ -473,7 +455,7 @@ export default function InstitutionalCategoryPage() {
                         </p>
                         <a
                             href="/advertise"
-                            className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                            className="inline-flex items-center gap-2 bg-blue-950 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
                         >
                             <Download className="w-5 h-5" />
                             Upload Document
@@ -511,47 +493,7 @@ export default function InstitutionalCategoryPage() {
             </div>
 
             {/* Footer */}
-            <footer className="bg-blue-950 text-white mt-16">
-                <div className="max-w-7xl mx-auto px-4 py-12">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                        <div>
-                            <div className="flex items-center gap-2 mb-4">
-                                <Globe className="w-8 h-8" />
-                                <h3 className="text-xl font-bold">LAN Library</h3>
-                            </div>
-                            <p className="text-gray-300 text-sm">
-                                Digital PDF library making knowledge accessible to everyone.
-                            </p>
-                        </div>
-                        <div>
-                            <h4 className="font-bold mb-4">Quick Links</h4>
-                            <ul className="space-y-2 text-sm">
-                                <li><a href="/about/lan" className="text-gray-300 hover:text-white">About Us</a></li>
-                                <li><a href="/learn/make-money" className="text-gray-300 hover:text-white">How It Works</a></li>
-                                <li><a href="/lan/faqs" className="text-gray-300 hover:text-white">FAQs</a></li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-bold mb-4">Institutions</h4>
-                            <ul className="space-y-2 text-sm">
-                                <li><a href="/institutional/university" className="text-gray-300 hover:text-white">Universities</a></li>
-                                <li><a href="/institutional/secondary-school" className="text-gray-300 hover:text-white">Secondary Schools</a></li>
-                                <li><a href="/institutional/exam-prep" className="text-gray-300 hover:text-white">Exam Prep</a></li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-bold mb-4">Customer Service</h4>
-                            <ul className="space-y-2 text-sm">
-                                <li><a href="/my-account" className="text-gray-300 hover:text-white">My Account</a></li>
-                                <li><a href="/my-books" className="text-gray-300 hover:text-white">My Books</a></li>
-                            </ul>
-                        </div>
-                    </div>
-                    <div className="border-t border-blue-800 mt-8 pt-8 text-center text-sm text-gray-300">
-                        <p>&copy; 2025 Learning Access Network. All rights reserved.</p>
-                    </div>
-                </div>
-            </footer>
+           <Footer />
         </div>
     );
 }

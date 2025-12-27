@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Sparkles,
   HelpCircle,
+  Crown,
 } from "lucide-react";
 import Link from "next/link";
 import { signOut } from "firebase/auth";
@@ -269,7 +270,6 @@ export default function Navbar() {
 
   return (
     <>
-      
       <header className="bg-blue-950 border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <Link href="/latest/documentations" className="no-underline">
           <div className="bg-white flex items-center justify-center gap-2 text-blue-950 py-2">
@@ -343,6 +343,13 @@ export default function Navbar() {
                 <span>My Account</span>
               </Link>
               <Link
+                href="/bestsellers"
+                className="flex items-center gap-1 px-3 py-2 hover:bg-gray-100 hover:text-blue-950 rounded-lg text-sm text-gray-50"
+              >
+                <Crown size={18} />
+                <span>Bestsellers</span>
+              </Link>
+              <Link
                 href="/saved-my-book"
                 className="flex items-center gap-1 px-3 py-2 hover:bg-gray-100 hover:text-blue-950 rounded-lg text-sm text-gray-50"
               >
@@ -388,7 +395,7 @@ export default function Navbar() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  className="w-full text-gray-900 px-4 py-2 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full text-gray-900 bg-white px-4 py-2 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500"
                   autoFocus
                 />
                 <button
@@ -918,6 +925,14 @@ export default function Navbar() {
                   <User size={18} />
                   <span>My Account</span>
                 </Link>
+                <Link
+                  href="/bestsellers"
+                  className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <Crown size={16} />
+                  Bestsellers
+                </Link>
+
                 <Link
                   href="/saved-my-book"
                   className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"

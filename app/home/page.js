@@ -9,6 +9,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import HomeLoading from './loading';
 import MobileCategoriesCarousel from '@/components/MobileCategoriesCarousel';
 import InstitutionalLibraryPage from '@/components/InstitutionalLib';
+import Footer from '@/components/FooterComp';
 
 export default function HomePage() {
     const [user, setUser] = useState(null);
@@ -412,47 +413,7 @@ export default function HomePage() {
                 </div>
             </div>
             {/* Footer */}
-            <footer className="bg-blue-950 text-white py-12">
-                <div className="max-w-7xl mx-auto px-4">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                        <div>
-                            <div className="flex items-center gap-2 mb-4">
-                                <Globe className="w-8 h-8" />
-                                <h3 className="text-2xl font-bold">[LAN Library]</h3>
-                            </div>
-                            <p className="text-gray-400 text-sm">
-                                Digital PDF library making knowledge accessible to everyone.
-                            </p>
-                        </div>
-                        <div>
-                            <h4 className="font-bold mb-4">Quick Links</h4>
-                            <ul className="space-y-2 text-sm">
-                                <li><a href="/about/lan" className="text-gray-400 hover:text-white">About Us</a></li>
-                                <li><a href="/learn/make-money" className="text-gray-400 hover:text-white">How It Works</a></li>
-                                <li><a href="/lan/faqs" className="text-gray-400 hover:text-white">FAQs</a></li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-bold mb-4">Categories</h4>
-                            <ul className="space-y-2 text-sm">
-                                <li><a href="/category/education" className="text-gray-400 hover:text-white">Education</a></li>
-                                <li><a href="/category/business" className="text-gray-400 hover:text-white">Business</a></li>
-                                <li><a href="/documents" className="text-gray-400 hover:text-white">All Books</a></li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-bold mb-4">Customer Service</h4>
-                            <ul className="space-y-2 text-sm">
-                                <li><a href="/my-account" className="text-gray-400 hover:text-white">My Account</a></li>
-                                <li><a href="/my-books" className="text-gray-400 hover:text-white">My Books</a></li>
-                            </ul>
-                        </div>
-                    </div>
-                    <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
-                        <p>&copy; 2025 Learning Access Network. All rights reserved.</p>
-                    </div>
-                </div>
-            </footer>
+         <Footer />
         </div>
     );
 }

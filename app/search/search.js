@@ -2,22 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, setDoc, increment } from "firebase/firestore";
 import { auth, db } from "@/lib/firebaseConfig";
 import { booksData } from "@/lib/booksData";
-import { FileText, X, Download } from "lucide-react";
+import { FileText, X, Download, TrendingUp } from "lucide-react";
 import Link from "next/link";
+import Navbar from '@/components/NavBar';
 
 export default function SearchClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const q = searchParams.get("q")?.toLowerCase() || "";
-
   const [searchResults, setSearchResults] = useState([]);
   const [selectedBook, setSelectedBook] = useState(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
   const [loading, setLoading] = useState(false);
+  const [mostSearchedBooks, setMostSearchedBooks] = useState([]);
+  const [showMostSearched, setShowMostSearched] = useState(false);
 
   // Helper function to get thumbnail from PDF
   const getThumbnailUrl = (book) => {
@@ -48,6 +50,73 @@ export default function SearchClient() {
   };
 
   // =========================
+  // TRACK SEARCH & UPDATE ANALYTICS
+  // =========================
+  const trackSearch = async (searchQuery) => {
+    if (!searchQuery || searchQuery.length < 2) return;
+
+    try {
+      const searchDocRef = doc(db, "searchAnalytics", searchQuery);
+      await setDoc(
+        searchDocRef,
+        {
+          query: searchQuery,
+          count: increment(1),
+          lastSearched: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      console.error("Error tracking search:", error);
+    }
+  };
+
+  // =========================
+  // FETCH MOST SEARCHED BOOKS
+  // =========================
+  const fetchMostSearchedBooks = async () => {
+    try {
+      const analyticsQuery = query(collection(db, "searchAnalytics"));
+      const querySnapshot = await getDocs(analyticsQuery);
+
+      const searches = [];
+      querySnapshot.forEach((doc) => {
+        searches.push({
+          query: doc.data().query,
+          count: doc.data().count,
+        });
+      });
+
+      // Sort by count and get top 10
+      searches.sort((a, b) => b.count - a.count);
+      const topSearches = searches.slice(0, 10);
+
+      // Find matching books
+      const matchedBooks = [];
+      for (const search of topSearches) {
+        const matchingBook = booksData.find(
+          book =>
+            book.title?.toLowerCase().includes(search.query) ||
+            book.author?.toLowerCase().includes(search.query)
+        );
+
+        if (matchingBook && !matchedBooks.find(b => b.id === matchingBook.id)) {
+          matchedBooks.push({
+            ...matchingBook,
+            image: getThumbnailUrl(matchingBook),
+            searchCount: search.count,
+            source: 'platform'
+          });
+        }
+      }
+
+      setMostSearchedBooks(matchedBooks);
+    } catch (error) {
+      console.error("Error fetching most searched books:", error);
+    }
+  };
+
+  // =========================
   // FETCH PURCHASED BOOKS
   // =========================
   useEffect(() => {
@@ -68,6 +137,7 @@ export default function SearchClient() {
     };
 
     fetchPurchasedBooks();
+    fetchMostSearchedBooks();
   }, []);
 
   // =========================
@@ -77,11 +147,16 @@ export default function SearchClient() {
     const performSearch = async () => {
       if (!q) {
         setSearchResults([]);
+        setShowMostSearched(true);
         return;
       }
 
+      setShowMostSearched(false);
       setLoading(true);
       console.log('🔍 Searching for:', q);
+
+      // Track the search
+      trackSearch(q);
 
       try {
         // 1. Search in platform books
@@ -218,43 +293,26 @@ export default function SearchClient() {
   // RENDER
   // =========================
   return (
+    <>
+    <Navbar />
     <div className="max-w-7xl mx-auto px-4 py-8 bg-white min-h-screen">
-      <h2 className="text-2xl font-bold mb-6 text-blue-950">
-        Search Results for: "{q}"
-      </h2>
+      {showMostSearched ? (
+        // Show Most Searched Books
+        <div>
+          <div className="flex items-center gap-2 mb-6">
+            <TrendingUp className="w-6 h-6 text-blue-950" />
+            <h2 className="text-2xl font-bold text-blue-950">Most Searched Books</h2>
+          </div>
 
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-950"></div>
-        </div>
-      )}
-
-      <style jsx>{`
-        .overflow-x-auto::-webkit-scrollbar { display: none; }
-        .overflow-x-auto { -ms-overflow-style: none; scrollbar-width: none; }
-        .snap-x { scroll-snap-type: x mandatory; }
-        .snap-start { scroll-snap-align: start; }
-      `}</style>
-
-      {!loading && searchResults.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-600 text-lg">No results found for "{q}"</p>
-          <Link href="/home" className="text-blue-950 hover:underline mt-4 inline-block">
-            ← Back to Home
-          </Link>
-        </div>
-      ) : !loading && (
-        <>
-          {/* =========================
-              PURCHASED BOOKS (CAROUSEL)
-          ========================= */}
-          {searchResults.filter(book => isPurchased(book.id)).length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-xl font-bold mb-4 text-blue-950">Purchased Books ({searchResults.filter(book => isPurchased(book.id)).length})</h3>
-
-              {/* Mobile/Tablet Carousel (rows of 5) */}
+          {mostSearchedBooks.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-600">No search data available yet.</p>
+            </div>
+          ) : (
+            <>
+              {/* Mobile/Tablet Carousel */}
               <div className="lg:hidden space-y-4">
-                {chunkArray(searchResults.filter(book => isPurchased(book.id)), 5).map((row, rowIndex) => (
+                {chunkArray(mostSearchedBooks, 5).map((row, rowIndex) => (
                   <div key={rowIndex} className="overflow-x-auto pb-4">
                     <div className="flex gap-3 snap-x snap-mandatory" style={{ minWidth: 'max-content' }}>
                       {row.map(book => (
@@ -272,9 +330,15 @@ export default function SearchClient() {
                                 e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
                               }}
                             />
-                            <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
-                              Owned
+                            <span className="absolute top-2 right-2 bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg flex items-center gap-1">
+                              <TrendingUp size={12} />
+                              {book.searchCount}
                             </span>
+                            {isPurchased(book.id) && (
+                              <span className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
+                                Owned
+                              </span>
+                            )}
                           </div>
                           <div className="p-2">
                             <h4 className="font-semibold text-xs text-gray-900 mb-1 line-clamp-2">{book.title}</h4>
@@ -290,63 +354,207 @@ export default function SearchClient() {
 
               {/* Desktop Grid */}
               <div className="hidden lg:grid grid-cols-5 gap-4">
-                {searchResults
-                  .filter(book => isPurchased(book.id))
-                  .map(book => (
-                    <Link
-                      key={book.id}
-                      href={`/book/preview?id=${book.id}`}
-                      className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                    >
-                      <div className="relative">
-                        <img
-                          src={getThumbnailUrl(book)}
-                          alt={book.title}
-                          className="w-full h-48 object-cover bg-gray-200"
-                          onError={(e) => {
-                            e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                          }}
-                        />
-                        <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
+                {mostSearchedBooks.map(book => (
+                  <Link
+                    key={book.id}
+                    href={`/book/preview?id=${book.id}`}
+                    className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                  >
+                    <div className="relative">
+                      <img
+                        src={getThumbnailUrl(book)}
+                        alt={book.title}
+                        className="w-full h-48 object-cover bg-gray-200"
+                        onError={(e) => {
+                          e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+                        }}
+                      />
+                      <span className="absolute top-2 right-2 bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg flex items-center gap-1">
+                        <TrendingUp size={12} />
+                        {book.searchCount}
+                      </span>
+                      {isPurchased(book.id) && (
+                        <span className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
                           Owned
                         </span>
-                      </div>
-                      <div className="p-3">
-                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">{book.title}</h4>
-                        <p className="text-xs text-gray-600 mb-1 line-clamp-1">{book.author}</p>
-                        <p className="text-sm font-bold text-blue-950">₦{book.price?.toLocaleString()}</p>
-                      </div>
-                    </Link>
-                  ))}
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">{book.title}</h4>
+                      <p className="text-xs text-gray-600 mb-1 line-clamp-1">{book.author}</p>
+                      <p className="text-sm font-bold text-blue-950">₦{book.price?.toLocaleString()}</p>
+                    </div>
+                  </Link>
+                ))}
               </div>
+            </>
+          )}
+        </div>
+      ) : (
+        // Show Search Results
+        <>
+          <h2 className="text-2xl font-bold mb-6 text-blue-950">
+            Search Results for: "{q}"
+          </h2>
+
+          {loading && (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-950"></div>
             </div>
           )}
 
-          {/* =========================
-              OTHER BOOKS (CAROUSEL)
-          ========================= */}
-          {searchResults.filter(book => !isPurchased(book.id)).length > 0 && (
-            <div>
-              <h3 className="text-xl font-bold mb-4 text-blue-950">
-                {searchResults.filter(book => isPurchased(book.id)).length > 0 ? "Other Books" : "All Results"} ({searchResults.filter(book => !isPurchased(book.id)).length})
-              </h3>
+          <style jsx>{`
+            .overflow-x-auto::-webkit-scrollbar { display: none; }
+            .overflow-x-auto { -ms-overflow-style: none; scrollbar-width: none; }
+            .snap-x { scroll-snap-type: x mandatory; }
+            .snap-start { scroll-snap-align: start; }
+          `}</style>
 
-              {/* Mobile/Tablet Carousel (rows of 5) */}
-              <div className="lg:hidden space-y-4">
-                {chunkArray(searchResults.filter(book => !isPurchased(book.id)), 5).map((row, rowIndex) => (
-                  <div key={rowIndex} className="overflow-x-auto pb-4">
-                    <div className="flex gap-3 snap-x snap-mandatory" style={{ minWidth: 'max-content' }}>
-                      {row.map(book => (
+          {!loading && searchResults.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-600 text-lg">No results found for "{q}"</p>
+              <Link href="/home" className="text-blue-950 hover:underline mt-4 inline-block">
+                ← Back to Home
+              </Link>
+            </div>
+          ) : !loading && (
+            <>
+              {/* PURCHASED BOOKS */}
+              {searchResults.filter(book => isPurchased(book.id)).length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-xl font-bold mb-4 text-blue-950">Purchased Books ({searchResults.filter(book => isPurchased(book.id)).length})</h3>
+
+                  {/* Mobile/Tablet Carousel */}
+                  <div className="lg:hidden space-y-4">
+                    {chunkArray(searchResults.filter(book => isPurchased(book.id)), 5).map((row, rowIndex) => (
+                      <div key={rowIndex} className="overflow-x-auto pb-4">
+                        <div className="flex gap-3 snap-x snap-mandatory" style={{ minWidth: 'max-content' }}>
+                          {row.map(book => (
+                            <Link
+                              key={book.id}
+                              href={`/book/preview?id=${book.id}`}
+                              className="flex-none w-[140px] sm:w-[160px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow snap-start"
+                            >
+                              <div className="relative">
+                                <img
+                                  src={getThumbnailUrl(book)}
+                                  alt={book.title}
+                                  className="w-full h-40 sm:h-48 object-cover bg-gray-200"
+                                  onError={(e) => {
+                                    e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+                                  }}
+                                />
+                                <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
+                                  Owned
+                                </span>
+                              </div>
+                              <div className="p-2">
+                                <h4 className="font-semibold text-xs text-gray-900 mb-1 line-clamp-2">{book.title}</h4>
+                                <p className="text-xs text-gray-600 mb-1 line-clamp-1">{book.author}</p>
+                                <p className="text-sm font-bold text-blue-950">₦{book.price?.toLocaleString()}</p>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Grid */}
+                  <div className="hidden lg:grid grid-cols-5 gap-4">
+                    {searchResults
+                      .filter(book => isPurchased(book.id))
+                      .map(book => (
                         <Link
                           key={book.id}
                           href={`/book/preview?id=${book.id}`}
-                          className="flex-none w-[140px] sm:w-[160px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow snap-start"
+                          className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
                         >
                           <div className="relative">
                             <img
                               src={getThumbnailUrl(book)}
                               alt={book.title}
-                              className="w-full h-40 sm:h-48 object-cover bg-gray-200"
+                              className="w-full h-48 object-cover bg-gray-200"
+                              onError={(e) => {
+                                e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+                              }}
+                            />
+                            <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
+                              Owned
+                            </span>
+                          </div>
+                          <div className="p-3">
+                            <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">{book.title}</h4>
+                            <p className="text-xs text-gray-600 mb-1 line-clamp-1">{book.author}</p>
+                            <p className="text-sm font-bold text-blue-950">₦{book.price?.toLocaleString()}</p>
+                          </div>
+                        </Link>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* OTHER BOOKS */}
+              {searchResults.filter(book => !isPurchased(book.id)).length > 0 && (
+                <div>
+                  <h3 className="text-xl font-bold mb-4 text-blue-950">
+                    {searchResults.filter(book => isPurchased(book.id)).length > 0 ? "Other Books" : "All Results"} ({searchResults.filter(book => !isPurchased(book.id)).length})
+                  </h3>
+
+                  {/* Mobile/Tablet Carousel */}
+                  <div className="lg:hidden space-y-4">
+                    {chunkArray(searchResults.filter(book => !isPurchased(book.id)), 5).map((row, rowIndex) => (
+                      <div key={rowIndex} className="overflow-x-auto pb-4">
+                        <div className="flex gap-3 snap-x snap-mandatory" style={{ minWidth: 'max-content' }}>
+                          {row.map(book => (
+                            <Link
+                              key={book.id}
+                              href={`/book/preview?id=${book.id}`}
+                              className="flex-none w-[140px] sm:w-[160px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow snap-start"
+                            >
+                              <div className="relative">
+                                <img
+                                  src={getThumbnailUrl(book)}
+                                  alt={book.title}
+                                  className="w-full h-40 sm:h-48 object-cover bg-gray-200"
+                                  onError={(e) => {
+                                    e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+                                  }}
+                                />
+                                {book.isFromFirestore && (
+                                  <span className="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
+                                    Upload
+                                  </span>
+                                )}
+                              </div>
+                              <div className="p-2">
+                                <h4 className="font-semibold text-xs text-gray-900 mb-1 line-clamp-2">{book.title}</h4>
+                                <p className="text-xs text-gray-600 mb-1 line-clamp-1">{book.author}</p>
+                                <p className="text-sm font-bold text-blue-950 mb-1">₦{book.price?.toLocaleString()}</p>
+                                <p className="text-xs text-gray-500">{book.pages}p • {book.format}</p>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Grid */}
+                  <div className="hidden lg:grid grid-cols-5 gap-4">
+                    {searchResults
+                      .filter(book => !isPurchased(book.id))
+                      .map(book => (
+                        <Link
+                          key={book.id}
+                          href={`/book/preview?id=${book.id}`}
+                          className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                        >
+                          <div className="relative">
+                            <img
+                              src={getThumbnailUrl(book)}
+                              alt={book.title}
+                              className="w-full h-48 object-cover bg-gray-200"
                               onError={(e) => {
                                 e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
                               }}
@@ -357,61 +565,23 @@ export default function SearchClient() {
                               </span>
                             )}
                           </div>
-                          <div className="p-2">
-                            <h4 className="font-semibold text-xs text-gray-900 mb-1 line-clamp-2">{book.title}</h4>
+                          <div className="p-3">
+                            <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">{book.title}</h4>
                             <p className="text-xs text-gray-600 mb-1 line-clamp-1">{book.author}</p>
                             <p className="text-sm font-bold text-blue-950 mb-1">₦{book.price?.toLocaleString()}</p>
-                            <p className="text-xs text-gray-500">{book.pages}p • {book.format}</p>
+                            <p className="text-xs text-gray-500">{book.pages} pages • {book.format}</p>
                           </div>
                         </Link>
                       ))}
-                    </div>
                   </div>
-                ))}
-              </div>
-
-              {/* Desktop Grid */}
-              <div className="hidden lg:grid grid-cols-5 gap-4">
-                {searchResults
-                  .filter(book => !isPurchased(book.id))
-                  .map(book => (
-                    <Link
-                      key={book.id}
-                      href={`/book/preview?id=${book.id}`}
-                      className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                    >
-                      <div className="relative">
-                        <img
-                          src={getThumbnailUrl(book)}
-                          alt={book.title}
-                          className="w-full h-48 object-cover bg-gray-200"
-                          onError={(e) => {
-                            e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                          }}
-                        />
-                        {book.isFromFirestore && (
-                          <span className="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
-                            Upload
-                          </span>
-                        )}
-                      </div>
-                      <div className="p-3">
-                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">{book.title}</h4>
-                        <p className="text-xs text-gray-600 mb-1 line-clamp-1">{book.author}</p>
-                        <p className="text-sm font-bold text-blue-950 mb-1">₦{book.price?.toLocaleString()}</p>
-                        <p className="text-xs text-gray-500">{book.pages} pages • {book.format}</p>
-                      </div>
-                    </Link>
-                  ))}
-              </div>
-            </div>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
 
-      {/* =========================
-          PURCHASE MODAL
-      ========================= */}
+      {/* PURCHASE MODAL */}
       {showPurchaseModal && selectedBook && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -457,5 +627,6 @@ export default function SearchClient() {
         </div>
       )}
     </div>
+    </>
   );
 }

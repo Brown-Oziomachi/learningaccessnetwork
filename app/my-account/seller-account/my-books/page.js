@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Book, Edit, Trash2, Eye, DollarSign, Download, Plus, Search, Filter, MoreVertical, TrendingUp, AlertCircle, CheckCircle, X, Upload } from "lucide-react";
+import { Book, Edit, Trash2, Eye, DollarSign, Download, Plus, Search, Filter, MoreVertical, TrendingUp, AlertCircle, CheckCircle, X, Upload, BookOpen } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
 import { collection, query, where, getDocs, doc, getDoc, deleteDoc, updateDoc } from "firebase/firestore";
@@ -35,17 +35,17 @@ export default function MyPostedBooks() {
     const fetchUserAndBooks = async (uid) => {
         try {
             setLoading(true);
-            
+
             // Fetch user data
             const userDoc = await getDoc(doc(db, "users", uid));
             if (userDoc.exists()) {
                 const userData = userDoc.data();
-                
+
                 if (!userData.isSeller) {
                     router.push('/my-account');
                     return;
                 }
-                
+
                 setUser({
                     uid,
                     ...userData
@@ -71,7 +71,7 @@ export default function MyPostedBooks() {
                 // Try querying by email as fallback
                 const emailQuery = query(advertBooksRef, where("userEmail", "==", email));
                 const emailSnapshot = await getDocs(emailQuery);
-                
+
                 if (!emailSnapshot.empty) {
                     const books = emailSnapshot.docs.map(doc => ({
                         id: doc.id,
@@ -108,7 +108,7 @@ export default function MyPostedBooks() {
 
         // Apply search filter
         if (searchQuery.trim()) {
-            filtered = filtered.filter(book => 
+            filtered = filtered.filter(book =>
                 book.bookTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 book.author?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 book.category?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -129,11 +129,11 @@ export default function MyPostedBooks() {
         try {
             setDeleting(true);
             await deleteDoc(doc(db, "advertMyBook", selectedBook.id));
-            
+
             // Update local state
             setPostedBooks(prev => prev.filter(book => book.id !== selectedBook.id));
             setFilteredBooks(prev => prev.filter(book => book.id !== selectedBook.id));
-            
+
             setShowDeleteModal(false);
             setSelectedBook(null);
             alert("Book deleted successfully!");
@@ -168,7 +168,7 @@ export default function MyPostedBooks() {
     };
 
     const getStatusBadge = (status) => {
-        switch(status) {
+        switch (status) {
             case 'approved':
                 return <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">Approved</span>;
             case 'pending':
@@ -215,59 +215,58 @@ export default function MyPostedBooks() {
 
             {/* Stats Section */}
             <div className="max-w-7xl mx-auto px-4 py-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-white rounded-xl p-6 shadow-sm">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-blue-100 p-3 rounded-lg">
-                                <Book className="text-blue-950" size={24} />
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
+                    <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
+                        <div className="flex items-center gap-2 lg:gap-3">
+                            <div className="bg-blue-100 p-2 lg:p-3 rounded-lg">
+                                <Book className="text-blue-950" size={20} />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-600">Total Books</p>
-                                <p className="text-2xl font-bold text-blue-950">{postedBooks.length}</p>
+                                <p className="text-xs lg:text-sm text-gray-600">Total Books</p>
+                                <p className="text-lg lg:text-2xl font-bold text-blue-950">{postedBooks.length}</p>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-white rounded-xl p-6 shadow-sm">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-green-100 p-3 rounded-lg">
-                                <CheckCircle className="text-green-600" size={24} />
+                    <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
+                        <div className="flex items-center gap-2 lg:gap-3">
+                            <div className="bg-green-100 p-2 lg:p-3 rounded-lg">
+                                <CheckCircle className="text-green-600" size={20} />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-600">Approved</p>
-                                <p className="text-2xl font-bold text-green-600">
+                                <p className="text-xs lg:text-sm text-gray-600">Approved</p>
+                                <p className="text-lg lg:text-2xl font-bold text-green-600">
                                     {postedBooks.filter(b => b.status === 'approved').length}
                                 </p>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-white rounded-xl p-6 shadow-sm">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-yellow-100 p-3 rounded-lg">
-                                <AlertCircle className="text-yellow-600" size={24} />
+                    <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
+                        <div className="flex items-center gap-2 lg:gap-3">
+                            <div className="bg-yellow-100 p-2 lg:p-3 rounded-lg">
+                                <AlertCircle className="text-yellow-600" size={20} />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-600">Pending</p>
-                                <p className="text-2xl font-bold text-yellow-600">
+                                <p className="text-xs lg:text-sm text-gray-600">Pending</p>
+                                <p className="text-lg lg:text-2xl font-bold text-yellow-600">
                                     {postedBooks.filter(b => b.status === 'pending').length}
                                 </p>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-white rounded-xl p-6 shadow-sm">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-purple-100 p-3 rounded-lg">
-                                <TrendingUp className="text-purple-600" size={24} />
+                    <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
+                        <div className="flex items-center gap-2 lg:gap-3">
+                            <div className="bg-purple-100 p-2 lg:p-3 rounded-lg">
+                                <TrendingUp className="text-purple-600" size={20} />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-600">Total Sales</p>
-                                <p className="text-2xl font-bold text-purple-600">
+                                <p className="text-xs lg:text-sm text-gray-600">Total Sales</p>
+                                <p className="text-lg lg:text-2xl font-bold text-purple-600">
                                     ₦{postedBooks.reduce((sum, book) => sum + (book.totalSales || 0), 0).toLocaleString()}
                                 </p>
                             </div>
                         </div>
                     </div>
                 </div>
-
                 {/* Search and Filter */}
                 <div className="bg-white rounded-xl p-4 mb-6 shadow-sm">
                     <div className="flex flex-col md:flex-row gap-4">
@@ -305,7 +304,7 @@ export default function MyPostedBooks() {
                             {postedBooks.length === 0 ? "No Books Posted Yet" : "No Books Found"}
                         </h3>
                         <p className="text-gray-600 mb-6">
-                            {postedBooks.length === 0 
+                            {postedBooks.length === 0
                                 ? "Start uploading your documents to reach more readers!"
                                 : "Try adjusting your search or filters"
                             }
@@ -377,9 +376,9 @@ export default function MyPostedBooks() {
                                                     >
                                                         <Eye size={18} className="text-blue-950" />
                                                     </button>
-                                                    <Link href={`/advertise?edit=${book.id}`}>
-                                                        <button className="p-2 hover:bg-green-100 rounded-lg transition-colors" title="Edit">
-                                                            <Edit size={18} className="text-green-600" />
+                                                    <Link href={`/book/preview?id=${book.id}`}>
+                                                        <button className="p-2 hover:bg-green-100 rounded-lg transition-colors" title="Open Book">
+                                                            <BookOpen size={18} className="text-green-600" />
                                                         </button>
                                                     </Link>
                                                     <button
@@ -434,10 +433,10 @@ export default function MyPostedBooks() {
                                             <Eye size={18} />
                                             View
                                         </button>
-                                        <Link href={`/advertise?edit=${book.id}`} className="flex-1">
+                                        <Link href={`/book/preview?id=${book.id}`} className="flex-1">
                                             <button className="w-full bg-green-50 text-green-600 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-green-100">
-                                                <Edit size={18} />
-                                                Edit
+                                                <BookOpen size={18} />
+                                                Open
                                             </button>
                                         </Link>
                                         <button
@@ -570,10 +569,10 @@ export default function MyPostedBooks() {
                                 </div>
                             </div>
                             <div className="mt-6 flex gap-3">
-                                <Link href={`/advertise?edit=${selectedBook.id}`} className="flex-1">
+                                <Link href={`/book/preview?id=${selectedBook.id}`} className="flex-1">
                                     <button className="w-full bg-blue-950 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-blue-900">
-                                        <Edit size={18} />
-                                        Edit Book
+                                        <BookOpen size={18} />
+                                        Open Book
                                     </button>
                                 </Link>
                                 <button
