@@ -34,10 +34,12 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import WhatIsLanModal from "./WhatIsLanModal";
 
 export default function Navbar() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showWhatIsLanModal, setShowWhatIsLanModal] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [mobileSubmenu, setMobileSubmenu] = useState(null);
@@ -413,12 +415,12 @@ export default function Navbar() {
         <div className="hidden md:block bg-gray-50 border-t border-gray-200">
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-center gap-1">
-              <Link
-                href="/about/lan"
+              <button
+                onClick={() => setShowWhatIsLanModal(true)}
                 className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 whitespace-nowrap"
               >
                 What is LAN Library?
-              </Link>
+              </button>
 
               {/* Education Dropdown */}
               <div
@@ -950,7 +952,10 @@ export default function Navbar() {
 
                 <div className="border-t border-blue-950 my-4 pt-4">
                   <button
-                    onClick={() => router.push("/lan/net/help-center")}
+                    onClick={() => {
+                      setShowWhatIsLanModal(true);
+                      setShowMobileMenu(false);
+                    }}
                     className="text-sm font-semibold text-gray-500 mb-2 px-4"
                   >
                     What is LAN Library?
@@ -1048,6 +1053,11 @@ export default function Navbar() {
           animation: slideDown 0.2s ease-out;
         }
       `}</style>
+      {/* What is LAN Library Modal */}
+    <WhatIsLanModal
+      isOpen={showWhatIsLanModal}
+      onClose={() => setShowWhatIsLanModal(false)}
+    />
     </>
   );
 }

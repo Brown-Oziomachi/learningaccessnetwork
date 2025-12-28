@@ -18,7 +18,8 @@ export default function MyAccount() {
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState(null);
     const router = useRouter();
-
+    const [sellerData, setSellerData] = useState(null);
+    const [showSellerRedirectModal, setShowSellerRedirectModal] = useState(false);
     const [formData, setFormData] = useState({
         firstName: "",
         surname: "",
@@ -47,57 +48,69 @@ export default function MyAccount() {
         };
     }, [router]);
 
-    const fetchUserData = async (uid) => {
-        try {
-            console.log("Fetching user data for UID:", uid);
-            setLoading(true);
-            setError(null);
+   const fetchUserData = async (uid) => {
+    try {
+        console.log("Fetching user data for UID:", uid);
+        setLoading(true);
+        setError(null);
 
-            const userDocRef = doc(db, "users", uid);
-            console.log("Document reference created");
+        const userDocRef = doc(db, "users", uid);
+        console.log("Document reference created");
 
-            const userDoc = await getDoc(userDocRef);
-            console.log("Document fetched, exists:", userDoc.exists());
+        const userDoc = await getDoc(userDocRef);
+        console.log("Document fetched, exists:", userDoc.exists());
 
-            if (userDoc.exists()) {
-                const userData = userDoc.data();
-                console.log("User data:", userData);
+        if (userDoc.exists()) {
+            const userData = userDoc.data();
+            console.log("User data:", userData);
 
-                setUser({ uid, ...userData });
-                setFormData({
-                    firstName: userData.firstName || "",
-                    surname: userData.surname || "",
-                    displayName: userData.displayName || "",
-                    dateOfBirth: userData.dateOfBirth || ""
+          if (userData.isSeller) {
+                console.log("User is a seller, showing redirect modal...");
+                // Store seller data for modal display
+                setSellerData({
+                    displayName: userData.displayName || `${userData.firstName} ${userData.surname}` || userData.email?.split('@')[0] || 'Seller',
+                    email: userData.email
                 });
-
-                console.log("User state updated successfully");
-            } else {
-                console.error("User document does not exist!");
-                setError("User profile not found. Please complete your registration.");
-
-                // Create a basic user document if it doesn't exist
-                const basicUserData = {
-                    email: auth.currentUser?.email,
-                    createdAt: new Date().toISOString(),
-                    firstName: "",
-                    surname: "",
-                    displayName: auth.currentUser?.displayName || "",
-                };
-
-                await updateDoc(userDocRef, basicUserData);
-                setUser({ uid, ...basicUserData });
+                setShowSellerRedirectModal(true);
+                setLoading(false);
+                return; // Stop execution here
             }
-        } catch (error) {
-            console.error("Error fetching user data:", error);
-            console.error("Error code:", error.code);
-            console.error("Error message:", error.message);
-            setError(`Failed to load profile: ${error.message}`);
-        } finally {
-            console.log("Setting loading to false");
-            setLoading(false);
+
+            setUser({ uid, ...userData });
+            setFormData({
+                firstName: userData.firstName || "",
+                surname: userData.surname || "",
+                displayName: userData.displayName || "",
+                dateOfBirth: userData.dateOfBirth || ""
+            });
+
+            console.log("User state updated successfully");
+        } else {
+            console.error("User document does not exist!");
+            setError("User profile not found. Please complete your registration.");
+
+            // Create a basic user document if it doesn't exist
+            const basicUserData = {
+                email: auth.currentUser?.email,
+                createdAt: new Date().toISOString(),
+                firstName: "",
+                surname: "",
+                displayName: auth.currentUser?.displayName || "",
+            };
+
+            await updateDoc(userDocRef, basicUserData);
+            setUser({ uid, ...basicUserData });
         }
-    };
+    } catch (error) {
+        console.error("Error fetching user data:", error);
+        console.error("Error code:", error.code);
+        console.error("Error message:", error.message);
+        setError(`Failed to load profile: ${error.message}`);
+    } finally {
+        console.log("Setting loading to false");
+        setLoading(false);
+    }
+};
 
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
@@ -244,21 +257,100 @@ export default function MyAccount() {
     }
 
     // Show page if user exists
-    if (!user) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <p className="text-gray-600">No user data available</p>
-                    <button
-                        onClick={() => router.push('/auth/signin')}
-                        className="mt-4 bg-blue-950 text-white px-6 py-2 rounded-lg"
-                    >
-                        Go to Sign In
-                    </button>
+   // Show page if user exists OR if showing seller redirect modal
+if (!user && !showSellerRedirectModal) {
+    return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="text-center">
+                <p className="text-gray-600">No user data available</p>
+                <button
+                    onClick={() => router.push('/auth/signin')}
+                    className="mt-4 bg-blue-950 text-white px-6 py-2 rounded-lg"
+                >
+                    Go to Sign In
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// If showing seller modal, render just the modal
+if (showSellerRedirectModal) {
+    return (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-blue-950 to-blue-800 p-6 text-center">
+                    <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Store className="w-10 h-10 text-blue-950" />
+                    </div>
+                  <h2 className="text-2xl font-bold text-white mb-2">
+                     Welcome Back, {sellerData?.displayName}! 🎉
+                  </h2>
+                    <p className="text-blue-100 text-sm">
+                        You have a seller account with us
+                    </p>
+                </div>
+
+                {/* Content */}
+                <div className="p-6">
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                        <p className="text-sm text-blue-900 leading-relaxed">
+                            <strong>Good news!</strong> As a verified seller, you have access to our 
+                            powerful seller dashboard where you can:
+                        </p>
+                        <ul className="mt-3 space-y-2 text-sm text-blue-800">
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-600 mt-0.5">✓</span>
+                                <span>Manage your book listings</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-600 mt-0.5">✓</span>
+                                <span>Track your sales and earnings</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-600 mt-0.5">✓</span>
+                                <span>Withdraw your funds</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-600 mt-0.5">✓</span>
+                                <span>View purchase history</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <p className="text-gray-600 text-sm text-center mb-6">
+                        We'll redirect you to your seller dashboard now
+                    </p>
+
+                    {/* Buttons */}
+                    <div className="flex flex-col gap-3">
+                        <button
+                            onClick={() => router.push('/my-account/seller-account')}
+                            className="w-full bg-blue-950 text-white py-3 rounded-xl font-bold hover:bg-blue-900 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Store size={20} />
+                            Go to Seller Dashboard
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowSellerRedirectModal(false);
+                                router.push('/documents');
+                            }}
+                            className="w-full border-2 border-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                        >
+                            Browse Books Instead
+                        </button>
+                    </div>
+
+                    <p className="text-xs text-gray-500 text-center mt-4">
+                        This happens automatically because you're a verified seller
+                    </p>
                 </div>
             </div>
-        );
-    }
+        </div>
+    );
+}
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -485,9 +577,87 @@ export default function MyAccount() {
                                 </button>
                             </div>
                         </div>
+                        
+                    </div>
+                    
+                </div>
+            )}
+            {/* Seller Redirect Modal */}
+            {showSellerRedirectModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-blue-950 to-blue-800 p-6 text-center">
+                            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Store className="w-10 h-10 text-blue-950" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-white mb-2">
+                                Welcome Back, Seller! 🎉
+                            </h2>
+                            <p className="text-blue-100 text-sm">
+                                You have a seller account with us
+                            </p>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6">
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                                <p className="text-sm text-blue-900 leading-relaxed">
+                                    <strong>Good news!</strong> As a verified seller, you have access to our 
+                                    powerful seller dashboard where you can:
+                                </p>
+                                <ul className="mt-3 space-y-2 text-sm text-blue-800">
+                                    <li className="flex items-start gap-2">
+                                        <span className="text-green-600 mt-0.5">✓</span>
+                                        <span>Manage your book listings</span>
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                        <span className="text-green-600 mt-0.5">✓</span>
+                                        <span>Track your sales and earnings</span>
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                        <span className="text-green-600 mt-0.5">✓</span>
+                                        <span>Withdraw your funds</span>
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                        <span className="text-green-600 mt-0.5">✓</span>
+                                        <span>View purchase history</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <p className="text-gray-600 text-sm text-center mb-6">
+                                We'll redirect you to your seller dashboard now
+                            </p>
+
+                            {/* Buttons */}
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={() => router.push('/my-account/seller-account')}
+                                    className="w-full bg-blue-950 text-white py-3 rounded-xl font-bold hover:bg-blue-900 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Store size={20} />
+                                    Go to Seller Dashboard
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowSellerRedirectModal(false);
+                                        router.push('/home');
+                                    }}
+                                    className="w-full border-2 border-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                                >
+                                    Browse Books Instead
+                                </button>
+                            </div>
+
+                            <p className="text-xs text-gray-500 text-center mt-4">
+                                This happens automatically because you're a verified seller
+                            </p>
+                        </div>
                     </div>
                 </div>
             )}
         </div>
     );
 }
+       

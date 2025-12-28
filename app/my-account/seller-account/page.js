@@ -8,6 +8,34 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
 
+const nigerianBanks = [
+    { name: "Access Bank", code: "044" },
+    { name: "Citibank", code: "023" },
+    { name: "Ecobank Nigeria", code: "050" },
+    { name: "Fidelity Bank", code: "070" },
+    { name: "First Bank of Nigeria", code: "011" },
+    { name: "First City Monument Bank (FCMB)", code: "214" },
+    { name: "Globus Bank", code: "00103" },
+    { name: "Guaranty Trust Bank (GTBank)", code: "058" },
+    { name: "Heritage Bank", code: "030" },
+    { name: "Keystone Bank", code: "082" },
+    { name: "Kuda Bank", code: "50211" },
+    { name: "Opay", code: "999992" },
+    { name: "Palmpay", code: "999991" },
+    { name: "Parallex Bank", code: "526" },
+    { name: "Polaris Bank", code: "076" },
+    { name: "Providus Bank", code: "101" },
+    { name: "Stanbic IBTC Bank", code: "221" },
+    { name: "Standard Chartered Bank", code: "068" },
+    { name: "Sterling Bank", code: "232" },
+    { name: "SunTrust Bank", code: "100" },
+    { name: "Union Bank of Nigeria", code: "032" },
+    { name: "United Bank for Africa (UBA)", code: "033" },
+    { name: "Unity Bank", code: "215" },
+    { name: "Wema Bank", code: "035" },
+    { name: "Zenith Bank", code: "057" },
+];
+
 export default function SellerAccount() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -25,7 +53,14 @@ export default function SellerAccount() {
     const [withdrawing, setWithdrawing] = useState(false);
     const [withdrawalError, setWithdrawalError] = useState("");
     const router = useRouter();
-
+    const [showBankModal, setShowBankModal] = useState(false);
+    const [bankFormData, setBankFormData] = useState({
+        accountName: "",
+        accountNumber: "",
+        bankName: "",
+        bankCode: ""
+    });
+const [savingBank, setSavingBank] = useState(false);
     const [formData, setFormData] = useState({
         firstName: "",
         surname: "",
@@ -53,10 +88,16 @@ export default function SellerAccount() {
             if (userDoc.exists()) {
                 const userData = userDoc.data();
 
-                if (!userData.isSeller) {
-                    router.push('/my-account');
-                    return;
-                }
+               if (!userData.isSeller) {
+                router.push('/my-account');
+                return;
+            }
+
+            //  Redirect regular users trying to access seller account
+            if (userData.isSeller && window.location.pathname === '/my-account') {
+                router.push('/my-account/seller-account');
+                return;
+            }
 
                 const sellerDoc = await getDoc(doc(db, "sellers", uid));
                 let bankDetails = null;
@@ -226,6 +267,44 @@ export default function SellerAccount() {
             console.error("Error fetching transactions:", error);
         }
     };
+
+    const handleSaveBank = async () => {
+    // Validate
+    if (!bankFormData.accountName || !bankFormData.accountNumber || !bankFormData.bankName) {
+        alert("Please fill in all required fields");
+        return;
+    }
+
+    try {
+        setSavingBank(true);
+
+        // Update seller document
+        await updateDoc(doc(db, "sellers", user.uid), {
+            bankDetails: bankFormData,
+            updatedAt: serverTimestamp()
+        });
+
+        // Also update user document for easy access
+        await updateDoc(doc(db, "users", user.uid), {
+            bankDetails: bankFormData
+        });
+
+        // Update local state
+        setUser((prev) => ({ 
+            ...prev, 
+            bankDetails: bankFormData 
+        }));
+
+        setShowBankModal(false);
+        alert("Bank details updated successfully!");
+
+    } catch (error) {
+        console.error("Error saving bank details:", error);
+        alert("Failed to save bank details: " + error.message);
+    } finally {
+        setSavingBank(false);
+    }
+};
 
     const handleImageUpload = (e) => {
         const file = e.target.files[0];
@@ -613,8 +692,20 @@ export default function SellerAccount() {
                                 <ChevronRight size={20} className="text-gray-300" />
                             </button>
 
-                            <button
-                                onClick={() => router.push('/my-account')}
+                           <button
+                                onClick={() => {
+                                    setShowProfileModal(false);
+                                    setShowBankModal(true);
+                                    // Pre-fill form with existing bank details
+                                    if (user?.bankDetails) {
+                                        setBankFormData({
+                                            accountName: user.bankDetails.accountName || "",
+                                            accountNumber: user.bankDetails.accountNumber || "",
+                                            bankName: user.bankDetails.bankName || "",
+                                            bankCode: user.bankDetails.bankCode || ""
+                                        });
+                                    }
+                                }}
                                 className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
                             >
                                 <div className="flex items-center gap-3">
@@ -815,9 +906,9 @@ export default function SellerAccount() {
 
             {/* Withdraw Modal */}
             {showWithdrawModal && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-                        <div className="bg-blue-950 p-6 flex justify-between items-center rounded-t-2xl text-white sticky top-0">
+                 <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+                <div className="bg-white w-full h-full md:h-auto md:max-w-2xl overflow-y-auto">
+                <div className="sticky top-0 bg-blue-950 px-6 py-4 flex justify-between items-center text-white">
                             <h2 className="text-2xl font-bold">Withdraw Funds</h2>
                             <button onClick={() => {
                                 setShowWithdrawModal(false);
@@ -919,9 +1010,9 @@ export default function SellerAccount() {
 
             {/* Edit Profile Modal */}
             {isEditing && (
-                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="sticky top-0 bg-blue-950 border-b border-gray-700 px-6 py-4 flex justify-between items-center rounded-t-2xl text-white">
+                <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+        <div className="bg-white w-full h-full md:h-auto md:max-w-2xl overflow-y-auto">
+            <div className="sticky top-0 bg-blue-950 px-6 py-4 flex justify-between items-center text-white">
                             <h2 className="text-2xl font-bold">Edit Profile</h2>
                             <button onClick={() => setIsEditing(false)}><X size={24} /></button>
                         </div>
@@ -967,6 +1058,159 @@ export default function SellerAccount() {
                     </div>
                 </div>
             )}
+
+              {/* Bank Details Modal */}
+{showBankModal && (
+    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+        <div className="bg-white w-full h-full md:h-auto md:max-w-2xl md:rounded-2xl overflow-y-auto">
+            <div className="sticky top-0 bg-blue-950 px-6 py-4 flex justify-between items-center md:rounded-t-2xl text-white">
+                <h2 className="text-2xl font-bold">Bank Details</h2>
+                <button 
+                    onClick={() => {
+                        setShowBankModal(false);
+                        setBankFormData({
+                            accountName: "",
+                            accountNumber: "",
+                            bankName: "",
+                            bankCode: ""
+                        });
+                    }}
+                >
+                    <X size={24} />
+                </button>
+            </div>
+
+            <div className="p-6">
+                {user?.bankDetails && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                        <p className="text-sm font-semibold text-blue-900 mb-3">Current Bank Details:</p>
+                        <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">Account Name:</span>
+                                <span className="font-semibold text-blue-950">{user.bankDetails.accountName}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">Account Number:</span>
+                                <span className="font-semibold text-blue-950">{user.bankDetails.accountNumber}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">Bank:</span>
+                                <span className="font-semibold text-blue-950">{user.bankDetails.bankName}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="font-semibold block mb-2 text-gray-700">
+                            Account Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={bankFormData.accountName}
+                            onChange={(e) => setBankFormData({ ...bankFormData, accountName: e.target.value })}
+                            placeholder="Enter account holder name"
+                            className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="font-semibold block mb-2 text-gray-700">
+                            Account Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={bankFormData.accountNumber}
+                            onChange={(e) => setBankFormData({ ...bankFormData, accountNumber: e.target.value })}
+                            placeholder="Enter account number"
+                            className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none"
+                            maxLength="10"
+                        />
+                    </div>
+
+                  <div>
+    <label className="font-semibold block mb-2 text-gray-700">
+        Bank Name <span className="text-red-500">*</span>
+    </label>
+    <select
+        value={bankFormData.bankName}
+        onChange={(e) => {
+            const selectedBank = nigerianBanks.find(bank => bank.name === e.target.value);
+            setBankFormData({ 
+                ...bankFormData, 
+                bankName: e.target.value,
+                bankCode: selectedBank ? selectedBank.code : ""
+            });
+        }}
+        className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none"
+    >
+        <option value="">Select your bank</option>
+        {nigerianBanks.map((bank) => (
+            <option key={bank.code} value={bank.name}>
+                {bank.name}
+            </option>
+        ))}
+    </select>
+</div>
+                   <div>
+    <label className="font-semibold block mb-2 text-gray-700">
+        Bank Code
+    </label>
+    <input
+        type="text"
+        value={bankFormData.bankCode}
+        readOnly
+        placeholder="Auto-filled when you select bank"
+        className="w-full bg-gray-100 text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl cursor-not-allowed"
+    />
+    <p className="text-xs text-gray-500 mt-1">✓ Bank code is automatically filled when you select a bank</p>
+</div>
+                </div>
+
+                <div className="mt-6 flex gap-3">
+                    <button
+                        onClick={() => {
+                            setShowBankModal(false);
+                            setBankFormData({
+                                accountName: "",
+                                accountNumber: "",
+                                bankName: "",
+                                bankCode: ""
+                            });
+                        }}
+                        className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSaveBank}
+                        disabled={savingBank}
+                        className="flex-1 bg-blue-950 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {savingBank ? (
+                            <>
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                Saving...
+                            </>
+                        ) : (
+                            <>
+                                <Save size={18} />
+                                Save Bank Details
+                            </>
+                        )}
+                    </button>
+                </div>
+
+                <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+                    <p className="text-xs text-yellow-700">
+                        <strong>Note:</strong> Ensure your bank details are correct. All withdrawals will be sent to this account.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+)}
 
             {/* Bottom Navigation - Mobile Only */}
             <div className="fixed bottom-0 left-0 right-0 bg-blue-950 border-t border-blue-800 lg:hidden">
