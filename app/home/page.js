@@ -253,7 +253,7 @@ export default function HomePage() {
                 const q = query(
                     advertBooksRef,
                     orderBy('createdAt', 'desc'),
-                    limit(4) // Get exactly 4 books
+                    limit(6) // Get exactly 4 books
                 );
 
                 const snapshot = await getDocs(q);
@@ -578,7 +578,7 @@ export default function HomePage() {
                         <div className="relative">
                             {/* Mobile Grid (2 columns) */}
                             <div className="grid grid-cols-2 gap-4 lg:hidden">
-                                {displayBooks.slice(0, 4).map((book) => (
+                                {displayBooks.slice(0, 6).map((book) => (
                                     <Link
                                         key={book.id}
                                         href={`/book/preview?id=${book.id}`}
