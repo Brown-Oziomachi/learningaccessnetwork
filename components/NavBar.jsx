@@ -274,8 +274,8 @@ export default function Navbar() {
     <>
       <header className="bg-blue-950 border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <Link href="/latest/documentations" className="no-underline">
-          <div className="bg-white flex items-center justify-center gap-2 text-blue-950 py-2">
-            <h1 className="text-sm">2026 Latest Documentations</h1>
+          <div className="bg-white flex items-center justify-center gap-2 text-blue-950 ">
+            <h1 className=" font-bold text-lg">Recently Published...</h1>
             <ChevronRight size={16} />
           </div>
         </Link>
@@ -295,8 +295,17 @@ export default function Navbar() {
               href="/home"
               className="flex items-center gap-2 flex-shrink-0"
             >
-              <h1 className="text-4xl sm:text-3xl font-bold text-gray-50">
+              <h1
+                className="text-4xl sm:text-3xl font-bold text-gray-50"
+                style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
+              >
                 [LAN Library]
+                <h2
+                  className="text-xs sm:text-base font-light"
+                  style={{ fontFamily: "'Lato', sans-serif" }}
+                >
+                  Digital Platform For Knowledge Access
+                </h2>
               </h1>
             </Link>
 
@@ -318,7 +327,8 @@ export default function Navbar() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  className="w-full bg-white text-gray-900 placeholder-gray-400 px-4 py-2 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full text-gray-900 bg-white px-4 py-2 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
                 />
                 <button
                   onClick={handleSearch}
@@ -878,11 +888,14 @@ export default function Navbar() {
 
       {/* Mobile Menu */}
       {showMobileMenu && (
-        <div className="fixed inset-0 bg-white z-50 md:hidden overflow-y-auto text-blue-950">
+        <div className="fixed inset-0 bg-white z-50 md:hidden overflow-y-auto text-blue-950 max-w-90">
           <div className="p-4">
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="text-3xl font-bold text-gray-900">
+            <div className="flex items-center justify-between mb-6 ">
+              <h1 className="text-3xl font-bold text-blue-950">
                 [LAN Library]
+                <h2 className="text-xs sm:text-base">
+                  Digital Platform For Knowledge Access
+                </h2>
               </h1>
               <button
                 onClick={() => setShowMobileMenu(false)}
@@ -1054,10 +1067,10 @@ export default function Navbar() {
         }
       `}</style>
       {/* What is LAN Library Modal */}
-    <WhatIsLanModal
-      isOpen={showWhatIsLanModal}
-      onClose={() => setShowWhatIsLanModal(false)}
-    />
+      <WhatIsLanModal
+        isOpen={showWhatIsLanModal}
+        onClose={() => setShowWhatIsLanModal(false)}
+      />
     </>
   );
 }

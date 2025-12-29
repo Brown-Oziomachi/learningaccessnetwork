@@ -280,36 +280,39 @@ export default function CategoryPage() {
                                 <Link
                                     key={book.id}
                                     href={`/book/preview?id=${book.id}`}
-                                    className="flex-none w-[200px] sm:w-[220px] md:w-[240px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-xl transition-shadow"
+                                    className="flex-none w-[180px] sm:w-[200px] group"
                                 >
-                                    <div className="relative bg-gray-50 p-3">
+                                    {/* Book Cover */}
+                                    <div className="relative mb-3">
                                         <img
                                             src={book.image}
                                             alt={book.title}
-                                            className="w-full h-[240px] sm:h-[260px] md:h-[280px] object-cover rounded p-8.5"
+                                            className="w-full h-[240px] sm:h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
                                             onError={(e) => {
                                                 e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
                                             }}
                                         />
-                                        <span className="absolute top-5 left-5 bg-black text-white px-2 py-1 rounded text-xs font-bold">PDF</span>
                                         {isPurchased(book.id) && (
-                                            <span className="absolute top-5 right-5 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
+                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
                                         )}
                                         {book.isFromFirestore && (
-                                            <span className="absolute bottom-5 left-5 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
+                                            <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
                                         )}
                                     </div>
-                                    <div className="p-4">
-                                        <h4 className="font-bold text-sm text-gray-900 mb-2 line-clamp-2 hover:text-blue-600">
+
+                                    {/* Title and Author */}
+                                    <div>
+                                        <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600">
                                             {book.title}
                                         </h4>
-                                        <p className="text-gray-500 text-xs mb-3">Added by {book.author}</p>
+                                        <p className="text-gray-600 text-xs">{book.author}</p>
                                     </div>
                                 </Link>
                             ))}
                         </div>
                     </div>
                 </div>
+
 
                 {/* Second Row */}
                 {displayBooks.length > 5 && (
@@ -320,30 +323,32 @@ export default function CategoryPage() {
                                     <Link
                                         key={book.id}
                                         href={`/book/preview?id=${book.id}`}
-                                        className="flex-none w-[200px] sm:w-[220px] md:w-[240px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-xl transition-shadow"
+                                        className="flex-none w-[180px] sm:w-[200px] group"
                                     >
-                                        <div className="relative bg-gray-50 p-3">
+                                        {/* Book Cover */}
+                                        <div className="relative mb-3">
                                             <img
                                                 src={book.image}
                                                 alt={book.title}
-                                                className="w-full h-[240px] sm:h-[260px] md:h-[280px] object-cover rounded p-8.5"
+                                                className="w-full h-[240px] sm:h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
                                                 onError={(e) => {
                                                     e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
                                                 }}
                                             />
-                                            <span className="absolute top-5 left-5 bg-black text-white px-2 py-1 rounded text-xs font-bold">PDF</span>
                                             {isPurchased(book.id) && (
-                                                <span className="absolute top-5 right-5 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
+                                                <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
                                             )}
                                             {book.isFromFirestore && (
-                                                <span className="absolute bottom-5 left-5 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
+                                                <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
                                             )}
                                         </div>
-                                        <div className="p-4">
-                                            <h4 className="font-bold text-sm text-gray-900 mb-2 line-clamp-2 hover:text-blue-600">
+
+                                        {/* Title and Author */}
+                                        <div>
+                                            <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600">
                                                 {book.title}
                                             </h4>
-                                            <p className="text-gray-500 text-xs mb-3">Added by {book.author}</p>
+                                            <p className="text-gray-600 text-xs">{book.author}</p>
                                         </div>
                                     </Link>
                                 ))}

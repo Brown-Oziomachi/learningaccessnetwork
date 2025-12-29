@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { fetchBookDetails } from "@/utils/bookUtils";
+import WhatIsLanModal from "./WhatIsLanModal";
 
 export default function BookPreviewPage() {
   const router = useRouter();
@@ -46,7 +47,9 @@ export default function BookPreviewPage() {
   const [previewContent, setPreviewContent] = useState("");
   const [checkingSeller, setCheckingSeller] = useState(true);
   const [isSeller, setIsSeller] = useState(false);
-const [allBooks, setAllBooks] = useState([]);
+  const [allBooks, setAllBooks] = useState([]);
+  const [showWhatIsLanModal, setShowWhatIsLanModal] = useState(false);
+  
 
   // Helper function to get thumbnail from PDF
   const getThumbnailUrl = (book) => {
@@ -555,6 +558,9 @@ useEffect(() => {
             <Link href="/home" className="flex items-center gap-2">
               <div className="text-4xl font-bold text-blue-50">
                 [LAN Library]
+                <h2 className="text-xs sm:text-base">
+                  Digital Platform For Knowledge Access
+                </h2>
               </div>
             </Link>
 
@@ -582,6 +588,9 @@ useEffect(() => {
               <div className="flex items-center justify-between mb-6">
                 <div className="text-3xl font-bold text-blue-950">
                   [LAN Library]
+                  <h2 className="text-xs sm:text-base">
+                    Digital Platform For Knowledge Access
+                  </h2>
                 </div>
                 <button onClick={() => setShowNavMenu(false)}>
                   <X size={24} />
@@ -629,15 +638,18 @@ useEffect(() => {
                 >
                   <HelpCircle size={20} />
                   <span>FAQ and support</span>
-                  <ChevronRight className="ml-auto"/>
+                  <ChevronRight className="ml-auto" />
                 </Link>
               </div>
 
               <div className="border-t border-blue-950 my-4"></div>
               <div className="mt-6">
-                <Link href="/about/lan">
-                  <h3 className="font-bold text-gray-900 mb-3">What is LAN?</h3>
-                </Link>
+                <button
+                  onClick={() => setShowWhatIsLanModal(true)}
+                  className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 whitespace-nowrap z-50"
+                >
+                  What is LAN Library?
+                </button>
 
                 <div className="space-y-1">
                   {categories.map((category, index) => (
@@ -692,7 +704,7 @@ useEffect(() => {
                 </div>
 
                 <Link
-                  href="/pdf"
+                  href="/documents"
                   onClick={() => setShowNavMenu(false)}
                   className="block p-3 hover:bg-gray-50 rounded-lg font-medium mt-2"
                 >
@@ -1009,88 +1021,81 @@ useEffect(() => {
         </div>
 
         {/* Related Books */}
-     <div className="mt-12">
-  <h3 className="text-2xl font-bold text-gray-900 mb-6">
-    You might also like
-  </h3>
-  
-  {/* Mobile/Tablet: Horizontal Scroll */}
-  <div className="md:hidden">
-    <div className="overflow-x-auto scrollbar-hide">
-      <div className="flex gap-4 pb-4">
-        {(allBooks.length > 0 ? allBooks : booksData)
-          .filter(relatedBook => relatedBook.id !== bookId)
-          .slice(0, 8)
-          .map((relatedBook) => (
-            <Link
-              key={relatedBook.id}
-              href={`/book/preview?id=${relatedBook.id}`}
-              className="flex-none w-[200px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-xl transition-shadow"
-            >
-              <div className="relative bg-gray-50 p-3">
-                <img
-                  src={getThumbnailUrl(relatedBook)}
-                  alt={relatedBook.title}
-                  className="w-full h-[240px] object-cover rounded p-8.5"
-                  onError={(e) => {
-                    e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-                  }}
-                  loading="lazy"
-                />
-                <span className="absolute top-5 left-5 bg-black text-white px-2 py-1 rounded text-xs font-bold">PDF</span>
-              </div>
-              <div className="p-4">
-                <h4 className="font-bold text-sm text-gray-900 mb-2 line-clamp-2 hover:text-blue-600">
-                  {relatedBook.title}
-                </h4>
-                <p className="text-gray-500 text-xs mb-2">By: {relatedBook.sellerName}</p>
-                <p className="text-blue-950 font-bold text-sm">
-                  ₦{relatedBook.price?.toLocaleString()}
-                </p>
-              </div>
-            </Link>
-          ))}
-      </div>
-    </div>
-  </div>
+        <div className="mt-12">
+          <h3 className="text-2xl font-bold text-gray-900 mb-6">
+            You might also like
+          </h3>
 
-  {/* Desktop: Grid */}
-  <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {/* Mobile/Tablet: 2-Column Grid */}
+<div className="md:hidden">
+  <div className="grid grid-cols-2 gap-4">
     {(allBooks.length > 0 ? allBooks : booksData)
-      .filter(relatedBook => relatedBook.id !== bookId)
+      .filter((relatedBook) => relatedBook.id !== bookId)
       .slice(0, 8)
       .map((relatedBook) => (
         <Link
           key={relatedBook.id}
           href={`/book/preview?id=${relatedBook.id}`}
-          className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-xl transition-shadow"
+          className="group"
         >
-          <div className="relative bg-gray-50 p-3">
+          <div className="relative mb-3">
             <img
               src={getThumbnailUrl(relatedBook)}
               alt={relatedBook.title}
-              className="w-full h-[280px] object-cover rounded p-10.5"
+              className="w-full h-[240px] sm:h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
               onError={(e) => {
-                e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+                e.target.src =
+                  "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
               }}
               loading="lazy"
             />
-            <span className="absolute top-5 left-5 bg-black text-white px-2 py-1 rounded text-xs font-bold">PDF</span>
           </div>
-          <div className="p-4">
-            <h4 className="font-bold text-sm text-gray-900 mb-2 line-clamp-2 hover:text-blue-600">
+          <div>
+            <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
               {relatedBook.title}
             </h4>
-            <p className="text-gray-500 text-xs mb-2">By: {relatedBook.author}</p>
-            <p className="text-blue-950 font-bold text-sm">
-              ₦{relatedBook.price?.toLocaleString()}
+            <p className="text-gray-600 text-xs">
+              {relatedBook.author}
             </p>
           </div>
         </Link>
       ))}
   </div>
 </div>
-      </div> 
+
+{/* Desktop: Grid */}
+<div className="hidden md:grid md:grid-cols-3 lg:grid-cols-4 gap-4">
+  {(allBooks.length > 0 ? allBooks : booksData)
+    .filter((relatedBook) => relatedBook.id !== bookId)
+    .slice(0, 8)
+    .map((relatedBook) => (
+      <Link
+        key={relatedBook.id}
+        href={`/book/preview?id=${relatedBook.id}`}
+        className="group"
+      >
+        <div className="relative mb-3">
+          <img
+            src={getThumbnailUrl(relatedBook)}
+            alt={relatedBook.title}
+            className="w-full h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
+            onError={(e) => {
+              e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+            }}
+            loading="lazy"
+          />
+        </div>
+        <div>
+          <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
+            {relatedBook.title}
+          </h4>
+          <p className="text-gray-600 text-xs">{relatedBook.author}</p>
+        </div>
+      </Link>
+    ))}
+</div>
+</div>
+</div>
 
       {/* Options Modal */}
       {showOptionsModal && (
@@ -1141,7 +1146,8 @@ useEffect(() => {
 
                 <button
                   onClick={handleReport}
-                  className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left">
+                  className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left"
+                >
                   <Flag size={24} className="text-gray-700" />
                   <span className="font-medium text-gray-900 text-lg">
                     Report
@@ -1205,6 +1211,10 @@ useEffect(() => {
           animation: fadeIn 0.3s ease-out;
         }
       `}</style>
+      <WhatIsLanModal
+        isOpen={showWhatIsLanModal}
+        onClose={() => setShowWhatIsLanModal(false)}
+      />
     </div>
   );
 }

@@ -9,7 +9,7 @@ export default function MobileCategoriesCarousel() {
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
 
-  // Group categories into slides of 4 (2x2 grid)
+  // Group categories into slides of 4 (2 columns x 2 rows = 4 per slide)
   const categoriesPerSlide = 4;
   const slides = [];
   for (let i = 0; i < categoriesWithImages.length; i += categoriesPerSlide) {
@@ -53,7 +53,7 @@ export default function MobileCategoriesCarousel() {
   };
 
   return (
-    <div className="lg:hidden px-1 py-10">
+    <div className="lg:hidden px-4 py-10">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">
         Browse by Category
       </h2>
@@ -61,7 +61,7 @@ export default function MobileCategoriesCarousel() {
       <div className="relative">
         {/* Carousel Container */}
         <div
-          className="overflow-hidden "
+          className="overflow-hidden"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -79,24 +79,20 @@ export default function MobileCategoriesCarousel() {
                   <Link
                     key={category.name}
                     href={`/category/${getCategorySlug(category.name)}`}
-                    className="group bg-white border border-gray-200  overflow-hidden hover:shadow-xl transition-all duration-300"
+                    className="group bg-white border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300"
                   >
-                    {/* Text Content - Top Section */}
-                    <div className="p-4 bg-gray-50">
-                      <h3 className="text-base font-bold text-gray-900 mb-1 line-clamp-1">
+                    {/* Text Content - Top Section (like desktop) */}
+                    <div className="p-4 bg-gray-100">
+                      <h3 className="text-base font-bold text-gray-900 mb-1">
                         {category.name}
                       </h3>
-                      <p className="text-xs text-gray-600 mb-2">
+                      <p className="text-xs text-gray-600">
                         {category.subcategories} categories
                       </p>
-                      <div className="flex items-center text-blue-950 text-xs font-medium">
-                        View all
-                        <ChevronRight className="w-3 h-3 ml-1" />
-                      </div>
                     </div>
 
-                    {/* Image - Bottom Section */}
-                    <div className="relative h-32 overflow-hidden">
+                    {/* Image - Bottom Section (like desktop) */}
+                    <div className="relative h-40 overflow-hidden">
                       <img
                         src={category.image}
                         alt={category.name}
@@ -115,7 +111,7 @@ export default function MobileCategoriesCarousel() {
           <>
             <button
               onClick={prevSlide}
-              className="absolute left-0 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-900 rounded-full p-2 shadow-lg z-10 disabled:opacity-50"
+              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 bg-white/90 hover:bg-white text-gray-900 rounded-full p-2 shadow-lg z-10 disabled:opacity-50"
               aria-label="Previous slide"
               disabled={currentSlide === 0}
             >
@@ -123,7 +119,7 @@ export default function MobileCategoriesCarousel() {
             </button>
             <button
               onClick={nextSlide}
-              className="absolute right-0 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-900 rounded-full p-2 shadow-lg z-10 disabled:opacity-50"
+              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 bg-white/90 hover:bg-white text-gray-900 rounded-full p-2 shadow-lg z-10 disabled:opacity-50"
               aria-label="Next slide"
               disabled={currentSlide === totalSlides - 1}
             >
@@ -134,7 +130,7 @@ export default function MobileCategoriesCarousel() {
 
         {/* Dots Indicator */}
         {totalSlides > 1 && (
-          <div className="flex justify-center gap-2 mt-4">
+          <div className="flex justify-center gap-2 mt-6">
             {slides.map((_, index) => (
               <button
                 key={index}
@@ -152,7 +148,7 @@ export default function MobileCategoriesCarousel() {
         <div className="text-center mt-3 text-sm text-gray-600">
           {currentSlide + 1} / {totalSlides}
         </div>
-      </div>    
+      </div>
     </div>
   );
 }

@@ -386,7 +386,7 @@ export default function AllBooksPage() {
     return (
         <>
             <Navbar />
-            <div className="min-h-screen bg-white">
+            <div className="min-h-screen bg-neutral-100">
 
                 {/* Breadcrumb */}
                 <div className="bg-gray-50 border-b border-gray-200">
@@ -412,7 +412,7 @@ export default function AllBooksPage() {
                     </div>
 
                     {/* Filters & Sort */}
-                    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+                    <div className="bg-neutral-50 border border-gray-200 rounded-lg p-4 mb-6">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                             {/* Left Side - Category Filter */}
                             <div className="flex items-center gap-3 flex-wrap">
@@ -485,105 +485,250 @@ export default function AllBooksPage() {
                     ) : (
                         <>
                             {/* Featured Books Carousel */}
-                            <div className="px-4 py-8 lg:px-0">
-                                <h1 className="text-4xl lg:text-5xl font-black mb-10 text-black">Documents</h1>
-                                <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-8">Get started with the community's uploads</h3>
+                                <div className="px-4 py-8 lg:px-0">
+                                    <h1 className="text-4xl lg:text-5xl font-black mb-10 text-black">Documents</h1>
+                                    <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-8">Get started with the community's uploads</h3>
 
-                                <div className="relative -mx-4 lg:mx-0">
-                                    <div className="overflow-x-auto overflow-y-hidden scrollbar-hide px-4 lg:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                        <style jsx>{`
+                                    <div className="relative -mx-4 lg:mx-0">
+                                        <div className="overflow-x-auto overflow-y-hidden scrollbar-hide px-4 lg:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                            <style jsx>{`
                 div::-webkit-scrollbar {
                     display: none;
                 }
             `}</style>
-                                        <div className="flex gap-5 lg:gap-5 pb-2">
-                                            {displayBooks.slice(0, 5).map((book, index) => (
-                                                <Link
-                                                    key={book.id}
-                                                    href={`/book/preview?id=${book.id}`}
-                                                    className="flex-none w-[35vw] sm:w-[45vw] lg:flex-1 lg:w-0 min-w-[240px] lg:min-w-60 bg-gray-50 border border-gray-200 overflow-hidden hover:shadow-xl transition-all cursor-pointer group"
-                                                >
-                                                    <div className="relative bg-gray-50">
-                                                        <img
-                                                            src={book.image}
-                                                            alt={book.title}
-                                                            className="block w-full h-[360px] lg:h-[180px] object-contain"
-                                                            onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                                                        />
-                                                        <span className="absolute top-3 left-3 bg-black text-white px-3 py-1.5 rounded text-xs font-bold uppercase">PDF</span>
-                                                        {isPurchased(book.id) && (
-                                                            <span className="absolute top-3 right-3 bg-green-600 text-white px-2.5 py-1 rounded text-xs font-bold">Owned</span>
-                                                        )}
-                                                        {book.isFromFirestore && (
-                                                            <span className="absolute bottom-3 left-3 bg-blue-600 text-white px-2.5 py-1 rounded text-xs font-bold">New</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="p-5 pb-6">
-                                                        <h4 className="font-bold text-base lg:text-lg text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">{book.title}</h4>
-                                                        <p className="text-gray-500 text-sm mb-5">Added by {book.author}</p>
-                                                        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                                            <div className="flex gap-5 lg:gap-5 pb-2">
+                                                {displayBooks.slice(0, 5).map((book, index) => (
+                                                    <Link
+                                                        key={book.id}
+                                                        href={`/book/preview?id=${book.id}`}
+                                                        className="flex-none w-[180px] sm:w-[200px] lg:w-[220px] group"
+                                                    >
+                                                        <div className="relative mb-3">
+                                                            <img
+                                                                src={book.image}
+                                                                alt={book.title}
+                                                                className="w-full h-[240px] sm:h-[280px] lg:h-[320px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
+                                                                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
+                                                            />
+                                                            {isPurchased(book.id) && (
+                                                                <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
+                                                            )}
+                                                            {book.isFromFirestore && (
+                                                                <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
+                                                            )}
                                                         </div>
-                                                    </div>
-                                                </Link>
-                                            ))}
+                                                        <div>
+                                                            <h4 className="font-bold text-sm lg:text-base text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                                                                {book.title}
+                                                            </h4>
+                                                            <p className="text-gray-600 text-xs lg:text-sm">{book.author}</p>
+                                                        </div>
+                                                    </Link>
+                                                ))}
+                                            </div>
                                         </div>
+                                        {displayBooks.length > 4 && (
+                                            <button className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 w-11 h-11 bg-white rounded-full shadow-lg items-center justify-center hover:bg-gray-50 transition-colors z-10 border border-gray-200">
+                                            </button>
+                                        )}
                                     </div>
-                                    {displayBooks.length > 4 && (
-                                        <button className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 w-11 h-11 bg-white rounded-full shadow-lg items-center justify-center hover:bg-gray-50 transition-colors z-10 border border-gray-200">
-                                        </button>
-                                    )}
                                 </div>
-                            </div>
 
-                            {/* Recent Books Carousel 1 */}
-                            <div className="px-4 py-8 lg:px-0">
-                                <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-8">Documents recommended for you</h3>
+                                {/* Documents recommended for you */}
+                                <div className="px-4 py-8 lg:px-0">
+                                    <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-8">Documents recommended for you</h3>
 
-                                <div className="relative -mx-4 lg:mx-0">
-                                    <div className="overflow-x-auto overflow-y-hidden scrollbar-hide px-4 lg:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                        <style jsx>{`
+                                    <div className="relative -mx-4 lg:mx-0">
+                                        <div className="overflow-x-auto overflow-y-hidden scrollbar-hide px-4 lg:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                            <style jsx>{`
                 div::-webkit-scrollbar {
                     display: none;
                 }
             `}</style>
-                                        <div className="flex gap-5 lg:gap-5 pb-2">
-                                            {displayBooks.slice(5, 10).map((book, index) => (
-                                                <Link
-                                                    key={book.id}
-                                                    href={`/book/preview?id=${book.id}`}
-                                                    className="flex-none w-[35vw] sm:w-[45vw] lg:flex-1 lg:w-0 min-w-[240px] lg:min-w-60 bg-gray-50 border border-gray-200 overflow-hidden hover:shadow-xl transition-all cursor-pointer group"
-                                                >
-                                                    <div className="relative bg-gray-50">
-                                                        <img
-                                                            src={book.image}
-                                                            alt={book.title}
-                                                            className="block w-full h-[360px] lg:h-[180px] object-contain"
-                                                            onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                                                        />
-                                                        <span className="absolute top-3 left-3 bg-black text-white px-3 py-1.5 rounded text-xs font-bold uppercase">PDF</span>
-                                                        {isPurchased(book.id) && (
-                                                            <span className="absolute top-3 right-3 bg-green-600 text-white px-2.5 py-1 rounded text-xs font-bold">Owned</span>
-                                                        )}
-                                                        {book.isFromFirestore && (
-                                                            <span className="absolute bottom-3 left-3 bg-blue-600 text-white px-2.5 py-1 rounded text-xs font-bold">New</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="p-5 pb-6">
-                                                        <h4 className="font-bold text-base lg:text-lg text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">{book.title}</h4>
-                                                        <p className="text-gray-500 text-sm mb-5">Added by {book.author}</p>
-                                                        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                                            <div className="flex gap-5 lg:gap-5 pb-2">
+                                                {displayBooks.slice(5, 10).map((book, index) => (
+                                                    <Link
+                                                        key={book.id}
+                                                        href={`/book/preview?id=${book.id}`}
+                                                        className="flex-none w-[180px] sm:w-[200px] lg:w-[220px] group"
+                                                    >
+                                                        <div className="relative mb-3">
+                                                            <img
+                                                                src={book.image}
+                                                                alt={book.title}
+                                                                className="w-full h-[240px] sm:h-[280px] lg:h-[320px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
+                                                                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
+                                                            />
+                                                            {isPurchased(book.id) && (
+                                                                <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
+                                                            )}
+                                                            {book.isFromFirestore && (
+                                                                <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
+                                                            )}
                                                         </div>
-                                                    </div>
-                                                </Link>
-                                            ))}
+                                                        <div>
+                                                            <h4 className="font-bold text-sm lg:text-base text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                                                                {book.title}
+                                                            </h4>
+                                                            <p className="text-gray-600 text-xs lg:text-sm">{book.author}</p>
+                                                        </div>
+                                                    </Link>
+                                                ))}
+                                            </div>
                                         </div>
+                                        {displayBooks.length > 9 && (
+                                            <button className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 w-11 h-11 bg-white rounded-full shadow-lg items-center justify-center hover:bg-gray-50 transition-colors z-10 border border-gray-200">
+                                            </button>
+                                        )}
                                     </div>
-                                    {displayBooks.length > 4 && (
-                                        <button className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 w-11 h-11 bg-white rounded-full shadow-lg items-center justify-center hover:bg-gray-50 transition-colors z-10 border border-gray-200">
-                                        </button>
-                                    )}
                                 </div>
-                            </div>
+
+                                {/* Trending Now */}
+                                <div className="px-4 py-8 lg:px-0">
+                                    <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-8">Trending Now</h3>
+
+                                    <div className="relative -mx-4 lg:mx-0">
+                                        <div className="overflow-x-auto overflow-y-hidden scrollbar-hide px-4 lg:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                            <style jsx>{`
+                div::-webkit-scrollbar {
+                    display: none;
+                }
+            `}</style>
+                                            <div className="flex gap-5 lg:gap-5 pb-2">
+                                                {displayBooks.slice(10, 15).map((book, index) => (
+                                                    <Link
+                                                        key={book.id}
+                                                        href={`/book/preview?id=${book.id}`}
+                                                        className="flex-none w-[180px] sm:w-[200px] lg:w-[220px] group"
+                                                    >
+                                                        <div className="relative mb-3">
+                                                            <img
+                                                                src={book.image}
+                                                                alt={book.title}
+                                                                className="w-full h-[240px] sm:h-[280px] lg:h-[320px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
+                                                                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
+                                                            />
+                                                            {isPurchased(book.id) && (
+                                                                <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
+                                                            )}
+                                                            {book.isFromFirestore && (
+                                                                <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-sm lg:text-base text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                                                                {book.title}
+                                                            </h4>
+                                                            <p className="text-gray-600 text-xs lg:text-sm">{book.author}</p>
+                                                        </div>
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {displayBooks.length > 14 && (
+                                            <button className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 w-11 h-11 bg-white rounded-full shadow-lg items-center justify-center hover:bg-gray-50 transition-colors z-10 border border-gray-200">
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Recently Added */}
+                                <div className="px-4 py-8 lg:px-0">
+                                    <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-8">Recently Added</h3>
+
+                                    <div className="relative -mx-4 lg:mx-0">
+                                        <div className="overflow-x-auto overflow-y-hidden scrollbar-hide px-4 lg:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                            <style jsx>{`
+                div::-webkit-scrollbar {
+                    display: none;
+                }
+            `}</style>
+                                            <div className="flex gap-5 lg:gap-5 pb-2">
+                                                {displayBooks.slice(15, 20).map((book, index) => (
+                                                    <Link
+                                                        key={book.id}
+                                                        href={`/book/preview?id=${book.id}`}
+                                                        className="flex-none w-[180px] sm:w-[200px] lg:w-[220px] group"
+                                                    >
+                                                        <div className="relative mb-3">
+                                                            <img
+                                                                src={book.image}
+                                                                alt={book.title}
+                                                                className="w-full h-[240px] sm:h-[280px] lg:h-[320px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
+                                                                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
+                                                            />
+                                                            {isPurchased(book.id) && (
+                                                                <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
+                                                            )}
+                                                            {book.isFromFirestore && (
+                                                                <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-sm lg:text-base text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                                                                {book.title}
+                                                            </h4>
+                                                            <p className="text-gray-600 text-xs lg:text-sm">{book.author}</p>
+                                                        </div>
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {displayBooks.length > 19 && (
+                                            <button className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 w-11 h-11 bg-white rounded-full shadow-lg items-center justify-center hover:bg-gray-50 transition-colors z-10 border border-gray-200">
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Popular This Week */}
+                                <div className="px-4 py-8 lg:px-0">
+                                    <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-8">Popular This Week</h3>
+
+                                    <div className="relative -mx-4 lg:mx-0">
+                                        <div className="overflow-x-auto overflow-y-hidden scrollbar-hide px-4 lg:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                            <style jsx>{`
+                div::-webkit-scrollbar {
+                    display: none;
+                }
+            `}</style>
+                                            <div className="flex gap-5 lg:gap-5 pb-2">
+                                                {displayBooks.slice(20, 25).map((book, index) => (
+                                                    <Link
+                                                        key={book.id}
+                                                        href={`/book/preview?id=${book.id}`}
+                                                        className="flex-none w-[180px] sm:w-[200px] lg:w-[220px] group"
+                                                    >
+                                                        <div className="relative mb-3">
+                                                            <img
+                                                                src={book.image}
+                                                                alt={book.title}
+                                                                className="w-full h-[240px] sm:h-[280px] lg:h-[320px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
+                                                                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
+                                                            />
+                                                            {isPurchased(book.id) && (
+                                                                <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
+                                                            )}
+                                                            {book.isFromFirestore && (
+                                                                <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">popular</span>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-sm lg:text-base text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                                                                {book.title}
+                                                            </h4>
+                                                            <p className="text-gray-600 text-xs lg:text-sm">{book.author}</p>
+                                                        </div>
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {displayBooks.length > 24 && (
+                                            <button className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 w-11 h-11 bg-white rounded-full shadow-lg items-center justify-center hover:bg-gray-50 transition-colors z-10 border border-gray-200">
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                           
                             {/* Pagination */}
                             {totalPages > 1 && (

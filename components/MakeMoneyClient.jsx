@@ -134,17 +134,24 @@ export default function MakeMoneyPage() {
       {/* Header */}
       <header className="border-b border-gray-800 sticky top-0 z-50 bg-blue-950 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/home" className="flex items-center gap-2">
-            <div className="lg:text-5xl text-2xl font-bold text-white">
-              [LAN Library]{" "}
-              
-            </div>
-          </Link>
-          <Link href="/become-seller">
-            <button className="text-blue-950 bg-white lg:px-6 lg:py-2 max-md:text-sm max-lg:px-5 max-lg:py-2 rounded-full font-semibold hover:bg-blue-700 transition-colors">
-              BECOME A SELLER
-            </button>
-          </Link>
+          <Link
+                       href="/home"
+                       className="flex items-center gap-2 flex-shrink-0"
+                     >
+                       <h1
+                         className="text-4xl sm:text-6xl font-bold text-gray-50"
+                         style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
+                       >
+                         [LAN Library]
+                         <h2
+                           className="text-xs sm:text-base font-light"
+                           style={{ fontFamily: "'Lato', sans-serif" }}
+                         >
+                           Digital Platform For Knowledge Access
+                         </h2>
+                       </h1>
+                     </Link>
+         
         </div>
       </header>
 

@@ -80,9 +80,10 @@ export default function LearningAccessNetwork() {
       <div className="relative z-10 flex flex-col min-h-screen bg-black/0">
         {/* Header */}
         <header className="pt-8 px-4 md:pt-12">
-          <h1 className="text-center text-3xl md:text-5xl font-bold">
-            <span className="text-white bg-blue-950 px-2">LEARNING </span>
-            <span className="text-blue-900 max-md:font-black ml-1 lg:bg-white">ACCESS NETWORK</span>
+          <h1 className="text-center text-3xl lg:text-7xl md:text-5xl font-bold">
+            <span className="text-white bg-blue-950 px-2">LAN </span>
+            <span className="text-blue-900 max-md:font-black ml-1 ">Library</span>
+            <h2 className="text-blue-950 text-xl md:text-2xl font-bold mt-2">Learning Access Network</h2>
           </h1>
         </header>
 

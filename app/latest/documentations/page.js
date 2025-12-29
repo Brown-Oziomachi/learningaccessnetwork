@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { db, auth } from '@/lib/firebaseConfig';
 import { collection, query, where, getDocs, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import Navbar from '@/components/NavBar';
 
 export default function Latest2026BooksPage() {
     const router = useRouter();
@@ -212,22 +213,23 @@ export default function Latest2026BooksPage() {
             <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600 font-medium">Loading latest 2026 books...</p>
+                    <p className="mt-4 text-gray-600 font-medium">Loading Recently Published...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-neutral-50">
             {/* Hero Section */}
-            <div className="relative bg-blue-950 text-white overflow-hidden">
+            <Navbar />
+            <div className="relative text-blue-950 overflow-hidden">
 
                 <div className="relative max-w-7xl mx-auto px-4 py-16">
                     {/* Back Button */}
                     <button
                         onClick={() => router.back()}
-                        className="flex items-center gap-2 text-white/90 hover:text-white mb-6 transition-colors"
+                        className="flex items-center gap-2 hover:text-white mb-6 transition-colors"
                     >
                         <ArrowLeft className="w-5 h-5" />
                         <span>Back</span>
@@ -241,9 +243,9 @@ export default function Latest2026BooksPage() {
                         </div>
 
                         <h1 className="text-5xl md:text-7xl font-black mb-4">
-                           2026 Documentations
+                           Recently Published...
                         </h1>
-                        <p className="text-xl md:text-2xl text-purple-100 max-w-3xl mx-auto">
+                        <p className="text-xl md:text-2xl max-w-3xl mx-auto">
                             Discover the newest additions to our library. Stay updated with fresh content!
                         </p>
                     </div>
@@ -253,22 +255,22 @@ export default function Latest2026BooksPage() {
                         <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 text-center transform hover:scale-105 transition-all">
                             <Calendar className="w-8 h-8 mx-auto mb-2 text-yellow-300" />
                             <div className="text-3xl font-bold">{stats.totalBooks}</div>
-                            <div className="text-sm text-purple-200">All 2026</div>
+                            <div className="text-sm ">All 2026</div>
                         </div>
                         <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 text-center transform hover:scale-105 transition-all">
                             <Flame className="w-8 h-8 mx-auto mb-2 text-orange-300" />
                             <div className="text-3xl font-bold">{stats.thisMonth}</div>
-                            <div className="text-sm text-purple-200">This Month</div>
+                            <div className="text-sm ">This Month</div>
                         </div>
                         <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 text-center transform hover:scale-105 transition-all">
                             <TrendingUp className="w-8 h-8 mx-auto mb-2 text-green-300" />
                             <div className="text-3xl font-bold">{stats.thisWeek}</div>
-                            <div className="text-sm text-purple-200">This Week</div>
+                            <div className="text-sm">This Week</div>
                         </div>
                         <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 text-center transform hover:scale-105 transition-all">
                             <Clock className="w-8 h-8 mx-auto mb-2 text-blue-300" />
                             <div className="text-3xl font-bold">{stats.today}</div>
-                            <div className="text-sm text-purple-200">Today</div>
+                            <div className="text-sm">Today</div>
                         </div>
                     </div>
                 </div>

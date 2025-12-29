@@ -13,7 +13,7 @@ export default function WhatIsLanModal({ isOpen, onClose }) {
       />
 
       {/* Modal */}
-      <div className="fixed right-0 top-0 h-full w-full md:w-[500px] bg-white shadow-2xl z-50 overflow-y-auto animate-slideInRight">
+      <div className="fixed right-0 top-0 h-full w-full md:w-[500px] bg-white shadow-2xl z-[999] overflow-y-auto animate-slideInRight">
         <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-blue-950">
             What is LAN Library?

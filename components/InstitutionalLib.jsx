@@ -6,9 +6,9 @@ import {  Upload, ArrowRight, Sparkles } from 'lucide-react';
 export default function InstitutionalLibraryPage() {
  
     return (
-        <div className="min-h-screen bg-white mt-10">
+        <div className="min-h-screen bg-neutral-100 mt-10">
             {/* Hero Section */}
-            <div className="relative bg-blue-950 text-white overflow-hidden">
+            <div className="relative bg-blue-950 brightness-70 text-white overflow-hidden">
                 {/* Geometric patterns */}
                 <div className="absolute inset-0 opacity-5">
                     <div className="absolute inset-0" style={{
