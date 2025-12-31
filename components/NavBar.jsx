@@ -19,6 +19,7 @@ import {
   Sparkles,
   HelpCircle,
   Crown,
+  School2Icon,
 } from "lucide-react";
 import Link from "next/link";
 import { signOut } from "firebase/auth";
@@ -309,16 +310,16 @@ export default function Navbar() {
               </h1>
             </Link>
 
-           <button
-            onClick={() => {
-              setShowMobileSearch(!showMobileSearch);
-              setShowMobileMenu(false);
-            }}
-            className="p-2 bg-white text-blue-950 rounded-lg "
-          >
-            <Search size={22} />
-          </button>
-           
+            <button
+              onClick={() => {
+                setShowMobileSearch(!showMobileSearch);
+                setShowMobileMenu(false);
+              }}
+              className="p-2 bg-white text-blue-950 rounded-lg "
+            >
+              <Search size={22} />
+            </button>
+
             <nav className="hidden lg:flex items-center gap-2 lg:gap-3 flex-shrink-0">
               <Link
                 href="/my-books"
@@ -368,6 +369,13 @@ export default function Navbar() {
                   <>Become a Seller</>
                 )}
               </button>
+              <Link
+                href="/register-school"
+                className="text-blue-950 hover:bg-blue-800 transition-colors bg-white font-semibold px-8 py-2 hover:text-white rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <School2Icon size={18} />
+                <span>Register School</span>
+              </Link>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 bg-red-800 text-white hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
@@ -378,7 +386,7 @@ export default function Navbar() {
             </nav>
           </div>
 
-         {showMobileSearch && (
+          {showMobileSearch && (
             <div className="mt-3 animate-slideDown">
               <div className="relative">
                 <input
@@ -390,7 +398,10 @@ export default function Navbar() {
                   className="w-full text-gray-900 bg-white px-4 py-2 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500"
                   autoFocus
                 />
-                <button onClick={handleSearch} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500">
+                <button
+                  onClick={handleSearch}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
+                >
                   <Search size={20} />
                 </button>
               </div>
@@ -638,7 +649,7 @@ export default function Navbar() {
                         <h4 className="font-semibold text-gray-900 mb-3 p-6">
                           Documents recommended for you
                         </h4>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-3 gap-4 p-6">
                           {menuCategories.science.books.map((book) => (
                             <Link
                               key={book.id}
@@ -703,7 +714,7 @@ export default function Navbar() {
                       <h4 className="font-semibold text-gray-900 mb-3 p-6">
                         Documents recommended for you
                       </h4>
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-3 gap-4 p-6">
                         {menuCategories.sexeducation.books.map((book) => (
                           <Link
                             key={book.id}
@@ -740,7 +751,7 @@ export default function Navbar() {
                 All Documents
               </Link>
             </div>
-                </div>
+          </div>
         </div>
       </header>
 
@@ -784,6 +795,13 @@ export default function Navbar() {
                     <>Become a Seller</>
                   )}
                 </button>
+                <Link
+                  href="/register-school"
+                  className="text-blue-950 hover:bg-blue-800 transition-colors bg-white font-semibold px-8 py-2 hover:text-white rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <School2Icon size={18} />
+                  <span>Register School</span>
+                </Link>
                 <Link
                   href="/my-books"
                   className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"

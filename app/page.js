@@ -15,6 +15,7 @@ export default function LearningAccessNetwork() {
   const [loading, setLoading] = useState(true);
   const currentYear = new Date().getFullYear();
   const [showWhatIsLanModal, setShowWhatIsLanModal] = useState(false);
+  const isDisabled = true;
 
   const bookImages = [
     'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=1920&h=1080&fit=crop',
@@ -47,7 +48,7 @@ export default function LearningAccessNetwork() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-blue-950">
-        <div className="text-white text-xl">Loading...</div>
+        <div className="text-white text-xl">WELCOME TO LAN Library...</div>
       </div>
     );
   }
@@ -70,7 +71,7 @@ export default function LearningAccessNetwork() {
               style={{ backgroundImage: `url(${bookImages[currentImageIndex]})` }}
             />
             {/* Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/80" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/50 to-black/80" />
           </motion.div>
         </AnimatePresence>
       </div>
@@ -96,7 +97,7 @@ export default function LearningAccessNetwork() {
 
         {/* Main Content - Different layouts for mobile and desktop */}
         <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-          
+
           {/* Mobile Layout */}
           <div className="lg:hidden w-full max-w-md space-y-6">
             {/* Hero Text */}
@@ -114,11 +115,11 @@ export default function LearningAccessNetwork() {
               </p>
               <div>
                 <button
-                onClick={() => setShowWhatIsLanModal(true)}
-                className="py-5 text-sm text-gray-700 hover:bg-gray-100 whitespace-nowrap text-center underline"
-              >
-                What is LAN Library?
-              </button>
+                  onClick={() => setShowWhatIsLanModal(true)}
+                  className="py-5 text-sm text-gray-700 hover:bg-gray-100 whitespace-nowrap text-center underline"
+                >
+                  What is LAN Library?
+                </button>
               </div>
             </motion.div>
 
@@ -154,7 +155,7 @@ export default function LearningAccessNetwork() {
               <div className="bg-white/95 backdrop-blur-sm p-8 rounded-2xl shadow-2xl">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="bg-blue-100 p-3 rounded-full">
-                   <BookOpenText className="w-8 h-8 text-blue-600" />
+                    <BookOpenText className="w-8 h-8 text-blue-600" />
                   </div>
                   <h3 className="text-2xl font-bold text-blue-950">For Readers</h3>
                 </div>
@@ -213,9 +214,9 @@ export default function LearningAccessNetwork() {
                     <p className="text-blue-200">Where Opportunity Meets Learning</p>
                   </div>
                 </div>
-                
+
                 <p className="text-lg leading-relaxed mb-6 text-blue-50">
-                  <strong className="text-white">LAN Library</strong> is a digital knowledge marketplace connecting book creators with readers worldwide. 
+                  <strong className="text-white">LAN Library</strong> is a digital knowledge marketplace connecting book writers with readers worldwide.
                   <span className="block mt-2 text-yellow-300">
                     ✨ Sellers earn income, buyers access knowledge
                   </span>
@@ -238,14 +239,14 @@ export default function LearningAccessNetwork() {
                     <div className="text-xs text-blue-200">Active Sellers</div>
                   </div>
                 </div>
-             <div>
-                <button
-                onClick={() => setShowWhatIsLanModal(true)}
-                className="py-10 text-sm whitespace-nowrap text-center underline"
-              >
-                What is LAN Library?
-              </button>
-              </div>
+                <div>
+                  <button
+                    onClick={() => setShowWhatIsLanModal(true)}
+                    className="py-10 text-sm whitespace-nowrap text-center underline"
+                  >
+                    What is LAN Library?
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -261,16 +262,26 @@ export default function LearningAccessNetwork() {
           >
             <a
               href="/auth/signin"
-              className="w-full md:w-auto bg-white text-center font-bold text-gray-800 px-12 py-4 rounded-lg hover:bg-gray-100 transition-all hover:scale-105 shadow-lg"
+              className="w-full md:w-auto bg-white text-center font-bold text-gray-800 px-12 py-2 rounded-lg hover:bg-gray-100 transition-all hover:scale-105 shadow-lg"
             >
               SIGN IN
             </a>
-            <Link
-              href="/advertise"
-              className="w-full md:w-auto bg-gradient-to-r from-blue-950 to-blue-950 text-white px-10 py-4 rounded-lg font-bold hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 text-center shadow-lg"
+            <div
+              className={`w-full md:w-auto bg-gradient-to-r from-blue-950 to-blue-950 
+          text-white px-10 py-2 rounded-lg font-bold text-center shadow-lg
+          ${isDisabled ? 'opacity-70 b cursor-not-allowed pointer-events-none' : 'hover:scale-105 hover:from-blue-700 hover:to-blue-800 transition-all'}`}
             >
               START SELLING NOW
-            </Link>
+            </div>
+
+            <div
+              className={`w-full md:w-auto bg-white text-gray-800 px-12 py-2 rounded-lg 
+            font-bold text-center shadow-lg
+            ${isDisabled ? 'opacity-50  cursor-not-allowed pointer-events-none' : 'hover:bg-gray-100 hover:scale-105 transition-all'}`}
+            >
+              REGISTER YOUR SCHOOL
+            </div>
+
           </motion.div>
 
           <motion.div
@@ -293,11 +304,10 @@ export default function LearningAccessNetwork() {
             <button
               key={index}
               onClick={() => setCurrentImageIndex(index)}
-              className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                index === currentImageIndex
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${index === currentImageIndex
                   ? 'bg-white h-8'
                   : 'bg-white/50 hover:bg-white/75'
-              }`}
+                }`}
               aria-label={`Go to slide ${index + 1}`}
             />
           ))}
@@ -312,20 +322,20 @@ export default function LearningAccessNetwork() {
               &copy; {currentYear} Learning Access Network (LAN Library). All rights reserved.
             </p>
             <div className="flex gap-6">
-              <Link href="/privacy-policy" className="hover:text-white transition-colors">
+              <Link href="/lan/privacy-policy" className="hover:text-white transition-colors">
                 Privacy Policy
               </Link>
-              <Link href="/terms-of-service" className="hover:text-white transition-colors">
+              <Link href="/lan/terms-of-service" className="hover:text-white transition-colors">
                 Terms of Service
               </Link>
-              <Link href="/cookie-policy" className="hover:text-white transition-colors">
+              {/* <Link href="/cookie-policy" className="hover:text-white transition-colors">
                 Cookie Policy
-              </Link>
+              </Link> */}
             </div>
           </div>
         </div>
       </div>
-        <WhatIsLanModal
+      <WhatIsLanModal
         isOpen={showWhatIsLanModal}
         onClose={() => setShowWhatIsLanModal(false)}
       />

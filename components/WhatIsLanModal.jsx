@@ -8,7 +8,7 @@ export default function WhatIsLanModal({ isOpen, onClose }) {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-50 transition-opacity"
+        className="fixed inset-0 bg-black/80 z-50 transition-opacity"
         onClick={onClose}
       />
 
@@ -29,9 +29,15 @@ export default function WhatIsLanModal({ isOpen, onClose }) {
 
         <div className="p-6 space-y-6 text-gray-700 leading-relaxed">
           <p className="text-lg font-semibold text-blue-950">
-            Ladies and gentlemen,
+            Read about LAN Library, its purpose, features, and how it benefits
+            both learners and publishers.
           </p>
-
+          <h3 className="text-2xl font-bold text-blue-950">
+            What is LAN Library
+          </h3>
+          <div>
+            <img src="/edulan.jpg" />
+          </div>
           <p className="text-base">
             LAN Library is a digital knowledge marketplace and access platform
             designed to make learning, reading, and sharing documents easy,
@@ -45,7 +51,9 @@ export default function WhatIsLanModal({ isOpen, onClose }) {
             <h3 className="text-2xl font-bold text-blue-950">
               What LAN Library Does
             </h3>
-
+            <div>
+              <img src="/does.jpg" />
+            </div>
             <p>
               At its core, LAN Library allows creators, authors, researchers,
               and educators to upload valuable documents such as books, academic
@@ -88,7 +96,9 @@ export default function WhatIsLanModal({ isOpen, onClose }) {
             <h3 className="text-2xl font-bold text-blue-950">
               What Makes LAN Library Special
             </h3>
-
+            <div>
+              <img src="/special.jpg" />
+            </div>
             <p>
               What makes LAN Library special is its controlled and secure
               marketplace system. When a buyer purchases a document, they pay
@@ -136,7 +146,9 @@ export default function WhatIsLanModal({ isOpen, onClose }) {
             <h3 className="text-2xl font-bold text-blue-950">
               Who Benefits from LAN Library
             </h3>
-
+            <div>
+              <img src="/stu.jpeg" />
+            </div>
             <h4 className="text-lg font-semibold text-blue-900">
               Students and Learners
             </h4>
@@ -215,7 +227,9 @@ export default function WhatIsLanModal({ isOpen, onClose }) {
             <h3 className="text-2xl font-bold text-blue-950">
               The Vision Behind LAN Library
             </h3>
-
+            <div>
+              <img src="/vision.jpeg" />
+            </div>
             <p>
               LAN Library is not just about selling documents. It is about
               building a trusted digital library where knowledge is preserved,
@@ -286,7 +300,9 @@ export default function WhatIsLanModal({ isOpen, onClose }) {
             <h3 className="text-2xl font-bold text-blue-950">
               How LAN Library Works
             </h3>
-
+            <div>
+              <img src="/work.png" />
+            </div>
             <h4 className="text-lg font-semibold text-blue-900">For Buyers</h4>
             <p>
               Getting started as a buyer is simple. Create a free account,
@@ -344,7 +360,9 @@ export default function WhatIsLanModal({ isOpen, onClose }) {
             <h3 className="text-2xl font-bold text-blue-950">
               Security and Trust
             </h3>
-
+            <div>
+              <img src="/libs.jpg" />
+            </div>
             <p>
               Security is at the heart of everything we do. Every transaction is
               encrypted and protected using industry-standard security
@@ -398,7 +416,9 @@ export default function WhatIsLanModal({ isOpen, onClose }) {
             <h3 className="text-2xl font-bold text-blue-950">
               Community and Growth
             </h3>
-
+            <div>
+              <img src="/comm.png" />
+            </div>
             <p>
               LAN Library is more than a marketplace—it is a growing community
               of learners, educators, and knowledge enthusiasts. We foster
@@ -457,7 +477,9 @@ export default function WhatIsLanModal({ isOpen, onClose }) {
             <h3 className="text-2xl font-bold text-blue-950">
               The Future of LAN Library
             </h3>
-
+            <div>
+              <img src="/lanb.png" />
+            </div>
             <p>
               We have ambitious plans for the future. We are developing features
               like live tutoring sessions, interactive learning modules,

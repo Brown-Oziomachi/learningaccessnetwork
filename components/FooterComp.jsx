@@ -2,7 +2,6 @@
 import React from "react";
 import Link from "next/link";
 import {
-  Globe,
   Book,
   Mail,
   Phone,
@@ -13,13 +12,17 @@ import {
   Linkedin,
   Youtube,
   ArrowRight,
+  CreditCard,
+  Building2,
+  Smartphone,
+  Wallet,
 } from "lucide-react";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-white text-blue-950 border-t border-gray-200">
+    <footer className="bg-blue-50 text-blue-950 border-t border-gray-200">
       <div className="max-w-7xl mx-auto px-4 py-12">
         {/* Main Footer Content */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
@@ -225,7 +228,7 @@ export default function Footer() {
                 Connect With Us
               </h4>
               <div className="flex items-center gap-3">
-                <a
+                {/* <a
                   href="https://facebook.com"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -260,7 +263,7 @@ export default function Footer() {
                   aria-label="LinkedIn"
                 >
                   <Linkedin className="w-5 h-5" />
-                </a>
+                </a> */}
                 <a
                   href="https://youtube.com"
                   target="_blank"
@@ -295,6 +298,65 @@ export default function Footer() {
           </div>
         </div>
 
+        {/* Payment Methods Section */}
+        <div className="border-t border-gray-200 pt-8 mb-8">
+          <div className="text-center">
+            <h4 className="font-bold text-blue-950 mb-4 text-sm">
+              Safe & Secure Payment Methods
+            </h4>
+            <div className="flex flex-wrap items-center justify-center gap-6 mb-4">
+              {/* Flutterwave Badge */}
+              <div className="flex items-center gap-2 bg-gradient-to-r from-orange-50 to-orange-100 px-5 py-2.5 rounded-lg border border-orange-200 shadow-sm">
+                <span className="text-sm font-medium text-gray-700">Powered by</span>
+                <span className="text-xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
+                  Flutterwave
+                </span>
+              </div>
+              
+              {/* Payment Icons */}
+              <div className="flex items-center gap-3 flex-wrap justify-center">
+                {/* Card Payment - Blue gradient */}
+                <div className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2.5 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all" title="Card Payment">
+                  <CreditCard className="w-5 h-5 text-white" />
+                  <span className="text-sm font-semibold text-white">Card</span>
+                </div>
+                
+                {/* Bank Transfer - Green gradient */}
+                <div className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 px-4 py-2.5 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all" title="Bank Transfer">
+                  <Building2 className="w-5 h-5 text-white" />
+                  <span className="text-sm font-semibold text-white">Bank Transfer</span>
+                </div>
+                
+                {/* USSD - Purple gradient */}
+                <div className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-purple-600 px-4 py-2.5 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all" title="USSD Payment">
+                  <Smartphone className="w-5 h-5 text-white" />
+                  <span className="text-sm font-semibold text-white">USSD</span>
+                </div>
+                
+                {/* eNaira - Teal gradient (Nigerian green) */}
+                <div className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-teal-600 px-4 py-2.5 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all" title="eNaira">
+                  <Wallet className="w-5 h-5 text-white" />
+                  <span className="text-sm font-semibold text-white">eNaira</span>
+                </div>
+                
+                {/* PayPal - Official PayPal blue */}
+                <div className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2.5 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all" title="PayPal">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                    <path d="M20.067 8.478c.492.88.556 2.014.3 3.327-.74 3.806-3.276 5.12-6.514 5.12h-.5a.805.805 0 0 0-.794.68l-.04.22-.63 3.993-.028.15a.805.805 0 0 1-.794.679H7.72a.483.483 0 0 1-.477-.558L8.926 14.5" fill="white"/>
+                    <path d="M8.926 14.5l.63-3.993.04-.22a.805.805 0 0 1 .794-.68h.5c3.238 0 5.774-1.314 6.514-5.12.256-1.313.192-2.446-.3-3.327-.503-.9-1.446-1.537-2.818-1.917a13.6 13.6 0 0 0-2.114-.238H8.114c-.386 0-.716.28-.777.66L5.23 13.558c-.083.466.27.887.746.887h2.95z" fill="white"/>
+                    <path d="M9.644 2.762c.061-.38.39-.66.777-.66h4.058c.721 0 1.351.047 1.886.143-1.074 5.5-4.54 7.376-9.042 7.376H5.976l1.922-12.198c.061-.38.39-.66.777-.66h4.058" fill="white"/>
+                  </svg>
+                  <span className="text-sm font-semibold text-white">PayPal</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 max-w-2xl mx-auto">
+              All transactions are encrypted and secured with industry-standard SSL technology. 
+              Your payment information is safe with us.
+            </p>
+          </div>
+        </div>
+
         {/* Bottom Bar */}
         <div className="border-t border-gray-200 pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-600">
@@ -304,23 +366,23 @@ export default function Footer() {
             </p>
             <div className="flex items-center gap-6">
               <Link
-                href="/privacy-policy"
+                href="/lan/privacy-policy"
                 className="hover:text-blue-950 transition-colors"
               >
                 Privacy Policy
               </Link>
               <Link
-                href="/terms-of-service"
+                href="/lan/terms-of-service"
                 className="hover:text-blue-950 transition-colors"
               >
                 Terms of Service
               </Link>
-              <Link
+              {/* <Link
                 href="/cookie-policy"
                 className="hover:text-blue-950 transition-colors"
               >
                 Cookie Policy
-              </Link>
+              </Link> */}
             </div>
           </div>
         </div>
@@ -329,7 +391,7 @@ export default function Footer() {
       {/* Back to Top Button */}
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="fixed bottom-8 right-8 w-12 h-12 bg-blue-950 text-white rounded-full shadow-lg hover:bg-blue-800 transition-all duration-300 flex items-center justify-center z-40"
+        className="fixed bottom-8 right-8 w-12 h-12 bg-blue-950 text-white rounded-full shadow-lg hover:bg-blue-800 transition-all duration-300 flex items-center justify-center z-40 hover:scale-110"
         aria-label="Back to top"
       >
         <ArrowRight className="w-5 h-5 -rotate-90" />
