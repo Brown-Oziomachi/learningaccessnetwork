@@ -1,6 +1,3 @@
-// app/advertise/AdvertiseClient.jsx
-// UPDATED: Includes Institutional Categories
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,13 +15,15 @@ export default function AdvertiseClient() {
     const [userData, setUserData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState("");
+    const [showAccessWarning, setShowAccessWarning] = useState(false);
+    const [isValidatingLink, setIsValidatingLink] = useState(false);
     const [formData, setFormData] = useState({
         name: "",
         email: "",
         bookTitle: "",
         author: "",
         category: "",
-        institutionalCategory: "", // NEW FIELD
+        institutionalCategory: "",
         price: "",
         format: "PDF",
         pages: "",
@@ -34,47 +33,28 @@ export default function AdvertiseClient() {
     });
 
     const categories = [
-        'Education',
-        'Personal Development',
-        'Business',
-        'Technology',
-        'Science',
-        'Literature',
-        'Health & Fitness',
-        'History',
-        'Arts & Culture',
-        'Relationship',
-        'Self-Help',
-        'Finance',
-        'Marketing',
-        'Programming',
-        'Psychology',
-        'Fiction',
-        'Non-Fiction',
-        'Philosophy',
-        'Travel',
-        'Cooking',
-        'Religion & Spirituality',
-        'Sex Education',
-        'Social Media'
+        'Education', 'Personal Development', 'Business', 'Technology',
+        'Science', 'Literature', 'Health & Fitness', 'History',
+        'Arts & Culture', 'Relationship', 'Self-Help', 'Finance',
+        'Marketing', 'Programming', 'Psychology', 'Fiction',
+        'Non-Fiction', 'Philosophy', 'Travel', 'Cooking',
+        'Religion & Spirituality', 'Sex Education', 'Social Media'
     ];
 
-    // Institutional categories
     const institutionalCategories = [
-    { value: '', label: 'None (General Library)' },
-    { value: 'university', label: 'Universities' },
-    { value: 'islamic-institutions', label: 'Islamic Institutions' },
-    { value: 'christian-institutions', label: 'Christian Institutions' },
-    { value: 'jewish-institutions', label: 'Jewish Institutions' },
-    { value: 'secondary-school', label: 'Secondary School' },
-    { value: 'primary-school', label: 'Primary School' },
-    { value: 'exam-prep', label: 'WAEC/NECO/JAMB' },
-    { value: 'polytechnic', label: 'Polytechnics' },
-    { value: 'college-of-education', label: 'Colleges of Education' },
-    { value: 'professional-cert', label: 'Professional Certifications' },
-    { value: 'postgraduate', label: 'Postgraduate Studies' }
-  ];
-
+        { value: '', label: 'None (General Library)' },
+        { value: 'university', label: 'Universities' },
+        { value: 'islamic-institutions', label: 'Islamic Institutions' },
+        { value: 'christian-institutions', label: 'Christian Institutions' },
+        { value: 'jewish-institutions', label: 'Jewish Institutions' },
+        { value: 'secondary-school', label: 'Secondary School' },
+        { value: 'primary-school', label: 'Primary School' },
+        { value: 'exam-prep', label: 'WAEC/NECO/JAMB' },
+        { value: 'polytechnic', label: 'Polytechnics' },
+        { value: 'college-of-education', label: 'Colleges of Education' },
+        { value: 'professional-cert', label: 'Professional Certifications' },
+        { value: 'postgraduate', label: 'Postgraduate Studies' }
+    ];
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -83,11 +63,9 @@ export default function AdvertiseClient() {
                 router.replace("/auth/signin?redirect=/advertise");
             } else {
                 setUser(currentUser);
-
                 try {
                     const userDocRef = doc(db, 'users', currentUser.uid);
                     const userDoc = await getDoc(userDocRef);
-
                     let displayName = currentUser.displayName || "";
                     let fullUserData = null;
 
@@ -97,7 +75,6 @@ export default function AdvertiseClient() {
                     }
 
                     setUserData(fullUserData);
-
                     setFormData((prev) => ({
                         ...prev,
                         name: displayName,
@@ -111,7 +88,6 @@ export default function AdvertiseClient() {
                         email: currentUser.email || "",
                     }));
                 }
-
                 setCheckingAuth(false);
             }
         });
@@ -124,7 +100,6 @@ export default function AdvertiseClient() {
         setFormData({ ...formData, [name]: value });
     };
 
-    // Extract Google Drive file ID from various URL formats
     const extractDriveFileId = (url) => {
         if (!url) return '';
         const match = url.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})|id=([\w-]{25,})/);
@@ -134,8 +109,23 @@ export default function AdvertiseClient() {
         return '';
     };
 
+    const handleDriveLinkChange = (e) => {
+        const { value } = e.target;
+        setFormData({ ...formData, driveLink: value });
+        
+        if (value.includes('drive.google.com')) {
+            setIsValidatingLink(true);
+            const hasViewParam = value.includes('/view') || value.includes('usp=sharing');
+            const driveFileId = extractDriveFileId(value);
+            
+            if (driveFileId && !hasViewParam) {
+                setShowAccessWarning(true);
+            }
+            setIsValidatingLink(false);
+        }
+    };
+
     const handleSubmit = async () => {
-        // Validation
         if (!formData.name || !formData.email || !formData.bookTitle ||
             !formData.author || !formData.category || !formData.price ||
             !formData.pages || !formData.description || !formData.message) {
@@ -148,7 +138,6 @@ export default function AdvertiseClient() {
             return;
         }
 
-        // Validate URL
         try {
             new URL(formData.driveLink);
         } catch {
@@ -160,47 +149,36 @@ export default function AdvertiseClient() {
             setLoading(true);
             setUploadProgress("Processing your submission...");
 
-            // Extract Drive file ID for thumbnail generation
             const driveFileId = extractDriveFileId(formData.driveLink);
-
-            // Create embed URL if it's a Google Drive link
             let embedUrl = formData.driveLink;
             if (formData.driveLink.includes('drive.google.com') && driveFileId) {
                 embedUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
             }
 
-            // Prepare seller information
             const displayName = userData?.displayName ||
                 userData?.name ||
                 formData.name ||
                 `${userData?.firstName || ''} ${userData?.surname || ''}`.trim();
 
             const bookData = {
-                // User & seller info
                 userId: user.uid,
                 sellerId: user.uid,
                 sellerEmail: user.email,
                 sellerName: displayName,
                 sellerPhone: userData?.phoneNumber || null,
-
-                // Book info
                 bookTitle: formData.bookTitle,
                 author: formData.author,
                 category: formData.category,
-                institutionalCategory: formData.institutionalCategory || null, // NEW FIELD
+                institutionalCategory: formData.institutionalCategory || null,
                 price: Number(formData.price),
                 format: formData.format,
                 pages: Number(formData.pages),
                 description: formData.description,
                 message: formData.message,
-
-                // Files - Store multiple formats for compatibility
                 pdfLink: formData.driveLink,
                 pdfUrl: formData.driveLink,
                 embedUrl: embedUrl,
-                driveFileId: driveFileId || null, // For thumbnail generation
-
-                // Metadata
+                driveFileId: driveFileId || null,
                 status: "pending",
                 views: 0,
                 purchases: 0,
@@ -208,23 +186,11 @@ export default function AdvertiseClient() {
                 updatedAt: serverTimestamp(),
             };
 
-            console.log("Submitting book with data:", {
-                sellerId: bookData.sellerId,
-                sellerEmail: bookData.sellerEmail,
-                sellerName: bookData.sellerName,
-                category: bookData.category,
-                institutionalCategory: bookData.institutionalCategory,
-                driveFileId: bookData.driveFileId,
-                embedUrl: bookData.embedUrl
-            });
-
             setUploadProgress("Saving book details...");
             const docRef = await addDoc(collection(db, "advertMyBook"), bookData);
 
-            console.log("Document saved with ID:", docRef.id);
             alert("Request sent successfully! We'll review your submission and contact you shortly.");
 
-            // Reset form
             setFormData({
                 name: formData.name,
                 email: formData.email,
@@ -482,20 +448,27 @@ export default function AdvertiseClient() {
                         )}
                     </div>
 
-                    <div>
+                   <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             PDF Link (Google Drive / Dropbox) *
                         </label>
-                        <input
-                            name="driveLink"
-                            type="url"
-                            placeholder="https://drive.google.com/file/d/..."
-                            value={formData.driveLink}
-                            onChange={handleChange}
-                            className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
-                        />
+                        <div className="relative">
+                            <input
+                                name="driveLink"
+                                type="url"
+                                placeholder="https://drive.google.com/file/d/..."
+                                value={formData.driveLink}
+                                onChange={handleDriveLinkChange}
+                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
+                            />
+                            {isValidatingLink && (
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                    <div className="animate-spin h-5 w-5 border-b-2 border-blue-950 rounded-full"></div>
+                                </div>
+                            )}
+                        </div>
                         <p className="mt-1 text-xs text-gray-500">
-                            Make sure the link is set to "Anyone with the link can view"
+                            ⚠️ Make sure the link is set to "Anyone with the link can view"
                         </p>
                     </div>
 
@@ -557,6 +530,80 @@ export default function AdvertiseClient() {
                     We typically respond within 24-48 hours • Thumbnails auto-generated from PDFs
                 </p>
             </div>
+            {showAccessWarning && (
+                          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-fadeIn">
+                              <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl animate-slideIn max-h-[90vh] overflow-y-auto">
+                                  <div className="flex items-start gap-4 mb-4">
+                                      <div className="flex-shrink-0 w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                                          <AlertCircle className="w-6 h-6 text-yellow-600" />
+                                      </div>
+                                      <div className="flex-1">
+                                          <h3 className="text-xl font-bold text-gray-900 mb-2">⚠️ File Access Warning</h3>
+                                          <p className="text-gray-600">
+                                              Your Google Drive link might not be publicly accessible. Buyers won't be able to view or download your PDF!
+                                          </p>
+                                      </div>
+                                      <button onClick={() => setShowAccessWarning(false)} className="text-gray-400 hover:text-gray-600">
+                                          <X className="w-6 h-6" />
+                                      </button>
+                                  </div>
+          
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                      <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                                          <AlertCircle className="w-5 h-5" />
+                                          How to Fix This (Easy Steps):
+                                      </h4>
+                                      <ol className="space-y-2 text-sm text-blue-900">
+                                          <li className="flex gap-3"><span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span><span>Go to your file in <strong>Google Drive</strong></span></li>
+                                          <li className="flex gap-3"><span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span><span><strong>Right-click</strong> on the PDF file</span></li>
+                                          <li className="flex gap-3"><span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span><span>Click <strong>"Share"</strong> or <strong>"Get link"</strong></span></li>
+                                          <li className="flex gap-3"><span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">4</span><span>Change to <strong className="text-green-700">"Anyone with the link"</strong></span></li>
+                                          <li className="flex gap-3"><span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">5</span><span>Make sure it says <strong className="text-green-700">"Viewer"</strong> permission</span></li>
+                                          <li className="flex gap-3"><span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">6</span><span><strong>Copy</strong> the new link and paste it here</span></li>
+                                      </ol>
+                                  </div>
+          
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                                      <h4 className="font-semibold text-red-900 mb-2 flex items-center gap-2">
+                                          <AlertCircle className="w-5 h-5" />
+                                          If You Don't Fix This:
+                                      </h4>
+                                      <ul className="space-y-1 text-sm text-red-900">
+                                          <li>❌ Buyers will see "Access Denied" error</li>
+                                          <li>❌ No thumbnail will be generated</li>
+                                          <li>❌ PDF preview won't work</li>
+                                          <li>❌ Downloads will fail completely</li>
+                                          <li>❌ You'll get refund requests and complaints</li>
+                                      </ul>
+                                  </div>
+          
+                                  <div className="flex gap-3">
+                                      <button onClick={() => setShowAccessWarning(false)} className="flex-1 bg-gray-200 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors">
+                                          I'll Fix It Later
+                                      </button>
+                                      <button onClick={() => { setShowAccessWarning(false); window.open('https://drive.google.com', '_blank'); }} className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                                          <Upload className="w-5 h-5" />
+                                          Open Google Drive
+                                      </button>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+          
+                      <style jsx>{`
+                          @keyframes fadeIn {
+                              from { opacity: 0; }
+                              to { opacity: 1; }
+                          }
+                          @keyframes slideIn {
+                              from { opacity: 0; transform: scale(0.95) translateY(20px); }
+                              to { opacity: 1; transform: scale(1) translateY(0); }
+                          }
+                          .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+                          .animate-slideIn { animation: slideIn 0.3s ease-out; }
+                      `}</style>
+
         </div>
+        
     );
 }

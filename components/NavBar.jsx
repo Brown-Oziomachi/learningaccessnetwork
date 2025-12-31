@@ -282,7 +282,7 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2 sm:gap-4">
             <button
-              className="md:hidden p-2 hover:bg-gray-100 rounded-lg text-gray-50"
+              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg text-gray-50"
               onClick={() => {
                 setShowMobileMenu(!showMobileMenu);
                 setShowMobileSearch(false);
@@ -309,37 +309,17 @@ export default function Navbar() {
               </h1>
             </Link>
 
-            <button
-              onClick={() => {
-                setShowMobileSearch(!showMobileSearch);
-                setShowMobileMenu(false);
-              }}
-              className="md:hidden p-2 hover:bg-gray-100 rounded-lg text-gray-50"
-            >
-              <Search size={22} />
-            </button>
-
-            <div className="hidden md:flex flex-1 max-w-md mx-4 lg:mx-8">
-              <div className="relative w-full">
-                <input
-                  type="text"
-                  placeholder="Search PDF books..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  className="w-full text-gray-900 bg-white px-4 py-2 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  autoFocus
-                />
-                <button
-                  onClick={handleSearch}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
-                >
-                  <Search size={20} />
-                </button>
-              </div>
-            </div>
-
-            <nav className="hidden md:flex items-center gap-2 lg:gap-3 flex-shrink-0">
+           <button
+            onClick={() => {
+              setShowMobileSearch(!showMobileSearch);
+              setShowMobileMenu(false);
+            }}
+            className="p-2 bg-white text-blue-950 rounded-lg "
+          >
+            <Search size={22} />
+          </button>
+           
+            <nav className="hidden lg:flex items-center gap-2 lg:gap-3 flex-shrink-0">
               <Link
                 href="/my-books"
                 className="flex items-center gap-1 px-3 py-2 hover:bg-gray-100 hover:text-blue-950 rounded-lg text-sm text-gray-50"
@@ -398,8 +378,8 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {showMobileSearch && (
-            <div className="mt-3 md:hidden animate-slideDown">
+         {showMobileSearch && (
+            <div className="mt-3 animate-slideDown">
               <div className="relative">
                 <input
                   type="text"
@@ -410,10 +390,7 @@ export default function Navbar() {
                   className="w-full text-gray-900 bg-white px-4 py-2 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500"
                   autoFocus
                 />
-                <button
-                  onClick={handleSearch}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
-                >
+                <button onClick={handleSearch} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500">
                   <Search size={20} />
                 </button>
               </div>
@@ -422,7 +399,7 @@ export default function Navbar() {
         </div>
 
         {/* Desktop Categories Bar */}
-        <div className="hidden md:block bg-gray-50 border-t border-gray-200">
+        <div className="hidden lg:block bg-gray-50 border-t border-gray-200 ">
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-center gap-1">
               <button
@@ -449,8 +426,8 @@ export default function Navbar() {
                 </button>
                 {activeDropdown === "education" &&
                   menuCategories.education.books.length > 0 && (
-                    <div className="absolute lg:-left-50 top-full mx-auto w-screen lg:max-w-4xl bg-white text-blue-950 border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
-                      <div className="mb-4">
+                    <div className="absolute top-full mx-auto z-50 bg-white text-blue-950">
+                      <div className="bg-white  p-6 mx-auto w-200 text-blue-950">
                         <h3 className="text-lg font-bold text-gray-900">
                           {menuCategories.education.title}
                         </h3>
@@ -459,19 +436,19 @@ export default function Navbar() {
                         </p>
                       </div>
 
-                      <h4 className="font-semibold text-gray-900 mb-3">
+                      <h4 className="font-semibold text-gray-900 mb-3 p-6">
                         Documents recommended for you
                       </h4>
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-3 gap-4 p-6">
                         {menuCategories.education.books.map((book) => (
                           <Link
                             key={book.id}
                             href={`/book/preview?id=${book.id}`}
                             onClick={() => setActiveDropdown(null)}
-                            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                            className="bg-white border border-gray-200 rounded-lg overflow-hidden  transition-shadow"
                           >
                             <div className="p-3">
-                              <h5 className="font-semibold text-sm line-clamp-2 mb-1">
+                              <h5 className="font-semibold text-sm line-clamp-2 mb-1 break-words overflow-hidden">
                                 {book.title}
                               </h5>
                               <p className="text-xs text-gray-600">
@@ -483,7 +460,7 @@ export default function Navbar() {
                       </div>
                       <Link
                         href="/category/education"
-                        className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
+                        className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline p-6"
                       >
                         All Education Documents{" "}
                         <ChevronRight size={14} className="inline" />
@@ -509,8 +486,8 @@ export default function Navbar() {
 
                 {/* Remove the books.length check here */}
                 {activeDropdown === "business" && (
-                  <div className="absolute lg:-left-50 top-full w-screen lg:max-w-4xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
-                    <div className="mb-4">
+                  <div className="absolute top-full mx-auto z-50 bg-white text-blue-950">
+                    <div className="bg-white  p-6 mx-auto w-200 text-blue-950">
                       <h3 className="text-lg font-bold text-gray-900">
                         {menuCategories.business.title}
                       </h3>
@@ -522,10 +499,10 @@ export default function Navbar() {
                     {/* Check length inside the dropdown */}
                     {menuCategories.business.books.length > 0 ? (
                       <>
-                        <h4 className="font-semibold text-gray-900 mb-3">
+                        <h4 className="font-semibold text-gray-900 mb-3 p-6">
                           Documents recommended for you
                         </h4>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-3 gap-4 p-6">
                           {menuCategories.business.books.map((book) => (
                             <Link
                               key={book.id}
@@ -534,7 +511,7 @@ export default function Navbar() {
                               className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
                             >
                               <div className="p-3">
-                                <h5 className="font-semibold text-sm line-clamp-2 mb-1">
+                                <h5 className="font-semibold text-sm line-clamp-2 mb-1 break-words overflow-hidden">
                                   {book.title}
                                 </h5>
                                 <p className="text-xs text-gray-600">
@@ -546,7 +523,7 @@ export default function Navbar() {
                         </div>
                         <Link
                           href="/category/business"
-                          className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
+                          className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline p-6"
                         >
                           All Business Documents{" "}
                           <ChevronRight size={14} className="inline" />
@@ -578,8 +555,8 @@ export default function Navbar() {
 
                 {/* Remove the books.length check here */}
                 {activeDropdown === "technology" && (
-                  <div className="absolute lg:-left-60 top-full w-screen lg:max-w-4xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
-                    <div className="mb-4">
+                  <div className="absolute top-full mx-auto z-50 bg-white text-blue-950">
+                    <div className="bg-white  p-6 mx-auto w-200 text-blue-950">
                       <h3 className="text-lg font-bold text-gray-900">
                         {menuCategories.technology.title}
                       </h3>
@@ -591,7 +568,7 @@ export default function Navbar() {
                     {/* Check length inside the dropdown */}
                     {menuCategories.technology.books.length > 0 ? (
                       <>
-                        <h4 className="font-semibold text-gray-900 mb-3">
+                        <h4 className="font-semibold text-gray-900 mb-3 p-6">
                           Documents recommended for you
                         </h4>
                         <div className="grid grid-cols-3 gap-4">
@@ -603,7 +580,7 @@ export default function Navbar() {
                               className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
                             >
                               <div className="p-3">
-                                <h5 className="font-semibold text-sm line-clamp-2 mb-1">
+                                <h5 className="font-semibold text-sm line-clamp-2 mb-1 break-words overflow-hidden">
                                   {book.title}
                                 </h5>
                                 <p className="text-xs text-gray-600">
@@ -615,14 +592,14 @@ export default function Navbar() {
                         </div>
                         <Link
                           href="/category/technology"
-                          className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
+                          className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline p-6"
                         >
                           All Technology Documents{" "}
                           <ChevronRight size={14} className="inline" />
                         </Link>
                       </>
                     ) : (
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-500 p-6">
                         No documents available in this category yet.
                       </p>
                     )}
@@ -645,8 +622,8 @@ export default function Navbar() {
 
                 {/* Remove the books.length check here */}
                 {activeDropdown === "science" && (
-                  <div className="absolute lg:-left-70 top-full w-screen lg:max-w-4xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
-                    <div className="mb-4">
+                  <div className="absolute top-full mx-auto z-50 bg-white text-blue-950">
+                    <div className="bg-white  p-6 mx-auto w-200 text-blue-950">
                       <h3 className="text-lg font-bold text-gray-900">
                         {menuCategories.science.title}
                       </h3>
@@ -658,7 +635,7 @@ export default function Navbar() {
                     {/* Check length inside the dropdown */}
                     {menuCategories.science.books.length > 0 ? (
                       <>
-                        <h4 className="font-semibold text-gray-900 mb-3">
+                        <h4 className="font-semibold text-gray-900 mb-3 p-6">
                           Documents recommended for you
                         </h4>
                         <div className="grid grid-cols-3 gap-4">
@@ -670,7 +647,7 @@ export default function Navbar() {
                               className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
                             >
                               <div className="p-3">
-                                <h5 className="font-semibold text-sm line-clamp-2 mb-1">
+                                <h5 className="font-semibold text-sm line-clamp-2 mb-1 break-words overflow-hidden">
                                   {book.title}
                                 </h5>
                                 <p className="text-xs text-gray-600">
@@ -682,14 +659,14 @@ export default function Navbar() {
                         </div>
                         <Link
                           href="/category/science"
-                          className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
+                          className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline p-6"
                         >
                           All Science Documents{" "}
                           <ChevronRight size={14} className="inline" />
                         </Link>
                       </>
                     ) : (
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-500 p-6">
                         No documents available in this category yet.
                       </p>
                     )}
@@ -713,8 +690,8 @@ export default function Navbar() {
                 </button>
                 {activeDropdown === "sex-education" && // ✅ Fixed here
                   menuCategories.sexeducation.books.length > 0 && (
-                    <div className="absolute lg:-left-90 top-full w-screen lg:max-w-4xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
-                      <div className="mb-4">
+                    <div className="absolute top-full mx-auto z-50 bg-white text-blue-950">
+                      <div className="bg-white  p-6 mx-auto w-200 text-blue-950">
                         <h3 className="text-lg font-bold text-gray-900">
                           {menuCategories.sexeducation.title}
                         </h3>
@@ -723,7 +700,7 @@ export default function Navbar() {
                         </p>
                       </div>
 
-                      <h4 className="font-semibold text-gray-900 mb-3">
+                      <h4 className="font-semibold text-gray-900 mb-3 p-6">
                         Documents recommended for you
                       </h4>
                       <div className="grid grid-cols-3 gap-4">
@@ -735,7 +712,7 @@ export default function Navbar() {
                             className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
                           >
                             <div className="p-3">
-                              <h5 className="font-semibold text-sm line-clamp-2 mb-1">
+                              <h5 className="font-semibold text-sm line-clamp-2 mb-1 break-words overflow-hidden">
                                 {book.title}
                               </h5>
                               <p className="text-xs text-gray-600">
@@ -747,128 +724,9 @@ export default function Navbar() {
                       </div>
                       <Link
                         href="/category/sex-education"
-                        className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
+                        className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline p-6"
                       >
                         All Sex Education Documents{" "}
-                        <ChevronRight size={14} className="inline" />
-                      </Link>
-                    </div>
-                  )}
-              </div>
-
-              <div
-                className="relative group"
-                onMouseEnter={() => setActiveDropdown("relationship")}
-                onMouseLeave={() => setActiveDropdown(null)}
-              >
-                <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
-                  Relationship{" "}
-                  <ChevronDown
-                    size={14}
-                    className={
-                      activeDropdown === "relationship" ? "rotate-180" : ""
-                    }
-                  />
-                </button>
-                {activeDropdown === "relationship" &&
-                  menuCategories.relationship.books.length > 0 && (
-                    <div className="absolute lg:-left-140 top-full w-screen lg:max-w-4xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
-                      <div className="mb-4">
-                        <h3 className="text-lg font-bold text-gray-900">
-                          {menuCategories.relationship.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {menuCategories.relationship.description}
-                        </p>
-                      </div>
-
-                      <h4 className="font-semibold text-gray-900 mb-3">
-                        Documents recommended for you
-                      </h4>
-                      <div className="grid grid-cols-3 gap-4">
-                        {menuCategories.relationship.books.map((book) => (
-                          <Link
-                            key={book.id}
-                            href={`/book/preview?id=${book.id}`}
-                            onClick={() => setActiveDropdown(null)}
-                            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                          >
-                            <div className="p-3">
-                              <h5 className="font-semibold text-sm line-clamp-2 mb-1">
-                                {book.title}
-                              </h5>
-                              <p className="text-xs text-gray-600">
-                                Added by {book.author}
-                              </p>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                      <Link
-                        href="/category/relationship"
-                        className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
-                      >
-                        All Science Documents{" "}
-                        <ChevronRight size={14} className="inline" />
-                      </Link>
-                    </div>
-                  )}
-              </div>
-
-              {/* Personal Development Dropdown */}
-              <div
-                className="relative group"
-                onMouseEnter={() => setActiveDropdown("personal")}
-                onMouseLeave={() => setActiveDropdown(null)}
-              >
-                <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
-                  Personal Growth{" "}
-                  <ChevronDown
-                    size={14}
-                    className={
-                      activeDropdown === "personal" ? "rotate-180" : ""
-                    }
-                  />
-                </button>
-                {activeDropdown === "personal" &&
-                  menuCategories.personal.books.length > 0 && (
-                    <div className="absolute lg:-left-150 top-full w-screen lg:max-w-4xl text-blue-950 bg-white border border-gray-200 shadow-lg py-6 px-8 animate-slideDown">
-                      <div className="mb-4">
-                        <h3 className="text-lg font-bold text-gray-900">
-                          {menuCategories.personal.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {menuCategories.personal.description}
-                        </p>
-                      </div>
-
-                      <h4 className="font-semibold text-gray-900 mb-3">
-                        Documents recommended for you
-                      </h4>
-                      <div className="grid grid-cols-3 gap-4">
-                        {menuCategories.personal.books.map((book) => (
-                          <Link
-                            key={book.id}
-                            href={`/book/preview?id=${book.id}`}
-                            onClick={() => setActiveDropdown(null)}
-                            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                          >
-                            <div className="p-3">
-                              <h5 className="font-semibold text-sm line-clamp-2 mb-1">
-                                {book.title}
-                              </h5>
-                              <p className="text-xs text-gray-600">
-                                Added by {book.author}
-                              </p>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                      <Link
-                        href="/category/personal-development"
-                        className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
-                      >
-                        All Personal Development Documents{" "}
                         <ChevronRight size={14} className="inline" />
                       </Link>
                     </div>
@@ -882,13 +740,13 @@ export default function Navbar() {
                 All Documents
               </Link>
             </div>
-          </div>
+                </div>
         </div>
       </header>
 
       {/* Mobile Menu */}
       {showMobileMenu && (
-        <div className="fixed inset-0 bg-white z-50 md:hidden overflow-y-auto text-blue-950 max-w-90">
+        <div className="fixed inset-0 bg-white z-50 lg:hidden overflow-y-auto text-blue-950 max-w-90">
           <div className="p-4">
             <div className="flex items-center justify-between mb-6 ">
               <h1 className="text-3xl font-bold text-blue-950">
@@ -1028,7 +886,7 @@ export default function Navbar() {
                       className="flex gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:shadow-md"
                     >
                       <div className="flex-1">
-                        <h5 className="font-semibold text-sm line-clamp-2 mb-1">
+                        <h5 className="font-semibold text-sm line-clamp-2 mb-1 break-words overflow-hidden">
                           {book.title}
                         </h5>
                         <p className="text-xs text-gray-600">

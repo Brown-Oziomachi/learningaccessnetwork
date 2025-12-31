@@ -6,7 +6,7 @@ import Navbar from '@/components/NavBar';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
-import { doc, getDoc, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
 import HomeLoading from './loading';
 import MobileCategoriesCarousel from '@/components/MobileCategoriesCarousel';
 import InstitutionalLibraryPage from '@/components/InstitutionalLib';
@@ -244,17 +244,18 @@ export default function HomePage() {
 
 
     // ✅ Fetch latest 4 books from Firebase
-    useEffect(() => {
-        const fetchLatestBooks = async () => {
-            try {
-                setLoadingBooks(true);
+   useEffect(() => {
+    const fetchLatestBooks = async () => {
+        try {
+            setLoadingBooks(true);
 
-                const advertBooksRef = collection(db, 'advertMyBook');
-                const q = query(
-                    advertBooksRef,
-                    orderBy('createdAt', 'desc'),
-                    limit(6) // Get exactly 4 books
-                );
+            const advertBooksRef = collection(db, 'advertMyBook');
+            const q = query(
+                advertBooksRef,
+                where('status', '==', 'approved'),  // ✅ ADD THIS LINE
+                orderBy('createdAt', 'desc'),
+                limit(6)
+            );
 
                 const snapshot = await getDocs(q);
 
@@ -588,14 +589,14 @@ export default function HomePage() {
                                             <img
                                                 src={book.image}
                                                 alt={book.title}
-                                                className="w-full h-[200px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
+                                                className="w-full h-[200px] object-cover  group-hover:shadow-xl transition-shadow"
                                                 onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
                                             />
                                             {isPurchased(book.id) && (
-                                                <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
+                                                <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 text-xs font-bold">Owned</span>
                                             )}
                                             {book.isFromFirestore && (
-                                                <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
+                                                <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 text-xs font-bold">New</span>
                                             )}
                                         </div>
                                         <div>

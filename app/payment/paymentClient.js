@@ -45,7 +45,7 @@ export default function PaymentClient() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const bookId = searchParams.get('bookId');
-
+    const [allBooks, setAllBooks] = useState([]);
     const [book, setBook] = useState(null);
     const [sellerDetails, setSellerDetails] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -266,7 +266,7 @@ export default function PaymentClient() {
                         <img
                             src={getThumbnailUrl(book)}
                             alt={'Cover of ' + book.title}
-                            className="w-32 h-48 object-cover rounded border border-gray-200 bg-gray-100"
+                            className="w-32 h-48 lg:w-70 lg:h-100 object-cover rounded border border-gray-200 bg-gray-100"
                             onError={(e) => {
                                 e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
                             }}
@@ -290,21 +290,31 @@ export default function PaymentClient() {
                                     Platform Book
                                 </span>
                             )}
+                        <div className="mt-6 max-lg:hidden bg-green-50 border border-green-200 rounded-lg p-4">
+                            <p className="text-sm text-green-950">
+                                <strong>Description:</strong>
+                                <p className="text-xs text-green-800 mt-1">
+                                    {(book.description) ? book.description : 'No description provided by the seller.'}
+                                </p>
+                            </p>
+                        </div>
                         </div>
                     </div>
+                        <div className="mt-6 lg:hidden bg-green-50 border border-green-200 rounded-lg p-4">
+                            <p className="text-sm text-green-950">
+                                <strong>Description:</strong>
+                                <p className="text-xs text-green-800 mt-1">
+                                    {(book.description) ? book.description : 'No description provided by the seller.'}
+                                </p>
+                            </p>
+                        </div>
                 </div>
 
                 {/* Debug Info (Remove in production) */}
-                <div className="bg-blue-950 rounded-lg p-4 mb-6">
-                    <details>
-                        <summary className="cursor-pointer font-semibold mb-2">Book Info |  <>{book.title}</></summary>
-                        <pre className="text-xs overflow-auto">
-                            <div className='p-5 bg-white text-blue-950 rounded-lg'>
-                            <p className=" mb-2 text-xl">{book.description || 'N/A'}</p>
-                            </div>
-
-                        </pre>
-                    </details>
+                <div className="bg-blue-950 rounded-lg p-4 mb-6 text-center font-bold">
+                    <h1>
+                        Save 85% by selling on LAN Library!
+                    </h1>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -337,15 +347,9 @@ export default function PaymentClient() {
                                         </p>
                                     </div>
                                 ) : (
-                                    <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
-                                        <p className="text-sm text-green-950">
-                                            <strong>Note:</strong> {book.sellerName}, you will receive
-                                            ₦{(book.price * 0.85).toLocaleString()} (85% of ₦{book.price.toLocaleString()})
-                                        </p>
-                                        <p className="text-xs text-green-800 mt-1">
-                                            LAN Library fee: ₦{(book.price * 0.15).toLocaleString()} (15%)
-                                        </p>
-                                    </div>
+                                        <div className="">
+                                        
+                                        </div>
                                 )
                             )}
                         </div>
@@ -354,6 +358,80 @@ export default function PaymentClient() {
                     {/* Order Summary */}
                     <div className="lg:col-span-1">
                         <OrderSummary book={book} sellerDetails={sellerDetails} />
+                    </div>
+                </div>
+                <div className="mt-12">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-6">
+                        You might also like
+                    </h3>
+
+                    {/* Mobile/Tablet: 2-Column Grid */}
+                    <div className="md:hidden">
+                        <div className="grid grid-cols-2 gap-4">
+                            {(allBooks.length > 0 ? allBooks : booksData)
+                                .filter((relatedBook) => relatedBook.id !== bookId)
+                                .slice(0, 8)
+                                .map((relatedBook) => (
+                                    <Link
+                                        key={relatedBook.id}
+                                        href={`/book/preview?id=${relatedBook.id}`}
+                                        className="group"
+                                    >
+                                        <div className="relative mb-3">
+                                            <img
+                                                src={getThumbnailUrl(relatedBook)}
+                                                alt={relatedBook.title}
+                                                className="w-full h-[240px] sm:h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
+                                                onError={(e) => {
+                                                    e.target.src =
+                                                        "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+                                                }}
+                                                loading="lazy"
+                                            />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                                                {relatedBook.title}
+                                            </h4>
+                                            <p className="text-gray-600 text-xs">
+                                                {relatedBook.author}
+                                            </p>
+                                        </div>
+                                    </Link>
+                                ))}
+                        </div>
+                    </div>
+
+                    {/* Desktop: Grid */}
+                    <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {(allBooks.length > 0 ? allBooks : booksData)
+                            .filter((relatedBook) => relatedBook.id !== bookId)
+                            .slice(0, 8)
+                            .map((relatedBook) => (
+                                <Link
+                                    key={relatedBook.id}
+                                    href={`/book/preview?id=${relatedBook.id}`}
+                                    className="group"
+                                >
+                                    <div className="relative mb-3">
+                                        <img
+                                            src={getThumbnailUrl(relatedBook)}
+                                            alt={relatedBook.title}
+                                            className="w-full h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
+                                            onError={(e) => {
+                                                e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+                                            }}
+                                            loading="lazy"
+                                        />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                                            {relatedBook.title}
+                                        </h4>
+                                        <p className="text-gray-600 text-xs">{relatedBook.author}</p>
+                                    </div>
+                                </Link>
+                            ))}
                     </div>
                 </div>
             </main>

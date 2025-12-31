@@ -11,6 +11,7 @@ import {
   Download, Book, Phone, MapPin, CreditCard, Building,
   Clock
 } from 'lucide-react';
+import { BookApprovalModal, ReplyModal, TransactionModal, UserModal } from '@/components/ApprovalModal';
 
 export default function ComprehensiveAdminPanel() {
   const [user, setUser] = useState(null);
@@ -1059,360 +1060,46 @@ Click OK to approve or Cancel to go back.
         )}
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto my-8">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-xl font-bold text-gray-900">
-                  {modalType === 'reply' && 'Send Reply'}
-                  {modalType === 'advertisement' && 'Book Advertisement Details'}
-                  {modalType === 'transaction' && 'Transaction Details'}
-                  {modalType === 'user' && 'User Account Details'}
-                </h3>
-                <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
-                  <XCircle className="w-6 h-6" />
-                </button>
-              </div>
+     {/* ==================== ALL MODALS ==================== */}
 
-              {modalType === 'reply' && (
-                <div>
-                  <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600 mb-1">To: {selectedItem?.email || selectedItem?.reporterEmail}</p>
-                    <p className="text-sm text-gray-600">Subject: Re: {selectedItem?.subject || selectedItem?.reason || 'Your inquiry'}</p>
-                  </div>
-                  <textarea value={replyMessage} onChange={(e) => setReplyMessage(e.target.value)} placeholder="Type your reply here..." className="w-full h-48 px-4 py-2 border border-gray-300 rounded-lg resize-none text-black" />
-                  <div className="flex gap-3 mt-4">
-                    <button onClick={sendEmailReply} disabled={sending} className="flex-1 bg-blue-950 text-white py-2 rounded-lg hover:bg-blue-900 disabled:opacity-50 flex items-center justify-center gap-2">
-                      {sending ? 'Sending...' : <><Send className="w-4 h-4" />Send Reply</>}
-                    </button>
-                    <button onClick={closeModal} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
+<BookApprovalModal
+  isOpen={showModal && modalType === 'advertisement'}
+  onClose={closeModal}
+  item={selectedItem}
+  onApprove={(item) => updateAdvertisementStatus(item.id, 'approved', item)}
+  onReject={(item, reason) => updateAdvertisementStatus(item.id, 'rejected', item)}
+  checkPdfDuplicate={checkPdfDuplicate}
+  formatDate={formatDate}
+  getStatusColor={getStatusColor}
+/>
 
-              {modalType === 'advertisement' && selectedItem && (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Book Title</p>
-                      <p className="font-semibold text-gray-900">{selectedItem.bookTitle}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Author</p>
-                      <p className="font-semibold text-gray-900">{selectedItem.author}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Seller Email</p>
-                      <p className="font-semibold text-gray-900">{selectedItem.sellerEmail}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Price</p>
-                      <p className="font-semibold text-green-600">₦{selectedItem.price?.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Category</p>
-                      <p className="font-semibold text-gray-900">{selectedItem.category}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Institutional-Category</p>
-                      <p className="font-semibold text-gray-900">{selectedItem.institutionalCategory}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Seller Name</p>
-                      <p className="font-semibold text-gray-900">{selectedItem.sellerName}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Status</p>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedItem.status)}`}>
-                        {selectedItem.status}
-                      </span>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-xs text-gray-500 mb-1">Description</p>
-                      <p className="text-sm text-gray-900">{selectedItem.description || 'No description provided'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Submitted</p>
-                      <p className="text-sm text-gray-900">{formatDate(selectedItem.createdAt)}</p>
-                    </div>
-                  </div>
+<ReplyModal
+  isOpen={showModal && modalType === 'reply'}
+  onClose={closeModal}
+  item={selectedItem}
+  replyMessage={replyMessage}
+  setReplyMessage={setReplyMessage}
+  onSend={sendEmailReply}
+  sending={sending}
+/>
 
-                  {(selectedItem.embedUrl || selectedItem.pdfUrl || selectedItem.pdfLink) && (
-                    <div className="space-y-3">
-                      {/* Thumbnail Preview */}
-                      {selectedItem.driveFileId && (
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <p className="text-sm font-semibold text-gray-700 mb-2">PDF Thumbnail:</p>
-                          <img
-                            src={`https://drive.google.com/thumbnail?id=${selectedItem.driveFileId}&sz=w400`}
-                            alt="PDF Thumbnail"
-                            className="w-full max-w-md mx-auto rounded-lg shadow-md"
-                            onError={(e) => {
-                              e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                            }}
-                          />
-                        </div>
-                      )}
+<TransactionModal
+  isOpen={showModal && modalType === 'transaction'}
+  onClose={closeModal}
+  item={selectedItem}
+  formatDate={formatDate}
+  getStatusColor={getStatusColor}
+/>
 
-                      {/* PDF Preview */}
-                      <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg">
-                        <p className="font-semibold text-blue-950">PDF Preview</p>
-                        <a
-                          href={selectedItem.embedUrl || selectedItem.pdfUrl || selectedItem.pdfLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline text-sm flex items-center gap-1"
-                        >
-                          <FileText className="w-4 h-4" />
-                          View Full PDF
-                        </a>
-                      </div>
-                      <iframe
-                        src={selectedItem.embedUrl || selectedItem.pdfUrl || selectedItem.pdfLink}
-                        className="w-full h-96 border border-gray-300 rounded-lg"
-                        title="PDF Preview"
-                      />
-                    </div>
-                  )}
-
-                  {checkingDuplicate && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-3">
-                      <div className="animate-spin h-5 w-5 border-b-2 border-yellow-600 rounded-full"></div>
-                      <p className="text-yellow-800">Checking for duplicate PDFs...</p>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    {selectedItem.status !== 'approved' && (
-                      <button onClick={() => updateAdvertisementStatus(selectedItem.id, 'approved', selectedItem)} disabled={checkingDuplicate} className="flex-1 bg-blue-950 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                        <Check className="w-5 h-5" />
-                        Approve Book
-                      </button>
-                    )}
-                    {selectedItem.status !== 'rejected' && (
-                      <button onClick={() => updateAdvertisementStatus(selectedItem.id, 'rejected', selectedItem)} className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2">
-                        <X className="w-5 h-5" />
-                        Reject Book
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {modalType === 'transaction' && selectedItem && (
-                <div className="space-y-4">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-bold text-blue-950 mb-3">Transaction Information</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Transaction ID</p>
-                        <p className="font-mono text-sm text-gray-900">{selectedItem.id}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Amount</p>
-                        <p className="font-bold text-2xl text-green-600">₦{selectedItem.amount?.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Status</p>
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedItem.status || 'completed')}`}>
-                          {selectedItem.status || 'completed'}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Date</p>
-                        <p className="text-sm text-gray-900">{formatDate(selectedItem.createdAt)}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-bold text-gray-900 mb-3">Book Details</h4>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-xs text-gray-500">Book Title</p>
-                        <p className="font-semibold text-gray-900">{selectedItem.bookTitle}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Book ID</p>
-                        <p className="font-mono text-sm text-gray-700">{selectedItem.bookId}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <h4 className="font-bold text-green-900 mb-3 flex items-center gap-2">
-                      <DollarSign className="w-5 h-5" />
-                      Seller Information (Money Recipient)
-                    </h4>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-xs text-gray-500">Seller Name</p>
-                        <p className="font-semibold text-gray-900">{selectedItem.sellerName || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Seller Email</p>
-                        <p className="font-semibold text-gray-900">{selectedItem.sellerEmail || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Seller ID</p>
-                        <p className="font-mono text-sm text-gray-700">{selectedItem.sellerId || 'N/A'}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-bold text-blue-900 mb-3">Buyer Information</h4>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-xs text-gray-500">Buyer Name</p>
-                        <p className="font-semibold text-gray-900">{selectedItem.buyerName || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Buyer Email</p>
-                        <p className="font-semibold text-gray-900">{selectedItem.buyerEmail}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Buyer ID</p>
-                        <p className="font-mono text-sm text-gray-700">{selectedItem.buyerId || 'N/A'}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {selectedItem.paymentMethod && (
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <h4 className="font-bold text-gray-900 mb-3">Payment Details</h4>
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-xs text-gray-500">Payment Method</p>
-                          <p className="text-sm text-gray-900">{selectedItem.paymentMethod}</p>
-                        </div>
-                        {selectedItem.transactionReference && (
-                          <div>
-                            <p className="text-xs text-gray-500">Reference</p>
-                            <p className="font-mono text-sm text-gray-700">{selectedItem.transactionReference}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <button onClick={closeModal} className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
-                    Close
-                  </button>
-                </div>
-              )}
-
-              {modalType === 'user' && selectedItem && (
-                <div className="space-y-4">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-bold text-blue-950 mb-3">User Information</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Display Name</p>
-                        <p className="font-semibold text-gray-900">{selectedItem.displayName || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Email</p>
-                        <p className="font-semibold text-gray-900">{selectedItem.email}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">User ID</p>
-                        <p className="font-mono text-xs text-gray-700">{selectedItem.id}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Role</p>
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${selectedItem.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}`}>
-                          {selectedItem.role || 'user'}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Account Status</p>
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedItem.accountStatus || 'active')}`}>
-                          {selectedItem.accountStatus || 'active'}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Joined</p>
-                        <p className="text-sm text-gray-900">{formatDate(selectedItem.createdAt)}</p>
-                      </div>
-                      {selectedItem.phoneNumber && (
-                        <div>
-                          <p className="text-xs text-gray-500 mb-1">Phone Number</p>
-                          <p className="text-sm text-gray-900">{selectedItem.phoneNumber}</p>
-                        </div>
-                      )}
-                      {selectedItem.lastLogin && (
-                        <div>
-                          <p className="text-xs text-gray-500 mb-1">Last Login</p>
-                          <p className="text-sm text-gray-900">{formatDate(selectedItem.lastLogin)}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {selectedItem.bio && (
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <p className="text-xs text-gray-500 mb-2">Bio</p>
-                      <p className="text-sm text-gray-900">{selectedItem.bio}</p>
-                    </div>
-                  )}
-
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h4 className="font-bold text-yellow-900 mb-2 flex items-center gap-2">
-                      <AlertTriangle className="w-5 h-5" />
-                      Account Management
-                    </h4>
-                    <p className="text-sm text-gray-700 mb-4">
-                      Manage this user's account status. Pending status allows users to appeal through the report page.
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {selectedItem.accountStatus !== 'active' && (
-                        <button onClick={() => updateUserStatus(selectedItem.id, 'active')} className="bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2">
-                          <Check className="w-4 h-4" />
-                          Activate
-                        </button>
-                      )}
-                      {selectedItem.accountStatus !== 'pending' && (
-                        <button onClick={() => updateUserStatus(selectedItem.id, 'pending')} className="bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 flex items-center justify-center gap-2">
-                          <Lock className="w-4 h-4" />
-                          Set Pending
-                        </button>
-                      )}
-                      {selectedItem.accountStatus !== 'suspended' && (
-                        <button onClick={() => updateUserStatus(selectedItem.id, 'suspended')} className="bg-orange-600 text-white py-2 rounded-lg hover:bg-orange-700 flex items-center justify-center gap-2">
-                          <UserX className="w-4 h-4" />
-                          Suspend
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <h4 className="font-bold text-red-900 mb-2 flex items-center gap-2">
-                      <AlertCircle className="w-5 h-5" />
-                      Danger Zone
-                    </h4>
-                    <p className="text-sm text-gray-700 mb-4">
-                      Permanently delete this user account. This action cannot be undone.
-                    </p>
-                    <button onClick={() => deleteUserAccount(selectedItem.id)} className="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2">
-                      <Trash2 className="w-4 h-4" />
-                      Delete Account Permanently
-                    </button>
-                  </div>
-
-                  <button onClick={closeModal} className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
-                    Close
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+<UserModal
+  isOpen={showModal && modalType === 'user'}
+  onClose={closeModal}
+  item={selectedItem}
+  formatDate={formatDate}
+  getStatusColor={getStatusColor}
+  onUpdateStatus={updateUserStatus}
+  onDelete={deleteUserAccount}
+/>
     </div>
   );
 }
