@@ -22,7 +22,6 @@ export default function LearningAccessNetwork() {
     'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=1920&h=1080&fit=crop',
     'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=1920&h=1080&fit=crop',
     'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=1920&h=1080&fit=crop',
-    // 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1920&h=1080&fit=crop'
   ];
 
   useEffect(() => {
@@ -30,7 +29,7 @@ export default function LearningAccessNetwork() {
       if (user) {
         router.replace("/home");
       } else {
-        setLoading(false);
+        setTimeout(() => setLoading(false), 5000);
       }
     });
     return () => unsubscribe();
@@ -47,8 +46,11 @@ export default function LearningAccessNetwork() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-blue-950">
-        <div className="text-white text-xl">WELCOME TO LAN Library...</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <h1 className="text-center text-3xl lg:text-7xl md:text-5xl font-bold">
+          <span className="text-white bg-blue-950 px-4 py-2 rounded">LAN</span>
+          <span className="text-blue-950 ml-3">Library</span>
+        </h1>
       </div>
     );
   }
