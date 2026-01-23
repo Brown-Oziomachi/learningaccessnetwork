@@ -357,7 +357,7 @@ export default function MyBooksClient() {
 
                         {/* Mobile Mask (Smaller screens) */}
                         <div
-                            className="absolute top-0 right-0 h-12 bg-[#323639] z-10 md:hidden flex items-center justify-end px-4 select-none"
+                            className="absolute top-0 right-0 h-15 bg-[#323639] z-10 md:hidden flex items-center justify-end px-4 select-none"
                             style={{ width: '120px' }}
                             onContextMenu={(e) => e.preventDefault()}
                         >
