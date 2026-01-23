@@ -120,7 +120,7 @@ export default function LearningAccessNetwork() {
         <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
           <div className="lg:hidden w-full max-w-md space-y-6">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 1, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
               className="bg-white/95 backdrop-blur-sm p-6 shadow-2xl border-6 border-l-blue-950"

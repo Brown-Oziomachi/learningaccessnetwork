@@ -27,10 +27,6 @@ dist/
 *.zip
 *.tar.gz
 *.pdf
-*.png
-*.jpg
-*.jpeg
-*.gif
 
 # misc
 .DS_Store
