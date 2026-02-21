@@ -18,7 +18,7 @@ export default function DOBClient() {
             firstName: searchParams.get('firstName') || '',
             surname: searchParams.get('surname') || '',
             email: searchParams.get('email') || '',
-            accountType: searchParams.get('accountType') || '' // ADD THIS LINE
+            accountType: searchParams.get('accountType') || '',
         });
     }, [searchParams]);
 
@@ -30,10 +30,15 @@ export default function DOBClient() {
             return;
         }
 
+        // ✅ Read ref from URL or sessionStorage
+        const ref = searchParams.get('ref') || sessionStorage.getItem('referredBy') || '';
+
         const params = new URLSearchParams({
             ...formData,
-            dateOfBirth
+            dateOfBirth,
         });
+
+        if (ref) params.append('ref', ref); // ✅ pass ref forward
 
         router.push(`/auth/create-account/email?${params.toString()}`);
     };

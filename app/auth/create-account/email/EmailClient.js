@@ -23,12 +23,9 @@ export default function EmailClient() {
             firstName: searchParams.get('firstName') || '',
             surname: searchParams.get('surname') || '',
             dateOfBirth: searchParams.get('dateOfBirth') || '',
-            accountType: searchParams.get('accountType') || '' // ADD THIS LINE
+            accountType: searchParams.get('accountType') || '',
         });
-
-        if (prefilledEmail) {
-            setEmail(prefilledEmail);
-        }
+        if (prefilledEmail) setEmail(prefilledEmail);
     }, [searchParams]);
 
     const handleNext = async () => {
@@ -41,19 +38,20 @@ export default function EmailClient() {
 
             if (!validation.isValid) {
                 setErrors(validation.errors);
-
-                if (validation.accountExists) {
-                    setAccountExists(true);
-                }
-
+                if (validation.accountExists) setAccountExists(true);
                 setLoading(false);
                 return;
             }
 
+            // ✅ Read ref from URL or sessionStorage
+            const ref = searchParams.get('ref') || sessionStorage.getItem('referredBy') || '';
+
             const params = new URLSearchParams({
                 ...formData,
-                email
+                email,
             });
+
+            if (ref) params.append('ref', ref); // ✅ pass ref forward
 
             router.push(`/auth/create-account/password?${params.toString()}`);
         } catch (error) {
@@ -100,23 +98,13 @@ export default function EmailClient() {
                     <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                         <p className="text-red-800 text-sm">{errors.email}</p>
-                        
-                        {/* Show contact support link for suspended/pending accounts */}
                         {(errors.email.includes('suspended') || errors.email.includes('under review')) && (
-                            <Link 
-                                href="/lan/customer-care" 
-                                className="text-red-600 hover:underline text-sm font-semibold mt-2 inline-block"
-                            >
+                            <Link href="/lan/customer-care" className="text-red-600 hover:underline text-sm font-semibold mt-2 inline-block">
                                 Contact Support →
                             </Link>
                         )}
-                        
-                        {/* Show sign in link if account exists */}
                         {accountExists && (
-                            <Link 
-                                href={`/auth/signin?email=${encodeURIComponent(email)}`}
-                                className="text-blue-950 hover:underline text-sm font-semibold mt-2 inline-block"
-                            >
+                            <Link href={`/auth/signin?email=${encodeURIComponent(email)}`} className="text-blue-950 hover:underline text-sm font-semibold mt-2 inline-block">
                                 Sign in instead →
                             </Link>
                         )}
@@ -140,9 +128,7 @@ export default function EmailClient() {
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                         Checking...
                     </>
-                ) : (
-                    'Next'
-                )}
+                ) : 'Next'}
             </button>
         </AuthLayout>
     );

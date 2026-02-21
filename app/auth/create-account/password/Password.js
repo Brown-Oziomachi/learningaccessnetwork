@@ -19,7 +19,7 @@ export default function PasswordClient() {
             surname: searchParams.get('surname') || '',
             dateOfBirth: searchParams.get('dateOfBirth') || '',
             email: searchParams.get('email') || '',
-            accountType: searchParams.get('accountType') || '' // ADD THIS LINE
+            accountType: searchParams.get('accountType') || '',
         });
     }, [searchParams]);
 
@@ -31,10 +31,15 @@ export default function PasswordClient() {
             return;
         }
 
+        // ✅ Read ref from URL or sessionStorage so it isn't lost
+        const ref = searchParams.get('ref') || sessionStorage.getItem('referredBy') || '';
+
         const params = new URLSearchParams({
             ...formData,
-            password
+            password,
         });
+
+        if (ref) params.append('ref', ref); // ✅ pass ref to confirm step
 
         router.push(`/auth/create-account/confirm?${params.toString()}`);
     };

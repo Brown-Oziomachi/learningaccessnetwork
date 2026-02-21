@@ -45,7 +45,7 @@ export default function ReferralClient() {
     // ✅ Auto-detects your domain — works on Vercel today, lanlibrary.com tomorrow
     const referralCode = user?.uid || currentUser?.uid || '';
     const referralLink = referralCode && typeof window !== 'undefined'
-        ? `${window.location.origin}/signup?ref=${referralCode}`
+        ? `${window.location.origin}/auth/signup?ref=${referralCode}`
         : '';
 
     // ── Fetch user & referral data from Firestore ──────────────────────────
