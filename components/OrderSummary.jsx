@@ -89,9 +89,9 @@ export const OrderSummary = ({ book }) => {
         </div>
         {book.discount && (
           <div className="flex justify-between text-sm text-green-600">
-            <span>Discount {book.discount}</span>
+            <span>LAN Lib's </span>
             <span className="font-semibold">
-              - ₦ {((book.oldPrice || 0) - (book.price || 0)).toLocaleString()}
+              20%
             </span>
           </div>
         )}
@@ -103,11 +103,11 @@ export const OrderSummary = ({ book }) => {
         </div>
       </div>
 
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-950">
+      <div className="mt-6 bg-blue-950 border border-blue-200 rounded-lg p-4">
+        <p className="text-sm text-blue-50">
           <strong>✓ Instant Access</strong>
           <br />
-          Download your PDF immediately after payment
+          Access your PDF immediately after payment
         </p>
       </div>
 

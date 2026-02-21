@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Check, X, AlertCircle, FileText, User, Mail, Calendar, DollarSign, 
   BookOpen, Book, ShieldCheck, Building, Phone, Send, Lock, UserX, 
-  Trash2, AlertTriangle 
+  Trash2, AlertTriangle, Upload, ExternalLink
 } from 'lucide-react';
 
 // ==================== BOOK APPROVAL MODAL ====================
@@ -24,6 +24,14 @@ export const BookApprovalModal = ({
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
 
   if (!isOpen || !item) return null;
+
+  const getFileType = (url) => {
+  if (!url) return 'Unknown';
+  if (url.includes('firebasestorage.googleapis.com')) return 'Direct Upload (Firebase)';
+  if (url.includes('drive.google.com')) return 'Google Drive';
+  if (url.includes('dropbox.com')) return 'Dropbox';
+  return 'External Link';
+};
 
   const handleApprove = async () => {
     if (checkPdfDuplicate) {
@@ -153,39 +161,103 @@ export const BookApprovalModal = ({
                 </div>
               </div>
 
-              {/* Description */}
-              {item.description && (
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <p className="text-xs text-gray-500 mb-2 font-semibold">Description</p>
-                  <p className="text-sm text-gray-700">{item.description}</p>
-                </div>
-              )}
+             {/* Description */}
+{item.description && (
+  <div className="bg-gray-50 rounded-xl p-4">
+    <p className="text-xs text-gray-500 mb-2 font-semibold">Description</p>
+    <p className="text-sm text-gray-700">{item.description}</p>
+  </div>
+)}
 
-              {/* PDF Preview */}
-              {item.driveFileId && (
-                <div className="bg-white border-2 border-dashed border-gray-300 rounded-xl p-4">
-                  <p className="text-sm font-semibold text-gray-700 mb-3">Book Preview</p>
-                  <img
-                    src={`https://drive.google.com/thumbnail?id=${item.driveFileId}&sz=w400`}
-                    alt="Book Preview"
-                    className="w-full max-w-sm mx-auto rounded-lg shadow-md"
-                    onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                  />
-                </div>
-              )}
+{/* Upload Method Indicator */}
+<div className="mb-4">
+  <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold ${
+    item.uploadMethod === 'direct_upload' 
+      ? 'bg-purple-100 text-purple-800' 
+      : 'bg-blue-100 text-blue-800'
+  }`}>
+    <FileText className="w-4 h-4" />
+    {item.uploadMethod === 'direct_upload' ? '📤 Direct Upload' : '🔗 Drive Link'}
+  </div>
+  <p className="text-xs text-gray-500 mt-1">
+    File Type: {getFileType(item.pdfUrl || item.pdfLink)}
+  </p>
+</div>
 
-              {/* PDF Embed */}
-              {(item.embedUrl || item.pdfUrl || item.pdfLink) && (
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-semibold text-gray-700">PDF Document</p>
-                    <a href={item.embedUrl || item.pdfUrl || item.pdfLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm flex items-center gap-1">
-                      <FileText className="w-4 h-4" />Open in New Tab
-                    </a>
-                  </div>
-                  <iframe src={item.embedUrl || item.pdfUrl || item.pdfLink} className="w-full h-96 border-2 border-gray-300 rounded-lg" title="PDF Preview" />
-                </div>
-              )}
+{/* Thumbnail Preview (for Drive links only) */}
+{item.driveFileId && (
+  <div className="bg-white border-2 border-dashed border-gray-300 rounded-xl p-4 mb-4">
+    <p className="text-sm font-semibold text-gray-700 mb-3">Book Thumbnail</p>
+    <img
+      src={`https://drive.google.com/thumbnail?id=${item.driveFileId}&sz=w400`}
+      alt="Book Preview"
+      className="w-full max-w-sm mx-auto rounded-lg shadow-md"
+      onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
+    />
+  </div>
+)}
+
+{/* PDF Preview */}
+<div className="mb-6">
+  <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+    <FileText className="w-5 h-5" />
+    PDF Document Preview
+  </h4>
+  
+  {(item.pdfUrl || item.pdfLink || item.embedUrl) ? (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      {item.uploadMethod === 'direct_upload' ? (
+        // For direct uploads (Firebase Storage)
+      <div className="space-y-3 p-4 bg-purple-50">
+  <div className="flex items-center gap-2 text-sm text-purple-900 mb-2">
+    <AlertCircle className="w-4 h-4" />
+    <span>This is a direct upload to Firebase Storage</span>
+  </div>
+  <a
+    href={item.pdfUrl}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="flex items-center justify-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors w-full"
+  >
+    <FileText className="w-4 h-4" />
+    Open PDF in New Tab
+  </a>
+  <iframe
+    src={item.pdfUrl}
+    className="w-full h-96 border-2 border-purple-200 rounded-lg"
+    title="PDF Preview"
+  />
+</div>
+      ) : (
+        // For Google Drive links
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-3 bg-blue-50">
+            <span className="text-sm text-blue-900">Google Drive Document</span>
+            <a 
+              href={item.pdfUrl || item.pdfLink || item.embedUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-blue-600 hover:underline text-sm flex items-center gap-1"
+            >
+              <FileText className="w-4 h-4" />
+              Open Original
+            </a>
+          </div>
+          <iframe
+            src={item.embedUrl || item.pdfUrl?.replace('/view', '/preview') || item.pdfLink?.replace('/view', '/preview')}
+            className="w-full h-96 border-0"
+            title="PDF Preview"
+          />
+        </div>
+      )}
+    </div>
+  ) : (
+    <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+      <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+      <p className="text-gray-600">No PDF link provided</p>
+    </div>
+  )}
+</div>
 
               {/* Checking Duplicate */}
               {checkingDuplicate && (

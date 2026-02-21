@@ -19,7 +19,7 @@ export default function MakeMoneyPage() {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState(null);
-
+  const currentYear = new Date().getFullYear()
   const videos = [
     {
       id: 1,
@@ -134,24 +134,20 @@ export default function MakeMoneyPage() {
       {/* Header */}
       <header className="border-b border-gray-800 sticky top-0 z-50 bg-blue-950 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link
-                       href="/home"
-                       className="flex items-center gap-2 flex-shrink-0"
-                     >
-                       <h1
-                         className="text-4xl sm:text-6xl font-bold text-gray-50"
-                         style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
-                       >
-                         [LAN Library]
-                         <h2
-                           className="text-xs sm:text-base font-light"
-                           style={{ fontFamily: "'Lato', sans-serif" }}
-                         >
-                           Digital Platform For Knowledge Access
-                         </h2>
-                       </h1>
-                     </Link>
-         
+          <Link href="/home" className="flex items-center gap-2 flex-shrink-0">
+            <h1
+              className="text-4xl sm:text-6xl font-bold text-gray-50"
+              style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
+            >
+              [LAN Library]
+              <h2
+                className="text-xs sm:text-base font-light"
+                style={{ fontFamily: "'Lato', sans-serif" }}
+              >
+                Digital Platform For Knowledge Access
+              </h2>
+            </h1>
+          </Link>
         </div>
       </header>
 
@@ -166,8 +162,9 @@ export default function MakeMoneyPage() {
           Selling Books
         </h1>
         <p className="text-gray-900 text-xl mb-8 max-w-2xl mx-auto">
-          Learn how to write and publish your first book with our comprehensive guide.
-          From developing ideas to marketing your finished work, we cover every step of the process
+          Learn how to write and publish your first book with our comprehensive
+          guide. From developing ideas to marketing your finished work, we cover
+          every step of the process
         </p>
       </section>
 
@@ -313,66 +310,68 @@ export default function MakeMoneyPage() {
         </div>
       </section>
 
-          {/* How It Works Section */}
-          <div className="bg-blue-950 text-white">
-      <section className="max-w-7xl mx-auto px-4 py-16 mt-10">
-        <h2 className="text-4xl font-bold mb-4 text-center">How It Works</h2>
-        <p className="text-gray-400 text-center mb-12">
-          Three simple steps to start earning
-        </p>
+      {/* How It Works Section */}
+      <div className="bg-blue-950 text-white">
+        <section className="max-w-7xl mx-auto px-4 py-16 mt-10">
+          <h2 className="text-4xl font-bold mb-4 text-center">How It Works</h2>
+          <p className="text-gray-400 text-center mb-12">
+            Three simple steps to start earning
+          </p>
 
-        <div className=" md:grid-cols-3 gap-1 flex overflow-x-auto max-md:w-full space-x-2 px-  md:space-x-0  md:overflow-visible  md:flex-none  md:px-0">
-          {steps.map((step, index) => (
-            <div key={index} className="relative w-80 md:w-auto flex-shrink-0 md:flex-shrink md:mx-0">
-              <div className="bg-gradient-to-br from-blue-900/50 to-purple-900/50  p-5 border border-blue-600/30 hover:border-blue-600 transition-all group">
-                <div className="text-6xl font-bold text-blue-600/30 mb-4">
-                  {step.number}
+          <div className=" md:grid-cols-3 gap-1 flex overflow-x-auto max-md:w-full space-x-2 px-  md:space-x-0  md:overflow-visible  md:flex-none  md:px-0">
+            {steps.map((step, index) => (
+              <div
+                key={index}
+                className="relative w-80 md:w-auto flex-shrink-0 md:flex-shrink md:mx-0"
+              >
+                <div className="bg-gradient-to-br from-blue-900/50 to-purple-900/50  p-5 border border-blue-600/30 hover:border-blue-600 transition-all group">
+                  <div className="text-6xl font-bold text-blue-600/30 mb-4">
+                    {step.number}
+                  </div>
+                  <h3 className="text-2xl font-bold mb-4 group-hover:text-blue-400 transition-colors">
+                    {step.title}
+                  </h3>
+                  <p className="text-gray-400 leading-relaxed">
+                    {step.description}
+                  </p>
                 </div>
-                <h3 className="text-2xl font-bold mb-4 group-hover:text-blue-400 transition-colors">
-                  {step.title}
-                </h3>
-                <p className="text-gray-400 leading-relaxed">
-                  {step.description}
-                </p>
-              </div>
-              {index < steps.length - 1 && (
-                <div className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2">
-                  <ArrowRight className="w-8 h-8 text-blue-600" />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Benefits Section */}
-      <section className="max-w-7xl mx-auto px-4 py-16">
-        <div className="bg-gradient-to-br from-blue-900/30 to-purple-900/30 rounded-3xl p-12 border border-blue-600/30">
-          <h2 className="text-4xl font-bold mb-12 text-center">
-            Why Sell on LAN Library?
-          </h2>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {[
-              "Earn 85% of every sale - highest in the industry",
-              "No upfront costs or hidden fees",
-              "Instant payment processing",
-              "Reach thousands of students and professionals",
-              "Keep full ownership of your content",
-              "24/7 customer support for sellers",
-              "Easy-to-use upload system",
-              "Detailed sales analytics dashboard",
-            ].map((benefit, index) => (
-              <div key={index} className="flex items-start gap-3">
-                <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
-                <span className="text-lg">{benefit}</span>
+                {index < steps.length - 1 && (
+                  <div className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2">
+                    <ArrowRight className="w-8 h-8 text-blue-600" />
+                  </div>
+                )}
               </div>
             ))}
           </div>
-        </div>
-      </section>
-              
+        </section>
+
+        {/* Benefits Section */}
+        <section className="max-w-7xl mx-auto px-4 py-16">
+          <div className="bg-gradient-to-br from-blue-900/30 to-purple-900/30 rounded-3xl p-12 border border-blue-600/30">
+            <h2 className="text-4xl font-bold mb-12 text-center">
+              Why Sell on LAN Library?
+            </h2>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {[
+                "Earn 85% of every sale - highest in the industry",
+                "No upfront costs or hidden fees",
+                "Instant payment processing",
+                "Reach thousands of students and professionals",
+                "Keep full ownership of your content",
+                "24/7 customer support for sellers",
+                "Easy-to-use upload system",
+                "Detailed sales analytics dashboard",
+              ].map((benefit, index) => (
+                <div key={index} className="flex items-start gap-3">
+                  <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
+                  <span className="text-lg">{benefit}</span>
+                </div>
+              ))}
+            </div>
           </div>
+        </section>
+      </div>
 
       {/* CTA Section */}
       <section className="max-w-7xl mx-auto px-4 py-16 text-center">
@@ -384,7 +383,7 @@ export default function MakeMoneyPage() {
 
         <div className="fle flex-col sm:flex-row gap-4 justify-center mx-auto">
           <Link href="/become-seller">
-            <button className="bg-blue-950 text-white lg:px-6 lg:py-2 max-md:text-sm max-lg:px-5 max-lg:py-2 rounded-full font-semibold hover:bg-blue-700 transition-colors">
+            <button className="bg-blue-950 text-white lg:px-15 lg:py-4 max-md:text-sm max-lg:px-15 max-lg:py-3  rounded-md font-semibold hover:bg-white hover:shadow-2xl hover:text-blue-950 transition-colors">
               BECOME A SELLER
             </button>
           </Link>
@@ -393,8 +392,11 @@ export default function MakeMoneyPage() {
 
       {/* Footer */}
       <footer className="border-t border-gray-800 py-8">
-        <div className="max-w-7xl mx-auto px-4 text-center text-gray-500">
-          <p>&copy; 2025 LAN Library. All rights reserved.</p>
+        <div className=" text-center mx-auto px-4 text-gray-500">
+          <p className="">
+            &copy; {currentYear} [LAN Library] Learning Access Network. All
+            rights reserved.
+          </p>{" "}
         </div>
       </footer>
 

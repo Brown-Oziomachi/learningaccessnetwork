@@ -1,11 +1,11 @@
 // ===========================
 // FILE: app/pdf/page.jsx
-// ALL BOOKS LIBRARY PAGE WITH CAROUSEL - FIXED THUMBNAILS
+// ALL BOOKS LIBRARY PAGE WITH MULTIPLE CAROUSEL ROWS
 // ===========================
 
 "use client"
 import React, { useState, useEffect } from 'react';
-import { Globe, Search, User, Menu, X, ChevronDown, ChevronRight, Download, Lock, FileText, LogOut, Filter, AlignEndVertical, MoreVertical, Bookmark, Share2, Flag } from 'lucide-react';
+import { Globe, Search, User, Menu, X, ChevronDown, ShoppingBag, ChevronRight, Download, Lock, FileText, LogOut, Filter, AlignEndVertical, MoreVertical, Bookmark, Share2, Flag, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -25,15 +25,18 @@ export default function AllBooksClient() {
     const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
     const [sortBy, setSortBy] = useState('popularity');
     const [selectedCategory, setSelectedCategory] = useState('all');
-    const [currentPage, setCurrentPage] = useState(1);
     const [showFilters, setShowFilters] = useState(false);
     const [user, setUser] = useState(null);
     const [showBookMenu, setShowBookMenu] = useState(false);
     const [savedBooks, setSavedBooks] = useState(new Set());
-    const booksPerPage = 12;
     const [showMobileSearch, setShowMobileSearch] = useState(false);
     const [allBooks, setAllBooks] = useState([]);
     const [loadingBooks, setLoadingBooks] = useState(true);
+    const [bookSalesCount, setBookSalesCount] = useState({});
+    const [visibleRows, setVisibleRows] = useState(5); // Start with 5 rows
+
+    const booksPerRow = 10;
+    const rowsPerLoad = 2; // Load 2 more rows when "Load More" is clicked
 
     const categories = [
         { value: 'all', label: 'All Categories' },
@@ -186,10 +189,66 @@ export default function AllBooksClient() {
 
     const sortedBooks = sortBooks(filteredBooks);
 
-    // Pagination
-    const totalPages = Math.ceil(sortedBooks.length / booksPerPage);
-    const startIndex = (currentPage - 1) * booksPerPage;
-    const displayBooks = sortedBooks.slice(startIndex, startIndex + booksPerPage);
+    // Calculate total rows needed
+    const totalRows = Math.ceil(sortedBooks.length / booksPerRow);
+    const hasMoreRows = visibleRows < totalRows;
+
+    // Get books to display based on visible rows
+    const displayBooks = sortedBooks.slice(0, visibleRows * booksPerRow);
+
+    // Split books into rows
+    const bookRows = [];
+    for (let i = 0; i < visibleRows; i++) {
+        const startIdx = i * booksPerRow;
+        const endIdx = Math.min(startIdx + booksPerRow, displayBooks.length);
+        if (startIdx < displayBooks.length) {
+            bookRows.push(displayBooks.slice(startIdx, endIdx));
+        }
+    }
+
+    // Load more rows
+    const handleLoadMore = () => {
+        setVisibleRows(prev => Math.min(prev + rowsPerLoad, totalRows));
+        // Smooth scroll to the newly loaded content
+        setTimeout(() => {
+            window.scrollBy({ top: 400, behavior: 'smooth' });
+        }, 100);
+    };
+
+    // Reset visible rows when filters change
+    useEffect(() => {
+        setVisibleRows(5);
+    }, [selectedCategory, searchQuery, sortBy]);
+
+    // Fetch sales count for all books
+    useEffect(() => {
+        const fetchBookSales = async () => {
+            try {
+                const usersSnapshot = await getDocs(collection(db, "users"));
+                const salesMap = {};
+
+                usersSnapshot.docs.forEach(userDoc => {
+                    const userData = userDoc.data();
+                    const purchasedBooks = userData.purchasedBooks || {};
+
+                    Object.values(purchasedBooks).forEach(purchase => {
+                        const bookId = purchase.bookId || purchase.id || purchase.firestoreId;
+                        if (bookId) {
+                            salesMap[bookId] = (salesMap[bookId] || 0) + 1;
+                            // Also track firestore- prefixed version
+                            salesMap[`firestore-${bookId}`] = (salesMap[`firestore-${bookId}`] || 0) + 1;
+                        }
+                    });
+                });
+
+                setBookSalesCount(salesMap);
+            } catch (error) {
+                console.error("Error fetching sales count:", error);
+            }
+        };
+
+        fetchBookSales();
+    }, []);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -227,62 +286,6 @@ export default function AllBooksClient() {
             loadSavedBooks();
         }
     }, [user]);
-
-    // Add this function to handle save/unsave
-    const handleSaveBook = async (book) => {
-        try {
-            const user = auth.currentUser;
-            if (!user) {
-                alert('Please sign in to save books');
-                return;
-            }
-
-            const userDocRef = doc(db, 'users', user.uid);
-            const userDoc = await getDoc(userDocRef);
-
-            let savedBooksArray = [];
-            if (userDoc.exists()) {
-                const userData = userDoc.data();
-                savedBooksArray = userData.savedBooks || [];
-            }
-
-            const isCurrentlySaved = savedBooks.has(book.id);
-
-            if (isCurrentlySaved) {
-                // Remove from saved
-                savedBooksArray = savedBooksArray.filter(b => b.id !== book.id);
-                setSavedBooks(prev => {
-                    const newSet = new Set(prev);
-                    newSet.delete(book.id);
-                    return newSet;
-                });
-                alert('Removed from Saved');
-            } else {
-                // Add to saved
-                const bookToSave = {
-                    id: book.id,
-                    title: book.title,
-                    author: book.author,
-                    image: book.image,
-                    price: book.price,
-                    category: book.category,
-                    savedAt: new Date().toISOString()
-                };
-                savedBooksArray.push(bookToSave);
-                setSavedBooks(prev => new Set(prev).add(book.id));
-                alert('Saved for later!');
-            }
-
-            await updateDoc(userDocRef, {
-                savedBooks: savedBooksArray
-            });
-
-            setShowBookMenu(false);
-        } catch (error) {
-            console.error('Error saving book:', error);
-            alert('Error saving book. Please try again.');
-        }
-    };
 
     // Fetch purchased books from Firebase
     useEffect(() => {
@@ -323,41 +326,6 @@ export default function AllBooksClient() {
         fetchPurchasedBooks();
     }, []);
 
-    // Reset to page 1 when filters change
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [selectedCategory, searchQuery, sortBy]);
-
-    const handleLogout = async () => {
-        try {
-            await signOut(auth);
-            router.push("/auth/signin");
-        } catch (error) {
-            console.error("Logout error:", error);
-        }
-    };
-
-    const handleSearch = () => {
-        if (searchQuery.trim()) {
-            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-            setShowMobileSearch(false);
-        }
-    };
-
-    const handlePurchase = (book) => {
-        setSelectedBook(book);
-        setShowPurchaseModal(true);
-    };
-
-    const handleProceedToPayment = () => {
-        setShowPurchaseModal(false);
-        router.push(`/payment?bookId=${selectedBook.id}`);
-    };
-
-    const handleDownload = (book) => {
-        alert(`Downloading ${book.title}...\nPDF will be sent to your registered email.`);
-    };
-
     const isPurchased = (bookId) => {
         return (
             purchasedBookIds.has(bookId) ||
@@ -367,17 +335,109 @@ export default function AllBooksClient() {
         );
     };
 
-    const goToPage = (page) => {
-        setCurrentPage(page);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
     if (loadingBooks) {
         return (
             <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin h-12 w-12 border-b-2 border-blue-950 rounded-full mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading books...</p>
+                <div className="relative w-20 h-24 perspective-1000">
+                    {/* Book Container */}
+                    <div className="book-flip-container">
+                        {/* Front Cover - Book */}
+                        <div className="book-face book-front">
+                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-r-lg shadow-2xl relative overflow-hidden">
+                                {/* Book spine shadow */}
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-black/30"></div>
+
+                                {/* Book pages effect */}
+                                <div className="absolute right-0 top-1 bottom-1 w-0.5 bg-white/20"></div>
+                                <div className="absolute right-1 top-2 bottom-2 w-0.5 bg-white/15"></div>
+                                <div className="absolute right-2 top-3 bottom-3 w-0.5 bg-white/10"></div>
+
+                                {/* Book icon */}
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <svg className="w-10 h-10 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                    </svg>
+                                </div>
+
+                                {/* Shine effect */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent"></div>
+                            </div>
+                        </div>
+
+                        {/* Back Cover - LAN */}
+                        <div className="book-face book-back">
+                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-lg shadow-2xl flex items-center justify-center relative overflow-hidden">
+                                {/* LAN Text */}
+                                <div className="flex gap-0.5 text-white font-black text-2xl">
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0s' }}>L</span>
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.15s' }}>A</span>
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.3s' }}>N</span>
+                                </div>
+
+                                {/* Glow effect */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 via-transparent to-transparent"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Loading dots */}
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
+                        <div className="w-1.5 h-1.5 bg-blue-950 rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-blue-800 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
+
+                    <style jsx>{`
+    .perspective-1000 {
+      perspective: 1000px;
+    }
+    
+    .book-flip-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      animation: bookFlip 3s ease-in-out infinite;
+    }
+    
+    .book-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    
+    .book-front {
+      z-index: 2;
+    }
+    
+    .book-back {
+      transform: rotateY(180deg);
+    }
+    
+    @keyframes bookFlip {
+      0%, 100% {
+        transform: rotateY(0deg);
+      }
+      25%, 75% {
+        transform: rotateY(180deg);
+      }
+    }
+    
+    @keyframes lan-letter {
+      0%, 100% {
+        transform: translateY(0) scale(1);
+      }
+      50% {
+        transform: translateY(-4px) scale(1.1);
+      }
+    }
+    
+    .lan-letter {
+      animation: lan-letter 0.6s ease-in-out infinite;
+    }
+  `}</style>
                 </div>
             </div>
         );
@@ -386,7 +446,7 @@ export default function AllBooksClient() {
     return (
         <>
             <Navbar />
-            <div className="min-h-screen bg-neutral-100">
+            <div className="min-h-screen bg-white">
 
                 {/* Breadcrumb */}
                 <div className="bg-gray-50 border-b border-gray-200">
@@ -443,7 +503,7 @@ export default function AllBooksClient() {
                             {/* Right Side - Sort & Results */}
                             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                                 <span className="text-sm text-gray-600">
-                                    Showing {startIndex + 1}-{Math.min(startIndex + booksPerPage, sortedBooks.length)} of {sortedBooks.length}
+                                    Showing {displayBooks.length} of {sortedBooks.length} books
                                 </span>
                                 <div className="flex items-center gap-2">
                                     <label className="text-sm font-semibold text-gray-700">Sort:</label>
@@ -464,8 +524,8 @@ export default function AllBooksClient() {
                         </div>
                     </div>
 
-                    {/* Books Grid or No Results */}
-                    {displayBooks.length === 0 ? (
+                    {/* Books Display or No Results */}
+                    {sortedBooks.length === 0 ? (
                         <div className="bg-white rounded-lg shadow-lg p-12 text-center">
                             <FileText className="w-20 h-20 mx-auto mb-4 text-gray-400" />
                             <h3 className="text-2xl font-bold text-gray-900 mb-2">No Books Found</h3>
@@ -484,200 +544,90 @@ export default function AllBooksClient() {
                         </div>
                     ) : (
                         <>
-                            {/* Featured Books Carousel */}
-                            <div className="px-4 py-8 lg:px-0">
-                                <h1 className="text-4xl lg:text-5xl font-black mb-10 text-black">Documents</h1>
-                                <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-8">Get started with the community's uploads</h3>
+                            {/* Multiple Carousel Rows */}
+                            <div className="space-y-8">
+                                {bookRows.map((rowBooks, rowIndex) => (
+                                    <div key={rowIndex} className="px-4 lg:px-0">
+                                        <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-4">
+                                        </h3>
 
-                                <div className="relative -mx-4 lg:mx-0">
-                                    <div className="overflow-x-auto overflow-y-hidden scrollbar-hide px-4 lg:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                        <style jsx>{`
-                div::-webkit-scrollbar {
-                    display: none;
-                }
-            `}</style>
-                                        <div className="flex gap-5 lg:gap-5 pb-2">
-                                            {displayBooks.slice(1, 20).map((book, index) => (
-                                                <Link
-                                                    key={book.id}
-                                                    href={`/book/preview?id=${book.id}`}
-                                                    className="flex-none w-[180px] sm:w-[200px] lg:w-[220px] group"
-                                                >
-                                                    <div className="relative mb-3">
-                                                        <img
-                                                            src={book.image}
-                                                            alt={book.title}
-                                                            className="w-full h-[240px] sm:h-[280px] lg:h-[320px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
-                                                            onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                                                        />
-                                                        {isPurchased(book.id) && (
-                                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
-                                                        )}
-                                                        {book.isFromFirestore && (
-                                                            <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="font-bold text-sm lg:text-base text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                                                            {book.title}
-                                                        </h4>
-                                                        <p className="text-gray-600 text-xs lg:text-sm">{book.author}</p>
-                                                    </div>
-                                                </Link>
-                                            ))}
+                                        {/* Horizontal Scrolling Carousel */}
+                                        <div className="relative -mx-4 lg:mx-0">
+                                            <div
+                                                className="overflow-x-auto overflow-y-hidden scrollbar-hide px-4 lg:px-0"
+                                                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                                            >
+                                                <style jsx>{`
+                                                    div::-webkit-scrollbar {
+                                                        display: none;
+                                                    }
+                                                `}</style>
+
+                                                <div className="flex gap-4 lg:gap-5 pb-4">
+                                                    {rowBooks.map((book) => (
+                                                        <Link
+                                                            key={book.id}
+                                                            href={`/book/preview?id=${book.id}`}
+                                                            className="flex-none w-[160px] sm:w-[180px] lg:w-[200px] group"
+                                                        >
+                                                            <div className="relative mb-3">
+                                                                <img
+                                                                    src={book.image}
+                                                                    alt={book.title}
+                                                                    className="w-full h-[220px] sm:h-[260px] lg:h-[300px] group-hover:shadow-xl transition-shadow"
+                                                                    onError={(e) => {
+                                                                        e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+                                                                    }}
+                                                                />
+                                                                {isPurchased(book.id) && (
+                                                                    <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
+                                                                        Owned
+                                                                    </span>
+                                                                )}
+                                                                {book.isFromFirestore && (
+                                                                    <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">
+                                                                        New
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="font-bold text-sm lg:text-base text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                                                                    {book.title}
+                                                                </h4>
+                                                                <p className="text-gray-600 text-xs lg:text-sm mb-1">{book.author}</p>
+                                                                <p className="text-gray-500 text-xs lg:text-sm flex items-center gap-1">
+                                                                    <ShoppingBag size={12} />
+                                                                    {bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0} sold
+                                                                </p>
+                                                            </div>
+                                                        </Link>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    {displayBooks.length > 4 && (
-                                        <button className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 w-11 h-11 bg-white rounded-full shadow-lg items-center justify-center hover:bg-gray-50 transition-colors z-10 border border-gray-200">
-                                        </button>
-                                    )}
-                                </div>
+                                ))}
                             </div>
 
-                            {/* Documents recommended for you */}
-                            <div className="px-4 py-8 lg:px-0">
-                                <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-8">Documents recommended for you</h3>
-
-                                <div className="relative -mx-4 lg:mx-0">
-                                    <div className="overflow-x-auto overflow-y-hidden scrollbar-hide px-4 lg:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                        <style jsx>{`
-                div::-webkit-scrollbar {
-                    display: none;
-                }
-            `}</style>
-                                        <div className="flex gap-5 lg:gap-5 pb-2">
-                                            {displayBooks.slice(7, 17).map((book, index) => (
-                                                <Link
-                                                    key={book.id}
-                                                    href={`/book/preview?id=${book.id}`}
-                                                    className="flex-none w-[180px] sm:w-[200px] lg:w-[220px] group"
-                                                >
-                                                    <div className="relative mb-3">
-                                                        <img
-                                                            src={book.image}
-                                                            alt={book.title}
-                                                            className="w-full h-[240px] sm:h-[280px] lg:h-[320px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
-                                                            onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                                                        />
-                                                        {isPurchased(book.id) && (
-                                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
-                                                        )}
-                                                        {book.isFromFirestore && (
-                                                            <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="font-bold text-sm lg:text-base text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                                                            {book.title}
-                                                        </h4>
-                                                        <p className="text-gray-600 text-xs lg:text-sm">{book.author}</p>
-                                                    </div>
-                                                </Link>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    {displayBooks.length > 9 && (
-                                        <button className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 w-11 h-11 bg-white rounded-full shadow-lg items-center justify-center hover:bg-gray-50 transition-colors z-10 border border-gray-200">
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Recently Added */}
-                            <div className="px-4 py-8 lg:px-0">
-                                <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-8">Recently Publshed</h3>
-
-                                <div className="relative -mx-4 lg:mx-0">
-                                    <div className="overflow-x-auto overflow-y-hidden scrollbar-hide px-4 lg:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                        <style jsx>{`
-                div::-webkit-scrollbar {
-                    display: none;
-                }
-            `}</style>
-                                        <div className="flex gap-5 lg:gap-5 pb-2">
-                                            {displayBooks.slice(0, 7).map((book, _index) => (
-                                                <Link
-                                                    key={book.id}
-                                                    href={`/book/preview?id=${book.id}`}
-                                                    className="flex-none w-[180px] sm:w-[200px] lg:w-[220px] group"
-                                                >
-                                                    <div className="relative mb-3">
-                                                        <img
-                                                            src={book.image}
-                                                            alt={book.title}
-                                                            className="w-full h-[240px] sm:h-[280px] lg:h-[320px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
-                                                            onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                                                        />
-                                                        {isPurchased(book.id) && (
-                                                            <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
-                                                        )}
-                                                        {book.isFromFirestore && (
-                                                            <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="font-bold text-sm lg:text-base text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                                                            {book.title}
-                                                        </h4>
-                                                        <p className="text-gray-600 text-xs lg:text-sm">{book.author}</p>
-                                                    </div>
-                                                </Link>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    {displayBooks.length > 19 && (
-                                        <button className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 w-11 h-11 bg-white rounded-full shadow-lg items-center justify-center hover:bg-gray-50 transition-colors z-10 border border-gray-200">
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Pagination */}
-                            {totalPages > 1 && (
-                                <div className="mt-12 flex flex-wrap text-blue-950 items-center justify-center gap-2">
+                            {/* Load More Button */}
+                            {hasMoreRows && (
+                                <div className="mt-12 flex justify-center">
                                     <button
-                                        onClick={() => goToPage(currentPage - 1)}
-                                        disabled={currentPage === 1}
-                                        className="px-4 py-2 border border-gray-300 text-blue-950 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                        onClick={handleLoadMore}
+                                        className="bg-blue-950 cursor-pointer text-white px-8 py-4 rounded-lg hover:bg-blue-900 transition-colors flex items-center gap-2 font-semibold text-lg shadow-lg hover:shadow-xl"
                                     >
-                                        Previous
+                                        <Plus size={20} />
+                                         {Math.min(rowsPerLoad * booksPerRow, sortedBooks.length - displayBooks.length)} more
                                     </button>
+                                </div>
+                            )}
 
-                                    {[...Array(totalPages)].map((_, index) => {
-                                        const page = index + 1;
-                                        if (
-                                            page === 1 ||
-                                            page === totalPages ||
-                                            (page >= currentPage - 1 && page <= currentPage + 1)
-                                        ) {
-                                            return (
-                                                <button
-                                                    key={page}
-                                                    onClick={() => goToPage(page)}
-                                                    className={`px-4 py-2 rounded-lg text-sm ${currentPage === page
-                                                        ? 'bg-blue-950 text-white'
-                                                        : 'border border-gray-300 hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    {page}
-                                                </button>
-                                            );
-                                        } else if (
-                                            page === currentPage - 2 ||
-                                            page === currentPage + 2
-                                        ) {
-                                            return <span key={page} className="text-gray-500">...</span>;
-                                        }
-                                        return null;
-                                    })}
-
-                                    <button
-                                        onClick={() => goToPage(currentPage + 1)}
-                                        disabled={currentPage === totalPages}
-                                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                                    >
-                                        Next
-                                    </button>
+                            {/* All Books Loaded Message */}
+                            {!hasMoreRows && sortedBooks.length > booksPerRow && (
+                                <div className="mt-12 text-center">
+                                    <p className="text-gray-600 text-lg">
+                                        You've reached the end! All {sortedBooks.length} books displayed.
+                                    </p>
                                 </div>
                             )}
                         </>

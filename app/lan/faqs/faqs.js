@@ -2,14 +2,18 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Search, Globe, HelpCircle } from 'lucide-react';
+import { ChevronDown, Share2, BookOpen, Users, Download, Library } from 'lucide-react';
 import Link from 'next/link';
 import Navbar from '@/components/NavBar';
 import Footer from '@/components/FooterComp';
 
 export default function FAQClient() {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [openIndex, setOpenIndex] = useState(null);
+    const [openIndex, setOpenIndex] = useState('0-0');
+
+    const toggleQuestion = (categoryIndex, questionIndex) => {
+        const index = `${categoryIndex}-${questionIndex}`;
+        setOpenIndex(openIndex === index ? null : index);
+    };
 
     const faqs = [
         {
@@ -65,12 +69,10 @@ export default function FAQClient() {
                     question: "Can I change my email address?",
                     answer: "You can update your email in your account settings under 'Account' > 'Settings'. However, note that your purchased books are tied to the email used during purchase. To access your books after changing your email, you must log in with the original email used when buying them."
                 },
-
                 {
                     question: "How do I upload my own PDF books?",
                     answer: "To have your books added, please contact Learning Access Network through the 'Advertise with us' section and provide your book details. LAN will review your submission and upload the book to the category you provide."
-                },
-
+                }
             ]
         },
         {
@@ -105,134 +107,155 @@ export default function FAQClient() {
         }
     ];
 
-    const filteredFaqs = faqs.map(category => ({
-        ...category,
-        questions: category.questions.filter(faq =>
-            faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            faq.answer.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-    })).filter(category => category.questions.length > 0);
-
-    const toggleQuestion = (categoryIndex, questionIndex) => {
-        const index = `${categoryIndex}-${questionIndex}`;
-        setOpenIndex(openIndex === index ? null : index);
-    };
-
     return (
         <div className="min-h-screen bg-white">
-            {/* Header */}
             <Navbar />
+
             {/* Hero Section */}
-            <div className=" text-blue-950 py-16">
-                <div className="max-w-4xl mx-auto px-4 text-center">
-                    <HelpCircle className="w-16 h-16 mx-auto mb-4" />
-                    <h1 className="text-4xl md:text-5xl font-bold mb-4">
-                        Frequently Asked Questions
-                    </h1>
-                    <p className="text-xl text-blue-950 mb-8">
-                        Find answers to common questions about Learning Access Network
-                    </p>
-                </div>
-            </div>
-
-            {/* FAQ Content */}
-            <main className="max-w-4xl mx-auto px-4 py-12">
-                {filteredFaqs.length > 0 ? (
-                    <div className="space-y-8">
-                        {filteredFaqs.map((category, categoryIndex) => (
-                            <div key={categoryIndex}>
-                                <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                                    {category.category}
-                                </h2>
-                                <div className="space-y-3">
-                                    {category.questions.map((faq, questionIndex) => {
-                                        const index = `${categoryIndex}-${questionIndex}`;
-                                        const isOpen = openIndex === index;
-
-                                        return (
-                                            <motion.div
-                                                key={questionIndex}
-                                                initial={{ opacity: 0, y: 20 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: questionIndex * 0.1 }}
-                                                className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                                            >
-                                                <button
-                                                    onClick={() => toggleQuestion(categoryIndex, questionIndex)}
-                                                    className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
-                                                >
-                                                    <span className="font-semibold text-gray-900 pr-4">
-                                                        {faq.question}
-                                                    </span>
-                                                    <ChevronDown
-                                                        className={`flex-shrink-0 text-blue-950 transition-transform ${isOpen ? 'transform rotate-180' : ''
-                                                            }`}
-                                                        size={20}
-                                                    />
-                                                </button>
-                                                <AnimatePresence>
-                                                    {isOpen && (
-                                                        <motion.div
-                                                            initial={{ height: 0, opacity: 0 }}
-                                                            animate={{ height: 'auto', opacity: 1 }}
-                                                            exit={{ height: 0, opacity: 0 }}
-                                                            transition={{ duration: 0.3 }}
-                                                        >
-                                                            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-                                                                <p className="text-gray-700 leading-relaxed">
-                                                                    {faq.answer}
-                                                                </p>
-                                                            </div>
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
-                                            </motion.div>
-                                        );
-                                    })}
-                                </div>
+            <section className="bg-gradient-to-br from-gray-50 to-white py-16 md:py-24 px-4">
+                <div className="max-w-7xl mx-auto">
+                    <div className="grid md:grid-cols-2 gap-12 items-center">
+                        <div className="order-2 md:order-1">
+                            <p className="text-gray-400 text-sm font-semibold mb-3 uppercase tracking-widest">
+                                Share & Earn
+                            </p>
+                            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+                                Share LAN Library,<br />
+                                and earn ₦500
+                            </h1>
+                            <p className="text-gray-600 text-lg md:text-xl mb-8 leading-relaxed max-w-lg">
+                                Good knowledge is meant to be shared. Invite friends to LAN Library and they'll unlock the privilege to sell their own books. Help your friends earn while sharing educational resources with the community.
+                            </p>
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                <Link href="/referrals">
+                                    <button className="bg-blue-950 text-white px-8 py-4 rounded-xl font-semibold hover:bg-blue-900 transition-all hover:shadow-lg transform hover:-translate-y-0.5">
+                                        Get your link
+                                    </button>
+                                </Link>
+                                <Link href="/documents">
+                                    <button className="bg-blue-50 text-blue-950 px-8 py-4 rounded-xl font-semibold hover:bg-blue-100 transition-all flex items-center justify-center gap-2">
+                                        <Library size={20} />
+                                        Browse Library
+                                    </button>
+                                </Link>
                             </div>
-                        ))}
+                        </div>
+                        <div className="order-1 md:order-2 relative">
+                            <div className="relative overflow-hidden">
+                                <img
+                                    src="/earn.png"
+                                    alt="Students sharing knowledge"
+                                    className="w-full h-[400px] md:h-[550px] "
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-blue-950/20 to-transparent"></div>
+                            </div>
+                        </div>
                     </div>
-                ) : (
-                    <div className="text-center py-16">
-                        <p className="text-gray-600 text-lg mb-4">
-                            No results found for "{searchQuery}"
-                        </p>
-                        <button
-                            onClick={() => setSearchQuery('')}
-                            className="text-blue-950 hover:underline font-semibold"
-                        >
-                            Clear search
-                        </button>
-                    </div>
-                )}
+                </div>
+            </section>
 
-                {/* Still Need Help */}
-                <div className="mt-16 bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-4">
+            {/* FAQ Section */}
+            <section className="py-20 md:py-28 px-4 bg-white">
+                <div className="max-w-7xl mx-auto">
+                    <div className="grid lg:grid-cols-12 gap-12 lg:gap-16">
+                        {/* Left Side - Sticky Title */}
+                        <div className="lg:col-span-4">
+                            <div className="lg:sticky lg:top-45">
+                                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
+                                    Frequently asked questions
+                                </h2>
+                            </div>
+                        </div>
+
+                        {/* Right Side - FAQ Items */}
+                        <div className="lg:col-span-8">
+                            <div className="space-y-1">
+                                {faqs.map((category, categoryIndex) => (
+                                    <div key={categoryIndex}>
+                                        {category.questions.map((faq, questionIndex) => {
+                                            const index = `${categoryIndex}-${questionIndex}`;
+                                            const isOpen = openIndex === index;
+
+                                            return (
+                                                <motion.div
+                                                    key={index}
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    transition={{ delay: questionIndex * 0.03 }}
+                                                    className="border-b border-gray-200 last:border-b-0"
+                                                >
+                                                    <button
+                                                        onClick={() => toggleQuestion(categoryIndex, questionIndex)}
+                                                        className="w-full flex items-center justify-between py-6 text-left group hover:bg-gray-50 px-2 -mx-2 rounded-lg transition-all"
+                                                    >
+                                                        <span className="font-semibold text-gray-900 pr-8 text-base md:text-lg group-hover:text-blue-950 transition-colors">
+                                                            {faq.question}
+                                                        </span>
+                                                        <div
+                                                            className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 ${isOpen
+                                                                ? 'bg-blue-950 rotate-180'
+                                                                : 'bg-blue-100 rotate-0 group-hover:bg-blue-200'
+                                                                }`}
+                                                        >
+                                                            <ChevronDown
+                                                                className={`transition-colors ${isOpen ? 'text-white' : 'text-blue-950'
+                                                                    }`}
+                                                                size={18}
+                                                            />
+                                                        </div>
+                                                    </button>
+                                                    <AnimatePresence>
+                                                        {isOpen && (
+                                                            <motion.div
+                                                                initial={{ height: 0, opacity: 0 }}
+                                                                animate={{ height: 'auto', opacity: 1 }}
+                                                                exit={{ height: 0, opacity: 0 }}
+                                                                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                                                className="overflow-hidden"
+                                                            >
+                                                                <div className="pb-6 px-2">
+                                                                    <p className="text-gray-600 leading-relaxed text-base pr-12">
+                                                                        {faq.answer}
+                                                                    </p>
+                                                                </div>
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </motion.div>
+                                            );
+                                        })}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* Still Need Help Section */}
+            <section className="py-20 px-4 bg-gray-50">
+                <div className="max-w-4xl mx-auto text-center">
+                    <h3 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
                         Still need help?
                     </h3>
-                    <p className="text-gray-700 mb-6">
-                        Can't find the answer you're looking for? Our support team is here to help.
+                    <p className="text-gray-600 text-lg mb-10 max-w-2xl mx-auto">
+                        Can't find the answer you're looking for? Our support team is here to help you.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                        <Link
-                            href="/contact/lan/4/enquiry"
-                            className="bg-blue-950 text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors font-semibold"
-                        >
-                            Contact Support
+                        <Link href="/contact/lan/4/enquiry">
+                            <button className="bg-blue-950 text-white px-8 py-4 rounded-xl hover:bg-blue-900 transition-all font-semibold hover:shadow-lg transform hover:-translate-y-0.5">
+                                Contact Support
+                            </button>
                         </Link>
-                        <Link
-                            href="/lan/net/help-center"
-                            className="bg-white border-2 border-blue-950 text-blue-950 px-6 py-3 rounded-lg hover:bg-blue-50 transition-colors font-semibold"
-                        >
-                            Visit Help Center
+                        <Link href="/lan/net/help-center">
+                            <button className="bg-white border-2 border-blue-950 text-blue-950 px-8 py-4 rounded-xl hover:bg-blue-50 transition-all font-semibold">
+                                Visit Help Center
+                            </button>
                         </Link>
                     </div>
                 </div>
-            </main>
+            </section>
 
-            {/* Footer */}
             <Footer />
         </div>
     );

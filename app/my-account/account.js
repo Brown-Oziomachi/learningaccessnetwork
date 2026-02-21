@@ -236,7 +236,7 @@ export default function MyAccountClient() {
                 <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">
                     <div className="text-red-500 text-6xl mb-4">⚠️</div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Profile</h2>
-                    <p className="text-gray-600 mb-6">{error}. It is not your fault, nor our fault. We guess it is network. Please try again later.</p>
+                    <p className="text-gray-600 mb-6"> It's not our fault, it is your fault. Check your network, and try again later.</p>
                     <div className="flex gap-4 justify-center">
                         <button
                             onClick={() => window.location.reload()}
@@ -246,7 +246,7 @@ export default function MyAccountClient() {
                         </button>
                         <button
                             onClick={() => router.push('/auth/signin')}
-                            className="border border-gray-300 px-6 py-2 rounded-lg hover:bg-gray-50"
+                            className="border border-gray-300 px-6 py-2 rounded-lg hover:bg-gray-50 text-blue-950"
                         >
                             Sign Out
                         </button>

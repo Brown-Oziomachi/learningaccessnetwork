@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebaseConfig";
+import { auth, db, storage } from "@/lib/firebaseConfig";
 import { addDoc, collection, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { Upload, X, AlertCircle, Building2, BookOpen, GraduationCap } from "lucide-react";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 export default function AdvertiseClient() {
     const router = useRouter();
@@ -17,7 +18,10 @@ export default function AdvertiseClient() {
     const [uploadProgress, setUploadProgress] = useState("");
     const [showAccessWarning, setShowAccessWarning] = useState(false);
     const [isValidatingLink, setIsValidatingLink] = useState(false);
-
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [selectedCoverImage, setSelectedCoverImage] = useState(null);
+    const [uploadingFile, setUploadingFile] = useState(false);
+    const [uploadPercentage, setUploadPercentage] = useState(0);
     const [formData, setFormData] = useState({
         name: "",
         email: "",
@@ -138,110 +142,282 @@ export default function AdvertiseClient() {
         }
     };
 
-    const handleSubmit = async () => {
-        if (!formData.name || !formData.email || !formData.bookTitle ||
-            !formData.author || !formData.category || !formData.price ||
-            !formData.pages || !formData.description || !formData.driveLink) {
-            alert("Please fill all required fields");
-            return;
+    const handleFileUpload = async (file) => {
+    if (!file) return null;
+
+    // Validate file type
+    if (file.type !== 'application/pdf') {
+        alert('Please upload a PDF file only');
+        return null;
+    }
+
+    // Validate file size (max 50MB)
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+        alert('File size must be less than 50MB');
+        return null;
+    }
+
+    try {
+        setUploadingFile(true);
+        setUploadProgress("Uploading PDF...");
+
+        // Create unique filename
+        const timestamp = Date.now();
+        const fileName = `books/${user.uid}/${timestamp}_${file.name}`;
+        const storageRef = ref(storage, fileName);
+
+        // Upload file with progress tracking
+        const uploadTask = uploadBytesResumable(storageRef, file);
+
+        return new Promise((resolve, reject) => {
+            uploadTask.on(
+                'state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    setUploadPercentage(Math.round(progress));
+                    setUploadProgress(`Uploading: ${Math.round(progress)}%`);
+                },
+                (error) => {
+                    console.error('Upload error:', error);
+                    setUploadingFile(false);
+                    reject(error);
+                },
+                async () => {
+                    const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                    setUploadingFile(false);
+                    setUploadProgress("");
+                    resolve(downloadURL);
+                }
+            );
+        });
+    } catch (error) {
+        console.error('Error uploading file:', error);
+        setUploadingFile(false);
+        setUploadProgress("");
+        alert('Failed to upload file. Please try again.');
+        return null;
+    }
+};
+
+const handleCoverImageUpload = async (file) => {
+    if (!file) return null;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+        alert('Please upload JPG, PNG, or WEBP image only');
+        return null;
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+        alert('Image size must be less than 5MB');
+        return null;
+    }
+
+    try {
+        setUploadProgress("Uploading cover image...");
+
+        // Create unique filename
+        const timestamp = Date.now();
+        const fileName = `covers/${user.uid}/${timestamp}_${file.name}`;
+        const storageRef = ref(storage, fileName);
+
+        // Upload file
+        const uploadTask = uploadBytesResumable(storageRef, file);
+
+        return new Promise((resolve, reject) => {
+            uploadTask.on(
+                'state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    setUploadProgress(`Uploading cover: ${Math.round(progress)}%`);
+                },
+                (error) => {
+                    console.error('Cover upload error:', error);
+                    reject(error);
+                },
+                async () => {
+                    const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                    setUploadProgress("");
+                    resolve(downloadURL);
+                }
+            );
+        });
+    } catch (error) {
+        console.error('Error uploading cover image:', error);
+        setUploadProgress("");
+        alert('Failed to upload cover image. Please try again.');
+        return null;
+    }
+};
+
+const handleCoverImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        setSelectedCoverImage(file);
+        // Create preview URL
+        const previewUrl = URL.createObjectURL(file);
+        setFormData({ ...formData, coverImagePreview: previewUrl });
+    }
+};
+
+const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        setSelectedFile(file);
+        // Clear drive link when file is selected
+        setFormData({ ...formData, driveLink: "" });
+    }
+};
+
+
+   const handleSubmit = async () => {
+    // Validate required fields
+    if (!formData.name || !formData.email || !formData.bookTitle ||
+        !formData.author || !formData.category || !formData.price ||
+        !formData.pages || !formData.description) {
+        alert("Please fill all required fields");
+        return;
+    }
+
+    // Check if either file is uploaded OR drive link is provided
+    if (!selectedFile && !formData.driveLink) {
+        alert("Please either upload a PDF file or provide a Google Drive link");
+        return;
+    }
+
+     try {
+        setLoading(true);
+
+        // Upload PDF file if selected
+        let pdfUrl = formData.driveLink;
+        if (selectedFile) {
+            pdfUrl = await handleFileUpload(selectedFile);
+            if (!pdfUrl) {
+                setLoading(false);
+                return;
+            }
         }
 
-        try {
-            new URL(formData.driveLink);
-        } catch {
-            alert("Please enter a valid Google Drive or Dropbox link");
-            return;
+        // ✅ Upload cover image if selected
+        let coverImageUrl = null;
+        if (selectedCoverImage) {
+            coverImageUrl = await handleCoverImageUpload(selectedCoverImage);
+            if (!coverImageUrl) {
+                // Continue even if cover upload fails - it's optional
+                console.warn('Cover image upload failed, continuing without it');
+            }
         }
 
-        try {
-            setLoading(true);
-            setUploadProgress("Processing your submission...");
-
-            const driveFileId = extractDriveFileId(formData.driveLink);
-            let embedUrl = formData.driveLink;
-            if (formData.driveLink.includes('drive.google.com') && driveFileId) {
-                embedUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
+        // Validate URL if using Drive link
+        if (!selectedFile && formData.driveLink) {
+            try {
+                new URL(formData.driveLink);
+            } catch {
+                alert("Please enter a valid Google Drive link");
+                setLoading(false);
+                return;
             }
+        }
 
-            const displayName = userData?.displayName ||
-                userData?.name ||
-                formData.name ||
-                `${userData?.firstName || ''} ${userData?.surname || ''}`.trim();
+        setUploadProgress("Processing your submission...");
 
-            const bookData = {
-                userId: user.uid,
-                sellerId: user.uid,
-                sellerEmail: user.email,
-                sellerName: displayName,
-                sellerPhone: userData?.phoneNumber || null,
-                bookTitle: formData.bookTitle,
-                author: formData.author,
-                category: formData.category,
-                institutionalCategory: formData.institutionalCategory || null,
-                isbn: formData.isbn || "N/A",
-                courseCode: formData.courseCode.toUpperCase() || null,
-                semester: formData.semester || null,
-                session: formData.session || null,
-                docType: formData.docType,
-                price: Number(formData.price),
-                format: formData.format,
-                pages: Number(formData.pages),
-                description: formData.description,
-                message: formData.message,
-                pdfLink: formData.driveLink,
-                pdfUrl: formData.driveLink,
-                embedUrl: embedUrl,
-                driveFileId: driveFileId || null,
-                status: "pending",
-                views: 0,
-                purchases: 0,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-            };
+        const driveFileId = extractDriveFileId(pdfUrl);
+        let embedUrl = pdfUrl;
+        if (pdfUrl.includes('drive.google.com') && driveFileId) {
+            embedUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
+        }
 
-            setUploadProgress("Saving book details...");
-            await addDoc(collection(db, "advertMyBook"), bookData);
+        const displayName = userData?.displayName ||
+            userData?.name ||
+            formData.name ||
+            `${userData?.firstName || ''} ${userData?.surname || ''}`.trim();
 
-            alert("Request sent successfully! We'll review your submission and contact you shortly.");
+        const bookData = {
+            userId: user.uid,
+            sellerId: user.uid,
+            sellerEmail: user.email,
+            sellerName: displayName,
+            sellerPhone: userData?.phoneNumber || null,
+            bookTitle: formData.bookTitle,
+            coverImage: coverImageUrl,
+            image: coverImageUrl, 
+            author: formData.author,
+            category: formData.category,
+            institutionalCategory: formData.institutionalCategory || null,
+            isbn: formData.isbn || "N/A",
+            courseCode: formData.courseCode.toUpperCase() || null,
+            semester: formData.semester || null,
+            session: formData.session || null,
+            docType: formData.docType,
+            price: Number(formData.price),
+            format: formData.format,
+            pages: Number(formData.pages),
+            description: formData.description,
+            message: formData.message,
+            pdfLink: pdfUrl,
+            pdfUrl: pdfUrl,
+            embedUrl: embedUrl,
+            driveFileId: driveFileId || null,
+            uploadMethod: selectedFile ? 'direct_upload' : 'drive_link', // Track upload method
+            status: "pending",
+            views: 0,
+            purchases: 0,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        };
 
-            setFormData({
-                name: formData.name,
-                email: formData.email,
-                bookTitle: "",
-                author: "",
-                category: "",
-                institutionalCategory: "",
-                isbn: "",
-                courseCode: "",
-                semester: "",
-                session: "",
-                docType: "Textbook",
-                price: "",
-                format: "PDF",
-                pages: "",
-                description: "",
-                message: "",
-                driveLink: "",
-            });
-            setUploadProgress("");
+        setUploadProgress("Saving book details...");
+        await addDoc(collection(db, "advertMyBook"), bookData);
 
-            router.replace("/home");
-        } catch (error) {
-            console.error("Error:", error);
-            let errorMessage = "Something went wrong. Please try again.";
+        alert("Request sent successfully! We'll review your submission and contact you shortly.");
 
-            if (error.code === 'permission-denied') {
-                errorMessage = "Permission denied. Please check your authentication.";
-            } else if (error.message) {
-                errorMessage = error.message;
-            }
+        // Reset form
+        setFormData({
+            name: formData.name,
+            email: formData.email,
+            bookTitle: "",
+            author: "",
+            category: "",
+            institutionalCategory: "",
+            isbn: "",
+            courseCode: "",
+            semester: "",
+            session: "",
+            docType: "Textbook",
+            price: "",
+            format: "PDF",
+            pages: "",
+            description: "",
+            message: "",
+            driveLink: "",
+        });
+        setSelectedFile(null);
+        setUploadPercentage(0);
+        setUploadProgress("");
 
-            alert(errorMessage);
-        } finally {
-            setLoading(false);
-            setUploadProgress("");
+        router.replace("/advertise/my-submissions");
+    } catch (error) {
+        console.error("Error:", error);
+        alert(error.message || "Something went wrong. Please try again.");
+    } finally {
+        setLoading(false);
+        setUploadProgress("");
+        setUploadingFile(false);
+    }
+};
+
+useEffect(() => {
+    // Cleanup preview URL when component unmounts
+    return () => {
+        if (formData.coverImagePreview) {
+            URL.revokeObjectURL(formData.coverImagePreview);
         }
     };
+}, [formData.coverImagePreview]);
 
     if (checkingAuth) {
         return (
@@ -571,29 +747,218 @@ export default function AdvertiseClient() {
                     </div>
 
                     {/* SECTION 6: FILE LINK */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            PDF Link (Google Drive / Dropbox) *
-                        </label>
-                        <div className="relative">
-                            <input
-                                name="driveLink"
-                                type="url"
-                                placeholder="https://drive.google.com/file/d/..."
-                                value={formData.driveLink}
-                                onChange={handleDriveLinkChange}
-                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
-                            />
-                            {isValidatingLink && (
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                    <div className="animate-spin h-5 w-5 border-b-2 border-blue-950 rounded-full"></div>
-                                </div>
-                            )}
+                  {/* SECTION 6: FILE UPLOAD OR LINK */}
+<div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border-2 border-purple-200">
+    <h3 className="text-lg font-semibold text-purple-900 mb-4 flex items-center gap-2">
+        <Upload className="w-5 h-5" />
+        Upload Your PDF
+    </h3>
+
+    {/* File Upload Button */}
+    <div className="mb-4">
+        <label className="block text-sm font-medium text-purple-900 mb-2">
+            Option 1: Upload PDF Directly (Recommended)
+        </label>
+        <div className="flex items-center gap-3">
+            <label className="flex-1 cursor-pointer">
+                <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                    selectedFile 
+                        ? 'border-green-500 bg-green-50' 
+                        : 'border-purple-300 bg-white hover:border-purple-500'
+                }`}>
+                    <input
+                        type="file"
+                        accept="application/pdf"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        disabled={uploadingFile || loading}
+                    />
+                    <Upload className={`w-8 h-8 mx-auto mb-2 ${
+                        selectedFile ? 'text-green-600' : 'text-purple-600'
+                    }`} />
+                    {selectedFile ? (
+                        <>
+                            <p className="font-semibold text-green-700">
+                                ✓ {selectedFile.name}
+                            </p>
+                            <p className="text-sm text-green-600 mt-1">
+                                {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <p className="font-semibold text-purple-900">
+                                Click to upload PDF
+                            </p>
+                            <p className="text-sm text-purple-700 mt-1">
+                                Max size: 50MB
+                            </p>
+                        </>
+                    )}
+                </div>
+            </label>
+            {selectedFile && (
+                <button
+                    onClick={() => setSelectedFile(null)}
+                    className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+            )}
+        </div>
+        {uploadPercentage > 0 && uploadPercentage < 100 && (
+            <div className="mt-3">
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                        className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadPercentage}%` }}
+                    ></div>
+                </div>
+                <p className="text-sm text-purple-700 mt-1 text-center">
+                    {uploadPercentage}% uploaded
+                </p>
+            </div>
+        )}
+    </div>
+
+{/* SECTION 6.5: COVER IMAGE UPLOAD */}
+<div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-6 rounded-xl border-2 border-indigo-200">
+    <h3 className="text-lg font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+        <BookOpen className="w-5 h-5" />
+        Book Cover Image (Optional)
+    </h3>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Upload Section */}
+        <div>
+            <label className="block text-sm font-medium text-indigo-900 mb-2">
+                Upload Cover Image
+            </label>
+            <label className="cursor-pointer">
+                <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                    selectedCoverImage 
+                        ? 'border-green-500 bg-green-50' 
+                        : 'border-indigo-300 bg-white hover:border-indigo-500'
+                }`}>
+                    <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        onChange={handleCoverImageSelect}
+                        className="hidden"
+                        disabled={loading || uploadingFile}
+                    />
+                    <Upload className={`w-8 h-8 mx-auto mb-2 ${
+                        selectedCoverImage ? 'text-green-600' : 'text-indigo-600'
+                    }`} />
+                    {selectedCoverImage ? (
+                        <>
+                            <p className="font-semibold text-green-700">
+                                ✓ {selectedCoverImage.name}
+                            </p>
+                            <p className="text-sm text-green-600 mt-1">
+                                {(selectedCoverImage.size / (1024 * 1024)).toFixed(2)} MB
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <p className="font-semibold text-indigo-900">
+                                Click to upload cover
+                            </p>
+                            <p className="text-sm text-indigo-700 mt-1">
+                                JPG, PNG, WEBP (Max 5MB)
+                            </p>
+                        </>
+                    )}
+                </div>
+            </label>
+            {selectedCoverImage && (
+                <button
+                    onClick={() => {
+                        setSelectedCoverImage(null);
+                        setFormData({ ...formData, coverImagePreview: null });
+                    }}
+                    className="mt-2 w-full px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center justify-center gap-2"
+                >
+                    <X className="w-4 h-4" />
+                    Remove Image
+                </button>
+            )}
+        </div>
+
+        {/* Preview Section */}
+        <div>
+            <label className="block text-sm font-medium text-indigo-900 mb-2">
+                Preview
+            </label>
+            <div className="border-2 border-indigo-200 rounded-lg p-4 bg-white">
+                {formData.coverImagePreview ? (
+                    <img
+                        src={formData.coverImagePreview}
+                        alt="Cover preview"
+                        className="w-full h-48 object-cover rounded-lg shadow-md"
+                    />
+                ) : (
+                    <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <div className="text-center text-gray-400">
+                            <BookOpen className="w-12 h-12 mx-auto mb-2" />
+                            <p className="text-sm">No image selected</p>
                         </div>
-                        <p className="mt-1 text-xs text-gray-500">
-                            ⚠️ Make sure the link is set to "Anyone with the link can view"
-                        </p>
                     </div>
+                )}
+            </div>
+            <p className="text-xs text-indigo-700 mt-2">
+                💡 A custom cover makes your book more attractive to buyers!
+            </p>
+        </div>
+    </div>
+
+    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
+        <p className="text-xs text-yellow-800">
+            <strong>Note:</strong> If you don't upload a cover image, we'll automatically generate a thumbnail from your PDF.
+        </p>
+    </div>
+</div>
+
+    {/* Divider */}
+    <div className="flex items-center gap-3 my-4">
+        <div className="flex-1 border-t border-purple-300"></div>
+        <span className="text-sm text-purple-700 font-medium">OR</span>
+        <div className="flex-1 border-t border-purple-300"></div>
+    </div>
+
+    {/* Drive Link Option */}
+    <div>
+        <label className="block text-sm font-medium text-purple-900 mb-2">
+            Option 2: Google Drive / Dropbox Link
+        </label>
+        <div className="relative">
+            <input
+                name="driveLink"
+                type="url"
+                placeholder="https://drive.google.com/file/d/..."
+                value={formData.driveLink}
+                onChange={handleDriveLinkChange}
+                disabled={selectedFile || uploadingFile || loading}
+                className={`w-full text-blue-950 border px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${
+                    selectedFile 
+                        ? 'bg-gray-100 border-gray-300 cursor-not-allowed' 
+                        : 'border-purple-300 focus:ring-purple-500'
+                }`}
+            />
+            {isValidatingLink && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="animate-spin h-5 w-5 border-b-2 border-purple-600 rounded-full"></div>
+                </div>
+            )}
+        </div>
+        <p className="mt-1 text-xs text-purple-700">
+            {selectedFile 
+                ? '✓ File upload selected - Drive link disabled' 
+                : '⚠️ Make sure the link is set to "Anyone with the link can view"'
+            }
+        </p>
+    </div>
+</div>
 
                     {/* SECTION 7: DESCRIPTIONS */}
                     <div className="space-y-4">
@@ -613,7 +978,7 @@ export default function AdvertiseClient() {
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Promotion Message *
+                                Book Summarization *
                             </label>
                             <textarea
                                 name="message"

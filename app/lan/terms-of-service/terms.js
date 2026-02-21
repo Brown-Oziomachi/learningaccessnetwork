@@ -19,11 +19,12 @@ export default function TermsOfServiceClient() {
       </div>
     <div className="prose prose-lg max-w-none lg:p-60 p-6">
       <div className="shadow-2xl lg:p-20 p-6 bg-white absolute lg:top-200 top-30 z-50">
-        <button
+          <button
             onClick={() => handleBack()}
-            className="bg-white text-blue-950 mb-20 cursor-pointer">
-            <ArrowLeft size={24} className="text-gray-900" />
-        </button>
+            className="text-blue-950 mb-20 cursor-pointer bg-blue-950 py-2 px-5 hover:bg-white ">
+            <ArrowLeft size={24} className="text-gray-100 hover:text-blue-950" />
+
+          </button>
       <h2 className="text-4xl font-bold text-slate-900 mb-6">Terms of Service</h2>
       <p className="text-slate-600 mb-8">Effective Date: December 31, 2025</p>
 

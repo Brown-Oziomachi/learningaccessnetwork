@@ -171,16 +171,16 @@ export default function AboutPage() {
             {/* Hero Section */}
             <Navbar />
             <div
-                className="relative text-blue-950  py-24"
+                className="relative   py-24"
                
             >
-                <div className="absolute inset-0 text-blue-950"></div>
+                <div className="absolute inset-0 text-white bg-blue-950"></div>
                 <div className="max-w-7xl mx-auto px-4 relative z-10">
                     <div className="max-w-3xl">
                         <h1 className="text-5xl md:text-6xl font-bold mb-6">
                             Empowering Minds Through Digital Learning
                         </h1>
-                        <p className="text-xl text-blue-950 leading-relaxed">
+                        <p className="text-xl leading-relaxed">
                             Learning Access Network (LAN) is revolutionizing how people access knowledge by providing a comprehensive digital library of high-quality educational content to learners worldwide.
                         </p>
                     </div>
@@ -313,10 +313,10 @@ export default function AboutPage() {
                             Browse Library
                         </Link>
                         <Link
-                            href="/auth/signin"
+                            href="/referrals"
                             className="border-2 border-white text-white px-8 py-4 rounded-lg font-semibold hover:bg-white hover:text-blue-950 transition-colors"
                         >
-                            Create Account
+                            Invite friends
                         </Link>
                     </div>
                 </div>

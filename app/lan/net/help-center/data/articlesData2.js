@@ -297,8 +297,7 @@ export const articlesP2 = {
         type: 'steps',
         items: [
           'Sign in to your account',
-          'Click "Account" in the top navigation',
-          'Select "Profile" from the dropdown',
+          'Click "My Account" in the top navigation',
           'You\'ll see all your profile information'
         ]
       },
@@ -310,6 +309,7 @@ export const articlesP2 = {
         type: 'list',
         items: [
           'First name and surname',
+          'Bank details',
           'Email address',
           'Date of birth',
           'Phone number',
@@ -339,7 +339,7 @@ export const articlesP2 = {
       {
         type: 'steps',
         items: [
-          'Click "Edit Profile"',
+          'Click on your Profile image',
           'Update the fields you want to change',
           'Click "Save Changes"',
           'Changes take effect immediately'

@@ -287,7 +287,7 @@ export default function FindAccountClient() {
                 {step === 'email' && (
                     <>
                         <p className="text-gray-600 mb-8">
-                            Enter your email address or your first name to find your account.
+                            Enter your email address or your name to find your account.
                         </p>
 
                         <div className="relative mb-4">
@@ -522,7 +522,7 @@ export default function FindAccountClient() {
                             <p className="text-gray-700 mb-6">
                                 No account found with <span className="font-semibold">"{searchInput}"</span>.
                                 <br />
-                                You can create a new account or try searching again.
+                                You can create a new account with <span className="font-semibold underline ">"{searchInput}"</span> or try searching again.
                             </p>
                         </div>
                         <div className="flex gap-3">

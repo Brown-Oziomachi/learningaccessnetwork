@@ -9,7 +9,7 @@ import {
   DollarSign, Users, BookOpen, ChevronRight, Send, RefreshCw, BarChart3,
   Settings, Flag, XCircle, AlertTriangle, UserX, Lock, ExternalLink,
   Download, Book, Phone, MapPin, CreditCard, Building,
-  Clock
+  Clock, ThumbsUp
 } from 'lucide-react';
 import { BookApprovalModal, ReplyModal, TransactionModal, UserModal } from '@/components/ApprovalModal';
 
@@ -37,7 +37,8 @@ export default function ComprehensiveAdminPanel() {
   const [pdfViewMode, setPdfViewMode] = useState('embed'); // 'embed' or 'fullscreen'
   const [schoolApplications, setSchoolApplications] = useState([]);
   const [schoolDocuments, setSchoolDocuments] = useState([]);
-  const ADMIN_EMAILS = ['browncemmanuel@gmail.com', 'lanlibrarydocs@gmail.com'];
+  const [feedbacks, setFeedbacks] = useState([]);
+  const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -53,30 +54,53 @@ export default function ComprehensiveAdminPanel() {
     return () => unsubscribe();
   }, []);
 
-  const checkAdminStatus = async (currentUser) => {
-    try {
-      if (ADMIN_EMAILS.includes(currentUser.email)) {
+
+const checkAdminStatus = async (currentUser) => {
+  try {
+    setCheckingAdmin(true);
+    
+    // Primary check: Firestore admin flag
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    const userDoc = await getDoc(userDocRef);
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      
+      // Check Firestore first
+      if (userData.role === 'admin' || userData.isAdmin === true) {
         setIsAdmin(true);
         await fetchAllData();
-        setCheckingAdmin(false);
         return;
       }
-      const userDocRef = doc(db, 'users', currentUser.uid);
-      const userDoc = await getDoc(userDocRef);
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        if (userData.role === 'admin' || userData.isAdmin === true) {
-          setIsAdmin(true);
-          await fetchAllData();
-        }
-      }
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      setIsAdmin(false);
-    } finally {
-      setCheckingAdmin(false);
     }
-  };
+    
+    // Fallback check: Environment variable (for emergency access)
+    if (ADMIN_EMAILS.includes(currentUser.email)) {
+      // Log this access for security monitoring
+      console.warn('⚠️ Admin access via environment variable:', currentUser.email);
+      
+      // Optionally, automatically set isAdmin in Firestore
+      await updateDoc(userDocRef, {
+        isAdmin: true,
+        role: 'admin',
+        adminAccessGranted: serverTimestamp()
+      });
+      
+      setIsAdmin(true);
+      await fetchAllData();
+      return;
+    }
+    
+    // No admin access
+    setIsAdmin(false);
+    
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+    setIsAdmin(false);
+  } finally {
+    setCheckingAdmin(false);
+  }
+};
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -87,9 +111,10 @@ export default function ComprehensiveAdminPanel() {
         fetchBookReports(),
         fetchTransactions(),
         fetchUsers(),
-        fetchWithdrawals(), // ✅ ADDED
-        fetchSchoolApplications(), // ✅ ADD THIS
-        fetchSchoolDocuments() // ✅ ADD THIS
+        fetchWithdrawals(), 
+        fetchSchoolApplications(), 
+        fetchSchoolDocuments(),
+        fetchFeedbacks(),
       ]);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -233,33 +258,76 @@ const updateSchoolDocumentStatus = async (docId, status) => {
   };
 
   const checkPdfDuplicate = async (pdfUrl) => {
-    if (!pdfUrl) return false;
-    setCheckingDuplicate(true);
-    try {
-      const q = query(collection(db, 'advertMyBook'), where('pdfUrl', '==', pdfUrl), where('status', '==', 'approved'));
-      const snapshot = await getDocs(q);
+  if (!pdfUrl) return false;
+  setCheckingDuplicate(true);
+  try {
+    // Check exact URL match
+    const q = query(
+      collection(db, 'advertMyBook'), 
+      where('pdfUrl', '==', pdfUrl), 
+      where('status', '==', 'approved')
+    );
+    const snapshot = await getDocs(q);
+    
+    // If it's a Firebase Storage URL, it's a direct upload - less strict duplicate check
+    if (pdfUrl.includes('firebasestorage.googleapis.com')) {
+      // For direct uploads, only flag if exact same file URL exists
       return !snapshot.empty;
-    } catch (error) {
-      console.error('Error checking duplicate:', error);
-      return false;
-    } finally {
-      setCheckingDuplicate(false);
     }
-  };
-
-  const updateAdvertisementStatus = async (id, status, ad) => {
-    if (status === 'approved') {
-      const isDuplicate = await checkPdfDuplicate(ad.pdfUrl);
-      if (isDuplicate) {
-        alert('⚠️ This PDF already exists in the database. Cannot approve duplicate.');
-        return;
+    
+    // For Google Drive, check more strictly
+    if (pdfUrl.includes('drive.google.com')) {
+      // Extract Drive file ID and check if any approved book has same file ID
+      const match = pdfUrl.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})|id=([\w-]{25,})/);
+      if (match) {
+        const fileId = match[1] || match[2] || match[3];
+        // Check all approved books for this file ID
+        const allApprovedQuery = query(
+          collection(db, 'advertMyBook'),
+          where('status', '==', 'approved')
+        );
+        const allApproved = await getDocs(allApprovedQuery);
+        
+        for (const doc of allApproved.docs) {
+          const data = doc.data();
+          if (data.driveFileId === fileId || 
+              data.pdfUrl?.includes(fileId) || 
+              data.pdfLink?.includes(fileId)) {
+            return true; // Duplicate found
+          }
+        }
       }
     }
-    await updateDoc(doc(db, 'advertMyBook', id), { status, reviewedAt: serverTimestamp() });
-    setAdvertisements(advertisements.map(a => a.id === id ? { ...a, status } : a));
-    alert(`✅ Book ${status} successfully`);
-    setShowModal(false);
-  };
+    
+    return !snapshot.empty;
+  } catch (error) {
+    console.error('Error checking duplicate:', error);
+    return false;
+  } finally {
+    setCheckingDuplicate(false);
+  }
+};
+
+  const updateAdvertisementStatus = async (id, status, ad) => {
+  if (status === 'approved') {
+    // Check for duplicates
+    const isDuplicate = await checkPdfDuplicate(ad.pdfUrl || ad.pdfLink);
+    if (isDuplicate) {
+      alert('⚠️ This file already exists in the database. Cannot approve duplicate.');
+      return;
+    }
+  }
+  
+  await updateDoc(doc(db, 'advertMyBook', id), { 
+    status, 
+    reviewedAt: serverTimestamp(),
+    reviewedBy: user.email // Add this for tracking
+  });
+  
+  setAdvertisements(advertisements.map(a => a.id === id ? { ...a, status } : a));
+  alert(`✅ Book ${status} successfully`);
+  setShowModal(false);
+};
 
   const updateTicketStatus = async (id, status) => {
     await updateDoc(doc(db, 'supportTickets', id), { status, resolvedAt: serverTimestamp() });
@@ -491,6 +559,55 @@ Click OK to approve or Cancel to go back.
     }
   };
 
+  const fetchFeedbacks = async () => {
+  try {
+    const q = query(collection(db, 'bookFeedbacks'), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    
+    const feedbackList = await Promise.all(
+      snapshot.docs.map(async (feedbackDoc) => {
+        const fbData = feedbackDoc.data();
+        
+        // If bookTitle is missing, fetch it
+        if (!fbData.bookTitle && fbData.bookId) {
+          try {
+            const bookId = fbData.bookId.replace('firestore-', '');
+            const bookDoc = await getDoc(doc(db, 'advertMyBook', bookId));
+            if (bookDoc.exists()) {
+              fbData.bookTitle = bookDoc.data().bookTitle || bookDoc.data().title;
+            }
+          } catch (error) {
+            console.error('Error fetching book title:', error);
+          }
+        }
+        
+        return {
+          id: feedbackDoc.id,
+          ...fbData,
+          createdAt: fbData.createdAt?.toDate() || new Date()
+        };
+      })
+    );
+    
+    setFeedbacks(feedbackList);
+  } catch (error) {
+    console.error('Error fetching feedbacks:', error);
+  }
+};
+
+const deleteFeedback = async (feedbackId) => {
+  if (!confirm('Are you sure you want to delete this feedback? This action cannot be undone.')) return;
+  
+  try {
+    await deleteDoc(doc(db, 'bookFeedbacks', feedbackId));
+    alert('✅ Feedback deleted successfully');
+    await fetchFeedbacks();
+  } catch (error) {
+    console.error('Error deleting feedback:', error);
+    alert('❌ Failed to delete feedback');
+  }
+};
+
   //  REJECT WITHDRAWAL FUNCTION
   const rejectWithdrawal = async (withdrawalId, sellerId, amount) => {
     const reason = prompt('Enter rejection reason (will be shown to seller):');
@@ -624,6 +741,7 @@ Click OK to approve or Cancel to go back.
     totalRevenue: transactions.reduce((sum, t) => sum + (t.amount || 0), 0),
     totalTransactions: transactions.length,
     totalUsers: users.length,
+    totalFeedbacks: feedbacks.length,
     totalBooks: advertisements.length,
     pendingAds: advertisements.filter(a => a.status === 'pending').length,
     openTickets: supportTickets.filter(t => t.status === 'open').length,
@@ -685,6 +803,7 @@ Click OK to approve or Cancel to go back.
             { id: 'users', icon: Users, label: 'Users' },
             { id: 'schools', icon: Building, label: 'Schools', badge: stats.pendingSchools },
             { id: 'school-documents', icon: FileText, label: 'School Docs', badge: stats.pendingSchoolDocs },
+            { id: 'feedbacks', icon: ThumbsUp, label: 'Feedbacks', badge: feedbacks.length },
             { id: 'settings', icon: Settings, label: 'Settings' }
 
           ].map(({ id, icon: Icon, label, badge }) => (
@@ -1210,6 +1329,56 @@ Click OK to approve or Cancel to go back.
     )}
   </div>
 )}
+
+{activeSection === 'feedbacks' && (
+  <div className="space-y-6">
+    <h2 className="text-2xl font-bold text-white">User Feedbacks</h2>
+
+    {feedbacks.length === 0 ? (
+      <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+        <ThumbsUp className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <h3 className="text-xl font-bold text-gray-900 mb-2">No Feedbacks Yet</h3>
+        <p className="text-gray-600">User feedbacks on books will appear here</p>
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {feedbacks.map((fb) => (
+          <div key={fb.id} className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900">Book Name: {fb.bookTitle || 'Unknown Book'}</h3>
+                <p className="text-sm text-gray-600 font-bold">FeedBack Name: {fb.userName || 'Anonymous'}</p>
+                <p className="text-sm text-gray-600 font-bold">Book Author: {fb.bookAuthor || 'Anonymous'}</p>
+                <p className="text-xs text-gray-500 font-bold">FeedBack Email: {fb.userEmail || 'No email'}</p>
+              </div>
+              <span className="text-xs text-gray-400">{formatDate(fb.createdAt)}</span>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
+                {fb.feedback || '(No feedback text provided)'}
+              </p>
+            </div>
+
+            <div className="text-xs text-gray-500 mb-4">
+              <p>Book ID: {fb.bookId}</p>
+              {fb.userId && <p>User ID: {fb.userId}</p>}
+            </div>
+
+            <button
+              onClick={() => deleteFeedback(fb.id)}
+              className="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Feedback
+            </button>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+)}
+
         {activeSection === 'withdrawals' && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-white">Withdrawal Requests</h2>

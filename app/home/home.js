@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect } from 'react';
-import { FileText, Monitor, Upload, ChevronLeft, Smartphone, Globe, ArrowRight, ChevronRight, BookOpen } from 'lucide-react';
+import { FileText, Monitor, Upload, ChevronLeft, ShoppingBag, Smartphone, Globe, ArrowRight, ChevronRight, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import Navbar from '@/components/NavBar';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -180,6 +180,7 @@ export default function HomeClient() {
     const [currentSlide, setCurrentSlide] = useState(0);
     const [activeTab, setActiveTab] = useState('subjects');
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const [bookSalesCount, setBookSalesCount] = useState({});
 
     // Now this will work because subjectCategories is already defined above
     const currentCategories = activeTab === 'subjects' ? categories : documentTypes;
@@ -194,30 +195,7 @@ export default function HomeClient() {
             image: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=1200&q=80',
             link: "/institutional/category/university",
         },
-        {
-            title: "Islamic Education: Building Strong Foundations in Faith",
-            description: "Explore Quranic studies, Islamic jurisprudence, and Arabic language resources",
-            timeAgo: "3 weeks ago",
-            author: "Islamic Studies Team",
-            image: 'https://images.unsplash.com/photo-1609599006353-e629aaabfeae?w=1200&q=80',
-            link: "/institutional/category/islamic-institutions",
-        },
-        {
-            title: "Christian Book Shop: Faith-Based Literature",
-            description: "Access Biblical studies, Christian living, devotionals, and inspirational books for spiritual growth",
-            timeAgo: "4 weeks ago",
-            author: "Christian Book Shop Team",
-            image: 'https://images.unsplash.com/photo-1519791883288-dc8bd696e667?w=1200&q=80',
-            link: "/institutional/category/christian-institutions",
-        },
-        {
-            title: "Jewish Scholarship: Ancient Wisdom for Modern Times",
-            description: "Dive into Torah studies, Jewish law, and Hebrew language learning resources",
-            timeAgo: "5 weeks ago",
-            author: "Jewish Studies Team",
-            image: 'https://images.unsplash.com/photo-1568667256549-094345857637?w=1200&q=80',
-            link: "/institutional/category/jewish-institutions",
-        },
+       
         {
             title: "Secondary School Success: Build Your Future Today",
             description: "Complete curriculum materials for SS1, SS2, and SS3 students across all subjects",
@@ -250,18 +228,39 @@ export default function HomeClient() {
             image: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=1200&q=80",
             link: "/institutional/category/polytechnic",
         },
-        {
-            title: "Bible School: Theological Education for Spiritual Leaders",
-            description: "Comprehensive theological training and biblical education resources for ministry preparation",
-            timeAgo: "1 week ago",
-            author: "Bible School Team",
-            image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1200&q=80",
-            link: "/institutional/category/bible-college",
-        },
+      
     ];
 
   
- 
+     // Fetch sales count for all books
+useEffect(() => {
+    const fetchBookSales = async () => {
+        try {
+            const usersSnapshot = await getDocs(collection(db, "users"));
+            const salesMap = {};
+
+            usersSnapshot.docs.forEach(userDoc => {
+                const userData = userDoc.data();
+                const purchasedBooks = userData.purchasedBooks || {};
+
+                Object.values(purchasedBooks).forEach(purchase => {
+                    const bookId = purchase.bookId || purchase.id || purchase.firestoreId;
+                    if (bookId) {
+                        salesMap[bookId] = (salesMap[bookId] || 0) + 1;
+                        // Also track firestore- prefixed version
+                        salesMap[`firestore-${bookId}`] = (salesMap[`firestore-${bookId}`] || 0) + 1;
+                    }
+                });
+            });
+
+            setBookSalesCount(salesMap);
+        } catch (error) {
+            console.error("Error fetching sales count:", error);
+        }
+    };
+
+    fetchBookSales();
+}, []);
 
     // Add this at the very top of your HomeClient component
     useEffect(() => {
@@ -523,7 +522,7 @@ useEffect(() => {
                 {featuredContent.map((content, index) => (
                     <a
                         key={index}
-                        href={content.link}
+                        // href={content.link}
                         className={`absolute inset-0 transition-opacity duration-700 cursor-pointer group ${index === currentSlide ? "opacity-100" : "opacity-0 pointer-events-none"
                             }`}
                     >
@@ -622,14 +621,14 @@ useEffect(() => {
             ) : (
                 <>
                     {/* Featured Books Carousel */}
-                    <div className="px-4 py-8 lg:px-0 mx-auto max-w-7xl">
+                    <div className="px-4 py-8 lg:px- mx-auto max-w-7xl">
                         <h1 className="text-4xl lg:text-5xl font-black mb-10 text-black">Documents</h1>
                         <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-8">Get started with the community's uploads</h3>
 
                         {/* Mobile: 2 per row (Grid) | Desktop: Horizontal scroll */}
                         <div className="relative">
                             {/* Mobile Grid (2 columns) */}
-                            <div className="grid grid-cols-2 gap-4 lg:hidden">
+                            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
                                 {displayBooks.slice(0, 6).map((book) => (
                                     <Link
                                         key={book.id}
@@ -640,7 +639,7 @@ useEffect(() => {
                                             <img
                                                 src={book.image}
                                                 alt={book.title}
-                                                className="w-full h-[200px] object-cover  group-hover:shadow-xl transition-shadow"
+                                                className="w-full  object-cover  group-hover:shadow-xl transition-shadow"
                                                 onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
                                             />
                                             {isPurchased(book.id) && (
@@ -656,6 +655,10 @@ useEffect(() => {
                                             </h4>
                                             <p className="text-gray-600 text-xs">{book.author}</p>
                                         </div>
+                                        <p className="text-gray-500 text-xs lg:text-sm flex items-center gap-1 mt-1">
+                                            <ShoppingBag size={12} />
+                                            {bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0} sold
+                                        </p>
                                     </Link>
                                 ))}
                             </div>
@@ -673,7 +676,7 @@ useEffect(() => {
                                         <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-6 py-20">
                                             <div>
                                                 <h2 className="text-3xl font-bold text-gray-900">Explore Library</h2>
-                                                <p className="text-gray-600 mt-2">Find materials by subject or document type</p>
+                                                <p className="text-gray-600 mt-2">Find materials by Departments or resources</p>
                                             </div>
 
                                             {/* Modern Tab Switcher */}
@@ -683,14 +686,14 @@ useEffect(() => {
                                                     className={`flex-1 md:flex-none px-6 py-2  font-semibold transition-all ${activeTab === 'subjects' ? 'bg-white text-blue-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                                                         }`}
                                                 >
-                                                    Subjects
+                                                    Departments
                                                 </button>
                                                 <button
                                                     onClick={() => setActiveTab('documents')}
                                                     className={`flex-1 md:flex-none px-6 py-2 font-semibold transition-all ${activeTab === 'documents' ? 'bg-white text-blue-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                                                         }`}
                                                 >
-                                                    Document Types
+                                                    Resources
                                                 </button>
                                             </div>
                                         </div>

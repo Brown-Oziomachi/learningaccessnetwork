@@ -119,8 +119,8 @@ export default function ContactPage() {
                                     type="text"
                                     value={formData.name}
                                     onChange={(e) => handleInputChange('name', e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-950"
-                                    placeholder="John Doe"
+                                    className="w-full px-4 py-3 text-black border border-gray-300 rounded-lg focus:outline-none focus:border-blue-950"
+                                    placeholder="LAN Lib"
                                 />
                             </div>
 
@@ -132,8 +132,8 @@ export default function ContactPage() {
                                     type="email"
                                     value={formData.email}
                                     onChange={(e) => handleInputChange('email', e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-950"
-                                    placeholder="john@example.com"
+                                    className="w-full px-4 py-3 border text-black border-gray-300 rounded-lg focus:outline-none focus:border-blue-950"
+                                    placeholder="lan@example.com"
                                 />
                             </div>
 
@@ -145,7 +145,7 @@ export default function ContactPage() {
                                     type="text"
                                     value={formData.subject}
                                     onChange={(e) => handleInputChange('subject', e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-950"
+                                    className="w-full px-4 py-3 border text-black border-gray-300 rounded-lg focus:outline-none focus:border-blue-950"
                                     placeholder="How can we help?"
                                 />
                             </div>
@@ -157,7 +157,7 @@ export default function ContactPage() {
                                 <textarea
                                     value={formData.message}
                                     onChange={(e) => handleInputChange('message', e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-950"
+                                    className="w-full px-4 py-3 text-black border border-gray-300 rounded-lg focus:outline-none focus:border-blue-950"
                                     rows="6"
                                     placeholder="Tell us more about your inquiry..."
                                 />

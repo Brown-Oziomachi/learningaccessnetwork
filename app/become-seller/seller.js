@@ -88,7 +88,6 @@ export default function BecomeSellerClient() {
                 const userData = userDoc.data();
 
                 if (userData.isSeller) {
-                    alert('You are already a seller!');
                     router.push('/my-account/seller-account');
                     return;
                 }
@@ -211,7 +210,7 @@ export default function BecomeSellerClient() {
             if (error.message === 'Operation timeout') {
                 alert("Request timed out. Please check your internet connection and try again.");
             } else if (error.code === 'unavailable') {
-                alert("Firestore is currently unavailable. Please check your internet connection.");
+                alert(" Please check your internet connection.");
             } else {
                 alert("Failed to create seller account: " + error.message);
             }

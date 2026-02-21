@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Search,
   User,
@@ -15,11 +15,19 @@ import {
   Bookmark,
   Globe,
   Book,
+  BookOpen,
   ChevronRight,
   Sparkles,
   HelpCircle,
   Crown,
   School2Icon,
+  FileText,
+  FileQuestion,
+  GraduationCap,
+  List,
+  ClipboardList,
+  PenTool,
+  Folder,
 } from "lucide-react";
 import Link from "next/link";
 import { signOut } from "firebase/auth";
@@ -51,7 +59,20 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true);
   const [checkingSeller, setCheckingSeller] = useState(true);
   const [userRole, setUserRole] = useState(null);
+  const [showSearchTags, setShowSearchTags] = useState(false);
+  const searchTagsRef = useRef(null);
 
+const searchTags = [
+  { name: "Textbook", description: "Standard educational books", icon: Book },
+  { name: "Lecture Note", description: "Summarized class materials", icon: FileText },
+  { name: "Past Question", description: "Previous exam papers", icon: FileQuestion },
+  { name: "Thesis", description: "Academic research papers", icon: GraduationCap },
+  { name: "Summary", description: "Quick study breakdowns", icon: List },
+  { name: "Syllabus", description: "Course requirements", icon: ClipboardList },
+  { name: "Course Outline", description: "Topic distributions", icon: BookOpen },
+  { name: "Assignment", description: "Practice tasks and projects", icon: PenTool },
+  { name: "Project", description: "Detailed student projects", icon: Folder }
+];
   // Fetch all books (from booksData + Firestore)
   useEffect(() => {
     const fetchBooks = async () => {
@@ -130,7 +151,23 @@ export default function Navbar() {
     return () => unsubscribe();
   }, []);
 
-  
+  // Click outside to close search tags
+useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (searchTagsRef.current && !searchTagsRef.current.contains(event.target)) {
+      setShowSearchTags(false);
+    }
+  };
+
+  if (showSearchTags) {
+    document.addEventListener('mousedown', handleClickOutside);
+  }
+
+  return () => {
+    document.removeEventListener('mousedown', handleClickOutside);
+  };
+}, [showSearchTags]);
+
       const handleLogout = async () => {
           try {
               await signOut(auth);
@@ -321,7 +358,7 @@ export default function Navbar() {
             <ChevronRight size={16} />
           </div>
         </Link>
-        <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4">
+        <div className="max-w-4xl mx-auto px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2 sm:gap-4">
             <button
               className="lg:hidden p-2 hover:bg-gray-100 rounded-lg text-gray-50"
@@ -335,7 +372,7 @@ export default function Navbar() {
 
             <Link
               href="/home"
-              className="flex items-center gap-2 flex-shrink-0"
+              className="flex items-center gap-2 shrink-0 lg:-ml-10"
             >
               <div>
                 <h1
@@ -348,21 +385,58 @@ export default function Navbar() {
                   className="text-xs sm:text-base font-light"
                   style={{ fontFamily: "'Lato', sans-serif" }}
                 >
-                  Digital Platform For Knowledge Access
+                  The Global Student Library 📚
                 </h2>
               </div>
             </Link>
 
-            <button
-              onClick={() => {
-                setShowMobileSearch(!showMobileSearch);
-                setShowMobileMenu(false);
-              }}
-              className="p-2 bg-white text-blue-950 rounded-lg cursor-pointer hover:bg-blue-950 hover:text-white"
-            >
-              <Search size={22} />
-            </button>
+            <div className="relative" ref={searchTagsRef}>
+              <button
+                onClick={() => {
+                  setShowMobileSearch(!showMobileSearch);
+                  setShowSearchTags(!showSearchTags);
+                  setShowMobileMenu(false);
+                }}
+                className="p-2 text-blue-950 rounded-lg cursor-pointer hover:bg-blue-950 hover:text-white"
+              >
+                <Search size={22} className="text-white" />
+              </button>
 
+              {/* Search Tags Dropdown */}
+              {showSearchTags && (
+                <div className="absolute right-0 lg:left-0 top-full mt-20 max-lg:w-80 lg:w-150 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 p-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {searchTags.map((tag) => {
+                      const Icon = tag.icon;
+                      return (
+                        <button
+                          key={tag.name}
+                          onClick={() => {
+                            setSearchQuery(tag.name);
+                            setShowSearchTags(false);
+                            setShowMobileSearch(true);
+                          }}
+                          className="flex flex-col items-start p-3 rounded-lg hover:bg-gray-50 transition-colors text-left group"
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <Icon
+                              size={16}
+                              className="text-blue-950 group-hover:text-blue-600"
+                            />
+                            <span className="font-semibold text-sm text-gray-900 group-hover:text-blue-600">
+                              {tag.name}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-500 line-clamp-2">
+                            {tag.description}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
             <nav className="hidden lg:flex items-center gap-2 lg:gap-3 flex-shrink-0">
               <Link
                 href="/my-books"
@@ -379,11 +453,11 @@ export default function Navbar() {
                 <span>My Account</span>
               </button>
               <Link
-                href="/bestsellers"
+                href="/topsellers"
                 className="flex items-center gap-1 px-3 py-2 hover:bg-gray-100 hover:text-blue-950 rounded-lg text-sm text-gray-50"
               >
                 <Crown size={18} />
-                <span>Bestsellers</span>
+                <span>Topsellers</span>
               </Link>
               <Link
                 href="/saved-my-book"
@@ -396,7 +470,7 @@ export default function Navbar() {
               <button
                 onClick={HandleClick}
                 disabled={checkingSeller}
-                className="text-blue-950 hover:bg-blue-950 transition-colors cursor-pointer bg-white font-semibold px-8 py-2 hover:text-white rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="text-blue-950 hover:bg-blue-950 transition-colors cursor-pointer bg-white font-semibold px-4 py-2 hover:text-white rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {checkingSeller ? (
                   <>
@@ -405,8 +479,7 @@ export default function Navbar() {
                   </>
                 ) : isSeller ? (
                   <>
-                    <Upload size={20} />
-                    Upload Document
+                    Upload
                   </>
                 ) : (
                   <>Become a Seller</>
@@ -424,7 +497,7 @@ export default function Navbar() {
                 className="flex items-center gap-1 lg:gap-2 px-2 cursor-pointer lg:px-3 py-2 bg-red-800 text-white hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
               >
                 <LogOut size={18} className="lg:w-5 lg:h-5" />
-                <span className=" lg:inline">Logout</span>
+                {/* <span className=" lg:inline">Logout</span> */}
               </button>
             </nav>
           </div>
@@ -438,7 +511,7 @@ export default function Navbar() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  className="w-full text-gray-900 bg-white px-4 py-2 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full text-gray-900 bg-white px-4 py-2 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-950"
                   autoFocus
                 />
                 <button
@@ -820,7 +893,7 @@ export default function Navbar() {
                     className="text-xs sm:text-base font-light"
                     style={{ fontFamily: "'Lato', sans-serif" }}
                   >
-                    Digital Platform For Knowledge Access
+                    The Global Student Library 📚
                   </h2>
                 </div>
               </Link>
@@ -875,11 +948,11 @@ export default function Navbar() {
                   <span>My Account</span>
                 </button>
                 <Link
-                  href="/bestsellers"
+                  href="/topsellers"
                   className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
                 >
                   <Crown size={16} />
-                  Bestsellers
+                  Topsellers
                 </Link>
 
                 <Link

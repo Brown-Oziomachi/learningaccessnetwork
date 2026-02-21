@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { CheckCircle, Sparkles, ArrowRight, X } from 'lucide-react';
 import AuthLayout from '@/components/auth/AuthLayout';
 import { createUserAccount } from '@/lib/auth/authHelpers';
+import { db } from '@/lib/firebaseConfig';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function ConfirmClient() {
     const router = useRouter();
@@ -14,7 +16,8 @@ export default function ConfirmClient() {
     const [loading, setLoading] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [userRole, setUserRole] = useState('');
-    const [accountType, setAccountType] = useState(''); // ADD THIS
+    const [accountType, setAccountType] = useState('');
+    const [referredBy, setReferredBy] = useState(''); // ✅ referral code
     const [formData, setFormData] = useState({
         firstName: '',
         surname: '',
@@ -24,13 +27,18 @@ export default function ConfirmClient() {
     });
 
     useEffect(() => {
-        // Get role from sessionStorage
         const role = sessionStorage.getItem('userRole') || 'student';
         setUserRole(role);
 
-        // Get accountType from URL
         const type = searchParams.get('accountType') || '';
-        setAccountType(type); // ADD THIS
+        setAccountType(type);
+
+        // ✅ Get referredBy from sessionStorage (saved in role-selection)
+        // Also check URL as backup
+        const refFromSession = sessionStorage.getItem('referredBy') || '';
+        const refFromUrl = searchParams.get('ref') || '';
+        const ref = refFromSession || refFromUrl;
+        setReferredBy(ref);
 
         setFormData({
             firstName: searchParams.get('firstName') || '',
@@ -44,25 +52,48 @@ export default function ConfirmClient() {
     const handleSubmit = async () => {
         setLoading(true);
 
-        // Include role in account creation
+        // ✅ Pass referredBy into account creation so it gets saved to the user doc
         const accountData = {
             ...formData,
-            role: userRole
+            role: userRole,
+            referredBy: referredBy || null, // ✅ saved to users/{uid}.referredBy in Firestore
         };
 
         const result = await createUserAccount(accountData);
 
         if (result.success) {
-            // Clear role from sessionStorage
-            sessionStorage.removeItem('userRole');
+            const newUserUid = result.uid; // ✅ make sure createUserAccount returns uid
 
-            // Show success modal
+            // ✅ Create the referral doc in Firestore so referrer earns ₦500
+            if (referredBy && referredBy !== newUserUid) {
+                try {
+                    await addDoc(collection(db, 'referrals'), {
+                        referrerId: referredBy,        // person who shared the link
+                        referredUserId: newUserUid,    // new user just created
+                        referredEmail: formData.email,
+                        referredName: `${formData.firstName} ${formData.surname}`,
+                        status: 'pending',             // becomes 'completed' after first purchase
+                        reward: 500,                   // ₦500 reward
+                        claimed: false,
+                        createdAt: serverTimestamp(),
+                    });
+                    console.log('✅ Referral record created for referrer:', referredBy);
+                } catch (err) {
+                    // Don't block signup if referral fails
+                    console.error('Error creating referral:', err);
+                }
+            }
+
+            // ✅ Clean up sessionStorage
+            sessionStorage.removeItem('userRole');
+            sessionStorage.removeItem('referredBy');
+
             setShowSuccessModal(true);
 
-            // Auto-redirect after 3 seconds
             setTimeout(() => {
-                handleModalContinue(); // Use the function instead
+                handleModalContinue();
             }, 3000);
+
         } else {
             const error = result.error;
 
@@ -85,11 +116,9 @@ export default function ConfirmClient() {
         }
     };
 
-    // UPDATED: Check for university registration flow
     const handleModalContinue = () => {
         setShowSuccessModal(false);
 
-        // Check if this is a university registration
         if (accountType === 'university' || userRole === 'university') {
             router.push('/register-school?type=university');
         } else if (userRole === 'seller') {
@@ -116,6 +145,16 @@ export default function ConfirmClient() {
                 <p className="text-gray-600 mb-8">
                     Please review your information before creating your account.
                 </p>
+
+                {/* ✅ Show referral badge if user was referred */}
+                {referredBy && (
+                    <div className="mb-4 bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2">
+                        <span className="text-green-600 text-lg">🎉</span>
+                        <p className="text-sm text-green-800 font-medium">
+                            You were invited by a friend! You'll get a ₦100 bonus after your first purchase.
+                        </p>
+                    </div>
+                )}
 
                 <div className="bg-blue-50 border-2 border-blue-950 rounded-2xl p-6 mb-8">
                     <div className="space-y-4">
@@ -179,7 +218,7 @@ export default function ConfirmClient() {
                 </div>
             </AuthLayout>
 
-            {/* Professional Success Modal */}
+            {/* Success Modal */}
             {showSuccessModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden transform animate-in zoom-in-95 duration-300">
@@ -202,9 +241,7 @@ export default function ConfirmClient() {
                                 <Sparkles className="absolute bottom-0 left-1/3 text-yellow-300 animate-pulse delay-150" size={20} />
                             </div>
 
-                            <h2 className="text-3xl font-black text-white mb-2">
-                                Welcome Aboard! 🎉
-                            </h2>
+                            <h2 className="text-3xl font-black text-white mb-2">Welcome Aboard! 🎉</h2>
                             <p className="text-blue-100 text-sm">
                                 Your account has been created successfully
                             </p>
@@ -242,9 +279,7 @@ export default function ConfirmClient() {
                                     <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                                         <span className="text-blue-600 font-bold text-xs">2</span>
                                     </div>
-                                    <p>
-                                        Access thousands of study materials and connect with learners worldwide.
-                                    </p>
+                                    <p>Access thousands of study materials and connect with learners worldwide.</p>
                                 </div>
 
                                 {userRole === 'seller' && (
@@ -263,7 +298,11 @@ export default function ConfirmClient() {
                                 onClick={handleModalContinue}
                                 className="w-full bg-blue-950 text-white py-4 rounded-2xl font-bold text-lg hover:bg-blue-900 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 group"
                             >
-                                {accountType === 'university' ? 'Register Your School' : userRole === 'seller' ? 'Go to Author Dashboard' : 'Explore Your Dashboard'}
+                                {accountType === 'university'
+                                    ? 'Register Your School'
+                                    : userRole === 'seller'
+                                        ? 'Go to Author Dashboard'
+                                        : 'Explore Your Dashboard'}
                                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                             </button>
 

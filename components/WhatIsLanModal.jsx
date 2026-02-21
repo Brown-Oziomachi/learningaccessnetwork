@@ -15,7 +15,7 @@ export default function WhatIsLanModal({ isOpen, onClose }) {
       </div>
 
       {/* Modal */}
-      <div className="fixed right-0 top-0 h-full w-full md:w-[700px] border-l-blue-950 border-20 bg-white shadow-2xl z-[999] overflow-y-auto animate-slideInRight">
+      <div className="fixed right-0 top-0 h-full w-full md:w-[700px] lg:w-[1000] border-l-blue-950 border-20 bg-white shadow-2xl z-[999] overflow-y-auto animate-slideInRight">
 
         <div className="sticky top-0 text-white bg-blue-950 border-b border-gray-200 p-4 flex items-center justify-between shadow-2xl">
           <h2 className="text-2xl font-bold text-white">

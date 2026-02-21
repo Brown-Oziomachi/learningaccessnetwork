@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { DollarSign, TrendingUp, ShoppingBag, CreditCard, Download, Book, Globe, Settings, X, Camera, Save, Mail, CheckCircle, AlertCircle, ChevronRight, User, MapPin, Phone, Calendar, Building } from "lucide-react";
+import { DollarSign, TrendingUp, ShoppingBag, Download, Book, Globe, Settings, X, Camera, Save, AlertCircle, ChevronRight, User, Building, Users } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, increment, setDoc } from "firebase/firestore";
@@ -193,7 +193,7 @@ export default function SellerAccountClient() {
                                 buyerName: userData.displayName || `${userData.firstName || ''} ${userData.surname || ''}`.trim() || 'Unknown Buyer',
                                 buyerEmail: userData.email,
                                 amount: purchase.amount,
-                                sellerAmount: purchase.amount * 0.85,
+                                sellerAmount: purchase.amount * 0.80,
                                 sellerId: purchase.sellerId,
                                 sellerName: purchase.sellerName,
                                 createdAtDate: purchase.purchaseDate ? new Date(purchase.purchaseDate) : new Date(),
@@ -226,7 +226,7 @@ export default function SellerAccountClient() {
 
             if (allTransactions.length > 0) {
                 const calculatedEarnings = allTransactions.reduce((sum, txn) => {
-                    const earning = txn.sellerAmount || (txn.amount * 0.85);
+                    const earning = txn.sellerAmount || (txn.amount * 0.80);
                     return sum + earning;
                 }, 0);
                 const calculatedBooksSold = allTransactions.length;
@@ -420,9 +420,106 @@ export default function SellerAccountClient() {
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 text-blue-950 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin h-12 w-12 border-b-2 border-blue-950 rounded-full mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading...</p>
+                <div className="relative w-20 h-24 perspective-1000">
+                    {/* Book Container */}
+                    <div className="book-flip-container">
+                        {/* Front Cover - Book */}
+                        <div className="book-face book-front">
+                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-r-lg shadow-2xl relative overflow-hidden">
+                                {/* Book spine shadow */}
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-black/30"></div>
+
+                                {/* Book pages effect */}
+                                <div className="absolute right-0 top-1 bottom-1 w-0.5 bg-white/20"></div>
+                                <div className="absolute right-1 top-2 bottom-2 w-0.5 bg-white/15"></div>
+                                <div className="absolute right-2 top-3 bottom-3 w-0.5 bg-white/10"></div>
+
+                                {/* Book icon */}
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <svg className="w-10 h-10 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                    </svg>
+                                </div>
+
+                                {/* Shine effect */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent"></div>
+                            </div>
+                        </div>
+
+                        {/* Back Cover - LAN */}
+                        <div className="book-face book-back">
+                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-lg shadow-2xl flex items-center justify-center relative overflow-hidden">
+                                {/* LAN Text */}
+                                <div className="flex gap-0.5 text-white font-black text-2xl">
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0s' }}>L</span>
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.15s' }}>A</span>
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.3s' }}>N</span>
+                                </div>
+
+                                {/* Glow effect */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 via-transparent to-transparent"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Loading dots */}
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
+                        <div className="w-1.5 h-1.5 bg-blue-950 rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-blue-800 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
+
+                    <style jsx>{`
+    .perspective-1000 {
+      perspective: 1000px;
+    }
+    
+    .book-flip-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      animation: bookFlip 3s ease-in-out infinite;
+    }
+    
+    .book-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    
+    .book-front {
+      z-index: 2;
+    }
+    
+    .book-back {
+      transform: rotateY(180deg);
+    }
+    
+    @keyframes bookFlip {
+      0%, 100% {
+        transform: rotateY(0deg);
+      }
+      25%, 75% {
+        transform: rotateY(180deg);
+      }
+    }
+    
+    @keyframes lan-letter {
+      0%, 100% {
+        transform: translateY(0) scale(1);
+      }
+      50% {
+        transform: translateY(-4px) scale(1.1);
+      }
+    }
+    
+    .lan-letter {
+      animation: lan-letter 0.6s ease-in-out infinite;
+    }
+  `}</style>
                 </div>
             </div>
         );
@@ -431,8 +528,8 @@ export default function SellerAccountClient() {
     const handleButton = () => {
         router.push("/lan/net/help-center")
     }
-    const handleGo = () => {
-        router.push("/advertise")
+    const referral = () => {
+        router.push("/referrals")
     }
 
     return (
@@ -455,8 +552,8 @@ export default function SellerAccountClient() {
                                     alt="Profile"
                                 />
                                 <div>
-                                    <p className="text-sm lg:text-base font-semibold text-blue-950">Hi, {user?.firstName || 'Seller'}</p>
-                                    <p className="text-xs text-gray-500">Verified Seller</p>
+                                    <p className="text-sm lg:text-base font-semibold text-blue-950 ">Hi, {user?.firstName || 'Seller'} {user?.surname}</p>
+                                    <p className="text-xs text-green-500">Verified Seller</p>
                                 </div>
                             </button>
                         </div>
@@ -465,7 +562,7 @@ export default function SellerAccountClient() {
                                 onClick={handleButton}
                                 className="bg-pink-500 hover:bg-pink-600 text-white text-xs lg:text-sm font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap"
                             >
-                                HELP
+                               GET HELP
                             </button>
                             {user?.role === 'student' && (
                                 <Link href="/student/dashboard">
@@ -516,8 +613,7 @@ export default function SellerAccountClient() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="bg-white rounded-xl p-6  shadow-sm">
                                 <div className="flex items-center gap-3 mb-3">
-                                    <div className="bg-blue-100 p-3 rounded-lg">
-                                        <TrendingUp size={24} className="text-blue-950 " />
+                                    <div className="bg-blue-950 p-3 rounded-lg">
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-600">Total Earnings</p>
@@ -527,8 +623,7 @@ export default function SellerAccountClient() {
                             </div>
                             <div className="bg-white rounded-xl p-6 shadow-sm">
                                 <div className="flex items-center gap-3 mb-3">
-                                    <div className="bg-green-100 p-3 rounded-lg">
-                                        <ShoppingBag size={24} className="text-green-600" />
+                                    <div className="bg-blue-950 p-3 rounded-lg">
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-600">Documents Sold</p>
@@ -621,13 +716,14 @@ export default function SellerAccountClient() {
                                     <TrendingUp size={24} />
                                 </div>
                                 <p className="text-2xl font-bold mb-1">Up to ₦5,000,000</p>
-                                <p className="text-sm text-purple-100">Earn more by selling more books</p>
+                                <p className="text-sm text-purple-100">Earn more by inviting friends</p>
                             </div>
                             <button
-                                onClick={handleGo}
-                                className="w-full bg-white text-purple-600 font-bold py-3 rounded-xl hover:bg-gray-100 transition-colors"
+                                onClick={referral}
+                                className="w-full flex items-center justify-center gap-2 bg-white text-purple-600 font-bold py-3 rounded-xl hover:bg-gray-100 transition-colors"
                             >
-                                Get Started
+                                <Users />
+                                Invite Your Friends...
                             </button>
                         </div>
 
@@ -665,7 +761,6 @@ export default function SellerAccountClient() {
                         >
                             <X size={24} />
                         </button>
-                        <Link href="/my-account">
                             <div className="flex flex-col items-center">
                                 <div className="relative mb-3">
                                     <img
@@ -677,7 +772,6 @@ export default function SellerAccountClient() {
                                 <p className="text-2xl font-bold text-gray-50">{user?.displayName || `${user?.firstName} ${user?.surname}`}</p>
                                 <p className="text-sm text-gray-300">+234{user?.phone || '0000000000'}</p>
                             </div>
-                        </Link>
                     </div>
 
                     <div className="flex-1 bg-gray-100 overflow-y-auto">
@@ -897,7 +991,7 @@ export default function SellerAccountClient() {
                                             {w.status === 'pending' && (
                                                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mt-2">
                                                     <p className="text-xs text-yellow-700">
-                                                        ⏳ Your withdrawal request is being reviewed by our team. You'll receive an email notification once it's processed.
+                                                     Your withdrawal request is being reviewed by our team. You'll receive an email notification once it's processed.
                                                     </p>
                                                 </div>
                                             )}
@@ -928,7 +1022,7 @@ export default function SellerAccountClient() {
                         <div className="p-6 border-b border-gray-200">
                             <div className="flex items-center gap-2 text-yellow-600 mb-2">
                                 <AlertCircle size={18} />
-                                <p className="text-sm font-semibold">Admin Approval Required</p>
+                                <p className="text-sm font-semibold">LAN Approval Required</p>
                             </div>
                             <p className="text-xs text-gray-600 mt-2">
                                 Your withdrawal request will be reviewed and processed within 24-48 hours. You'll receive an email notification once approved.

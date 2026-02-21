@@ -19,7 +19,38 @@ export default function MyPostedBooksClient() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [bookSalesCount, setBookSalesCount] = useState({});
     const router = useRouter();
+
+    // Fetch sales count for all books
+    useEffect(() => {
+        const fetchBookSales = async () => {
+            try {
+                const usersSnapshot = await getDocs(collection(db, "users"));
+                const salesMap = {};
+
+                usersSnapshot.docs.forEach(userDoc => {
+                    const userData = userDoc.data();
+                    const purchasedBooks = userData.purchasedBooks || {};
+
+                    Object.values(purchasedBooks).forEach(purchase => {
+                        const bookId = purchase.bookId || purchase.id || purchase.firestoreId;
+                        if (bookId) {
+                            salesMap[bookId] = (salesMap[bookId] || 0) + 1;
+                            // Also track firestore- prefixed version
+                            salesMap[`firestore-${bookId}`] = (salesMap[`firestore-${bookId}`] || 0) + 1;
+                        }
+                    });
+                });
+
+                setBookSalesCount(salesMap);
+            } catch (error) {
+                console.error("Error fetching sales count:", error);
+            }
+        };
+
+        fetchBookSales();
+    }, []);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -102,6 +133,42 @@ export default function MyPostedBooksClient() {
         }
     };
 
+    // Get sales count for a specific book
+    const getBookSalesCount = (book) => {
+        return (
+            bookSalesCount[book.id] ||
+            bookSalesCount[book.firestoreId] ||
+            bookSalesCount[`firestore-${book.id}`] ||
+            bookSalesCount[`firestore-${book.firestoreId}`] ||
+            0
+        );
+    };
+
+    // Calculate total sales revenue for a book
+    const getBookTotalSales = (book) => {
+        const salesCount = getBookSalesCount(book);
+        const price = Number(book.price) || 0;
+        return salesCount * price;
+    };
+
+    // Calculate overall statistics
+    const calculateStats = () => {
+        const totalRevenue = postedBooks.reduce((sum, book) => {
+            return sum + getBookTotalSales(book);
+        }, 0);
+
+        const totalCopiesSold = postedBooks.reduce((sum, book) => {
+            return sum + getBookSalesCount(book);
+        }, 0);
+
+        return {
+            totalRevenue,
+            totalCopiesSold
+        };
+    };
+
+    const stats = calculateStats();
+
     // Filter and search books
     useEffect(() => {
         let filtered = [...postedBooks];
@@ -183,9 +250,106 @@ export default function MyPostedBooksClient() {
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin h-12 w-12 border-b-2 border-blue-950 rounded-full mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading your books...</p>
+                <div className="relative w-20 h-24 perspective-1000">
+                    {/* Book Container */}
+                    <div className="book-flip-container">
+                        {/* Front Cover - Book */}
+                        <div className="book-face book-front">
+                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-r-lg shadow-2xl relative overflow-hidden">
+                                {/* Book spine shadow */}
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-black/30"></div>
+
+                                {/* Book pages effect */}
+                                <div className="absolute right-0 top-1 bottom-1 w-0.5 bg-white/20"></div>
+                                <div className="absolute right-1 top-2 bottom-2 w-0.5 bg-white/15"></div>
+                                <div className="absolute right-2 top-3 bottom-3 w-0.5 bg-white/10"></div>
+
+                                {/* Book icon */}
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <svg className="w-10 h-10 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                    </svg>
+                                </div>
+
+                                {/* Shine effect */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent"></div>
+                            </div>
+                        </div>
+
+                        {/* Back Cover - LAN */}
+                        <div className="book-face book-back">
+                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-lg shadow-2xl flex items-center justify-center relative overflow-hidden">
+                                {/* LAN Text */}
+                                <div className="flex gap-0.5 text-white font-black text-2xl">
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0s' }}>L</span>
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.15s' }}>A</span>
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.3s' }}>N</span>
+                                </div>
+
+                                {/* Glow effect */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 via-transparent to-transparent"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Loading dots */}
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
+                        <div className="w-1.5 h-1.5 bg-blue-950 rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-blue-800 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
+
+                    <style jsx>{`
+    .perspective-1000 {
+      perspective: 1000px;
+    }
+    
+    .book-flip-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      animation: bookFlip 3s ease-in-out infinite;
+    }
+    
+    .book-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    
+    .book-front {
+      z-index: 2;
+    }
+    
+    .book-back {
+      transform: rotateY(180deg);
+    }
+    
+    @keyframes bookFlip {
+      0%, 100% {
+        transform: rotateY(0deg);
+      }
+      25%, 75% {
+        transform: rotateY(180deg);
+      }
+    }
+    
+    @keyframes lan-letter {
+      0%, 100% {
+        transform: translateY(0) scale(1);
+      }
+      50% {
+        transform: translateY(-4px) scale(1.1);
+      }
+    }
+    
+    .lan-letter {
+      animation: lan-letter 0.6s ease-in-out infinite;
+    }
+  `}</style>
                 </div>
             </div>
         );
@@ -246,9 +410,9 @@ export default function MyPostedBooksClient() {
                                 <AlertCircle className="text-yellow-600" size={20} />
                             </div>
                             <div>
-                                <p className="text-xs lg:text-sm text-gray-600">Pending</p>
+                                <p className="text-xs lg:text-sm text-gray-600">Copies Sold</p>
                                 <p className="text-lg lg:text-2xl font-bold text-yellow-600">
-                                    {postedBooks.filter(b => b.status === 'pending').length}
+                                    {stats.totalCopiesSold}
                                 </p>
                             </div>
                         </div>
@@ -259,14 +423,15 @@ export default function MyPostedBooksClient() {
                                 <TrendingUp className="text-purple-600" size={20} />
                             </div>
                             <div>
-                                <p className="text-xs lg:text-sm text-gray-600">Total Sales</p>
+                                <p className="text-xs lg:text-sm text-gray-600">Total Revenue</p>
                                 <p className="text-lg lg:text-2xl font-bold text-purple-600">
-                                    ₦{postedBooks.reduce((sum, book) => sum + (book.totalSales || 0), 0).toLocaleString()}
+                                    ₦{stats.totalRevenue.toLocaleString()}
                                 </p>
                             </div>
                         </div>
                     </div>
                 </div>
+
                 {/* Search and Filter */}
                 <div className="bg-white rounded-xl p-4 mb-6 shadow-sm">
                     <div className="flex flex-col md:flex-row gap-4">
@@ -328,129 +493,155 @@ export default function MyPostedBooksClient() {
                                         <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Book</th>
                                         <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Category</th>
                                         <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Price</th>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Sold</th>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Revenue</th>
                                         <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
                                         <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Uploaded</th>
                                         <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200">
-                                    {filteredBooks.map((book) => (
-                                        <tr key={book.id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <img
-                                                        src={getThumbnailUrl(book)}
-                                                        alt={book.bookTitle}
-                                                        className="w-12 h-16 object-cover rounded border border-gray-200"
-                                                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                                                    />
-                                                    <div>
-                                                        <p className="font-semibold text-blue-950">{book.bookTitle}</p>
-                                                        <p className="text-sm text-gray-600">{book.author}</p>
+                                    {filteredBooks.map((book) => {
+                                        const salesCount = getBookSalesCount(book);
+                                        const totalSales = getBookTotalSales(book);
+
+                                        return (
+                                            <tr key={book.id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <img
+                                                            src={getThumbnailUrl(book)}
+                                                            alt={book.bookTitle}
+                                                            className="w-12 h-16 object-cover rounded border border-gray-200"
+                                                            onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
+                                                        />
+                                                        <div>
+                                                            <p className="font-semibold text-blue-950">{book.bookTitle}</p>
+                                                            <p className="text-sm text-gray-600">{book.author}</p>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className="text-sm text-gray-700 capitalize">{book.category}</span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className="font-semibold text-blue-950">₦{Number(book.price).toLocaleString()}</span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {getStatusBadge(book.status)}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className="text-sm text-gray-600">
-                                                    {book.uploadedAt?.toLocaleDateString()}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedBook(book);
-                                                            setShowDetailsModal(true);
-                                                        }}
-                                                        className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
-                                                        title="View Details"
-                                                    >
-                                                        <Eye size={18} className="text-blue-950" />
-                                                    </button>
-                                                    <Link href={`/book/preview?id=${book.id}`}>
-                                                        <button className="p-2 hover:bg-green-100 rounded-lg transition-colors" title="Open Book">
-                                                            <BookOpen size={18} className="text-green-600" />
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-sm text-gray-700 capitalize">{book.category}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="font-semibold text-blue-950">₦{Number(book.price).toLocaleString()}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="font-semibold text-gray-900">{salesCount}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="font-semibold text-purple-600">₦{totalSales.toLocaleString()}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {getStatusBadge(book.status)}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-sm text-gray-600">
+                                                        {book.uploadedAt?.toLocaleDateString()}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedBook(book);
+                                                                setShowDetailsModal(true);
+                                                            }}
+                                                            className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
+                                                            title="View Details"
+                                                        >
+                                                            <Eye size={18} className="text-blue-950" />
                                                         </button>
-                                                    </Link>
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedBook(book);
-                                                            setShowDeleteModal(true);
-                                                        }}
-                                                        className="p-2 hover:bg-red-100 rounded-lg transition-colors"
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 size={18} className="text-red-600" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                        <Link href={`/book/preview?id=${book.id}`}>
+                                                            <button className="p-2 hover:bg-green-100 rounded-lg transition-colors" title="Open Book">
+                                                                <BookOpen size={18} className="text-green-600" />
+                                                            </button>
+                                                        </Link>
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedBook(book);
+                                                                setShowDeleteModal(true);
+                                                            }}
+                                                            className="p-2 hover:bg-red-100 rounded-lg transition-colors"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 size={18} className="text-red-600" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
 
                         {/* Mobile Card View */}
                         <div className="lg:hidden space-y-4">
-                            {filteredBooks.map((book) => (
-                                <div key={book.id} className="bg-white rounded-xl shadow-sm p-4">
-                                    <div className="flex gap-3 mb-3">
-                                        <img
-                                            src={getThumbnailUrl(book)}
-                                            alt={book.bookTitle}
-                                            className="w-20 h-28 object-cover rounded border border-gray-200"
-                                            onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                                        />
-                                        <div className="flex-1">
-                                            <h3 className="font-bold text-blue-950 mb-1">{book.bookTitle}</h3>
-                                            <p className="text-sm text-gray-600 mb-2">{book.author}</p>
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className="text-sm font-semibold text-blue-950">₦{Number(book.price).toLocaleString()}</span>
-                                                {getStatusBadge(book.status)}
+                            {filteredBooks.map((book) => {
+                                const salesCount = getBookSalesCount(book);
+                                const totalSales = getBookTotalSales(book);
+
+                                return (
+                                    <div key={book.id} className="bg-white rounded-xl shadow-sm p-4">
+                                        <div className="flex gap-3 mb-3">
+                                            <img
+                                                src={getThumbnailUrl(book)}
+                                                alt={book.bookTitle}
+                                                className="w-20 h-28 object-cover rounded border border-gray-200"
+                                                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
+                                            />
+                                            <div className="flex-1">
+                                                <h3 className="font-bold text-blue-950 mb-1">{book.bookTitle}</h3>
+                                                <p className="text-sm text-gray-600 mb-2">{book.author}</p>
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="text-sm font-semibold text-blue-950">₦{Number(book.price).toLocaleString()}</span>
+                                                    {getStatusBadge(book.status)}
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-xs text-gray-500">
+                                                        Sold: <span className="font-semibold text-gray-900">{salesCount} copies</span>
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">
+                                                        Revenue: <span className="font-semibold text-purple-600">₦{totalSales.toLocaleString()}</span>
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">
+                                                        Uploaded: {book.uploadedAt?.toLocaleDateString()}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <p className="text-xs text-gray-500">
-                                                Uploaded: {book.uploadedAt?.toLocaleDateString()}
-                                            </p>
+                                        </div>
+                                        <div className="flex gap-2 pt-3 border-t border-gray-200">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedBook(book);
+                                                    setShowDetailsModal(true);
+                                                }}
+                                                className="flex-1 bg-blue-50 text-blue-950 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-blue-100"
+                                            >
+                                                <Eye size={18} />
+                                                View
+                                            </button>
+                                            <Link href={`/book/preview?id=${book.id}`} className="flex-1">
+                                                <button className="w-full bg-green-50 text-green-600 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-green-100">
+                                                    <BookOpen size={18} />
+                                                    Open
+                                                </button>
+                                            </Link>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedBook(book);
+                                                    setShowDeleteModal(true);
+                                                }}
+                                                className="bg-red-50 text-red-600 py-2 px-4 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-red-100"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
                                         </div>
                                     </div>
-                                    <div className="flex gap-2 pt-3 border-t border-gray-200">
-                                        <button
-                                            onClick={() => {
-                                                setSelectedBook(book);
-                                                setShowDetailsModal(true);
-                                            }}
-                                            className="flex-1 bg-blue-50 text-blue-950 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-blue-100"
-                                        >
-                                            <Eye size={18} />
-                                            View
-                                        </button>
-                                        <Link href={`/book/preview?id=${book.id}`} className="flex-1">
-                                            <button className="w-full bg-green-50 text-green-600 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-green-100">
-                                                <BookOpen size={18} />
-                                                Open
-                                            </button>
-                                        </Link>
-                                        <button
-                                            onClick={() => {
-                                                setSelectedBook(book);
-                                                setShowDeleteModal(true);
-                                            }}
-                                            className="bg-red-50 text-red-600 py-2 px-4 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-red-100"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </>
                 )}
@@ -504,20 +695,23 @@ export default function MyPostedBooksClient() {
 
             {/* Book Details Modal */}
             {showDetailsModal && selectedBook && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                    <div className="bg-white rounded-2xl w-full max-w-2xl my-8">
-                        <div className="bg-blue-950 text-white p-6 rounded-t-2xl flex items-center justify-between">
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-">
+                    <div className="bg-white w-full max-w-2xl max-h-full flex flex-col rounded-2xl">
+                        {/* Fixed Header */}
+                        <div className="bg-blue-950 text-white p-6 rounded-t-2xl flex items-center justify-between flex-shrink-0">
                             <h3 className="text-2xl font-bold">Book Details</h3>
                             <button onClick={() => setShowDetailsModal(false)}>
                                 <X size={24} />
                             </button>
                         </div>
-                        <div className="p-6">
+
+                        {/* Scrollable Content */}
+                        <div className="p-6 overflow-y-auto flex-1">
                             <div className="flex gap-6 mb-6">
                                 <img
                                     src={getThumbnailUrl(selectedBook)}
                                     alt={selectedBook.bookTitle}
-                                    className="w-32 h-44 object-cover rounded-lg border border-gray-200"
+                                    className="w-32 h-44 object-cover rounded-lg border border-gray-200 flex-shrink-0"
                                     onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
                                 />
                                 <div className="flex-1">
@@ -543,14 +737,21 @@ export default function MyPostedBooksClient() {
                                     </div>
                                 </div>
                             </div>
+
                             {selectedBook.description && (
                                 <div className="mb-6">
                                     <h5 className="font-bold text-gray-900 mb-2">Description</h5>
-                                    <p className="text-gray-600 text-sm">{selectedBook.description}</p>
+                                    <p className="text-gray-600 text-sm leading-relaxed">{selectedBook.description}</p>
                                 </div>
                             )}
-                            <div className="bg-gray-50 rounded-lg p-4">
-                                <h5 className="font-bold text-gray-900 mb-3">Additional Information</h5>
+
+                            <div className="mb-6">
+                                <h5 className="font-bold text-gray-900 mb-2">Summary</h5>
+                                <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">{selectedBook.message}</p>
+                            </div>
+
+                            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                                <h5 className="font-bold text-gray-900 mb-3">Sales & Performance</h5>
                                 <div className="space-y-2 text-sm">
                                     <div className="flex justify-between">
                                         <span className="text-gray-600">Uploaded:</span>
@@ -559,16 +760,17 @@ export default function MyPostedBooksClient() {
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-600">Total Sales:</span>
-                                        <span className="font-semibold text-gray-900">₦{(selectedBook.totalSales || 0).toLocaleString()}</span>
+                                        <span className="text-gray-600">Copies Sold:</span>
+                                        <span className="font-semibold text-gray-900">{getBookSalesCount(selectedBook)}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-600">Copies Sold:</span>
-                                        <span className="font-semibold text-gray-900">{selectedBook.copiesSold || 0}</span>
+                                        <span className="text-gray-600">Total Revenue:</span>
+                                        <span className="font-semibold text-purple-600">₦{getBookTotalSales(selectedBook).toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div className="mt-6 flex gap-3">
+
+                            <div className="flex gap-3">
                                 <Link href={`/book/preview?id=${selectedBook.id}`} className="flex-1">
                                     <button className="w-full bg-blue-950 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-blue-900">
                                         <BookOpen size={18} />

@@ -9,6 +9,13 @@ export default function SignUpClient() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const email = searchParams.get('email');
+    const ref = searchParams.get('ref'); // ✅ capture referral code
+
+    // Build role-selection URL keeping both email and ref
+    const roleSelectionUrl = `/auth/role-selection${email || ref
+            ? `?${email ? `email=${email}` : ''}${email && ref ? '&' : ''}${ref ? `ref=${ref}` : ''}`
+            : ''
+        }`;
 
     return (
         <AuthLayout backPath="/auth/signin">
@@ -25,15 +32,12 @@ export default function SignUpClient() {
             </div>
 
             <p className="text-gray-700 mb-8 leading-relaxed">
-                Create an account to access thousands of PDF books, connect with learners, and build your digital library.
+                Create an account to access thousands of PDF books, connect with
+                learners, and build your digital library.
             </p>
 
             <div className="flex flex-col md:flex-row gap-5 max-md:w-full">
-                {/* Updated to go to role-selection instead of create-account */}
-                <Link
-                    href={`/auth/role-selection${email ? `?email=${email}` : ''}`}
-                    className="w-full md:w-auto"
-                >
+                <Link href={roleSelectionUrl} className="w-full md:w-auto">
                     <button className="w-full bg-blue-950 text-white py-3 px-5 rounded-full font-semibold hover:bg-blue-900 transition-colors">
                         Create new account
                     </button>

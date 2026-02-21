@@ -15,11 +15,11 @@ const calculatePaymentDistribution = (book) => {
             distributionType: 'platform_owner_book'
         };
     } else {
-        // User book: Seller gets 85%, platform gets 15%
+        // User book: Seller gets 80%, platform gets 25%
         return {
             isPlatformBook: false,
-            platformFee: Math.round(book.price * 0.15),
-            sellerAmount: Math.round(book.price * 0.85),
+            platformFee: Math.round(book.price * 0.25),
+            sellerAmount: Math.round(book.price * 0.80),
             distributionType: 'user_seller_book'
         };
     }
@@ -31,9 +31,9 @@ const getPaymentSplitDescription = (book) => {
     if (isPlatformBook) {
         return `100% (₦${book.price.toLocaleString()}) to platform owner`;
     } else {
-        const sellerAmount = Math.round(book.price * 0.85);
-        const platformFee = Math.round(book.price * 0.15);
-        return `85% (₦${sellerAmount.toLocaleString()}) to seller, 15% (₦${platformFee.toLocaleString()}) platform fee`;
+        const sellerAmount = Math.round(book.price * 0.80);
+        const platformFee = Math.round(book.price * 0.25);
+        return `80% (₦${sellerAmount.toLocaleString()}) to seller, 25% (₦${platformFee.toLocaleString()}) platform fee`;
     }
 };
 

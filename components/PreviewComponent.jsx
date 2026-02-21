@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs  } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { booksData } from "@/lib/booksData";
@@ -18,12 +18,13 @@ import {
   FileText,
   ChevronRight,
   Layers,
-  ThumbsDown,
+  ThumbsUp,
   Flag,
   CheckCircle,
   Upload,
   User,
   HelpCircle,
+   ShoppingBag,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -50,7 +51,14 @@ export default function BookPreviewPage() {
   const [isSeller, setIsSeller] = useState(false);
   const [allBooks, setAllBooks] = useState([]);
   const [showWhatIsLanModal, setShowWhatIsLanModal] = useState(false);
-  
+  const [showOverview, setShowOverview] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [bookSalesCount, setBookSalesCount] = useState({});
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [bookFeedbackCount, setBookFeedbackCount] = useState(0);
+
 
   // Helper function to get thumbnail from PDF
   const getThumbnailUrl = (book) => {
@@ -213,6 +221,35 @@ export default function BookPreviewPage() {
       }
     };
   
+    useEffect(() => {
+    const fetchBookSales = async () => {
+        try {
+            const usersSnapshot = await getDocs(collection(db, "users"));
+            const salesMap = {};
+
+            usersSnapshot.docs.forEach(userDoc => {
+                const userData = userDoc.data();
+                const purchasedBooks = userData.purchasedBooks || {};
+
+                Object.values(purchasedBooks).forEach(purchase => {
+                    const bookId = purchase.bookId || purchase.id || purchase.firestoreId;
+                    if (bookId) {
+                        salesMap[bookId] = (salesMap[bookId] || 0) + 1;
+                        // Also track firestore- prefixed version
+                        salesMap[`firestore-${bookId}`] = (salesMap[`firestore-${bookId}`] || 0) + 1;
+                    }
+                });
+            });
+
+            setBookSalesCount(salesMap);
+        } catch (error) {
+            console.error("Error fetching sales count:", error);
+        }
+    };
+
+    fetchBookSales();
+}, []);
+
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (!document.hidden && user) {
@@ -519,7 +556,7 @@ useEffect(() => {
       paymentBookId = bookId;
     }
 
-    console.log("Navigating to payment with bookId:", paymentBookId);
+    // console.log("Navigating to payment with bookId:", paymentBookId);
     router.push(`/payment?bookId=${paymentBookId}`);
   };
 
@@ -546,7 +583,7 @@ useEffect(() => {
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
-        title: book.title,
+        title: `LAN Library | ${book.title},`,
         text: `Check out "${book.title}" by ${book.author}`,
         url: window.location.href,
       });
@@ -556,6 +593,53 @@ useEffect(() => {
     }
     setShowOptionsModal(false);
   };
+
+  useEffect(() => {
+  const fetchFeedbackCount = async () => {
+    try {
+      if (!bookId) return;
+      const { collection: col, query: q, where: w, getDocs: gd } = await import("firebase/firestore");
+      const feedbackQuery = q(col(db, "bookFeedbacks"), w("bookId", "==", bookId));
+      const snapshot = await gd(feedbackQuery);
+      setBookFeedbackCount(snapshot.size);
+    } catch (error) {
+      console.error("Error fetching feedback count:", error);
+    }
+  };
+  fetchFeedbackCount();
+}, [bookId]);
+
+const submitFeedback = async () => {
+  try {
+    setIsSubmittingFeedback(true);
+    await addDoc(collection(db, "bookFeedbacks"), {
+      bookId: bookId,
+      bookTitle: book?.title || book?.bookTitle || "Unknown Book",
+      bookAuthor: book?.author || "Unknown Author",
+      userId: user?.uid,
+      userEmail: user?.email,
+      userName: user?.displayName || user?.email?.split("@")[0] || "Anonymous",
+      feedback: feedbackText.trim(),
+      createdAt: serverTimestamp(),
+    });
+    
+    setFeedbackText("");
+    setShowFeedbackModal(false);
+    setBookFeedbackCount((prev) => prev + 1);
+    showToastMessage("Feedback submitted! Redirecting...");
+    
+    // ✅ Redirect to feedback page after 1 second
+    setTimeout(() => {
+      router.push(`/book/feedbacks?bookId=${bookId}`);
+    }, 1000);
+    
+  } catch (error) {
+    console.error("Error submitting feedback:", error);
+    showToastMessage("Error submitting feedback. Try again.");
+  } finally {
+    setIsSubmittingFeedback(false);
+  }
+};
 
   if (loading) {
     return (
@@ -570,7 +654,7 @@ useEffect(() => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Book Not Found
+            Book Not Found / Check Your Network Connection
           </h2>
           <Link href="/home" className="text-blue-600 hover:underline">
             Return to Home
@@ -596,7 +680,7 @@ useEffect(() => {
               <div className="text-4xl font-bold text-blue-50">
                 [LAN Library]
                 <h2 className="text-xs sm:text-base">
-                  Digital Platform For Knowledge Access
+                  The Global Student Library 📚
                 </h2>
               </div>
             </Link>
@@ -626,7 +710,7 @@ useEffect(() => {
                 <div className="text-3xl font-bold text-blue-950">
                   [LAN Library]
                   <h2 className="text-xs sm:text-base">
-                    Digital Platform For Knowledge Access
+                    The Global Student Library 📚
                   </h2>
                 </div>
                 <button onClick={() => setShowNavMenu(false)}>
@@ -687,7 +771,7 @@ useEffect(() => {
                       <button
                         onClick={() =>
                           setExpandedCategory(
-                            expandedCategory === index ? null : index
+                            expandedCategory === index ? null : index,
                           )
                         }
                         className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"
@@ -786,17 +870,12 @@ useEffect(() => {
                 <img
                   src={getThumbnailUrl(book)}
                   alt={"Cover of " + book.title}
-                  className="w-full h-auto rounded-lg shadow-md object-cover border border-gray-200 p-5.5"
+                  className="w-full h-auto border border-gray-200 p-5.5"
                   onError={(e) => {
                     e.target.src =
                       "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
                   }}
                 />
-              </div>
-
-              <div className="text-gray-600 text-sm mb-4">
-                <h2 className="font-bold text-blue-950 mb-2">Introduction:</h2>
-                {book.description}
               </div>
 
               <div className="mb-6">
@@ -823,20 +902,40 @@ useEffect(() => {
               ) : (
                 <button
                   onClick={handlePurchase}
-                  className="w-full bg-blue-950 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold mb-3"
+                  className="w-full hidden bg-blue-950 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold mb-3"
                 >
                   Purchase and Access - ₦{book.price?.toLocaleString()}
                 </button>
               )}
 
               <div className="grid grid-cols-2 gap-3 mb-6 mt-3">
-                <button className="flex text-blue-950 items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <button className="flex text-blue-50 bg-blue-950 items-center justify-center gap-2 px-4 py-2 border rounded-lg">
                   <Layers size={18} />
-                  <span className="text-sm">Outline</span>
+                  <span className="text-sm">
+                    Price: {book.price?.toLocaleString()}
+                  </span>
                 </button>
-                <button className="flex items-center text-blue-950 justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <button className="flex items-center text-blue-50 bg-blue-950 justify-center gap-2 px-4 py-2 border  rounded-lg">
+                  <ShoppingBag size={12} />
+                  <span className="text-sm">
+                    {bookSalesCount[book.id] ||
+                      bookSalesCount[book.firestoreId] ||
+                      0}{" "}
+                    sold
+                  </span>
+                </button>
+                <button
+                  onClick={() =>
+                    router.push(`/book/feedbacks?bookId=${bookId}`)
+                  }
+                  className="flex items-center text-blue-50 bg-blue-950 justify-center gap-2 px-4 py-2 border  rounded-lg "
+                >
+                  <ThumbsUp className="w-4 h-4 " />
+                  <span className="">FeedBack: {bookFeedbackCount}</span>
+                </button>
+                <button className="flex items-center text-blue-50 bg-blue-950 justify-center gap-2 px-4 py-2 border  rounded-lg">
                   <FileText size={18} />
-                  <span className="text-sm">Page view</span>
+                  <span className="text-sm">{book.pages} Pages</span>
                 </button>
               </div>
 
@@ -893,18 +992,85 @@ useEffect(() => {
                 {isPurchased ? (
                   <div className="p-8">
                     {book.embedUrl ? (
-                      <iframe
-                        src={book.embedUrl}
-                        className="w-full h-[1000px] border-none rounded-lg"
-                        title={book.title}
-                        allow="autoplay"
-                      />
+                      <div className="w-full relative">
+                        <iframe
+                          src={book.embedUrl}
+                          className="w-full h-[1000px] border-none rounded-lg"
+                          title={book.title}
+                          allow="autoplay"
+                        />
+                        {/* Desktop mask — hides the pop-out button */}
+                        <div
+                          className="absolute top-0 right-0 h-[76px] bg-[#323639] z-10 hidden md:flex items-center justify-end px-5 gap-3 select-none"
+                          style={{ width: "220px" }}
+                          onContextMenu={(e) => e.preventDefault()}
+                        >
+                          <div className="flex flex-col items-end leading-tight">
+                            <div>
+                              <span className="text-blue-400 text-[10px] font-bold uppercase tracking-wider">
+                                LAN Library |
+                              </span>
+                              <span className="text-gray-400 text-[9px] font-mono">
+                                {" The Global Student Library"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="h-6 w-[1px] bg-gray-600/50 mx-1" />
+                          <Lock size={16} className="text-gray-400" />
+                        </div>
+                        {/* Mobile mask */}
+                        <div
+                          className="absolute top-0 right-0 h-[78px] bg-[#323639] z-10 md:hidden flex items-center justify-end px-4 select-none"
+                          style={{ width: "120px" }}
+                          onContextMenu={(e) => e.preventDefault()}
+                        >
+                          <div>
+                            <span className="text-blue-400 text-[10px] font-bold uppercase tracking-wider">
+                              LAN Library |
+                            </span>
+                            <span className="text-gray-400 text-[9px] font-mono">
+                              {" The Global Student Library"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     ) : book.pdfUrl ? (
-                      <iframe
-                        src={`${book.pdfUrl}#view=FitH`}
-                        className="w-full h-[1000px] border-none rounded-lg"
-                        title={book.title}
-                      />
+                      <div className="w-full relative">
+                        <iframe
+                          src={`${book.pdfUrl}#view=FitH`}
+                          className="w-full h-[1000px] border-none rounded-lg"
+                          title={book.title}
+                        />
+                        {/* Desktop mask */}
+                        <div
+                          className="absolute top-0 right-0 h-[56px] bg-[#323639] z-10 hidden md:flex items-center justify-end px-5 gap-3 select-none"
+                          style={{ width: "220px" }}
+                          onContextMenu={(e) => e.preventDefault()}
+                        >
+                          <div className="flex flex-col items-end leading-tight">
+                            <span className="text-blue-400 text-[10px] font-bold uppercase tracking-wider">
+                              LAN Library
+                            </span>
+                            <span className="text-gray-400 text-[9px] font-mono">
+                              ID:{" "}
+                              {user?.uid?.substring(0, 8).toUpperCase() ||
+                                "USER"}
+                            </span>
+                          </div>
+                          <div className="h-6 w-[1px] bg-gray-600/50 mx-1" />
+                          <Lock size={16} className="text-gray-400" />
+                        </div>
+                        {/* Mobile mask */}
+                        <div
+                          className="absolute top-0 right-0 h-[48px] bg-[#323639] z-10 md:hidden flex items-center justify-end px-4 select-none"
+                          style={{ width: "120px" }}
+                          onContextMenu={(e) => e.preventDefault()}
+                        >
+                          <span className="text-gray-400 text-[9px] font-bold uppercase">
+                            LAN Lib's
+                          </span>
+                        </div>
+                      </div>
                     ) : (
                       <div className="bg-white p-8 rounded-lg">
                         <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 flex items-center gap-3">
@@ -954,7 +1120,7 @@ useEffect(() => {
                     {/* PDF Preview (First Page/Beginning) */}
                     <div className="relative">
                       {book.embedUrl ? (
-                        // ✅ FIXED: Show embedUrl for Firestore books
+                        // Show embedUrl for Firestore books
                         <div className="h-[600px] overflow-hidden">
                           <iframe
                             src={book.embedUrl}
@@ -964,7 +1130,7 @@ useEffect(() => {
                           />
                         </div>
                       ) : book.pdfUrl ? (
-                        // ✅ Show pdfUrl for platform books
+                        //  Show pdfUrl for platform books
                         <div className="h-[600px] overflow-hidden">
                           <iframe
                             src={`${book.pdfUrl}#view=FitH&page=1&toolbar=0`}
@@ -1032,18 +1198,20 @@ useEffect(() => {
                 )}
               </div>
 
-              <div className="border-t border-gray-200 p-4 flex items-center justify-between md:hidden text-blue-950">
-                <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg">
+              <div className="border-t border-gray-200 p-4 flex items-center justify-between text-blue-950">
+                <button
+                  onClick={() => setShowOverview(true)}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg"
+                >
                   <Layers size={18} />
                   Overview
                 </button>
-                <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg">
-                  <Search size={18} />
-                  Find
-                </button>
-                <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg">
+                <button
+                  onClick={() => setShowSummary(true)}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg"
+                >
                   <FileText size={18} />
-                  Summarize
+                  Summary
                 </button>
               </div>
             </div>
@@ -1061,7 +1229,7 @@ useEffect(() => {
             <div className="grid grid-cols-2 gap-4">
               {(allBooks.length > 0 ? allBooks : booksData)
                 .filter((relatedBook) => relatedBook.id !== bookId)
-                .slice(0, 8)
+                .slice(0, 10)
                 .map((relatedBook) => (
                   <Link
                     key={relatedBook.id}
@@ -1072,7 +1240,7 @@ useEffect(() => {
                       <img
                         src={getThumbnailUrl(relatedBook)}
                         alt={relatedBook.title}
-                        className="w-full h-[240px] sm:h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
+                        className="w-full h-[240px] sm:h-[280px]  group-hover:shadow-xl transition-shadow"
                         onError={(e) => {
                           e.target.src =
                             "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
@@ -1097,7 +1265,7 @@ useEffect(() => {
           <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-4 gap-4">
             {(allBooks.length > 0 ? allBooks : booksData)
               .filter((relatedBook) => relatedBook.id !== bookId)
-              .slice(0, 8)
+              .slice(0, 20)
               .map((relatedBook) => (
                 <Link
                   key={relatedBook.id}
@@ -1108,7 +1276,7 @@ useEffect(() => {
                     <img
                       src={getThumbnailUrl(relatedBook)}
                       alt={relatedBook.title}
-                      className="w-full h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
+                      className="w-full h-[380px] group-hover:shadow-xl transition-shadow"
                       onError={(e) => {
                         e.target.src =
                           "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
@@ -1129,6 +1297,93 @@ useEffect(() => {
           </div>
         </div>
       </div>
+
+      {showOverview && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => setShowOverview(false)}
+          />
+          <div className="fixed inset-y-0 left-0 w-96 lg:w-200 bg-white shadow-2xl z-50 overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Overview</h2>
+                <button
+                  onClick={() => setShowOverview(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <img
+                src={book.image || book.coverImage}
+                alt={book.title}
+                className="w-full object-cover rounded-lg mb-4"
+              />
+
+              <h3 className="text-xl font-bold mb-2 text-gray-900">
+                {book.title}
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                By <span className="underline">{book.author}</span>
+              </p>
+              <>
+                <h3 className="font-bold mb-2 text-gray-900">Description</h3>
+                <p className="text-sm text-gray-600 mb-6">{book.description}</p>
+              </>
+              <h3 className="font-bold mb-2 text-gray-900">Category</h3>
+              <p className="text-sm text-gray-600 mb-6">
+                {book.category || "General"}
+              </p>
+
+              <h3 className="font-bold mb-2 text-gray-900">Format</h3>
+              <p className="text-sm text-gray-600">
+                {book.format || "PDF"} • {book.pages || "N/A"} pages
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+
+      {showSummary && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/70 z-40"
+            onClick={() => setShowSummary(false)}
+          />
+          <div className="fixed inset-y-0 right-0 w-96 lg:w-200 bg-white shadow-2xl z-50 overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold mb-2 text-gray-900">
+                  {book.title}
+                </h3>
+                <button
+                  onClick={() => setShowSummary(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <img
+                src={book.image || book.coverImage}
+                alt={book.title}
+                className="w-full h-full object-cover rounded-lg mb-4"
+              />
+              <>
+                <h3 className="font-bold mb-2 text-gray-900">Summary</h3>
+                <p className="text-sm text-gray-600 mb-6 whitespace-pre-line leading-relaxed">
+                  {book.message}
+                </p>
+              </>
+              <p className="text-sm text-gray-600 mb-4">
+                By:<span className="underline">{book.author}</span>
+              </p>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Options Modal */}
       {showOptionsModal && (
@@ -1170,10 +1425,16 @@ useEffect(() => {
                   </span>
                 </button>
 
-                <button className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left">
-                  <ThumbsDown size={24} className="text-gray-700" />
+                <button
+                  onClick={() => {
+                    setShowOptionsModal(false);
+                    setShowFeedbackModal(true);
+                  }}
+                  className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors text-left"
+                >
+                  <ThumbsUp size={24} className="text-gray-700" />
                   <span className="font-medium text-gray-900 text-lg">
-                    Don't show again
+                    Feedback
                   </span>
                 </button>
 
@@ -1193,6 +1454,68 @@ useEffect(() => {
                 >
                   <X size={20} className="inline mr-2" />
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/60 z-[100]"
+            onClick={() => {
+              setShowFeedbackModal(false);
+              setFeedbackText("");
+            }}
+          />
+          <div className="fixed inset-0 z-[101] flex items-center justify-center px-4">
+            <div className="bg-gray-900 text-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+              <h2 className="text-xl font-bold mb-1">Feedback</h2>
+              <p className="text-gray-400 text-sm mb-4">
+                Please provide details: (optional)
+              </p>
+
+              <textarea
+                autoFocus
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="What was satisfying about this response?"
+                rows={4}
+                className="w-full bg-gray-800 border border-gray-600 focus:border-blue-500 rounded-lg p-3 text-white placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-sm"
+              />
+
+              <p className="text-gray-500 text-xs mt-2 mb-5">
+                Submitting this feedback will help us improve this book's
+                experience.{" "}
+                <button
+                  onClick={() =>
+                    router.push(`/book/feedbacks?bookId=${bookId}`)
+                  }
+                  className="text-blue-400 underline hover:text-blue-300"
+                >
+                  View all feedback
+                </button>
+              </p>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowFeedbackModal(false);
+                    setFeedbackText("");
+                  }}
+                  className="px-5 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-800 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitFeedback}
+                  disabled={isSubmittingFeedback}
+                  className="px-5 py-2 rounded-lg bg-white text-gray-900 font-semibold text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingFeedback ? "Submitting..." : "Submit"}
                 </button>
               </div>
             </div>

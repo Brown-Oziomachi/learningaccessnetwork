@@ -14,12 +14,14 @@ export default function GlobalNotFound() {
   return (
     <html lang="en" className={inter.className}>
       <body className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center px-6">
-        <div className="max-w-md w-full text-center bg-white shadow-lg rounded-2xl p-10">
+        <div className="max-w-lg w-full text-center bg-white shadow-xl p-10">
           {/* 404 */}
           <h1 className="text-7xl font-extrabold text-blue-950 mb-4">
             404
           </h1>
-
+        <div className="py-5">
+            <img src="/Log.png" alt="Lan image explanation"/>
+        </div>
           {/* Title */}
           <h2 className="text-2xl font-semibold text-gray-900 mb-2">
             Page not found

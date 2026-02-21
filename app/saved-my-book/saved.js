@@ -150,7 +150,7 @@ export default function SavedBooksClient() {
                             Start saving books you're interested in to view them here later!
                         </p>
                         <button
-                            onClick={() => router.push('/home')}
+                            onClick={() => router.push('/documents')}
                             className="inline-block bg-blue-950 text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors"
                         >
                             Browse Books

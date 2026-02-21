@@ -10,20 +10,25 @@ export default function CreateAccountNameClient() {
     const searchParams = useSearchParams();
     const prefilledEmail = searchParams.get('email');
 
+    // ✅ Get ref from URL OR sessionStorage (saved in role-selection)
+    const refFromUrl = searchParams.get('ref');
+
     const [formData, setFormData] = useState({
         firstName: '',
         surname: ''
     });
     const [errors, setErrors] = useState({});
-    const [selectedRole, setSelectedRole] = useState('student');
+    const [selectedRole, setSelectedRole] = useState('seller');
 
-    // Get the role from sessionStorage when component mounts
     useEffect(() => {
         const role = sessionStorage.getItem('userRole');
-        if (role) {
-            setSelectedRole(role);
+        if (role) setSelectedRole(role);
+
+        // ✅ If ref came in URL, make sure sessionStorage has it too
+        if (refFromUrl) {
+            sessionStorage.setItem('referredBy', refFromUrl);
         }
-    }, []);
+    }, [refFromUrl]);
 
     const handleNext = () => {
         const validation = validateName(formData.firstName, formData.surname);
@@ -33,14 +38,16 @@ export default function CreateAccountNameClient() {
             return;
         }
 
+        // ✅ Get ref from sessionStorage (most reliable across steps)
+        const ref = sessionStorage.getItem('referredBy') || refFromUrl || '';
+
         const params = new URLSearchParams({
             firstName: formData.firstName,
-            surname: formData.surname
+            surname: formData.surname,
         });
 
-        if (prefilledEmail) {
-            params.append('email', prefilledEmail);
-        }
+        if (prefilledEmail) params.append('email', prefilledEmail);
+        if (ref) params.append('ref', ref); // ✅ pass ref forward
 
         router.push(`/auth/create-account/dob?${params.toString()}`);
     };
@@ -53,8 +60,7 @@ export default function CreateAccountNameClient() {
             <p className="text-gray-600 mb-2">
                 Enter the name you use in real life.
             </p>
-            
-            {/* Show selected role */}
+
             <p className="text-sm text-blue-950 font-semibold mb-8">
                 Creating {selectedRole} account
             </p>

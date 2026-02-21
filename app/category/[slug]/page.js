@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect, useMemo } from 'react';
-import { Globe, ArrowLeft } from 'lucide-react';
+import { Globe, ArrowLeft, ShoppingBag, } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { onAuthStateChanged } from "firebase/auth";
@@ -20,6 +20,7 @@ export default function CategoryPage() {
     const [firestoreBooks, setFirestoreBooks] = useState([]);
     const [allBooks, setAllBooks] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [bookSalesCount, setBookSalesCount] = useState({});
 
     const getThumbnailUrl = (book) => {
         if (!book) return 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
@@ -75,6 +76,36 @@ export default function CategoryPage() {
 
         return () => unsubscribe();
     }, [router]);
+
+         // Fetch sales count for all books
+useEffect(() => {
+    const fetchBookSales = async () => {
+        try {
+            const usersSnapshot = await getDocs(collection(db, "users"));
+            const salesMap = {};
+
+            usersSnapshot.docs.forEach(userDoc => {
+                const userData = userDoc.data();
+                const purchasedBooks = userData.purchasedBooks || {};
+
+                Object.values(purchasedBooks).forEach(purchase => {
+                    const bookId = purchase.bookId || purchase.id || purchase.firestoreId;
+                    if (bookId) {
+                        salesMap[bookId] = (salesMap[bookId] || 0) + 1;
+                        // Also track firestore- prefixed version
+                        salesMap[`firestore-${bookId}`] = (salesMap[`firestore-${bookId}`] || 0) + 1;
+                    }
+                });
+            });
+
+            setBookSalesCount(salesMap);
+        } catch (error) {
+            console.error("Error fetching sales count:", error);
+        }
+    };
+
+    fetchBookSales();
+}, []);
 
     useEffect(() => {
         const fetchFirestoreBooks = async () => {
@@ -212,9 +243,106 @@ export default function CategoryPage() {
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-white">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-950 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading books...</p>
+                <div className="relative w-20 h-24 perspective-1000">
+                    {/* Book Container */}
+                    <div className="book-flip-container">
+                        {/* Front Cover - Book */}
+                        <div className="book-face book-front">
+                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-r-lg shadow-2xl relative overflow-hidden">
+                                {/* Book spine shadow */}
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-black/30"></div>
+
+                                {/* Book pages effect */}
+                                <div className="absolute right-0 top-1 bottom-1 w-0.5 bg-white/20"></div>
+                                <div className="absolute right-1 top-2 bottom-2 w-0.5 bg-white/15"></div>
+                                <div className="absolute right-2 top-3 bottom-3 w-0.5 bg-white/10"></div>
+
+                                {/* Book icon */}
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <svg className="w-10 h-10 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                    </svg>
+                                </div>
+
+                                {/* Shine effect */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent"></div>
+                            </div>
+                        </div>
+
+                        {/* Back Cover - LAN */}
+                        <div className="book-face book-back">
+                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-lg shadow-2xl flex items-center justify-center relative overflow-hidden">
+                                {/* LAN Text */}
+                                <div className="flex gap-0.5 text-white font-black text-2xl">
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0s' }}>L</span>
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.15s' }}>A</span>
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.3s' }}>N</span>
+                                </div>
+
+                                {/* Glow effect */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 via-transparent to-transparent"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Loading dots */}
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
+                        <div className="w-1.5 h-1.5 bg-blue-950 rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-blue-800 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
+
+                    <style jsx>{`
+    .perspective-1000 {
+      perspective: 1000px;
+    }
+    
+    .book-flip-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      animation: bookFlip 3s ease-in-out infinite;
+    }
+    
+    .book-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    
+    .book-front {
+      z-index: 2;
+    }
+    
+    .book-back {
+      transform: rotateY(180deg);
+    }
+    
+    @keyframes bookFlip {
+      0%, 100% {
+        transform: rotateY(0deg);
+      }
+      25%, 75% {
+        transform: rotateY(180deg);
+      }
+    }
+    
+    @keyframes lan-letter {
+      0%, 100% {
+        transform: translateY(0) scale(1);
+      }
+      50% {
+        transform: translateY(-4px) scale(1.1);
+      }
+    }
+    
+    .lan-letter {
+      animation: lan-letter 0.6s ease-in-out infinite;
+    }
+  `}</style>
                 </div>
             </div>
         );
@@ -307,6 +435,10 @@ export default function CategoryPage() {
                                         </h4>
                                         <p className="text-gray-600 text-xs">{book.author}</p>
                                     </div>
+                                     <p className="text-gray-500 text-xs lg:text-sm flex items-center gap-1 mt-1">
+                                            <ShoppingBag size={12} />
+                                            {bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0} sold
+                                        </p>
                                 </Link>
                             ))}
                         </div>
@@ -350,6 +482,10 @@ export default function CategoryPage() {
                                             </h4>
                                             <p className="text-gray-600 text-xs">{book.author}</p>
                                         </div>
+                                         <p className="text-gray-500 text-xs lg:text-sm flex items-center gap-1 mt-1">
+                                            <ShoppingBag size={12} />
+                                            {bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0} sold
+                                        </p>
                                     </Link>
                                 ))}
                             </div>

@@ -103,6 +103,19 @@ export default function MyBooksClient() {
         setShowRelatedModal(false);
     };
 
+    // Filter books based on search query
+    const filteredBooks = purchasedBooks.filter(book => {
+        if (!searchQuery) return true;
+
+        const query = searchQuery.toLowerCase();
+        return (
+            book.title?.toLowerCase().includes(query) ||
+            book.author?.toLowerCase().includes(query) ||
+            book.category?.toLowerCase().includes(query) ||
+            book.description?.toLowerCase().includes(query)
+        );
+    });
+
     // Fetch purchased books
     const fetchPurchasedBooks = async (userId) => {
         try {
@@ -289,9 +302,106 @@ export default function MyBooksClient() {
     if (loading) {
         return (
             <div className="min-h-screen bg-blue-950 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-50 mx-auto"></div>
-                    <p className="mt-4 text-white">Loading My Books...</p>
+                <div className="relative w-20 h-24 perspective-1000">
+                    {/* Book Container */}
+                    <div className="book-flip-container">
+                        {/* Front Cover - Book */}
+                        <div className="book-face book-front">
+                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-r-lg shadow-2xl relative overflow-hidden">
+                                {/* Book spine shadow */}
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-black/30"></div>
+
+                                {/* Book pages effect */}
+                                <div className="absolute right-0 top-1 bottom-1 w-0.5 bg-white/20"></div>
+                                <div className="absolute right-1 top-2 bottom-2 w-0.5 bg-white/15"></div>
+                                <div className="absolute right-2 top-3 bottom-3 w-0.5 bg-white/10"></div>
+
+                                {/* Book icon */}
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <svg className="w-10 h-10 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                    </svg>
+                                </div>
+
+                                {/* Shine effect */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent"></div>
+                            </div>
+                        </div>
+
+                        {/* Back Cover - LAN */}
+                        <div className="book-face book-back">
+                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-lg shadow-2xl flex items-center justify-center relative overflow-hidden">
+                                {/* LAN Text */}
+                                <div className="flex gap-0.5 text-white font-black text-2xl">
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0s' }}>L</span>
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.15s' }}>A</span>
+                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.3s' }}>N</span>
+                                </div>
+
+                                {/* Glow effect */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 via-transparent to-transparent"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Loading dots */}
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
+                        <div className="w-1.5 h-1.5 bg-blue-950 rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-blue-800 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
+
+                    <style jsx>{`
+    .perspective-1000 {
+      perspective: 1000px;
+    }
+    
+    .book-flip-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      animation: bookFlip 3s ease-in-out infinite;
+    }
+    
+    .book-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    
+    .book-front {
+      z-index: 2;
+    }
+    
+    .book-back {
+      transform: rotateY(180deg);
+    }
+    
+    @keyframes bookFlip {
+      0%, 100% {
+        transform: rotateY(0deg);
+      }
+      25%, 75% {
+        transform: rotateY(180deg);
+      }
+    }
+    
+    @keyframes lan-letter {
+      0%, 100% {
+        transform: translateY(0) scale(1);
+      }
+      50% {
+        transform: translateY(-4px) scale(1.1);
+      }
+    }
+    
+    .lan-letter {
+      animation: lan-letter 0.6s ease-in-out infinite;
+    }
+  `}</style>
                 </div>
             </div>
         );
@@ -526,13 +636,37 @@ export default function MyBooksClient() {
             <Navbar />
 
             <main className="max-w-7xl mx-auto px-4 py-8">
-                <div className="mb-8">
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">My Books</h2>
-                    <p className="text-gray-600">
-                        {purchasedBooks.length} {purchasedBooks.length === 1 ? 'book' : 'books'} purchased
-                    </p>
-                </div>
 
+<div className="mb-8">
+    <h2 className="text-3xl font-bold text-gray-900 mb-2">My Books</h2>
+    <p className="text-gray-600">
+        {purchasedBooks.length} {purchasedBooks.length === 1 ? 'book' : 'books'} purchased
+    </p>
+    
+    {/* ADD THIS SEARCH INPUT */}
+    {purchasedBooks.length > 0 && (
+        <div className="mt-4 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <input
+                type="text"
+                placeholder="Search by title, author, or category..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full text-blue-950 pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
+            />
+            {searchQuery && (
+                <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                    <X size={20} />
+                </button>
+            )}
+        </div>
+    )}
+                </div>
+                
+                
                 {purchasedBooks.length === 0 ? (
                     <div className="bg-white rounded-lg shadow-lg p-12 text-center">
                         <FileText className="w-20 h-20 mx-auto mb-4 text-gray-400" />
@@ -594,8 +728,8 @@ export default function MyBooksClient() {
                                         className="w-full bg-blue-950 text-white py-2 md:py-3 rounded-lg hover:bg-blue-900 transition-colors flex items-center justify-center gap-2 font-semibold text-xs md:text-base"
                                     >
                                         <ExternalLink className="w-4 h-4 md:w-5 md:h-5" />
-                                        <span className="hidden md:inline">Open Book</span>
-                                        <span className="md:hidden">Open</span>
+                                        <span className="hidden md:inline">Read Book</span>
+                                        <span className="md:hidden">Read</span>
                                     </button>
                                 </div>
                             </div>
