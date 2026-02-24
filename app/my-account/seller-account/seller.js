@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { DollarSign, TrendingUp, ShoppingBag, Download, Book, Globe, Settings, X, Camera, Save, AlertCircle, ChevronRight, User, Building, Users } from "lucide-react";
+import { DollarSign, TrendingUp, ShoppingBag, Download, Book, Globe, Settings, X, Camera, Save, AlertCircle, ChevronRight, User, Building, Users, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, increment, setDoc } from "firebase/firestore";
@@ -151,15 +151,16 @@ export default function SellerAccountClient() {
         }
     };
 
+    
     const fetchSellerTransactions = async (uid) => {
         try {
             let allTransactions = [];
 
+            // 1. Fetch from transactions collection
             const transactionsQuery = query(
                 collection(db, "transactions"),
                 where("sellerId", "==", uid)
             );
-
             const transactionsSnapshot = await getDocs(transactionsQuery);
             const txnsFromCollection = transactionsSnapshot.docs.map(doc => {
                 const data = doc.data();
@@ -170,11 +171,10 @@ export default function SellerAccountClient() {
                     createdAtDate: data.createdAt?.toDate?.() || (data.purchaseDate ? new Date(data.purchaseDate) : new Date())
                 };
             });
-
             allTransactions = [...txnsFromCollection];
 
+            // 2. Fetch from purchasedBooks in users collection
             const usersSnapshot = await getDocs(collection(db, "users"));
-
             usersSnapshot.docs.forEach(userDoc => {
                 const userData = userDoc.data();
                 const purchasedBooks = userData.purchasedBooks || {};
@@ -183,9 +183,8 @@ export default function SellerAccountClient() {
                     if (purchase.sellerId === uid) {
                         const existingTxn = allTransactions.find(
                             t => t.id === purchase.transactionId ||
-                                t.bookTitle === purchase.title && t.buyerEmail === userData.email
+                                (t.bookTitle === purchase.title && t.buyerEmail === userData.email)
                         );
-
                         if (!existingTxn) {
                             allTransactions.push({
                                 id: purchase.transactionId || `purchase-${purchase.bookId}-${userDoc.id}`,
@@ -204,9 +203,7 @@ export default function SellerAccountClient() {
                 });
             });
 
-            allTransactions.sort((a, b) => b.createdAtDate - a.createdAtDate);
-            setTransactions(allTransactions);
-
+            // 3. Fetch withdrawals
             const withdrawalsQuery = query(
                 collection(db, "withdrawals"),
                 where("sellerId", "==", uid)
@@ -220,43 +217,94 @@ export default function SellerAccountClient() {
                     requestedAtDate: data.requestedAt?.toDate?.() || new Date()
                 };
             });
-
             withdrawalsList.sort((a, b) => b.requestedAtDate - a.requestedAtDate);
             setWithdrawals(withdrawalsList);
 
+            // 4. Fetch outgoing transfers
+            const transfersQuery = query(
+                collection(db, 'transfers'),
+                where('senderId', '==', uid)
+            );
+            const transfersSnap = await getDocs(transfersQuery);
+            const transfersList = transfersSnap.docs.map(d => {
+                const data = d.data();
+                return {
+                    id: d.id,
+                    ...data,
+                    bookTitle: `Transfer to ${data.recipientName || 'Unknown'}`,
+                    buyerName: data.recipientName || 'Unknown',
+                    amount: data.amount,
+                    sellerAmount: -data.amount,
+                    createdAtDate: data.createdAt?.toDate?.() || new Date(),
+                    type: 'transfer_out',
+                };
+            });
+
+            // 4b. Fetch incoming transfers
+            const incomingTransfersQuery = query(
+                collection(db, 'transfers'),
+                where('recipientId', '==', uid)
+            );
+            const incomingSnap = await getDocs(incomingTransfersQuery);
+            const incomingList = incomingSnap.docs.map(d => {
+                const data = d.data();
+                return {
+                    id: `incoming-${d.id}`,
+                    ...data,
+                    bookTitle: `Transfer from ${data.senderName || 'Unknown'}`,
+                    buyerName: data.senderName || 'Unknown',
+                    amount: data.amount,
+                    sellerAmount: data.amount,
+                    createdAtDate: data.createdAt?.toDate?.() || new Date(),
+                    type: 'transfer_in',
+                };
+            });
+
+            // 5. Merge all into allTransactions BEFORE sorting and setting state
+            allTransactions = [...allTransactions, ...transfersList, ...incomingList];
+            allTransactions.sort((a, b) => b.createdAtDate - a.createdAtDate);
+
+            // 6. Set transactions (includes transfers both ways)
+            setTransactions(allTransactions);
+
+            // 7. Calculate earnings — exclude transfers from earnings calculation
             if (allTransactions.length > 0) {
-                const calculatedEarnings = allTransactions.reduce((sum, txn) => {
-                    const earning = txn.sellerAmount || (txn.amount * 0.80);
-                    return sum + earning;
+                const salesOnly = allTransactions.filter(
+                    txn => txn.type !== 'transfer_out' && txn.type !== 'transfer_in'
+                );
+                const calculatedEarnings = salesOnly.reduce((sum, txn) => {
+                    return sum + (txn.sellerAmount || (txn.amount * 0.80));
                 }, 0);
-                const calculatedBooksSold = allTransactions.length;
+                const calculatedBooksSold = salesOnly.length;
 
                 const totalWithdrawn = withdrawalsList
                     .filter(w => w.status === 'completed')
                     .reduce((sum, w) => sum + (w.amount || 0), 0);
 
-                const calculatedBalance = calculatedEarnings - totalWithdrawn;
+                const totalTransferred = transfersList.reduce((sum, t) => sum + (t.amount || 0), 0);
+                const calculatedBalance = calculatedEarnings - totalWithdrawn - totalTransferred;
 
                 setTotalEarnings(calculatedEarnings);
                 setBooksSold(calculatedBooksSold);
-                setAccountBalance(calculatedBalance);
 
+                // Use Firestore balance as source of truth (transfers already update it atomically)
                 const sellerDocRef = doc(db, "sellers", uid);
                 const sellerDoc = await getDoc(sellerDocRef);
+                if (sellerDoc.exists()) {
+                    const firestoreBalance = sellerDoc.data().accountBalance || 0;
+                    setAccountBalance(firestoreBalance);
+                }
 
                 if (sellerDoc.exists()) {
                     const currentData = sellerDoc.data();
-
                     const needsUpdate =
                         Math.abs(currentData.totalEarnings - calculatedEarnings) > 0.01 ||
-                        currentData.booksSold !== calculatedBooksSold ||
-                        Math.abs((currentData.accountBalance || 0) - calculatedBalance) > 0.01;
+                        currentData.booksSold !== calculatedBooksSold;
 
                     if (needsUpdate) {
                         await updateDoc(sellerDocRef, {
                             totalEarnings: calculatedEarnings,
                             booksSold: calculatedBooksSold,
-                            accountBalance: calculatedBalance,
                             updatedAt: serverTimestamp()
                         });
                     }
@@ -267,7 +315,7 @@ export default function SellerAccountClient() {
             console.error("Error fetching transactions:", error);
         }
     };
-
+    
     const handleSaveBank = async () => {
         // Validate
         if (!bankFormData.accountName || !bankFormData.accountNumber || !bankFormData.bankName) {
@@ -580,34 +628,46 @@ export default function SellerAccountClient() {
                     {/* Left Column - Balance & Actions */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Balance Card */}
-                        <div className="bg-gradient-to-br from-blue-950 to-blue-800 rounded-2xl p-6 shadow-lg text-white">
-                            <div className="flex items-center justify-between mb-6">
+                        <div className="bg-gradient-to-br from-blue-950 to-blue-800 rounded-2xl p-4 sm:p-6 shadow-lg text-white">
+                            <div className="flex items-center justify-between mb-4 sm:mb-6">
                                 <div className="flex items-center gap-2">
                                     <DollarSign size={20} />
-                                    <span className="font-semibold">Available Balance</span>
+                                    <span className="font-semibold text-sm sm:text-base">Available Balance</span>
                                 </div>
                                 <button
                                     onClick={() => setShowTransactionHistory(true)}
-                                    className="text-sm font-medium flex items-center gap-1 hover:opacity-80"
+                                    className="text-xs sm:text-sm font-medium flex items-center gap-1 hover:opacity-80"
                                 >
                                     History <ChevronRight size={16} />
                                 </button>
                             </div>
 
-                            <div className="flex items-end justify-between">
-                                <div>
-                                    <p className="text-4xl lg:text-5xl font-bold mb-2">₦{accountBalance.toLocaleString()}</p>
-                                    <p className="text-sm text-blue-200">Total earnings: ₦{totalEarnings.toLocaleString()}</p>
+                            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                                <div className="min-w-0">
+                                    <p className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-1 sm:mb-2 truncate">
+                                        ₦{accountBalance.toLocaleString()}
+                                    </p>
+                                    <p className="text-xs sm:text-sm text-blue-200">
+                                        Total earnings: ₦{totalEarnings.toLocaleString()}
+                                    </p>
                                 </div>
-                                <button
-                                    onClick={() => setShowWithdrawModal(true)}
-                                    disabled={accountBalance < 1000}
-                                    className="bg-white text-blue-950 px-6 py-3 rounded-xl font-bold hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    Withdraw
-                                </button>
+                                <div className="flex flex-row gap-3 w-full sm:w-auto">
+                                    <button
+                                        onClick={() => setShowWithdrawModal(true)}
+                                        disabled={accountBalance < 1000}
+                                        className="flex-1 sm:flex-none bg-white text-blue-950 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold text-sm sm:text-base hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Withdraw
+                                    </button>
+
+                                    <a href="/transfer"
+                                    className="flex-1 sm:flex-none text-center bg-blue-950 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold text-sm sm:text-base hover:bg-gray-950 transition-colors"
+                    >
+                                    Transfer
+                                </a>
                             </div>
                         </div>
+                    </div>
 
                         {/* Stats Grid */}
                         <div className="grid grid-cols-2 gap-4">
@@ -640,8 +700,10 @@ export default function SellerAccountClient() {
                                 {transactions.slice(0, 5).map((txn) => (
                                     <div key={txn.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                                         <div className="flex items-center gap-3">
-                                            <div className="bg-blue-100 p-2 rounded-lg">
-                                                <ShoppingBag size={20} className="text-blue-950" />
+                                            <div className={`p-2 rounded-lg ${txn.type === 'transfer_out' ? 'bg-red-100' : 'bg-blue-100'}`}>
+                                                {txn.type === 'transfer_out'
+                                                    ? <ArrowUpRight size={20} className="text-red-500" />
+                                                    : <ShoppingBag size={20} className="text-blue-950" />}
                                             </div>
                                             <div>
                                                 <p className="font-semibold text-blue-950 text-sm lg:text-base">{txn.bookTitle}</p>
@@ -649,8 +711,14 @@ export default function SellerAccountClient() {
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-green-600 font-bold">+₦{(txn.sellerAmount || (txn.amount * 0.85)).toLocaleString()}</p>
-                                            <p className="text-xs text-gray-500">Success</p>
+                                            <p className={`font-bold ${txn.type === 'transfer_out' ? 'text-red-500' : 'text-green-600'}`}>
+                                                {txn.type === 'transfer_out'
+                                                    ? `-₦${txn.amount?.toLocaleString()}`
+                                                    : `+₦${(txn.sellerAmount || (txn.amount * 0.85)).toLocaleString()}`}
+                                            </p>
+                                            <p className="text-xs text-gray-500">
+                                                {txn.type === 'transfer_out' ? 'Transfer Sent' : 'Success'}
+                                            </p>
                                         </div>
                                     </div>
                                 ))}
@@ -901,8 +969,15 @@ export default function SellerAccountClient() {
                                     <div key={txn.id} className="bg-white rounded-xl p-4 shadow-sm">
                                         <div className="flex items-center justify-between mb-3">
                                             <div className="flex items-center gap-3">
-                                                <div className="bg-blue-100 p-2 rounded-lg">
-                                                    <ShoppingBag size={18} className="text-blue-950" />
+                                                <div className={`p-2 rounded-lg ${txn.type === 'transfer_out' ? 'bg-red-100' :
+                                                        txn.type === 'transfer_in' ? 'bg-green-100' :
+                                                            'bg-blue-100'
+                                                    }`}>
+                                                    {txn.type === 'transfer_out'
+                                                        ? <ArrowUpRight size={18} className="text-red-500" />
+                                                        : txn.type === 'transfer_in'
+                                                            ? <ArrowDownLeft size={18} className="text-green-600" />
+                                                            : <ShoppingBag size={18} className="text-blue-950" />}
                                                 </div>
                                                 <div>
                                                     <p className="font-semibold text-blue-950">{txn.bookTitle}</p>

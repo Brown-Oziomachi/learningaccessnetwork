@@ -9,12 +9,12 @@ export default function SignUpClient() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const email = searchParams.get('email');
-    const ref = searchParams.get('ref'); // ✅ capture referral code
+    const ref = searchParams.get('referral_code'); // ✅ capture referral code
 
     // Build role-selection URL keeping both email and ref
     const roleSelectionUrl = `/auth/role-selection${email || ref
-            ? `?${email ? `email=${email}` : ''}${email && ref ? '&' : ''}${ref ? `ref=${ref}` : ''}`
-            : ''
+        ? `?${email ? `email=${email}` : ''}${email && ref ? '&' : ''}${ref ? `referral_code=${ref}` : ''}`
+        : ''
         }`;
 
     return (

@@ -1,38 +1,52 @@
 import "./globals.css";
 import { Inter } from "next/font/google";
-import Link from "next/link";
-import GoHomeButton from '@/components/GoHomeButton'
+import GoHomeButton from '@/components/GoHomeButton';
 
 const inter = Inter({ subsets: ["latin"] });
-
-export const metadata = {
-  title: "404 - Page Not Found",
-  description: "The page you are looking for does not exist.",
-};
 
 export default function GlobalNotFound() {
   return (
     <html lang="en" className={inter.className}>
-      <body className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center px-6">
-        <div className="max-w-lg w-full text-center bg-white shadow-xl p-10">
-          {/* 404 */}
-          <h1 className="text-7xl font-extrabold text-blue-950 mb-4">
-            404
-          </h1>
-        <div className="py-5">
-            <img src="/Log.png" alt="Lan image explanation"/>
-        </div>
+      <body className="min-h-screen bg-gray-100 flex items-center justify-center px-6">
+
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 max-w-sm w-full text-center">
+
+          {/* Icon */}
+          <div className="flex justify-center mb-4">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="56"
+              height="56"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#d1d5db"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              <line x1="11" y1="8" x2="11" y2="14" />
+              <line x1="8" y1="11" x2="14" y2="11" />
+            </svg>
+          </div>
+
           {/* Title */}
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-            Page not found
+          <h2 className="text-xl font-bold text-gray-900 mb-2">
+            Page Not Found
           </h2>
 
           {/* Description */}
-         <p className="text-gray-600 mb-8">
-               Why wasting time searching for a page that doesn't exist in LAN Library. Go to help-center and learn how to use our system.
-        </p>
-          <GoHomeButton/>
-          </div>
+          <p className="text-gray-500 text-sm mb-6">
+            The page you're looking for doesn't exist in LAN Library.
+            Head back home or visit the help center.
+          </p>
+
+          {/* Button */}
+          <GoHomeButton />
+
+        </div>
+
       </body>
     </html>
   );

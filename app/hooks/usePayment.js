@@ -160,8 +160,8 @@ export const usePayment = (book, formData, sellerDetails) => {
 
             // 3. Update seller's records - UPDATED with dynamic amount
             if (sellerDetails?.id) {
-                const sellerAmount = distribution.sellerAmount; // CHANGED: now uses calculated amount
-                const platformFee = distribution.platformFee; // CHANGED: now uses calculated fee
+                const sellerAmount = distribution.sellerAmount; 
+                const platformFee = distribution.platformFee; 
 
                 try {
                     // Update users collection (seller profile)
@@ -195,7 +195,6 @@ export const usePayment = (book, formData, sellerDetails) => {
                         console.log('✓ Seller user profile updated');
                     }
 
-                    // Update sellers collection (for withdrawals)
                     const sellersRef = doc(db, 'sellers', sellerDetails.id);
                     const sellerDoc = await getDoc(sellersRef);
 
@@ -209,18 +208,7 @@ export const usePayment = (book, formData, sellerDetails) => {
                         });
                         console.log('✓ Seller account balance updated');
                     } else {
-                        await setDoc(sellersRef, {
-                            sellerId: sellerDetails.id,
-                            sellerName: sellerDetails.name,
-                            sellerEmail: sellerDetails.email,
-                            accountBalance: sellerAmount,
-                            totalEarnings: sellerAmount,
-                            booksSold: 1,
-                            createdAt: serverTimestamp(),
-                            lastSaleDate: serverTimestamp(),
-                            updatedAt: serverTimestamp()
-                        });
-                        console.log('✓ New seller document created');
+                        console.log('ℹ️ No seller doc found — skipping seller wallet update');
                     }
 
                     console.log('✓ Seller credited:', {

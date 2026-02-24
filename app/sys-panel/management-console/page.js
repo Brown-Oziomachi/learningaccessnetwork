@@ -13,6 +13,142 @@ import {
 } from 'lucide-react';
 import { BookApprovalModal, ReplyModal, TransactionModal, UserModal } from '@/components/ApprovalModal';
 
+// ── Platform Fee Section Component ──────────────────────────────────────────
+function PlatformFeeSection({ user }) {
+  const [pendingFees, setPendingFees] = useState([]);
+  const [loadingFees, setLoadingFees] = useState(true);
+  const [payingOut, setPayingOut] = useState(false);
+  const [lastPayout, setLastPayout] = useState(null);
+
+  useEffect(() => {
+    loadPendingFees();
+    loadLastPayout();
+  }, []);
+
+  const loadPendingFees = async () => {
+    try {
+      setLoadingFees(true);
+      const { collection, query, where, getDocs } = await import('firebase/firestore');
+      const q = query(
+        collection(db, 'platformFees'),
+        where('disbursedToFlutterwave', '==', false)
+      );
+      const snap = await getDocs(q);
+      setPendingFees(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error('Error loading fees:', err);
+    } finally {
+      setLoadingFees(false);
+    }
+  };
+
+  const loadLastPayout = async () => {
+    try {
+      const { collection, query, orderBy, limit, getDocs } = await import('firebase/firestore');
+      const q = query(
+        collection(db, 'payoutLogs'),
+        orderBy('createdAt', 'desc'),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        setLastPayout({ id: snap.docs[0].id, ...snap.docs[0].data() });
+      }
+    } catch (err) {
+      console.error('Error loading last payout:', err);
+    }
+  };
+
+  const totalPending = pendingFees.reduce((sum, f) => sum + (f.fee || 0), 0);
+
+  const triggerPayout = async () => {
+    if (totalPending < 100) {
+      alert(`Not enough fees to disburse. Current pending: ₦${totalPending}. Minimum is ₦100.`);
+      return;
+    }
+
+    if (!confirm(`Disburse ₦${totalPending.toLocaleString()} from ${pendingFees.length} fees to your Flutterwave account?`)) return;
+
+    setPayingOut(true);
+    try {
+      const res = await fetch('https://YOUR_REGION-YOUR_PROJECT.cloudfunctions.net/manualFeePayout', {
+        headers: { 'x-admin-secret': process.env.NEXT_PUBLIC_ADMIN_SECRET || 'YOUR_ADMIN_SECRET' }
+      });
+      const data = await res.json();
+
+      if (data.message?.includes('success') || data.total > 0) {
+        alert(`✅ Payout Successful!\n\nAmount: ₦${data.total?.toLocaleString()}\nFees collected: ${data.feesCount}\nReference: ${data.reference}`);
+        await loadPendingFees();
+        await loadLastPayout();
+      } else {
+        alert(`ℹ️ ${data.message || 'No fees to disburse'}`);
+      }
+    } catch (err) {
+      console.error('Payout error:', err);
+      alert(`❌ Payout failed: ${err.message}`);
+    } finally {
+      setPayingOut(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Live fee stats */}
+      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+        {loadingFees ? (
+          <div className="flex items-center gap-2 text-gray-500">
+            <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full" />
+            Loading pending fees...
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">
+                <span className="font-bold text-gray-900">{pendingFees.length}</span> pending fees
+                totalling <span className="font-bold text-green-600">₦{totalPending.toLocaleString()}</span>
+              </p>
+              {lastPayout && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Last payout: ₦{lastPayout.totalAmount?.toLocaleString()} on{' '}
+                  {lastPayout.createdAt?.toDate?.().toLocaleDateString('en-NG', {
+                    day: '2-digit', month: 'short', year: 'numeric'
+                  })}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={loadPendingFees}
+              className="text-blue-600 hover:text-blue-800 p-1"
+              title="Refresh"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Payout button */}
+      <button
+        onClick={triggerPayout}
+        disabled={payingOut || loadingFees || totalPending < 100}
+        className="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-base hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {payingOut ? (
+          <><div className="animate-spin h-5 w-5 border-2 border-white/30 border-t-white rounded-full" /> Processing Payout...</>
+        ) : (
+          <><DollarSign className="w-5 h-5" /> Withdraw ₦{totalPending.toLocaleString()} Platform Fees to Flutterwave</>
+        )}
+      </button>
+
+      {totalPending < 100 && !loadingFees && (
+        <p className="text-xs text-center text-gray-400">
+          Minimum ₦100 required to disburse. Keep collecting fees!
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function ComprehensiveAdminPanel() {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -26,7 +162,7 @@ export default function ComprehensiveAdminPanel() {
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [withdrawals, setWithdrawals] = useState([]);
-  const [processingWithdrawal, setProcessingWithdrawal] = useState(false);
+  const [processingWithdrawalId, setProcessingWithdrawalId] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
@@ -364,11 +500,8 @@ const updateSchoolDocumentStatus = async (docId, status) => {
   //  FLUTTERWAVE TRANSFER FUNCTION
   const processFlutterwaveTransfer = async (withdrawal) => {
     try {
-      setProcessingWithdrawal(true);
-
       console.log(' Initiating transfer via API route...');
 
-      //  Call our Next.js API route instead of Flutterwave directly
       const response = await fetch('/api/flutterwave-transfer', {
         method: 'POST',
         headers: {
@@ -398,8 +531,6 @@ const updateSchoolDocumentStatus = async (docId, status) => {
         success: false,
         error: error.message || 'Failed to process transfer'
       };
-    } finally {
-      setProcessingWithdrawal(false);
     }
   };
 
@@ -446,7 +577,7 @@ Click OK to approve or Cancel to go back.
     }
 
     try {
-      setProcessingWithdrawal(true);
+      setProcessingWithdrawalId(true);
 
       console.log('🔄 Starting withdrawal approval process...');
       console.log('📋 Withdrawal details:', {
@@ -555,7 +686,7 @@ Click OK to approve or Cancel to go back.
       console.error('❌ Unexpected error:', error);
       alert(`❌ Failed to approve withdrawal\n\nError: ${error.message}\n\nPlease check the console for more details.`);
     } finally {
-      setProcessingWithdrawal(false);
+      setProcessingWithdrawalId(false);
     }
   };
 
@@ -620,7 +751,7 @@ const deleteFeedback = async (feedbackId) => {
     if (!confirm(`Reject withdrawal of ₦${amount.toLocaleString()}?`)) return;
 
     try {
-      setProcessingWithdrawal(true);
+      setProcessingWithdrawalId(true);
 
       await updateDoc(doc(db, 'withdrawals', withdrawalId), {
         status: 'rejected',
@@ -646,7 +777,7 @@ const deleteFeedback = async (feedbackId) => {
       console.error('Error rejecting withdrawal:', error);
       alert(` Failed to reject withdrawal: ${error.message}`);
     } finally {
-      setProcessingWithdrawal(false);
+      setProcessingWithdrawalId(false);
     }
   };
 
@@ -1330,6 +1461,44 @@ const deleteFeedback = async (feedbackId) => {
   </div>
 )}
 
+{activeSection === 'settings' && (
+  <div className="space-y-6">
+    <h2 className="text-2xl font-bold text-white">Settings</h2>
+
+    {/* Platform Fees Payout */}
+    <div className="bg-white rounded-lg shadow-sm p-6">
+      <div className="flex items-center gap-3 mb-2">
+        <DollarSign className="w-6 h-6 text-green-600" />
+        <h3 className="text-xl font-bold text-gray-900">Platform Fee Payouts</h3>
+      </div>
+      <p className="text-gray-500 text-sm mb-6">
+        Collect all accumulated ₦50 transfer fees and send them to your Flutterwave account.
+      </p>
+
+      {/* Fee Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <p className="text-green-600 text-xs font-semibold uppercase mb-1">Pending Fees</p>
+          <p className="text-2xl font-bold text-green-900" id="pendingFeesCount">—</p>
+          <p className="text-xs text-gray-500 mt-1">Not yet disbursed</p>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-blue-600 text-xs font-semibold uppercase mb-1">Total Amount</p>
+          <p className="text-2xl font-bold text-blue-900" id="pendingFeesAmount">—</p>
+          <p className="text-xs text-gray-500 mt-1">Ready to withdraw</p>
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <p className="text-gray-600 text-xs font-semibold uppercase mb-1">Fee Per Transfer</p>
+          <p className="text-2xl font-bold text-gray-900">₦50</p>
+          <p className="text-xs text-gray-500 mt-1">Fixed platform fee</p>
+        </div>
+      </div>
+
+      <PlatformFeeSection user={user} />
+    </div>
+  </div>
+        )}
+        
 {activeSection === 'feedbacks' && (
   <div className="space-y-6">
     <h2 className="text-2xl font-bold text-white">User Feedbacks</h2>
@@ -1507,10 +1676,10 @@ const deleteFeedback = async (feedbackId) => {
                       <div className="space-y-2">
                         <button
                           onClick={() => approveWithdrawal(withdrawal)}
-                          disabled={processingWithdrawal}
+                          disabled={processingWithdrawalId === withdrawal.id}
                           className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold transition-colors"
                         >
-                          {processingWithdrawal ? (
+                          {processingWithdrawalId === withdrawal.id ? (
                             <>
                               <div className="animate-spin h-5 w-5 border-b-2 border-white rounded-full"></div>
                               Processing...
@@ -1524,7 +1693,7 @@ const deleteFeedback = async (feedbackId) => {
                         </button>
                         <button
                           onClick={() => rejectWithdrawal(withdrawal.id, withdrawal.sellerId, withdrawal.amount)}
-                          disabled={processingWithdrawal}
+                          disabled={processingWithdrawalId === withdrawal.id}
                           className="w-full bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold transition-colors"
                         >
                           <X className="w-5 h-5" />

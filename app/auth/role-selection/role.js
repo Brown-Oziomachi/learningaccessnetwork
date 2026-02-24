@@ -13,7 +13,7 @@ export default function RoleSelectionClient() {
 
     // ✅ Capture ref and email from URL
     const emailParam = searchParams.get('email');
-    const refParam = searchParams.get('ref'); // referral code (UID of referrer)
+    const refParam = searchParams.get('referral_code'); // was 'ref'
 
     const [selectedRole, setSelectedRole] = useState('');
     const [showWaitlist, setShowWaitlist] = useState(false);
@@ -65,7 +65,7 @@ export default function RoleSelectionClient() {
         // ✅ Also pass ref in URL as backup
         const params = new URLSearchParams();
         if (emailParam) params.append('email', emailParam);
-        if (refParam) params.append('ref', refParam);
+        if (refParam) params.append('referral_code', refParam); // was 'ref'
 
         const query = params.toString();
         router.push(`/auth/create-account${query ? `?${query}` : ''}`);

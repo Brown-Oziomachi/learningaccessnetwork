@@ -31,8 +31,7 @@ export default function DOBClient() {
         }
 
         // ✅ Read ref from URL or sessionStorage
-        const ref = searchParams.get('ref') || sessionStorage.getItem('referredBy') || '';
-
+        const ref = searchParams.get('referral_code') || sessionStorage.getItem('referredBy') || '';
         const params = new URLSearchParams({
             ...formData,
             dateOfBirth,

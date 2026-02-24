@@ -190,6 +190,15 @@ export default function Footer() {
                   <span>Referral</span>
                 </Link>
               </li>
+               <li>
+                <Link
+                  href="/transfer"
+                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
+                >
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <span>Transfer </span>
+                </Link>
+              </li>
               <li>
                 <Link
                   href="/lan/net/help-center"

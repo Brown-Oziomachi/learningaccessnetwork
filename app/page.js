@@ -995,6 +995,11 @@ export default function LearningAccessNetwork() {
                 </div>
               </div>
             </div>
+            <a href="/learn/make-money" target="_blank"
+              className="px-10 py-4 bg-white text-blue-950 font-black rounded-lg hover:bg-gray-100 transition-all shadow-xl text-lg mx-auto"
+            >
+              Watch More Videos
+            </a>
           </div>
         </div>
       </section>

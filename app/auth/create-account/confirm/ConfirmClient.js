@@ -36,7 +36,7 @@ export default function ConfirmClient() {
         // ✅ Get referredBy from sessionStorage (saved in role-selection)
         // Also check URL as backup
         const refFromSession = sessionStorage.getItem('referredBy') || '';
-        const refFromUrl = searchParams.get('ref') || '';
+        const refFromUrl = searchParams.get('referral_code') || '';
         const ref = refFromSession || refFromUrl;
         setReferredBy(ref);
 
@@ -148,15 +148,15 @@ export default function ConfirmClient() {
 
                 {/* ✅ Show referral badge if user was referred */}
                 {referredBy && (
-                    <div className="mb-4 bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2">
+                    <div className="mb-4 bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2 mx-auto">
                         <span className="text-green-600 text-lg">🎉</span>
-                        <p className="text-sm text-green-800 font-medium">
-                            You were invited by a friend! You'll get a ₦100 bonus after your first purchase.
+                        <p className="text-sm text-green-800 font-medium ">
+                            You were invited by a friend!.
                         </p>
                     </div>
                 )}
 
-                <div className="bg-blue-50 border-2 border-blue-950 rounded-2xl p-6 mb-8">
+                <div className="bg-blue-950 border-2 border-blue-950 text-blue-50 rounded-2xl p-6 mb-8">
                     <div className="space-y-4">
                         <Link href={`/auth/create-account?${editParams.toString()}`}>
                             <button className="max-md:w-full lg:right-10 mt-2 mb-4 bg-white lg:w-1/4 border-2 border-blue-950 text-blue-950 py-3 rounded-full font-semibold hover:bg-blue-50 transition-colors">
@@ -165,29 +165,29 @@ export default function ConfirmClient() {
                         </Link>
 
                         <div>
-                            <label className="text-sm text-gray-600 font-medium">Account Type</label>
-                            <p className="text-lg text-gray-900 font-semibold capitalize">
+                            <label className="text-sm text-gray-200 font-medium uppercase">Account Type</label>
+                            <p className="text-lg font-semibold capitalize">
                                 {accountType === 'university' ? 'University/School' : userRole}
                             </p>
                         </div>
 
                         <div>
-                            <label className="text-sm text-gray-600 font-medium">Name</label>
-                            <p className="text-lg text-gray-900 font-semibold">
+                            <label className="text-sm font-medium uppercase">Name</label>
+                            <p className="text-lg font-semibold">
                                 {formData.firstName} {formData.surname}
                             </p>
                         </div>
 
                         <div>
-                            <label className="text-sm text-gray-600 font-medium">Date of Birth</label>
-                            <p className="text-lg text-gray-900 font-semibold">
+                            <label className="text-sm font-medium uppercase">Date of Birth</label>
+                            <p className="text-lg font-semibold">
                                 {formData.dateOfBirth || 'Not provided'}
                             </p>
                         </div>
 
                         <div>
-                            <label className="text-sm text-gray-600 font-medium">Email</label>
-                            <p className="text-lg text-gray-900 font-semibold">
+                            <label className="text-sm font-medium uppercase">Email</label>
+                            <p className="text-lg font-semibold">
                                 {formData.email}
                             </p>
                         </div>
@@ -196,9 +196,16 @@ export default function ConfirmClient() {
 
                 <p className="text-xs text-gray-600 mb-6 leading-relaxed">
                     By clicking Create Account, you agree to our{' '}
-                    <button className="text-blue-950 font-medium hover:underline">Terms</button>,{' '}
-                    <button className="text-blue-950 font-medium hover:underline">Privacy Policy</button> and{' '}
-                    <button className="text-blue-950 font-medium hover:underline">Cookies Policy</button>.
+                    <Link href="/lan/terms-of-service">
+                        <button className="text-blue-950 font-medium hover:underline">Terms</button>
+                    </Link>,{' '}
+                    <Link href="/lan/privacy-policy">
+                        <button className="text-blue-950 font-medium hover:underline">Privacy Policy</button>
+                    </Link>
+                    {/* and{' '}
+                    <Link href="/lan/cookies-policy">
+                        <button className="text-blue-950 font-medium hover:underline">Cookies Policy</button>
+                    </Link>. */}
                 </p>
 
                 <button
@@ -230,18 +237,14 @@ export default function ConfirmClient() {
                         </button>
 
                         <div className="relative bg-gradient-to-br from-blue-950 via-blue-800 to-blue-900 p-8 text-center overflow-hidden">
-                            <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
-                            <div className="absolute bottom-0 right-0 w-40 h-40 bg-white/10 rounded-full translate-x-1/2 translate-y-1/2"></div>
 
-                            <div className="relative mb-4">
+                            {/* <div className="relative mb-4">
                                 <div className="w-20 h-20 bg-white rounded-full mx-auto flex items-center justify-center shadow-lg animate-bounce">
                                     <CheckCircle size={48} className="text-green-600" strokeWidth={2.5} />
                                 </div>
                                 <Sparkles className="absolute top-0 right-1/3 text-yellow-300 animate-pulse" size={24} />
                                 <Sparkles className="absolute bottom-0 left-1/3 text-yellow-300 animate-pulse delay-150" size={20} />
-                            </div>
-
-                            <h2 className="text-3xl font-black text-white mb-2">Welcome Aboard! 🎉</h2>
+                            </div> */}
                             <p className="text-blue-100 text-sm">
                                 Your account has been created successfully
                             </p>

@@ -11,8 +11,10 @@ export default function CreateAccountNameClient() {
     const prefilledEmail = searchParams.get('email');
 
     // ✅ Get ref from URL OR sessionStorage (saved in role-selection)
-    const refFromUrl = searchParams.get('ref');
-
+    const refFromUrl = searchParams.get('referral_code');
+    if (refFromUrl) {
+        sessionStorage.setItem('referredBy', refFromUrl);
+    }
     const [formData, setFormData] = useState({
         firstName: '',
         surname: ''
@@ -47,8 +49,7 @@ export default function CreateAccountNameClient() {
         });
 
         if (prefilledEmail) params.append('email', prefilledEmail);
-        if (ref) params.append('ref', ref); // ✅ pass ref forward
-
+        if (ref) params.append('referral_code', ref); // ✅ pass ref forward
         router.push(`/auth/create-account/dob?${params.toString()}`);
     };
 

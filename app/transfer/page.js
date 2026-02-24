@@ -1,11 +1,10 @@
 import { Suspense } from "react";
-import ReferralClient from "./referral";
+import TransferClient from "./transfer";
 
 export const metadata = {
-    title: "Referral | LAN Library",
-    description: "Invite friends to join LAN Library and earn rewards! Share your unique referral link and enjoy exclusive benefits together."
-}
-export default function ReferralPage() {
+    title: "Transfer | LAN Library",
+    description: "Easily transfer your books to another account with our secure transfer service. Keep your library accessible and organized."}
+export default function TransferPage() {
     return (
         <Suspense
             fallback={
@@ -14,7 +13,7 @@ export default function ReferralPage() {
                 </div>
             }
         >
-            <ReferralClient />
+            <TransferClient />
         </Suspense>
     );
 }
