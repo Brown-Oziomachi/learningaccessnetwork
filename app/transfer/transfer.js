@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, Copy, Check, Loader2, CheckCircle2, AlertCircle, ArrowUpRight, Wallet, Search, Shield, Lock, Eye, EyeOff, X } from 'lucide-react';
+import { ArrowRight, Copy, Check, Loader2, CheckCircle2, AlertCircle, ArrowUpRight, Wallet, Search, Shield, Lock, Eye, EyeOff, X, ArrowDownLeft } from 'lucide-react';
 import Navbar from '@/components/NavBar';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -338,20 +338,40 @@ export default function TransferClient() {
     }, []);
 
     const loadRecentTransfers = async (uid) => {
-        try {
-            const q = query(
-                collection(db, 'transfers'),
-                where('senderId', '==', uid),
-                orderBy('createdAt', 'desc'),
-                limit(20)
-            );
-            const snap = await getDocs(q);
-            setRecentTransfers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (err) {
-            console.error('Recent transfers error:', err);
-        }
-    };
+    try {
+        const sentQ = query(
+            collection(db, 'transfers'),
+            where('senderId', '==', uid),
+            orderBy('createdAt', 'desc'),
+            limit(20)
+        );
+        const receivedQ = query(
+            collection(db, 'transfers'),
+            where('recipientId', '==', uid),
+            orderBy('createdAt', 'desc'),
+            limit(20)
+        );
 
+        const [sentSnap, receivedSnap] = await Promise.all([
+            getDocs(sentQ),
+            getDocs(receivedQ)
+        ]);
+
+        const sent = sentSnap.docs.map(d => ({ id: d.id, ...d.data(), type: 'sent' }));
+        const received = receivedSnap.docs.map(d => ({ id: d.id, ...d.data(), type: 'received' }));
+
+        const all = [...sent, ...received].sort((a, b) => {
+            const aTime = a.createdAt?.toMillis?.() || 0;
+            const bTime = b.createdAt?.toMillis?.() || 0;
+            return bTime - aTime;
+        });
+
+        setRecentTransfers(all.slice(0, 20));
+    } catch (err) {
+        console.error('Recent transfers error:', err);
+    }
+    };
+    
     // ── Save PIN to Firestore ──
     const handleSavePin = async (pin) => {
         await updateDoc(doc(db, 'sellers', seller.uid), {
@@ -596,21 +616,37 @@ export default function TransferClient() {
                             <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200">
                                 <h3 className="font-bold text-gray-900 text-sm mb-4">Recent Transfers</h3>
                                 <div className="space-y-3">
-                                    {(showAllTransfers ? recentTransfers : recentTransfers.slice(0, 5)).map(t => (
-                                        <button key={t.id} onClick={() => setSelectedTransfer(t)}
-                                            className="flex items-center gap-3 min-w-0 w-full text-left hover:bg-gray-50 rounded-xl p-1.5 -mx-1.5 transition-colors group">
-                                            <div className="w-8 h-8 bg-red-50 rounded-full flex items-center justify-center flex-shrink-0">
-                                                <ArrowUpRight size={14} className="text-red-500" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-950">{t.recipientName}</p>
-                                                <p className="text-xs text-gray-400 font-mono truncate">{formatAccountNumber(t.recipientAccountNumber)}</p>
-                                            </div>
-                                            <p className="text-xs font-bold text-red-500 flex-shrink-0">
-                                                -₦{(t.totalDeducted || t.amount + 50).toLocaleString()}
-                                            </p>
-                                        </button>
-                                    ))}
+                                    {(showAllTransfers ? recentTransfers : recentTransfers.slice(0, 5)).map(t => {
+                                        const isSent = t.type === 'sent';
+                                        return (
+                                            <button key={t.id} onClick={() => setSelectedTransfer(t)}
+                                                className="flex items-center gap-3 min-w-0 w-full text-left hover:bg-gray-50 rounded-xl p-1.5 -mx-1.5 transition-colors group">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isSent ? 'bg-red-50' : 'bg-green-50'}`}>
+                                                    {isSent
+                                                        ? <ArrowUpRight size={14} className="text-red-500" />
+                                                        : <ArrowDownLeft size={14} className="text-green-500" />
+                                                    }
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-950">
+                                                        {isSent ? t.recipientName : t.senderName}
+                                                    </p>
+                                                    <p className="text-xs text-gray-400 font-mono truncate">
+                                                        {isSent
+                                                            ? formatAccountNumber(t.recipientAccountNumber)
+                                                            : formatAccountNumber(t.senderAccountNumber)
+                                                        }
+                                                    </p>
+                                                </div>
+                                                <p className={`text-xs font-bold flex-shrink-0 ${isSent ? 'text-red-500' : 'text-green-600'}`}>
+                                                    {isSent
+                                                        ? `-₦${(t.totalDeducted || t.amount + 50).toLocaleString()}`
+                                                        : `+₦${t.amount.toLocaleString()}`
+                                                    }
+                                                </p>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                                 {recentTransfers.length > 5 && (
                                     <button onClick={() => setShowAllTransfers(p => !p)}

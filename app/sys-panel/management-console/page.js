@@ -1856,7 +1856,7 @@ const deleteFeedback = async (feedbackId) => {
               <button
                 onClick={() => {
                   const entered = document.getElementById('adminPinInput').value;
-                  const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PIN || '1234';
+                  const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PIN || '3533';
                   if (entered !== ADMIN_PIN) {
                     alert('❌ Incorrect PIN');
                     document.getElementById('adminPinInput').value = '';
