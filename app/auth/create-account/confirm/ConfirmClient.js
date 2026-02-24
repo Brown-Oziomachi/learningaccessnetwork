@@ -7,7 +7,7 @@ import { CheckCircle, Sparkles, ArrowRight, X } from 'lucide-react';
 import AuthLayout from '@/components/auth/AuthLayout';
 import { createUserAccount } from '@/lib/auth/authHelpers';
 import { db } from '@/lib/firebaseConfig';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 
 export default function ConfirmClient() {
     const router = useRouter();
@@ -52,51 +52,56 @@ export default function ConfirmClient() {
     const handleSubmit = async () => {
         setLoading(true);
 
-        // ✅ Pass referredBy into account creation so it gets saved to the user doc
         const accountData = {
             ...formData,
             role: userRole,
-            referredBy: referredBy || null, // ✅ saved to users/{uid}.referredBy in Firestore
+            referredBy: referredBy || null,
         };
 
         const result = await createUserAccount(accountData);
 
         if (result.success) {
-            const newUserUid = result.uid; // ✅ make sure createUserAccount returns uid
+            const newUserUid = result.uid;
 
-            // ✅ Create the referral doc in Firestore so referrer earns ₦500
+            // ✅ Resolve shortCode → real referrer UID before creating referral doc
             if (referredBy && referredBy !== newUserUid) {
                 try {
-                    await addDoc(collection(db, 'referrals'), {
-                        referrerId: referredBy,        // person who shared the link
-                        referredUserId: newUserUid,    // new user just created
-                        referredEmail: formData.email,
-                        referredName: `${formData.firstName} ${formData.surname}`,
-                        status: 'pending',             // becomes 'completed' after first purchase
-                        reward: 500,                   // ₦500 reward
-                        claimed: false,
-                        createdAt: serverTimestamp(),
-                    });
-                    console.log('✅ Referral record created for referrer:', referredBy);
+                    const { query, collection, where, getDocs } = await import('firebase/firestore');
+                    const q = query(
+                        collection(db, 'users'),
+                        where('referralCode', '==', referredBy)
+                    );
+                    const snap = await getDocs(q);
+
+                    if (!snap.empty) {
+                        const referrerId = snap.docs[0].id; // ✅ real UID of referrer
+
+                        await addDoc(collection(db, 'referrals'), {
+                            referrerId: referrerId,         // ✅ real UID, not shortCode
+                            referredUserId: newUserUid,
+                            referredEmail: formData.email,
+                            referredName: `${formData.firstName} ${formData.surname}`,
+                            status: 'pending',
+                            reward: 500,
+                            claimed: false,
+                            createdAt: serverTimestamp(),
+                        });
+                        console.log('✅ Referral created for referrer UID:', referrerId);
+                    } else {
+                        console.warn('⚠️ No user found with referralCode:', referredBy);
+                    }
                 } catch (err) {
-                    // Don't block signup if referral fails
                     console.error('Error creating referral:', err);
                 }
             }
 
-            // ✅ Clean up sessionStorage
             sessionStorage.removeItem('userRole');
             sessionStorage.removeItem('referredBy');
-
             setShowSuccessModal(true);
-
-            setTimeout(() => {
-                handleModalContinue();
-            }, 3000);
+            setTimeout(() => handleModalContinue(), 3000);
 
         } else {
             const error = result.error;
-
             switch (error.code) {
                 case 'auth/email-already-in-use':
                     alert('This email is already registered. Please sign in instead.');
@@ -111,7 +116,6 @@ export default function ConfirmClient() {
                 default:
                     alert(`Failed to create account: ${error.message}`);
             }
-
             setLoading(false);
         }
     };

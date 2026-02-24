@@ -52,6 +52,7 @@ export default function SellerAccountClient() {
     const [withdrawAmount, setWithdrawAmount] = useState("");
     const [withdrawing, setWithdrawing] = useState(false);
     const [withdrawalError, setWithdrawalError] = useState("");
+    const [seller, setSeller] = useState(null); // ✅ ADD THIS
     const router = useRouter();
     const [showBankModal, setShowBankModal] = useState(false);
     const [bankFormData, setBankFormData] = useState({
@@ -106,6 +107,7 @@ export default function SellerAccountClient() {
                     const sellerData = sellerDoc.data();
                     bankDetails = sellerData.bankDetails || null;
 
+                    setSeller({ uid, ...sellerData }); // ✅ ADD THIS
                     setAccountBalance(sellerData.accountBalance || 0);
                     setTotalEarnings(sellerData.totalEarnings || 0);
                     setBooksSold(sellerData.booksSold || 0);
@@ -465,6 +467,8 @@ export default function SellerAccountClient() {
         }
     };
 
+    const sellerName = user?.bankDetails?.accountName || user?.businessInfo?.businessName || 'Unknown Seller';
+
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 text-blue-950 flex items-center justify-center">
@@ -800,6 +804,22 @@ export default function SellerAccountClient() {
                             <div className="bg-white rounded-xl shadow-sm p-6">
                                 <h3 className="font-bold text-lg text-blue-950 mb-4">Bank Details</h3>
                                 <div className="space-y-2 text-sm">
+
+                                    {/* ✅ LAN Account Number */}
+                                    {seller?.accountNumber && (
+                                        <div className="flex justify-between items-center pb-3 mb-1 border-b border-gray-100">
+                                            <span className="text-gray-600">LAN Account Number:</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono font-semibold text-blue-950 tracking-wider">
+                                                    {(() => {
+                                                        const num = seller.accountNumber.replace('LAN', '');
+                                                        return `LAN-${num.slice(0, 3)}-${num.slice(3)}`;
+                                                    })()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="flex justify-between">
                                         <span className="text-gray-600">Account Name:</span>
                                         <span className="font-semibold text-blue-950">{user.bankDetails.accountName}</span>
@@ -815,9 +835,6 @@ export default function SellerAccountClient() {
                                 </div>
                             </div>
                         )}
-                    </div>
-                </div>
-            </div>
 
             {/* Profile Modal */}
             {showProfileModal && (
@@ -1431,6 +1448,9 @@ export default function SellerAccountClient() {
 
             {/* Bottom Padding for Mobile Nav */}
             <div className="h-20 lg:hidden"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

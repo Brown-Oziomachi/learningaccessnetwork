@@ -12,7 +12,7 @@ import {
     increment, orderBy, limit
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebaseConfig';
-import TransferReceipt from '@/components/Transferreceipt';
+import TransferReceipt, { TransferReceiptModal } from '@/components/Transferreceipt';
 
 export const generateAccountNumber = () => {
     const digits = Math.floor(1000000 + Math.random() * 9000000);
@@ -41,7 +41,9 @@ export default function TransferClient() {
     const [transferring, setTransferring] = useState(false);
     const [transferError, setTransferError] = useState('');
     const [recentTransfers, setRecentTransfers] = useState([]);
-
+    const [selectedTransfer, setSelectedTransfer] = useState(null);
+    const [showAllTransfers, setShowAllTransfers] = useState(false);
+    
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (!firebaseUser) { setLoading(false); return; }
@@ -74,7 +76,7 @@ export default function TransferClient() {
                 collection(db, 'transfers'),
                 where('senderId', '==', uid),
                 orderBy('createdAt', 'desc'),
-                limit(5)
+                limit(10)
             );
             const snap = await getDocs(q);
             const results = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -238,7 +240,7 @@ export default function TransferClient() {
         );
     }
 
-    const sellerName = seller.businessInfo?.businessName || seller.bankDetails?.accountName || 'Unknown Seller';
+    const sellerName = seller.bankDetails?.accountName || seller.businessInfo?.businessName || 'Unknown Seller';
 
     return (
         <div className="bg-gray-50 min-h-screen">
@@ -322,16 +324,17 @@ export default function TransferClient() {
 
                         {/* Recent Transfers — desktop */}
                         {recentTransfers.length > 0 && (
-                            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200">
-                                <h3 className="font-bold text-gray-900 text-sm mb-4">Recent Transfers</h3>
+                            <>
+                                <h3 className="font-bold text-gray-900 text-sm mb-4 mt-6 ">Recent Transfers</h3>
                                 <div className="space-y-3">
-                                    {recentTransfers.map(t => (
-                                        <div key={t.id} className="flex items-center gap-3 min-w-0">
+                                    {(showAllTransfers ? recentTransfers : recentTransfers.slice(0, 5)).map(t => (
+                                        <button key={t.id} onClick={() => setSelectedTransfer(t)}
+                                            className="flex items-center gap-3 min-w-0 w-full text-left hover:bg-gray-50 rounded-xl p-1.5 -mx-1.5 transition-colors group">
                                             <div className="w-8 h-8 bg-red-50 rounded-full flex items-center justify-center flex-shrink-0">
                                                 <ArrowUpRight size={14} className="text-red-500" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-semibold text-gray-900 truncate">{t.recipientName}</p>
+                                                <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-950">{t.recipientName}</p>
                                                 <p className="text-xs text-gray-400 font-mono truncate">
                                                     {formatAccountNumber(t.recipientAccountNumber)}
                                                 </p>
@@ -339,10 +342,20 @@ export default function TransferClient() {
                                             <p className="text-xs font-bold text-red-500 flex-shrink-0">
                                                 -₦{(t.totalDeducted || t.amount + 50).toLocaleString()}
                                             </p>
-                                        </div>
+                                        </button>
                                     ))}
                                 </div>
-                            </div>
+
+                                {/* View All / Show Less toggle */}
+                                {recentTransfers.length > 5 && (
+                                    <button
+                                        onClick={() => setShowAllTransfers(prev => !prev)}
+                                        className="mt-3 w-full text-xs font-semibold text-blue-950 hover:text-blue-700 py-2 border-t border-gray-100 transition-colors"
+                                    >
+                                        {showAllTransfers ? '↑ Show Less' : `View All (${recentTransfers.length})`}
+                                    </button>
+                                )}
+                            </>
                         )}
                     </div>
 
@@ -395,7 +408,7 @@ export default function TransferClient() {
                                                 <CheckCircle2 size={18} className="text-green-600 flex-shrink-0" />
                                                 <div className="min-w-0">
                                                     <p className="font-semibold text-green-900 truncate">
-                                                        {recipientInfo.businessInfo?.businessName || recipientInfo.bankDetails?.accountName || 'Unknown account'}
+                                                        {recipientInfo.bankDetails?.accountName || recipientInfo.businessInfo?.businessName || 'Unknown account'}
                                                     </p>
                                                     <p className="text-xs text-green-700 font-mono">
                                                         {formatAccountNumber(recipientInfo.accountNumber)}
@@ -573,16 +586,17 @@ export default function TransferClient() {
 
                         {/* Recent Transfers — mobile (below form) */}
                         {recentTransfers.length > 0 && (
-                            <div className="lg:hidden mt-4 bg-white rounded-2xl p-4 shadow-sm border border-gray-200">
-                                <h3 className="font-bold text-gray-900 text-sm mb-3">Recent Transfers</h3>
-                                <div className="space-y-3">
-                                    {recentTransfers.map(t => (
-                                        <div key={t.id} className="flex items-center gap-3 min-w-0">
+                            <>
+                                <h3 className="font-bold text-gray-900 text-sm mb-4 mt-6 lg:hidden">Recent Transfers</h3>
+                                <div className="space-y-3 lg:hidden">
+                                    {(showAllTransfers ? recentTransfers : recentTransfers.slice(0, 5)).map(t => (
+                                        <button key={t.id} onClick={() => setSelectedTransfer(t)}
+                                            className="flex items-center gap-3 min-w-0 w-full text-left hover:bg-gray-50 rounded-xl p-1.5 -mx-1.5 transition-colors group">
                                             <div className="w-8 h-8 bg-red-50 rounded-full flex items-center justify-center flex-shrink-0">
                                                 <ArrowUpRight size={14} className="text-red-500" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-semibold text-gray-900 truncate">{t.recipientName}</p>
+                                                <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-950">{t.recipientName}</p>
                                                 <p className="text-xs text-gray-400 font-mono truncate">
                                                     {formatAccountNumber(t.recipientAccountNumber)}
                                                 </p>
@@ -590,16 +604,32 @@ export default function TransferClient() {
                                             <p className="text-xs font-bold text-red-500 flex-shrink-0">
                                                 -₦{(t.totalDeducted || t.amount + 50).toLocaleString()}
                                             </p>
-                                        </div>
+                                        </button>
                                     ))}
                                 </div>
-                            </div>
+
+                                {/* View All / Show Less toggle */}
+                                {recentTransfers.length > 5 && (
+                                    <button
+                                        onClick={() => setShowAllTransfers(prev => !prev)}
+                                        className="mt-3 w-full text-xs font-semibold text-blue-950 hover:text-blue-700 py-2 border-t border-gray-100 transition-colors lg:hidden"
+                                    >
+                                        {showAllTransfers ? '↑ Show Less' : `View All (${recentTransfers.length})`}
+                                    </button>
+                                )}
+                            </>
                         )}
                     </div>
 
                 </div>
             </div>
-            <Footer />
+            {selectedTransfer && (
+                <TransferReceiptModal
+                    transfer={selectedTransfer}
+                    onClose={() => setSelectedTransfer(null)}
+                />
+            )}
+            {/* <Footer /> */}
         </div>
     );
 }

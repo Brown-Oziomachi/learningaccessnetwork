@@ -108,7 +108,7 @@ export default function SignInClient() {
                         {/* Main Image */}
                         <div className="relative mb-8">
                             <img
-                                src="/stu.png"
+                                src="/lan.png"
                                 alt="Student"
                                 className=" shadow-2xl w-full mt-20"
                             />
