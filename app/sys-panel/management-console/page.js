@@ -174,6 +174,8 @@ export default function ComprehensiveAdminPanel() {
   const [schoolApplications, setSchoolApplications] = useState([]);
   const [schoolDocuments, setSchoolDocuments] = useState([]);
   const [feedbacks, setFeedbacks] = useState([]);
+  const [showAdminPinModal, setShowAdminPinModal] = useState(false);
+  const [pendingWithdrawal, setPendingWithdrawal] = useState(null);
   const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
 
   useEffect(() => {
@@ -369,9 +371,25 @@ const updateSchoolDocumentStatus = async (docId, status) => {
   };
 
   const fetchTransactions = async () => {
-    const q = query(collection(db, 'transactions'), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const [txnSnap, transferSnap] = await Promise.all([
+      getDocs(query(collection(db, 'transactions'), orderBy('createdAt', 'desc'))),
+      getDocs(query(collection(db, 'transfers'), orderBy('createdAt', 'desc')))
+    ]);
+    const txns = txnSnap.docs.map(d => ({ id: d.id, ...d.data(), source: 'sale' }));
+    const transfers = transferSnap.docs.map(d => ({
+      id: d.id, ...d.data(),
+      source: 'transfer',
+      bookTitle: `Transfer → ${d.data().recipientName || 'Unknown'}`,
+      buyerEmail: d.data().senderName || d.data().senderId,
+      sellerName: d.data().recipientName,
+      amount: d.data().totalDeducted || d.data().amount,
+    }));
+    const all = [...txns, ...transfers].sort((a, b) => {
+      const aDate = a.createdAt?.toDate?.() || new Date(0);
+      const bDate = b.createdAt?.toDate?.() || new Date(0);
+      return bDate - aDate;
+    });
+    setTransactions(all);
   };
 
   const fetchUsers = async () => {
@@ -871,6 +889,7 @@ const deleteFeedback = async (feedbackId) => {
   const stats = {
     totalRevenue: transactions.reduce((sum, t) => sum + (t.amount || 0), 0),
     totalTransactions: transactions.length,
+    totalTransfers: transactions.filter(t => t.source === 'transfer').length,
     totalUsers: users.length,
     totalFeedbacks: feedbacks.length,
     totalBooks: advertisements.length,
@@ -938,7 +957,8 @@ const deleteFeedback = async (feedbackId) => {
             { id: 'settings', icon: Settings, label: 'Settings' }
 
           ].map(({ id, icon: Icon, label, badge }) => (
-            <button key={id} onClick={() => setActiveSection(id)} className={`p-4 rounded-lg transition-all ${activeSection === id ? 'bg-white text-blue-950 shadow-lg' : 'bg-blue-900 text-white hover:bg-blue-800'}`}>
+            <button key={id} onClick={() => { setActiveSection(id); setSearchTerm(''); }}
+              className={`p-4 rounded-lg transition-all ${activeSection === id ? 'bg-white text-blue-950 shadow-lg' : 'bg-blue-900 text-white hover:bg-blue-800'}`}>
               <Icon className="w-6 h-6 mx-auto mb-2" />
               <span className="text-sm font-semibold">{label}</span>
               {badge > 0 && <span className="block text-xs mt-1 bg-yellow-400 text-yellow-900 rounded-full px-2 py-0.5">{badge}</span>}
@@ -954,8 +974,7 @@ const deleteFeedback = async (feedbackId) => {
                 { label: 'Total Revenue', value: `₦${stats.totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'green' },
                 { label: 'Total Users', value: stats.totalUsers, icon: Users, color: 'blue' },
                 { label: 'Total Books', value: stats.totalBooks, icon: BookOpen, color: 'purple' },
-                { label: 'Transactions', value: stats.totalTransactions, icon: TrendingUp, color: 'orange' }
-              ].map(({ label, value, icon: Icon, color }) => (
+                { label: 'Transactions', value: `${stats.totalTransactions} total`, icon: TrendingUp, color: 'orange' }              ].map(({ label, value, icon: Icon, color }) => (
                 <div key={label} className="bg-white rounded-lg shadow-sm p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -978,7 +997,8 @@ const deleteFeedback = async (feedbackId) => {
                 <div key={section} className={`bg-${bg} border border-${border} rounded-lg p-6`}>
                   <h3 className={`font-bold text-${color}-900 mb-2`}>{title}</h3>
                   <p className={`text-3xl font-bold text-${color}-600 mb-4`}>{count}</p>
-                  <button onClick={() => setActiveSection(section)} className={`text-${color}-800 hover:underline text-sm flex items-center gap-1`}>
+                  <button onClick={() => { setActiveSection(section); setSearchTerm(''); }}
+                    className={`text-${color}-800 hover:underline text-sm flex items-center gap-1`}>
                     View All <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -1094,8 +1114,15 @@ const deleteFeedback = async (feedbackId) => {
 
         {activeSection === 'users' && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">All Users</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white">All Users <span className="text-blue-300 text-lg">({users.length})</span></h2>
+            </div>
             <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
+              <div className="bg-white rounded-lg shadow-sm p-4">
+                <input type="text" placeholder="Search users by name, email or role..."
+                  value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-blue-950" />
+              </div>
               <table className="w-full">
                 <thead className="bg-blue-950 text-white border-b">
                   <tr>
@@ -1105,7 +1132,11 @@ const deleteFeedback = async (feedbackId) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {users.map((u) => (
+                  {users.filter(u =>
+                    u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    u.role?.toLowerCase().includes(searchTerm.toLowerCase())
+                  ).map((u) => (
                     <tr key={u.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm text-gray-900">{u.displayName || 'N/A'}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{u.email}</td>
@@ -1128,9 +1159,17 @@ const deleteFeedback = async (feedbackId) => {
         {activeSection === 'support' && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-white">Support Tickets</h2>
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <input type="text" placeholder="Search tickets..."
+                value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-blue-950" />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {supportTickets.map((ticket) => (
-                <div key={ticket.id} className="bg-white rounded-lg shadow-sm p-6">
+              {supportTickets.filter(t =>
+                t.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                t.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                t.name?.toLowerCase().includes(searchTerm.toLowerCase())
+              ).map((ticket) => (                <div key={ticket.id} className="bg-white rounded-lg shadow-sm p-6">
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <h3 className="font-bold text-gray-900">{ticket.subject || 'No Subject'}</h3>
@@ -1551,7 +1590,11 @@ const deleteFeedback = async (feedbackId) => {
         {activeSection === 'withdrawals' && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-white">Withdrawal Requests</h2>
-
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <input type="text" placeholder="Search by seller name, email or reference..."
+                value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-blue-950" />
+            </div>
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
@@ -1603,8 +1646,12 @@ const deleteFeedback = async (feedbackId) => {
                   <p className="text-gray-600">Withdrawal requests from sellers will appear here</p>
                 </div>
               ) : (
-                withdrawals.map((withdrawal) => (
-                  <div key={withdrawal.id} className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-yellow-500">
+                withdrawals.filter(w =>
+                  w.sellerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  w.sellerEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  w.reference?.toLowerCase().includes(searchTerm.toLowerCase())
+                ).map((withdrawal) => (
+                      <div key={withdrawal.id} className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-yellow-500">
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h3 className="font-bold text-gray-900 text-lg">{withdrawal.sellerName}</h3>
@@ -1675,8 +1722,7 @@ const deleteFeedback = async (feedbackId) => {
                     {withdrawal.status === 'pending' && (
                       <div className="space-y-2">
                         <button
-                          onClick={() => approveWithdrawal(withdrawal)}
-                          disabled={processingWithdrawalId === withdrawal.id}
+                          onClick={() => { setPendingWithdrawal(withdrawal); setShowAdminPinModal(true); }}                          disabled={processingWithdrawalId === withdrawal.id}
                           className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold transition-colors"
                         >
                           {processingWithdrawalId === withdrawal.id ? (
@@ -1784,7 +1830,57 @@ const deleteFeedback = async (feedbackId) => {
   getStatusColor={getStatusColor}
   onUpdateStatus={updateUserStatus}
   onDelete={deleteUserAccount}
-/>
+      />
+      
+      {showAdminPinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="bg-blue-950 px-6 py-6 text-center">
+              <div className="w-12 h-12 bg-blue-800 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-blue-700">
+                <Lock className="w-6 h-6 text-blue-200" />
+              </div>
+              <h3 className="text-white font-bold text-lg">Admin Authorization</h3>
+              <p className="text-blue-300 text-xs mt-1">Enter PIN to approve ₦{pendingWithdrawal?.amount?.toLocaleString()}</p>
+              <p className="text-blue-200 text-xs mt-1">To: {pendingWithdrawal?.sellerName}</p>
+            </div>
+            <div className="p-6">
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="Enter Admin PIN"
+                autoFocus
+                id="adminPinInput"
+                className="w-full text-center text-2xl font-bold tracking-widest border-2 border-gray-200 rounded-2xl px-4 py-4 focus:border-blue-950 focus:outline-none text-blue-950"
+              />
+              <button
+                onClick={() => {
+                  const entered = document.getElementById('adminPinInput').value;
+                  const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PIN || '1234';
+                  if (entered !== ADMIN_PIN) {
+                    alert('❌ Incorrect PIN');
+                    document.getElementById('adminPinInput').value = '';
+                    return;
+                  }
+                  setShowAdminPinModal(false);
+                  approveWithdrawal(pendingWithdrawal);
+                  setPendingWithdrawal(null);
+                }}
+                className="w-full mt-4 py-4 bg-green-600 text-white rounded-2xl font-bold text-base hover:bg-green-700 transition-all"
+              >
+                Confirm Approval
+              </button>
+              <button
+                onClick={() => { setShowAdminPinModal(false); setPendingWithdrawal(null); }}
+                className="w-full mt-3 py-3 text-gray-400 text-sm hover:text-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+     
     </div>
   );
 }

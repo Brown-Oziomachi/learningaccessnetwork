@@ -23,6 +23,8 @@ export default function FindAccountClient() {
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [searchingLive, setSearchingLive] = useState(false);
+    const [showSuspendedModal, setShowSuspendedModal] = useState(false);
+    const [showPendingModal, setShowPendingModal] = useState(false);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -114,14 +116,14 @@ export default function FindAccountClient() {
         const accountStatus = user.accountStatus || 'active';
 
         if (accountStatus === 'suspended') {
-            setError('This account has been suspended. Please contact support at support@lanlibrary.com');
             setShowSuggestions(false);
+            setShowSuspendedModal(true);
             return;
         }
 
         if (accountStatus === 'pending') {
-            setError('This account is under review. Please contact support at support@lanlibrary.com');
             setShowSuggestions(false);
+            setShowPendingModal(true);
             return;
         }
 
@@ -222,20 +224,18 @@ export default function FindAccountClient() {
                 });
             }
 
-            if (results.length === 0) {
-                setShowAccountNotFoundModal(true);
-            } else if (results.length === 1) {
+            if (results.length === 1) {
                 const user = results[0];
                 const accountStatus = user.accountStatus || 'active';
 
                 if (accountStatus === 'suspended') {
-                    setError('This account has been suspended. Please contact support at support@lanlibrary.com');
+                    setShowSuspendedModal(true);
                     setLoading(false);
                     return;
                 }
 
                 if (accountStatus === 'pending') {
-                    setError('This account is under review. Please contact support at support@lanlibrary.com');
+                    setShowPendingModal(true);
                     setLoading(false);
                     return;
                 }
@@ -338,10 +338,9 @@ export default function FindAccountClient() {
                                                 <button
                                                     key={index}
                                                     onClick={() => handleSelectSuggestion(user)}
-                                                    disabled={isBlocked}
                                                     className={`w-full flex items-center gap-4 p-4 transition border-b last:border-b-0 text-left ${isBlocked
-                                                            ? 'opacity-50 cursor-not-allowed bg-gray-50'
-                                                            : 'hover:bg-blue-50'
+                                                        ? 'bg-red-50 hover:bg-red-100'
+                                                        : 'hover:bg-blue-50'
                                                         }`}
                                                 >
                                                     {/* Profile Image */}
@@ -549,6 +548,112 @@ export default function FindAccountClient() {
                     </motion.div>
                 </div>
             )}
+            {/* Suspended Account Modal */}
+            {showSuspendedModal && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden"
+                    >
+                        {/* Red Header */}
+                        <div className="bg-red-600 px-6 py-8 text-center">
+                            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <AlertCircle className="w-9 h-9 text-white" />
+                            </div>
+                            <h3 className="text-2xl font-black text-white mb-1">Account Suspended</h3>
+                            <p className="text-red-100 text-sm">Your access has been restricted</p>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-6">
+                            <p className="text-gray-700 text-center mb-4 leading-relaxed">
+                                This account has been <span className="font-bold text-red-600">suspended</span> due to a violation of our Terms of Service or Community Guidelines.
+                            </p>
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+                                <p className="text-sm text-red-800 font-semibold mb-1">What this means:</p>
+                                <ul className="text-sm text-red-700 space-y-1 list-disc list-inside">
+                                    <li>You cannot log in to this account</li>
+                                    <li>Your listings are not visible to others</li>
+                                    <li>Pending transactions may be on hold</li>
+                                </ul>
+                            </div>
+                            <p className="text-sm text-gray-600 text-center mb-6">
+                                If you believe this is a mistake, please contact our support team.
+                            </p>
+                    <div className="flex flex-col gap-3">
+                        <a
+                            href="mailto:support@lanlibrary.com"
+                            className="w-full bg-red-600 text-white font-bold py-3 rounded-xl text-center hover:bg-red-700 transition-colors"
+                        >
+                            Contact Support
+                        </a>
+                        <button
+                            onClick={() => setShowSuspendedModal(false)}
+                            className="w-full border-2 border-gray-200 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors"
+                        >
+                            Go Back
+                        </button>
+                    </div>
+                </div>
+        </motion.div>
+    </div >
+)
+}
+
+{/* Pending Account Modal */ }
+{
+    showPendingModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden"
+            >
+                {/* Yellow Header */}
+                <div className="bg-yellow-500 px-6 py-8 text-center">
+                    <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <AlertCircle className="w-9 h-9 text-white" />
+                    </div>
+                    <h3 className="text-2xl font-black text-white mb-1">Account Under Review</h3>
+                    <p className="text-yellow-100 text-sm">We're verifying your account</p>
+                </div>
+
+                {/* Body */}
+                <div className="p-6">
+                    <p className="text-gray-700 text-center mb-4 leading-relaxed">
+                        Your account is currently <span className="font-bold text-yellow-600">under review</span>. This usually takes 24–48 hours.
+                    </p>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+                        <p className="text-sm text-yellow-800 font-semibold mb-1">While under review:</p>
+                        <ul className="text-sm text-yellow-700 space-y-1 list-disc list-inside">
+                            <li>You cannot log in yet</li>
+                            <li>We may contact you for more information</li>
+                            <li>You'll be notified once approved</li>
+                        </ul>
+                    </div>
+                    <p className="text-sm text-gray-600 text-center mb-6">
+                        Need help? Reach out to our support team.
+                    </p>
+                <div className="flex flex-col gap-3">
+                    <a
+                        href="mailto:support@lanlibrary.com"
+                        className="w-full bg-yellow-500 text-white font-bold py-3 rounded-xl text-center hover:bg-yellow-600 transition-colors"
+                    >
+                        Contact Support
+                    </a>
+                    <button
+                        onClick={() => setShowPendingModal(false)}
+                        className="w-full border-2 border-gray-200 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                        Go Back
+                    </button>
+                </div>
+        </div>
+        </motion.div >
+    </div >
+)
+}
         </div>
     );
 }

@@ -47,46 +47,65 @@ export default function SignInClient() {
         setError(null);
         setSuccessMessage(null);
 
-        const result = await handleEmailPasswordSignIn(
-            loginData.email.toLowerCase().trim(),
-            loginData.password
-        );
+        try {
+            // ✅ STEP 1: Check account status in Firestore BEFORE attempting login
+            const { collection, query, where, getDocs } = await import('firebase/firestore');
+            const { db } = await import('@/lib/firebaseConfig');
 
-        if (result.success) {
-            // Successful login
-        } else {
-            const errorCode = result.error?.code || result.error?.errorCode || '';
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, where('email', '==', loginData.email.toLowerCase().trim()));
+            const snap = await getDocs(q);
 
-            switch (errorCode) {
-                case 'auth/account-suspended':
-                    setError('Your account has been suspended. Please contact support at support@lanlibrary.com for assistance.');
-                    break;
-                case 'auth/account-pending':
-                    setError('Your account is under review. Please contact support at support@lanlibrary.com for assistance.');
-                    break;
-                case 'auth/invalid-credential':
-                case 'auth/wrong-password':
-                case 'auth/user-not-found':
-                    setError('Incorrect email or password. Please try again.');
-                    break;
-                case 'auth/invalid-email':
-                    setError('Invalid email address format.');
-                    break;
-                case 'auth/too-many-requests':
-                    setError('Too many failed login attempts. Please try again later or reset your password.');
-                    break;
-                case 'auth/user-disabled':
-                    setError('This account has been disabled. Please contact support.');
-                    break;
-                default:
-                    if (result.error?.message?.includes('suspended')) {
-                        setError('Your account has been suspended. Please contact support for assistance.');
-                    } else if (result.error?.message?.includes('under review')) {
-                        setError('Your account is under review. Please wait for approval or contact support.');
-                    } else {
-                        setError(result.error?.message || 'Failed to sign in. Please try again later.');
-                    }
+            if (!snap.empty) {
+                const userData = snap.docs[0].data();
+                const accountStatus = userData.accountStatus || 'active';
+
+                if (accountStatus === 'suspended') {
+                    setError('suspended');
+                    setLoading(false);
+                    return;
+                }
+
+                if (accountStatus === 'pending') {
+                    setError('pending');
+                    setLoading(false);
+                    return;
+                }
             }
+
+            // ✅ STEP 2: Only proceed with Firebase Auth if account is active
+            const result = await handleEmailPasswordSignIn(
+                loginData.email.toLowerCase().trim(),
+                loginData.password
+            );
+
+            if (result.success) {
+                // Successful login — auth hook handles redirect
+            } else {
+                const errorCode = result.error?.code || result.error?.errorCode || '';
+                switch (errorCode) {
+                    case 'auth/invalid-credential':
+                    case 'auth/wrong-password':
+                    case 'auth/user-not-found':
+                        setError('Incorrect email or password. Please try again.');
+                        break;
+                    case 'auth/invalid-email':
+                        setError('Invalid email address format.');
+                        break;
+                    case 'auth/too-many-requests':
+                        setError('Too many failed login attempts. Please try again later or reset your password.');
+                        break;
+                    case 'auth/user-disabled':
+                        setError('This account has been disabled. Please contact support.');
+                        break;
+                    default:
+                        setError(result.error?.message || 'Failed to sign in. Please try again later.');
+                }
+                setLoading(false);
+            }
+        } catch (err) {
+            console.error('Login error:', err);
+            setError('Something went wrong. Please try again.');
             setLoading(false);
         }
     };
@@ -128,7 +147,7 @@ export default function SignInClient() {
                                         </div>
                                     </div>
                                 </div>
-                            </div>                           
+                            </div>
                         </div>
 
                         {/* Stats */}
@@ -189,20 +208,52 @@ export default function SignInClient() {
                     )}
 
                     {/* Error Message */}
-                    {error && (
-                        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                            <div>
-                                <p className="text-red-800 text-sm">Failed to login. Please check your Network connection</p>
-                                {(error.includes('suspended') || error.includes('pending') || error.includes('under review')) && (
-                                    <Link href="/lan/customer-care" className="text-red-600 hover:underline text-sm font-semibold mt-2 inline-block">
-                                        Contact Support →
-                                    </Link>
-                                )}
+                    {error === 'suspended' && (
+                        <div className="mb-6 bg-red-600 rounded-2xl overflow-hidden shadow-lg">
+                            <div className="px-5 py-4 text-center">
+                                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <AlertCircle className="w-7 h-7 text-white" />
+                                </div>
+                                <p className="text-white font-black text-lg mb-1">Account Suspended</p>
+                                <p className="text-red-100 text-sm mb-4">
+                                    This account has been suspended due to a violation of our Terms of Service. You cannot log in.
+                                </p>
+                                <a
+                                    href="mailto:support@lanlibrary.com"
+                                    className="inline-block bg-white text-red-600 font-bold px-6 py-2 rounded-full text-sm hover:bg-red-50 transition-colors"
+                                >
+                                    Contact Support
+                                </a>
                             </div>
                         </div>
                     )}
 
+                    {error === 'pending' && (
+                        <div className="mb-6 bg-yellow-500 rounded-2xl overflow-hidden shadow-lg">
+                            <div className="px-5 py-4 text-center">
+                                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <AlertCircle className="w-7 h-7 text-white" />
+                                </div>
+                                <p className="text-white font-black text-lg mb-1">Account Under Review</p>
+                                <p className="text-yellow-100 text-sm mb-4">
+                                    Your account is currently under review. You'll be notified once approved.
+                                </p>
+                                <a
+                                    href="mailto:support@lanlibrary.com"
+                                    className="inline-block bg-white text-yellow-600 font-bold px-6 py-2 rounded-full text-sm hover:bg-yellow-50 transition-colors"
+                                >
+                                    Contact Support
+                                </a>
+                            </div>
+                        </div>
+                    )}
+
+                    {error && error !== 'suspended' && error !== 'pending' && (
+                        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                            <p className="text-red-800 text-sm">{error}</p>
+                        </div>
+                    )}
                     {/* Google Sign In */}
                     <div className="mb-8">
                         <GoogleSignInButton />
