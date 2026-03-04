@@ -149,32 +149,24 @@ export default function SignInClient() {
                                 </div>
                             </div>
                         </div>
-
-                        {/* Stats */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white rounded-xl p-4 shadow-lg">
-                                <TrendingUp className="w-8 h-8 text-blue-950 mb-2" />
-                                <div className="text-2xl font-black text-gray-900">85%</div>
-                                <div className="text-sm text-gray-600">Revenue Share</div>
-                            </div>
-                            <div className="bg-white rounded-xl p-4 shadow-lg">
-                                <Users className="w-8 h-8 text-blue-950 mb-2" />
-                                <div className="text-2xl font-black text-gray-900">500+</div>
-                                <div className="text-sm text-gray-600">Active Sellers</div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
                 {/* Logo */}
-                <div className="absolute top-8 left-8">
-                    <div className="flex items-center gap-2 text-blue-950 bg-white px-10 py-3 rounded-xl">
-                        <div className=" rounded-lg font-black text-xl">
-                            [LAN]
-                        </div>
-                        <div>
-                            <div className="font-bold text-blue-950">Library</div>
-                        </div>
+                <div className="absolute top-0 left-8">
+                    <div className="flex items-center gap-2 text-blue-950 px-10 py-3 rounded-xl">
+                        <h1
+              className="text-4xl max-md:text-2xl lg:text-6xl font-bold text-gray-50"
+              style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
+            >
+              [LAN Library]
+              <p
+                className="text-xs sm:text-base font-light"
+                style={{ fontFamily: "'Lato', sans-serif" }}
+              >
+                The Global Student Library 📚
+              </p>
+            </h1>
                     </div>
                 </div>
             </div>
@@ -183,12 +175,24 @@ export default function SignInClient() {
             <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
                 <div className="w-full max-w-md">
                     {/* Mobile Logo */}
-                    <div className="lg:hidden mb-8 text-center bg-white">
+                    <div className="lg:hidden mb-8 text-center">
                         <div className="inline-flex items-center gap-2">
-                            <div className="bg-blue-950 text-white px-4 py-2 rounded-lg font-black text-xl">
-                                [LAN]
-                            </div>
-                            <span className="font-bold text-gray-900">Library</span>
+                           <div className="mx-auto">
+                    <div className="flex items-center gap-2 text-blue-950 px-10 py-3 rounded-xl ">
+                        <h1
+              className="text-3xl sm:text-6xl font-bold text-blue-950 text-center"
+              style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
+            >
+              [LAN Library]
+              <h2
+                className="text-xs sm:text-base font-light"
+                style={{ fontFamily: "'Lato', sans-serif" }}
+              >
+                The Global Student Library 📚
+              </h2>
+            </h1>
+                    </div>
+                </div>
                         </div>
                     </div>
 
@@ -251,7 +255,7 @@ export default function SignInClient() {
                     {error && error !== 'suspended' && error !== 'pending' && (
                         <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
                             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                            <p className="text-red-800 text-sm">{error}</p>
+                            <p className="text-red-800 text-sm">No network connection. Please try again</p>
                         </div>
                     )}
                     {/* Google Sign In */}

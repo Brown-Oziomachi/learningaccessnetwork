@@ -1353,7 +1353,7 @@ const submitFeedback = async () => {
             onClick={() => setShowSummary(false)}
           />
           <div className="fixed inset-y-0 right-0 w-96 lg:w-200 bg-white shadow-2xl z-50 overflow-y-auto">
-            <div className="p-6">
+            <div className="p-9">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold mb-2 text-gray-900">
                   {book.title}

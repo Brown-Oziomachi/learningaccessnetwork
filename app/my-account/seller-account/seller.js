@@ -1409,7 +1409,7 @@ export default function SellerAccountClient() {
             )}
 
             {/* Bottom Navigation - Mobile Only */}
-            <div className="fixed bottom-0 left-0 right-0 bg-blue-950 border-t border-blue-800 lg:hidden">
+            <div className="fixed -bottom-7  left-0 right-0 bg-blue-950 border-t border-blue-800 lg:hidden">
                 <div className="flex justify-around items-center py-3 px-2">
                     <Link href="/home">
                         <button className="flex flex-col items-center gap-1">

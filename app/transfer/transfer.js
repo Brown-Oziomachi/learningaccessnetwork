@@ -11,6 +11,8 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebaseConfig';
 import TransferReceipt, { TransferReceiptModal } from '@/components/Transferreceipt';
+import Link from 'next/link';
+import { Smartphone } from 'lucide-react';
 
 export const generateAccountNumber = () => {
     const digits = Math.floor(1000000 + Math.random() * 9000000);
@@ -557,11 +559,23 @@ export default function TransferClient() {
             <div className="max-w-5xl mx-auto px-4 py-6 md:py-12">
 
                 {/* Page Header */}
-                <div className="mb-6">
-                    <h1 className="text-2xl md:text-4xl font-bold text-blue-900 mb-1">LAN Wallet Transfer</h1>
-                    <p className="text-sm md:text-base text-gray-600">Send money instantly to any seller on LAN</p>
+                {/* Page Header */}
+                <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl md:text-4xl font-bold text-blue-900 mb-1">LAN Wallet Transfer</h1>
+                        <p className="text-sm md:text-base text-gray-600">Send money instantly to any seller on LAN</p>
+                    </div>
+                    <Link href="/recharge"
+                        className="flex items-center gap-2 bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm hover:shadow-md hover:border-blue-200 transition-all group flex-shrink-0">
+                        <div className="w-9 h-9 bg-blue-950 rounded-xl flex items-center justify-center group-hover:bg-blue-800 transition-colors">
+                            <Smartphone size={18} className="text-white" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-gray-900 leading-tight">Buy Airtime & Data</p>
+                            <p className="text-xs text-gray-400">Top up any network</p>
+                        </div>
+                    </Link>
                 </div>
-
                 {/* Mobile account banner */}
                 <div className="lg:hidden mb-4">
                     <div className="bg-blue-950 text-white rounded-2xl p-4">

@@ -36,20 +36,20 @@ export default function LearningAccessNetwork() {
 
   // Student activity images - showing students using LAN Library
   const studentActivityImages = [
-    'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&q=80', // Students studying together with laptops
-    'https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=1200&q=80', // Student reading on tablet
+    // 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&q=80', // Students studying together with laptops
+    // 'https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=1200&q=80', // Student reading on tablet
     'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&q=80', // Student with laptop and books
-    'https://images.unsplash.com/photo-1516321497487-e288fb19713f?w=1200&q=80', // Happy student with digital device
-    'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=1200&q=80', // Student browsing online
+    // 'https://images.unsplash.com/photo-1516321497487-e288fb19713f?w=1200&q=80', // Happy student with digital device
+    // 'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=1200&q=80', // Student browsing online
   ];
 
   // Seller activity images - showing sellers earning and uploading
   const sellerActivityImages = [
-    'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&q=80', // Person working on laptop happily
-    'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1200&q=80', // Woman celebrating success
+    // 'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&q=80', // Person working on laptop happily
+    // 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1200&q=80', // Woman celebrating success
     'https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=1200&q=80', // Professional uploading content
-    'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1200&q=80', // Person earning money online
-    'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=1200&q=80', // Author working on content
+    // 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1200&q=80', // Person earning money online
+    // 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=1200&q=80', // Author working on content
   ];
 
   const stats = [
@@ -207,7 +207,7 @@ export default function LearningAccessNetwork() {
         </h1>
         <div>
           <h2 className="bg-blue-950 text-white text-xs md:text-xl font-semibold mt-3 text-center px-5 py-1 rounded">
-            Learning Access Network
+          The Global Student Library 📚         
           </h2>
         </div>
         <div className="py-5">
@@ -382,36 +382,27 @@ export default function LearningAccessNetwork() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-blue-950 border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-white text-blue-950 px-2 py-2 rounded-full font-black text-xl">
-               [ LAN
-              </div>
-              <span className="font-bold text-white text-lg hidden md:block">Library]</span>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigateToSignIn()}
-                className="text-white hover:text-blue-200 font-semibold hidden md:block"
+      <header className="border-b border-gray-800 sticky top-0 z-50 bg-blue-950 backdrop-blur">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+            <h1
+              className="text-4xl sm:text-6xl font-bold text-gray-50"
+              style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
+            >
+              [LAN Library]
+              <h2
+                className="text-xs sm:text-base font-light"
+                style={{ fontFamily: "'Lato', sans-serif" }}
               >
-                Browse Books
-              </button>
-              <button
-                onClick={() => navigateToSignIn('seller')}
-                className="px-6 py-2.5 text-blue-950 bg-white font-bold rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                Start Selling
-              </button>
-            </div>
-          </div>
+                The Global Student Library 📚
+              </h2>
+            </h1>
+          </Link>
         </div>
       </header>
 
       {/* Hero Section - Mobile: Text on Image */}
-      <section className="relative lg:hidden h-[600px] overflow-hidden">
+      <section className="relative lg:hidden h-[600px] overflow-hidden mb-10">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentImageIndex}
@@ -430,20 +421,25 @@ export default function LearningAccessNetwork() {
           </motion.div>
         </AnimatePresence>
 
-        <div className="relative z-10 h-full flex flex-col justify-end p-6 pb-12">
-          <h1 className="text-4xl font-black text-white mb-4 leading-tight">
+        <div className="relative z-10 h-full flex flex-col justify-end p-6 pb-12 mt-5">
+          <h1 className="text-4xl font-black text-white mb-4 leading-tight ">
             The Global Student Library 📚
           </h1>
+            <h1 className="text-xl text-yellow-300 mb-1 font-bold">
+                  Share the wealth [of knowledge].
+                  </h1>
+                <p className="text-lg mb-4 leading-relaxed font-bold">Turn your books into income. Upload your work, reach a global audience [90M+], and earn whenever readers discover and purchase your content.
+                </p>
           <p className="text-white text-lg mb-6 leading-relaxed">
             A secure marketplace where <span className="font-bold text-yellow-300">students and authors sell original works</span> and <span className="font-bold text-yellow-300">learners access course-specific knowledge</span> they need to excel.
           </p>
           <div className="flex flex-col gap-3">
-            <button
-              onClick={() => navigateToSignIn()}
-              className="bg-white text-blue-950 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
+
+            <a href="/auth/signin" target="_blank"
+              className="bg-white text-center text-blue-950 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
             >
               Browse Books
-            </button>
+            </a>
             <button
               onClick={() => setShowWhatIsLanModal(true)}
               className="text-white font-bold underline"
@@ -455,7 +451,7 @@ export default function LearningAccessNetwork() {
       </section>
 
       {/* Hero Section - Desktop: Text Beside Image */}
-      <section className="hidden lg:block relative h-[800px] overflow-hidden">
+      <section className="hidden lg:block relative h-[800px] overflow-hidden ">
         {/* Image Carousel Background - Full Width */}
         <AnimatePresence mode="wait">
           <motion.div
@@ -477,37 +473,37 @@ export default function LearningAccessNetwork() {
         </AnimatePresence>
 
         {/* Content Overlay */}
-        <div className="relative z-10 h-full flex items-center">
-          <div className="max-w-7xl mx-auto px-4 w-full">
+        <div className="relative z-10 h-full flex items-center ">
+          <div className="max-w-7xl mx-auto px-4 w-full mb-30">
             <div className="max-w-2xl">
               <motion.div
                 initial={{ opacity: 0, x: -50 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.8 }}
               >
-                <div className="inline-block bg-blue-950 text-white px-4 py-2 rounded-full text-sm font-bold mb-6">
-                  Global Academic Marketplace
-                </div>
-
-                <h1 className="text-6xl font-black text-white mb-6 leading-tight drop-shadow-lg">
+                <h1 className="text-6xl font-black text-white mb-6 leading-tight drop-shadow-lg mt-30">
                   The Global Student Library 📚
                 </h1>
+
+                <h1 className="text-xl text-blue-200">
+                  Share the wealth [of knowledge].</h1>
+                <p className="text-xl mb-4">Turn your books into income. Upload your work, reach a global audience [90M+], and earn whenever readers discover and purchase your content.
+                </p>
 
                 <p className="text-xl text-white mb-8 leading-relaxed drop-shadow-md">
                   A secure marketplace where <span className="font-bold text-blue-200">students and authors sell original works</span> and <span className="font-bold text-blue-200">learners access course-specific knowledge</span> they need to excel. Easy, secure, and rewarding for everyone.
                 </p>
 
                 <div className="flex gap-4 mb-8">
-                  <button
-                    onClick={() => navigateToSignIn()}
+                  <a href="/auth/signin" target="_blank"
                     className="px-8 py-4 bg-blue-950 text-white font-bold rounded-lg hover:bg-blue-900 transition-all shadow-lg flex items-center gap-2"
                   >
                     Browse Books
                     <ArrowRight className="w-5 h-5" />
-                  </button>
-                  <button
+                  </a>
+                  <button 
                     onClick={() => setShowWhatIsLanModal(true)}
-                    className="px-8 py-4 border-2 border-white text-white font-bold rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
+                    className="cursor-pointer px-8 py-4 border-2 border-white text-white font-bold rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
                   >
                     Platform Guide
                   </button>
@@ -558,9 +554,9 @@ export default function LearningAccessNetwork() {
       </section>
 
       {/* For Students Section - Desktop: Image on Right, Mobile: Text on Image */}
-      <section className="relative lg:py-20 bg-white">
+      <section className="relative lg:py-20 bg-white mb-5 ">
         {/* Mobile */}
-        <div className="lg:hidden relative h-[700px]">
+        <div className="lg:hidden relative h-[700px] ">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentStudentImageIndex}
@@ -646,13 +642,13 @@ export default function LearningAccessNetwork() {
                     </div>
                   </li>
                 </ul>
-
-                <button
-                  onClick={() => navigateToSignIn()}
-                  className="mt-8 px-8 py-4 bg-blue-950 text-white font-bold rounded-lg hover:bg-blue-900 transition-all shadow-lg"
+                <div className='mt-5'>
+                <a href="/auth/signin" target="_blank"
+                  className=" px-8 py-4 bg-blue-950 text-white font-bold rounded-lg hover:bg-blue-900 transition-all shadow-lg"
                 >
                   Start Learning →
-                </button>
+                </a>
+                </div>
               </div>
             </motion.div>
 
@@ -705,7 +701,7 @@ export default function LearningAccessNetwork() {
       {/* For Sellers Section - Desktop: Image on Left, Mobile: Text on Image */}
       <section className="relative lg:py-0 bg-gray-50">
         {/* Mobile */}
-        <div className="lg:hidden relative h-[500px]">
+        <div className="lg:hidden relative h-[700px]">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentSellerImageIndex}
@@ -840,19 +836,144 @@ export default function LearningAccessNetwork() {
                     </div>
                   </li>
                 </ul>
-
-                <button
-                  onClick={() => navigateToSignIn('seller')}
+                <div className='mt-5'>
+                <a href="/auth/signin" target="_blank"
                   className="mt-8 px-8 py-4 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-all shadow-lg"
                 >
                   Start Selling →
-                </button>
+                  </a>
+                  </div>
               </div>
             </motion.div>
           </div>
         </div>
       </section>
 
+      {/* App Screenshot Banner Section */}
+      <section className="relative py-16 lg:py-24 bg-blue-950 overflow-hidden mt-10">
+        {/* Wavy background pattern */}
+        <div className="absolute inset-0 opacity-20">
+          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern
+                id="waves"
+                x="0"
+                y="0"
+                width="100"
+                height="20"
+                patternUnits="userSpaceOnUse"
+              >
+                <path
+                  d="M0 10 Q25 0 50 10 Q75 20 100 10"
+                  stroke="white"
+                  strokeWidth="1.5"
+                  fill="none"
+                />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#waves)" />
+          </svg>
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-6 flex flex-col lg:flex-row items-center gap-12">
+
+          {/* Left - Text */}
+          <div className="flex-1 text-center lg:text-left">
+            <h2 className="text-5xl sm:text-4xl md:text-5xl lg:text-9xl font-black text-white leading-tight mb-6">
+              Knowledge <br className="hidden sm:block" />
+              that works <br className="hidden sm:block" />
+              for every <br className="hidden sm:block" />
+              student
+            </h2>
+
+            <p className="text-gray-300 text-base lg:text-5xl mb-8 max-w-md mx-auto lg:mx-0">
+              Buy, sell, and access books instantly. Stay ahead with one smart library.
+            </p>
+
+            <a
+              href="/auth/signin"
+              className="inline-block bg-white text-gray-900 font-bold lg:px-25 lg:text-2xl lg:py-6 px-5 py-3 rounded-full hover:bg-gray-100 transition-all shadow-lg"
+            >
+              Open an account
+            </a>
+          </div>
+
+          {/* Right - Image */}
+          <div className="flex-1 flex justify-center lg:justify-end">
+            <img
+              src="/lan.png"
+              alt="LAN Library App Screenshot"
+              className="w-[280px] sm:w-[350px] md:w-[420px] lg:w-[500px] xl:w-[550px] 
+                   h-auto object-contain rounded-[2.5rem] 
+                   drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)]"
+            />
+          </div>
+        </div>
+      </section>
+
+{/* Key Benefits Section */}
+<section className="py-20 bg-white">
+  <div className="max-w-5xl mx-auto px-6 text-center">
+    
+    {/* Header */}
+    <h2 className="text-5xl font-black text-gray-900 mb-4">Key Benefits</h2>
+    <p className="text-gray-500 text-lg max-w-2xl mx-auto mb-16">
+      Our payment system is designed for sellers on LAN Library who need fast, 
+      reliable access to their earnings without delays or complications.
+    </p>
+
+    {/* Top 3 Benefits */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-16">
+      
+      {/* Instant Payout */}
+      <div className="flex flex-col items-center text-center">
+        <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
+          <span className="text-5xl">⚡</span>
+        </div>
+        <h3 className="text-xl font-black text-gray-900 mb-3">Instant seller payout</h3>
+        <p className="text-gray-500 text-base leading-relaxed">
+          Get paid immediately after a buyer purchases your book, directly into your LAN wallet.
+        </p>
+      </div>
+
+      {/* Flexible Withdrawal */}
+      <div className="flex flex-col items-center text-center">
+        <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
+          <span className="text-5xl">🔄</span>
+        </div>
+        <h3 className="text-xl font-black text-gray-900 mb-3">Flexible withdrawal</h3>
+        <p className="text-gray-500 text-base leading-relaxed">
+          Withdraw your earnings at any time that suits you, to any Nigerian bank account.
+        </p>
+      </div>
+
+      {/* No Hidden Fees */}
+      <div className="flex flex-col items-center text-center">
+        <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
+          <span className="text-5xl">🚫</span>
+        </div>
+        <h3 className="text-xl font-black text-gray-900 mb-3">No hidden charges</h3>
+        <p className="text-gray-500 text-base leading-relaxed">
+          Transfer your money without surprise fees or physical paperwork. What you earn is what you get.
+        </p>
+      </div>
+
+    </div>
+
+    {/* Bottom Center Benefit */}
+    <div className="flex flex-col items-center text-center max-w-xs mx-auto">
+      <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
+        <span className="text-5xl">💰</span>
+      </div>
+      <h3 className="text-xl font-black text-gray-900 mb-3">Earn up to ₦500K monthly</h3>
+      <p className="text-gray-500 text-base leading-relaxed">
+        Top sellers on LAN Library earn consistently, from small daily sales to large monthly payouts.
+      </p>
+    </div>
+
+  </div>
+      </section>
+      
       {/* Featured Books Section */}
       {!loadingBooks && featuredBooks.length > 0 && (
         <section className="py-20 bg-white">
@@ -995,6 +1116,8 @@ export default function LearningAccessNetwork() {
                 </div>
               </div>
             </div>
+            <div>
+            </div>
             <a href="/learn/make-money" target="_blank"
               className="px-10 py-4 bg-white text-blue-950 font-black rounded-lg hover:bg-gray-100 transition-all shadow-xl text-lg mx-auto"
             >
@@ -1013,12 +1136,11 @@ export default function LearningAccessNetwork() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
-              onClick={() => navigateToSignIn('seller')}
+            <a href='/auth/signin' target="_blank"
               className="px-10 py-4 bg-white text-blue-950 font-black rounded-lg hover:bg-gray-100 transition-all shadow-xl text-lg"
             >
               Start Selling Now
-            </button>
+            </a>
             <button
               onClick={() => navigateToSignIn()}
               className="px-10 py-4 border-2 border-white text-white font-black rounded-lg hover:bg-white/10 transition-all text-lg"
@@ -1045,45 +1167,57 @@ export default function LearningAccessNetwork() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
+      <footer className="bg-white text-blue-950 py-12">
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="bg-white text-blue-950 px-4 py-2 rounded-lg font-black text-xl">LAN</div>
-                <span className="font-bold text-lg">Library</span>
-              </div>
-              <p className="text-gray-400">Global marketplace for academic excellence</p>
-            </div>
+            <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+              <h1
+                className="text-4xl sm:text-6xl font-bold text-blue-950"
+                style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
+              >
+                [LAN Library]
+                <h2
+                  className="text-xs sm:text-base font-light"
+                  style={{ fontFamily: "'Lato', sans-serif" }}
+                >
+                  The Global Student Library 📚
+                </h2>
+              </h1>
+            </Link>
 
             <div>
               <h3 className="font-bold mb-4">For Students</h3>
-              <ul className="space-y-2 text-gray-400">
+              <ul className="space-y-2 text-blue-950">
                 <li><button onClick={() => navigateToSignIn()} className="hover:text-white">Browse Books</button></li>
                 <li><button onClick={() => navigateToSignIn()} className="hover:text-white">Categories</button></li>
+                <li><button onClick={() => navigateToSignIn()} className="hover:text-white">My Books</button></li>
+                <li><button onClick={() => navigateToSignIn()} className="hover:text-white">Saved Books</button></li>
               </ul>
             </div>
 
             <div>
               <h3 className="font-bold mb-4">For Sellers</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><button onClick={() => navigateToSignIn('seller')} className="hover:text-white">Start Selling</button></li>
-                <li><button onClick={() => navigateToSignIn('seller')} className="hover:text-white">Pricing</button></li>
+              <ul className="space-y-2 text-blue-950">
+                <li><button onClick={() => navigateToSignIn('wallet')} className="hover:text-white">LAN Wallet</button></li>
+                <li><button onClick={() => navigateToSignIn('transfer')} className="hover:text-white">Transfer</button></li>
+                <li><button onClick={() => navigateToSignIn('recharge')} className="hover:text-white">Recharge</button></li>
+                <li><button onClick={() => navigateToSignIn('referral')} className="hover:text-white">Referral</button></li>
+
               </ul>
             </div>
 
             <div>
               <h3 className="font-bold mb-4">Company</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><button onClick={() => setShowWhatIsLanModal(true)} className="hover:text-white">About Us</button></li>
+              <ul className="space-y-2 text-blue-950">
+                <li><button onClick={() => setShowWhatIsLanModal(true)} className="hover:text-white">Plateform guide</button></li>
                 <li><Link href="/lan/privacy-policy" className="hover:text-white">Privacy Policy</Link></li>
                 <li><Link href="/lan/terms-of-service" className="hover:text-white">Terms of Service</Link></li>
               </ul>
             </div>
           </div>
 
-          <div className="border-t border-gray-800 pt-8 text-center text-gray-400">
-            <p>&copy; {currentYear} LAN Library - Learning Access Network. All rights reserved.</p>
+          <div className="border-t border-gray-800 pt-8 text-center text-blue-950">
+            <p>&copy; {currentYear} [ LAN Library ] - Learning Access Network. All rights reserved.</p>
           </div>
         </div>
       </footer>

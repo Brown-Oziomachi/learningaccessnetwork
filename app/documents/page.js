@@ -2,6 +2,11 @@
 import { Suspense } from "react";
 import AllBooksClient from "./documents";
 
+export const metadata = {
+    title: "LAN Library | Browse varities of documents uploaded by LAN sellers ",
+    description: "Become part of Africa's largest digital academic library, where education resources is documented for students to have access to all knowledge through network system. Have access to all university library from your country."
+}
+
 export default function AllBooksPage() {
     return (
         <Suspense

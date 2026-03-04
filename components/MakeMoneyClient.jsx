@@ -98,7 +98,7 @@ export default function MakeMoneyPage() {
       number: "03",
       title: "Start Earning",
       description:
-        "Every time someone buys your book, you earn 85% of the sale. Withdraw anytime you reach ₦5,000.",
+        "Every time someone buys your book, you earn 80% of the sale. Withdraw anytime you reach ₦1,000.",
     },
   ];
 
@@ -144,7 +144,7 @@ export default function MakeMoneyPage() {
                 className="text-xs sm:text-base font-light"
                 style={{ fontFamily: "'Lato', sans-serif" }}
               >
-                Digital Platform For Knowledge Access
+                The Global Student Library 📚
               </h2>
             </h1>
           </Link>

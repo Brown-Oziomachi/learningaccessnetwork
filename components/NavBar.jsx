@@ -231,7 +231,7 @@ useEffect(() => {
       } else if (data.role === "seller" || data.isSeller) {
         router.push("/my-account/seller-account");
       } else {
-        router.push("/student/dashboard");
+        router.push("/");
       }
     } catch (err) {
       console.error(err);
@@ -353,9 +353,9 @@ useEffect(() => {
     <>
       <header className="bg-blue-950 border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <Link href="/latest/documentations" className="no-underline">
-          <div className="bg-white flex items-center justify-center gap-2 text-blue-950 ">
-            <h1 className=" font-bold text-lg">Recently Published...</h1>
-            <ChevronRight size={16} />
+          <div className="bg-white flex items-center justify-center gap-2 text-blue-950">
+            <h1 className=" font-bold text-lg mt-3">Recently Published...</h1>
+            <ChevronRight size={16} className="mt-3"/>
           </div>
         </Link>
         <div className="max-w-4xl mx-auto px-4 py-3 sm:py-4">
@@ -446,6 +446,7 @@ useEffect(() => {
                 <span>My Books</span>
               </Link>
               <button
+                target="_blank"
                 onClick={handleMyAccountClick}
                 className="flex items-center gap-1 px-3 py-2 hover:bg-gray-100 hover:text-blue-950 rounded-lg text-sm text-gray-50"
               >
@@ -478,9 +479,7 @@ useEffect(() => {
                     Loading...
                   </>
                 ) : isSeller ? (
-                  <>
-                    Upload
-                  </>
+                  <>Upload</>
                 ) : (
                   <>Become a Seller</>
                 )}
@@ -941,6 +940,7 @@ useEffect(() => {
                   <span>My Books</span>
                 </Link>
                 <button
+                  target="_blank"
                   onClick={handleMyAccountClick}
                   className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
                 >
@@ -961,6 +961,27 @@ useEffect(() => {
                 >
                   <Bookmark size={18} />
                   <span>Saved</span>
+                </Link>
+                <Link
+                  href="/transfer"
+                  className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <Bookmark size={18} />
+                  <span>Transfer</span>
+                </Link>
+                <Link
+                  href="/recharge"
+                  className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <Bookmark size={18} />
+                  <span>Recharge</span>
+                </Link>
+                <Link
+                  href="/referrals"
+                  className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <Bookmark size={18} />
+                  <span>Referral</span>
                 </Link>
                 <Link
                   href="/lan/net/help-center"

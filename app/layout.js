@@ -12,8 +12,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "LAN Library - Digital Platform for Knowledge Access",
-  description: "Learning Access Network is a digital platform designed to make knowledge easily accessible to everyone. Discover, read, and purchase books across various categories including education, personal development, business, technology, and more.",
+  title: "LAN Library | The Global Student Library 📚",
+  description: "Learning Access Network is a digital platform designed to make knowledge easily accessible to everyone. Discover, read, and purchase books across various categories including education, past questions, thesis, lecture notes, personal development, business, technology, and more.",
   keywords: "learning, books, education, personal development, business books, technology books, online library, digital platform, knowledge access, universities library, documents",
   openGraph: {
     title: "LAN Library - Digital Platform for Knowledge Access",
