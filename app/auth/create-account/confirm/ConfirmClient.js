@@ -67,6 +67,8 @@ export default function ConfirmClient() {
             referredBy: referredBy || null,
         };
 
+      
+    
         const result = await createUserAccount(accountData);
 
         if (result.success) {
@@ -84,19 +86,38 @@ export default function ConfirmClient() {
 
                     if (!snap.empty) {
                         const referrerId = snap.docs[0].id;
+
+                        // Save referral doc
                         await addDoc(collection(db, 'referrals'), {
-                            referrerId: referrerId,
+                            referrerId,
                             referredUserId: newUserUid,
                             referredEmail: formData.email,
                             referredName: `${formData.firstName} ${formData.surname}`,
-                            status: 'pending',
+                            status: 'completed', // ✅ mark as completed immediately
                             reward: 500,
-                            claimed: false,
+                            claimed: true,
                             createdAt: serverTimestamp(),
                         });
+
+                        // ✅ Credit ₦500 to referrer's account balance
+                        const { doc, updateDoc, increment } = await import('firebase/firestore');
+                        await updateDoc(doc(db, 'sellers', referrerId), {
+                            accountBalance: increment(500),
+                            updatedAt: serverTimestamp(),
+                        });
+
+                        // ✅ Send notification to referrer
+                        await addDoc(collection(db, 'notifications'), {
+                            userId: referrerId,
+                            type: 'referral_reward',
+                            title: 'Referral Bonus! 🎉',
+                            message: `${formData.firstName} ${formData.surname} joined using your referral link. ₦500 has been added to your wallet!`,
+                            createdAt: serverTimestamp(),
+                            read: false,
+                        });
                     }
-                } catch (err) {
-                    console.error('Error creating referral:', err);
+                } catch (error) {
+                    console.error('Error processing referral:', error);
                 }
             }
 

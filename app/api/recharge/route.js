@@ -55,7 +55,7 @@ async function getFlutterwaveBalance(key) {
     try {
         const { status, data } = await flwRequest('GET', '/v3/balances/NGN', key);
         if (status === 200 && data.status === 'success') {
-            return data.data?.available_balance || 0;
+            return data.data?.available_balance ?? null;
         }
         return null;
     } catch {
@@ -63,7 +63,7 @@ async function getFlutterwaveBalance(key) {
     }
 }
 
-// Fire-and-forget balance alert check after each purchase
+// Fire-and-forget balance alert after each purchase
 async function triggerBalanceAlert(baseUrl) {
     try {
         await fetch(`${baseUrl}/api/flutterwave-balance-alert`, { method: 'POST' });
@@ -136,22 +136,45 @@ export async function POST(request) {
         // ── LIVE MODE ─────────────────────────────────────────────────────────
         const key = getV3SecretKey();
 
-        // 1. Check FLW wallet balance
+        // 1. Check FLW wallet balance — NON-BLOCKING
+        // Only block if we CONFIRMED the balance is insufficient.
+        // If balance check fails (null), we allow the purchase to proceed.
         const flwBalance = await getFlutterwaveBalance(key);
+        console.log(`[recharge] FLW wallet balance: ${flwBalance === null ? 'unknown (check failed)' : '₦' + flwBalance}`);
+
         if (flwBalance !== null && flwBalance < Number(amount)) {
-            console.error(`[recharge] FLW wallet ₦${flwBalance} insufficient for ₦${amount}`);
+            // We confirmed balance is too low — block
+            console.error(`[recharge] Confirmed insufficient: ₦${flwBalance} < ₦${amount}`);
             return NextResponse.json(
-                { error: 'Service temporarily unavailable. Please try again shortly or contact support.' },
-                { status: 503 }
+                { error: 'Service temporarily unavailable. Please try again shortly or contact support.' },                { status: 503 }
             );
         }
 
         // 2. Build payload and call Flutterwave
         const payload = type === 'airtime'
-            ? { country: 'NG', customer: formattedPhone, amount: Number(amount), recurrence: 'ONCE', type: 'AIRTIME', reference: ref }
-            : { country: 'NG', customer: formattedPhone, amount: Number(amount), recurrence: 'ONCE', type: item_code, reference: ref, biller_code };
+            ? {
+                country: 'NG',
+                customer: formattedPhone,
+                amount: Number(amount),
+                recurrence: 'ONCE',
+                type: 'AIRTIME',
+                reference: ref,
+            }
+            : {
+                country: 'NG',
+                customer: formattedPhone,
+                amount: Number(amount),
+                recurrence: 'ONCE',
+                type: item_code,
+                reference: ref,
+                biller_code,
+            };
+
+        console.log('[recharge] Sending to FLW:', JSON.stringify(payload));
 
         const { status, data } = await flwRequest('POST', '/v3/bills', key, payload);
+
+        console.log('[recharge] FLW response:', JSON.stringify(data).slice(0, 400));
 
         if (status !== 200 || data.status !== 'success') {
             return NextResponse.json(
@@ -160,7 +183,7 @@ export async function POST(request) {
             );
         }
 
-        // 3. Check delivery status
+        // 3. Check actual delivery status
         const deliveryStatus = data.data?.data?.status || data.data?.status || '';
         if (deliveryStatus && deliveryStatus.toLowerCase() === 'failed') {
             return NextResponse.json(
@@ -169,16 +192,11 @@ export async function POST(request) {
             );
         }
 
-        // 4. Trigger balance alert check (non-blocking, fire and forget)
-        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+        // 4. Trigger background balance alert (non-blocking)
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://yourdomain.com';
         triggerBalanceAlert(baseUrl);
 
-        // 5. Also immediately warn in response if balance is getting low
-        const balanceWarning = (flwBalance !== null && flwBalance - Number(amount) < ALERT_THRESHOLD)
-            ? { balanceWarning: true, remainingBalance: flwBalance - Number(amount) }
-            : {};
-
-        return NextResponse.json({ ref, data, ...balanceWarning });
+        return NextResponse.json({ ref, data });
 
     } catch (err) {
         console.error('Recharge error:', err);
