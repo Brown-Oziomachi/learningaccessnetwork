@@ -24,6 +24,7 @@ export default function EmailClient() {
             surname: searchParams.get('surname') || '',
             dateOfBirth: searchParams.get('dateOfBirth') || '',
             accountType: searchParams.get('accountType') || '',
+            country: searchParams.get('country') || '', // ✅ add this
         });
         if (prefilledEmail) setEmail(prefilledEmail);
     }, [searchParams]);

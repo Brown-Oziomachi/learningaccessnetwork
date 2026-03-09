@@ -6,7 +6,9 @@ import {
     CreditCard,
     CheckCircle,
     ArrowLeft,
-    Loader2
+    Loader2,
+    GraduationCap,
+    Info
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
@@ -19,12 +21,13 @@ export default function BecomeSellerClient() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const router = useRouter();
-
+    const [showLecturerInfo, setShowLecturerInfo] = useState(false);
     const [formData, setFormData] = useState({
         firstName: "",
         surname: "",
         email: "",
         phoneNumber: "",
+        title: "",
         bankName: "",
         bankCode: "",
         accountNumber: "",
@@ -166,6 +169,34 @@ export default function BecomeSellerClient() {
         }
 
         try {
+            // ── Create Flutterwave subaccount ──────────────────────────────────
+            let flutterwaveSubaccountId = null;
+            try {
+                const flwRes = await fetch('/api/flutterwave/create-subaccount', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        uid: user.uid,
+                        email: formData.email,
+                        firstName: formData.firstName,
+                        surname: formData.surname,
+                        phoneNumber: formData.phoneNumber,
+                        bankCode: formData.bankCode,
+                        accountNumber: formData.accountNumber,
+                        businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
+                    }),
+                });
+                const flwData = await flwRes.json();
+                if (flwData.success) {
+                    flutterwaveSubaccountId = flwData.subaccount_id;
+                } else {
+                    console.error('Flutterwave error:', flwData.error);
+                }
+            } catch (flwErr) {
+                console.error('Flutterwave call failed:', flwErr);
+            }
+            // ───────────────────────────────────────────────────────────────────
+
             setSubmitting(true);
 
             const timeout = (ms) => new Promise((_, reject) =>
@@ -176,6 +207,7 @@ export default function BecomeSellerClient() {
                 updateDoc(doc(db, "users", user.uid), {
                     isSeller: true,
                     phoneNumber: formData.phoneNumber,
+                    flutterwaveSubaccountId: flutterwaveSubaccountId, // ✅ add this line
                     updatedAt: serverTimestamp()
                 }),
                 timeout(10000)
@@ -190,12 +222,15 @@ export default function BecomeSellerClient() {
                         bankName: formData.bankName,
                         bankCode: formData.bankCode, // ✅ ADDED
                         accountNumber: formData.accountNumber,
-                        accountName: formData.accountName
+                        accountName: formData.accountName,
+                        flutterwaveSubaccountId: flutterwaveSubaccountId, // ✅ add this line
                     },
                     businessInfo: {
                         businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
                         businessDescription: formData.businessDescription
                     },
+                    title: formData.title || "",
+                    sellerName: `${formData.firstName} ${formData.surname}`.trim(),
                     createdAt: serverTimestamp(),
                     status: "active"
                 }),
@@ -330,7 +365,62 @@ export default function BecomeSellerClient() {
                         </div>
                     </div>
 
-                    <div className="mb-8">
+                    <div className="sm:col-span-2">
+                        <div className="flex items-center gap-2 mb-2">
+                            <label className="font-semibold text-gray-700">
+                                Title / Profession
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => setShowLecturerInfo(true)}
+                                className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center hover:bg-blue-200 transition-colors shrink-0 "
+                                title="Why select Lecturer?"
+                            >
+                                <Info size={12} />
+                            </button>
+                        </div>
+                        <select
+                            value={formData.title}
+                            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                            className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                            <option value="">Select title (optional)</option>
+                            <option value="Lecturer">Lecturer</option>
+                            <option value="Dr.">Dr.</option>
+                            <option value="Prof.">Prof.</option>
+                            <option value="Professor">Professor</option>
+                        </select>
+                        {(formData.title === 'Lecturer' || formData.title === 'Dr.' || formData.title === 'Prof.' || formData.title === 'Professor') && (
+                            <div className="mt-3 bg-gradient-to-br from-blue-950 to-indigo-900 text-white rounded-2xl p-5 shadow-lg border border-blue-800">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <GraduationCap className="w-5 h-5 text-blue-200" />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-base mb-1">You're registering as an Academic! 🎓</p>
+                                        <p className="text-blue-200 text-sm leading-relaxed mb-3">
+                                            As a <span className="text-white font-semibold">{formData.title}</span>, your profile will be featured in our exclusive <span className="text-white font-semibold">University Lecturers</span> directory, giving students direct access to your academic materials.
+                                        </p>
+                                        <div className="space-y-2">
+                                            {[
+                                                "Your profile appears in the Lecturers section",
+                                                "Students can find your materials by department & university",
+                                                "Builds your academic brand on LAN Library",
+                                                "Earn from every download of your course materials"
+                                            ].map((benefit, i) => (
+                                                <div key={i} className="flex items-center gap-2 text-sm text-blue-100">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-300 flex-shrink-0" />
+                                                    {benefit}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mb-8 mt-5">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <Building2 className="text-blue-600" size={20} />
                             Bank Account Details
@@ -539,6 +629,66 @@ export default function BecomeSellerClient() {
                         </button>
                     </div>
                 </div>
+                {/* Lecturer Info Popup */}
+                {showLecturerInfo && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/50 backdrop-blur-sm">
+                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+                            {/* Header */}
+                            <div className="bg-gradient-to-br from-blue-950 to-indigo-900 px-6 py-6 text-white text-center">
+                                <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-white/20">
+                                    <GraduationCap className="w-7 h-7 text-blue-200" />
+                                </div>
+                                <h3 className="text-xl font-bold">Why Select an Academic Title?</h3>
+                                <p className="text-blue-300 text-sm mt-1">Unlock exclusive features for educators</p>
+                            </div>
+
+                            {/* Body */}
+                            <div className="p-6 space-y-4">
+                                {[
+                                    {
+                                        icon: "🎓",
+                                        title: "Featured in Lecturers Directory",
+                                        desc: "Your profile appears in the dedicated University Lecturers section where students actively search for academic materials."
+                                    },
+                                    {
+                                        icon: "🔍",
+                                        title: "Searchable by Department & University",
+                                        desc: "Students can find you by your department and university once you add those details to your profile."
+                                    },
+                                    {
+                                        icon: "📚",
+                                        title: "Academic Brand Building",
+                                        desc: "Build your reputation as a trusted academic source on LAN Library across Nigeria."
+                                    },
+                                    {
+                                        icon: "💰",
+                                        title: "Earn from Course Materials",
+                                        desc: "Monetize your lecture notes, past questions, and academic resources with every download."
+                                    }
+                                ].map((item, i) => (
+                                    <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
+                                        <span className="text-2xl flex-shrink-0">{item.icon}</span>
+                                        <div>
+                                            <p className="font-semibold text-gray-900 text-sm">{item.title}</p>
+                                            <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">{item.desc}</p>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                <p className="text-xs text-center text-gray-400 pt-2">
+                                    Applies to: Lecturer, Dr., Prof., Professor
+                                </p>
+
+                                <button
+                                    onClick={() => setShowLecturerInfo(false)}
+                                    className="w-full bg-blue-950 text-white py-3 rounded-2xl font-bold hover:bg-blue-900 transition-colors"
+                                >
+                                    Got it!
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </main>
         </div>
     );

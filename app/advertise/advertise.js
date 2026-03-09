@@ -445,31 +445,13 @@ useEffect(() => {
             <div className="bg-white/95 backdrop-blur-sm rounded-2xl max-w-4xl w-full p-8 shadow-2xl relative z-10 my-8">
                 <div className="text-center mb-6">
                     <h2 className="text-3xl font-bold text-blue-950 mb-2">
-                        Advertise Your Book
+                        Upload Your Book
                     </h2>
                     <p className="text-gray-600 text-sm">
                         Reach thousands of readers and earn 80% per sale
                     </p>
                 </div>
 
-                {/* Instructions Alert */}
-                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex gap-3">
-                        <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                        <div className="text-sm text-blue-900">
-                            <p className="font-semibold mb-1">How to submit your PDF:</p>
-                            <ol className="list-decimal ml-4 space-y-1">
-                                <li>Upload your PDF to <strong>Google Drive</strong> or <strong>Dropbox</strong></li>
-                                <li>Set the file sharing to "Anyone with the link can view"</li>
-                                <li>Copy the sharing link and paste it below</li>
-                                <li>Fill in academic details if this is course material</li>
-                            </ol>
-                            <p className="mt-2 text-green-700 font-semibold">
-                                💰 You'll earn 80% on every sale (Platform takes 20%)
-                            </p>
-                        </div>
-                    </div>
-                </div>
 
                 <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
                     {/* SECTION 1: SELLER INFO */}
@@ -1013,7 +995,7 @@ useEffect(() => {
                         disabled={loading}
                         className="flex-1 bg-blue-950 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-900 transition-colors disabled:opacity-50"
                     >
-                        {loading ? "Uploading..." : "Send Request"}
+                        {loading ? "Uploading..." : "Upload"}
                     </button>
                 </div>
 

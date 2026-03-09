@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import AuthLayout from '@/components/auth/AuthLayout';
 import { validatePassword } from '@/lib/auth/authValidation';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function PasswordClient() {
     const router = useRouter();
@@ -12,6 +13,7 @@ export default function PasswordClient() {
     const [password, setPassword] = useState('');
     const [errors, setErrors] = useState({});
     const [formData, setFormData] = useState({});
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         setFormData({
@@ -20,6 +22,7 @@ export default function PasswordClient() {
             dateOfBirth: searchParams.get('dateOfBirth') || '',
             email: searchParams.get('email') || '',
             accountType: searchParams.get('accountType') || '',
+            country: searchParams.get('country') || '', // ✅ add this
         });
     }, [searchParams]);
 
@@ -55,9 +58,9 @@ export default function PasswordClient() {
                 Create a password with at least 6 characters.
             </p>
 
-            <div className="mb-2">
+            <div className="mb-2 relative">
                 <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="Password"
                     required
                     value={password}
@@ -65,8 +68,15 @@ export default function PasswordClient() {
                         setPassword(e.target.value);
                         setErrors({});
                     }}
-                    className="w-full px-4 py-4 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-950 text-gray-900"
+                    className="w-full px-4 py-4 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-950 text-gray-900"
                 />
+                <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
+                >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
             </div>
 
             {errors.password && (

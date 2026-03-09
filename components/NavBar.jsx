@@ -454,11 +454,11 @@ useEffect(() => {
                 <span>My Account</span>
               </button>
               <Link
-                href="/topsellers"
+                href="/lecturers"
                 className="flex items-center gap-1 px-3 py-2 hover:bg-gray-100 hover:text-blue-950 rounded-lg text-sm text-gray-50"
               >
                 <Crown size={18} />
-                <span>Topsellers</span>
+                <span>Lecturers</span>
               </Link>
               <Link
                 href="/saved-my-book"
@@ -948,11 +948,11 @@ useEffect(() => {
                   <span>My Account</span>
                 </button>
                 <Link
-                  href="/topsellers"
+                href="/lecturers"
                   className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
                 >
                   <Crown size={16} />
-                  Topsellers
+                  Lecturers
                 </Link>
 
                 <Link

@@ -442,8 +442,7 @@ export default function DocumentTypePage() {
                                     {displayBooks.slice(0, 5).map((book) => (
                                         <Link
                                             key={book.id}
-                                            href={`/book/preview?id=${book.id}`}
-                                            className="flex-none w-[180px] sm:w-[200px] group"
+                                            href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                                            className="flex-none w-[180px] sm:w-[200px] group"
                                         >
                                             <div className="relative mb-3">
                                                 <img
@@ -486,7 +485,7 @@ export default function DocumentTypePage() {
                                         {displayBooks.slice(5, 10).map((book) => (
                                             <Link
                                                 key={book.id}
-                                                href={`/book/preview?id=${book.id}`}
+                                                href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
                                                 className="flex-none w-[180px] sm:w-[200px] group"
                                             >
                                                 <div className="relative mb-3">

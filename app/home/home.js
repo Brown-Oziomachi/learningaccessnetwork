@@ -632,7 +632,7 @@ useEffect(() => {
                                 {displayBooks.slice(0, 6).map((book) => (
                                     <Link
                                         key={book.id}
-                                        href={`/book/preview?id=${book.id}`}
+                                        href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
                                         className="group"
                                     >
                                         <div className="relative mb-3">

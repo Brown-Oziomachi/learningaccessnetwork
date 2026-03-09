@@ -176,7 +176,8 @@ export const fetchSellerDetails = async (book) => {
                 phone: userData.phone || userData.phoneNumber || book.sellerPhone,
                 accountDetails: userData.accountDetails || null,
                 walletId: userData.walletId || null,
-                bankAccount: userData.bankAccount || null
+                bankAccount: userData.bankAccount || null,
+                flutterwaveSubaccountId: userData.flutterwaveSubaccountId || null, 
             };
         }
 
@@ -194,7 +195,8 @@ export const fetchSellerDetails = async (book) => {
                 phone: sellerData.sellerPhone || book.sellerPhone,
                 accountDetails: null,
                 walletId: null,
-                bankAccount: null
+                bankAccount: null,
+                flutterwaveSubaccountId: sellerData.flutterwaveSubaccountId || null, 
             };
         }
 

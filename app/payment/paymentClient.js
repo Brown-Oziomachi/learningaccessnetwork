@@ -78,7 +78,8 @@ const completeReferralOnPurchase = async (buyerUid) => {
 export default function PaymentClient() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const bookId = searchParams.get('bookId');
+    const rawBookId = searchParams.get('bookId');
+    const bookId = rawBookId?.startsWith('firestore-') ? rawBookId : `firestore-${rawBookId}`;
     const [allBooks, setAllBooks] = useState([]);
     const [book, setBook] = useState(null);
     const [sellerDetails, setSellerDetails] = useState(null);

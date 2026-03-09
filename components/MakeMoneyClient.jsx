@@ -153,8 +153,8 @@ export default function MakeMoneyPage() {
 
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-4 py-16 text-center">
-        <div className="inline-block bg-blue-950 text-white px-4 py-1 rounded-full text-sm font-semibold mb-4">
-          New
+        <div className="inline-block bg-blue-950 text-white px-16 py-7 text-3xl rounded-full font-semibold mb-4">
+          LAN Library
         </div>
         <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
           Make Money

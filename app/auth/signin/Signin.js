@@ -120,7 +120,6 @@ export default function SignInClient() {
 
     return (
         <div className="min-h-screen flex">
-            {/* Left Side - Decorative (Desktop Only) */}
             <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-950 via-blue-950 to-blue-950 relative overflow-hidden">
                 <div className="absolute inset-0 flex items-center justify-center p-12">
                     <div className="max-w-lg">
@@ -129,7 +128,7 @@ export default function SignInClient() {
                             <img
                                 src="/lan.png"
                                 alt="Student"
-                                className=" shadow-2xl w-full mt-20"
+                                className=" shadow-2xl w-full mt-40"
                             />
 
                             {/* Floating Card - Books Sold */}
@@ -180,7 +179,7 @@ export default function SignInClient() {
                            <div className="mx-auto">
                     <div className="flex items-center gap-2 text-blue-950 px-10 py-3 rounded-xl ">
                         <h1
-              className="text-3xl sm:text-6xl font-bold text-blue-950 text-center"
+              className="text-2xl sm:text-6xl font-bold text-blue-950 text-center"
               style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
             >
               [LAN Library]

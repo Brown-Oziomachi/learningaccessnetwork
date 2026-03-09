@@ -567,8 +567,7 @@ export default function AllBooksClient() {
                                                     {rowBooks.map((book) => (
                                                         <Link
                                                             key={book.id}
-                                                            href={`/book/preview?id=${book.id}`}
-                                                            className="flex-none w-[160px] sm:w-[180px] lg:w-[200px] group"
+                                                            href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                                                            className="flex-none w-[160px] sm:w-[180px] lg:w-[200px] group"
                                                         >
                                                             <div className="relative mb-3">
                                                                 <img

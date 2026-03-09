@@ -407,8 +407,7 @@ useEffect(() => {
                             {displayBooks.slice(0, 5).map((book) => (
                                 <Link
                                     key={book.id}
-                                    href={`/book/preview?id=${book.id}`}
-                                    className="flex-none w-[180px] sm:w-[200px] group"
+                                    href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                                    className="flex-none w-[180px] sm:w-[200px] group"
                                 >
                                     {/* Book Cover */}
                                     <div className="relative mb-3">
@@ -454,8 +453,7 @@ useEffect(() => {
                                 {displayBooks.slice(5, 10).map((book) => (
                                     <Link
                                         key={book.id}
-                                        href={`/book/preview?id=${book.id}`}
-                                        className="flex-none w-[180px] sm:w-[200px] group"
+href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                                        className="flex-none w-[180px] sm:w-[200px] group"
                                     >
                                         {/* Book Cover */}
                                         <div className="relative mb-3">

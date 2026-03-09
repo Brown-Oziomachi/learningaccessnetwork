@@ -19,6 +19,7 @@ export default function DOBClient() {
             surname: searchParams.get('surname') || '',
             email: searchParams.get('email') || '',
             accountType: searchParams.get('accountType') || '',
+            country: searchParams.get('country') || '', // ✅ add this
         });
     }, [searchParams]);
 
@@ -30,16 +31,15 @@ export default function DOBClient() {
             return;
         }
 
-        // ✅ Read ref from URL or sessionStorage
         const ref = searchParams.get('referral_code') || sessionStorage.getItem('referredBy') || '';
         const params = new URLSearchParams({
             ...formData,
             dateOfBirth,
         });
 
-        if (ref) params.append('ref', ref); // ✅ pass ref forward
+        if (ref) params.append('ref', ref);
 
-        router.push(`/auth/create-account/email?${params.toString()}`);
+        router.push(`/auth/create-account/country?${params.toString()}`); // ✅ changed from email to country
     };
 
     return (

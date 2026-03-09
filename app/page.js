@@ -397,6 +397,11 @@ export default function LearningAccessNetwork() {
                 The Global Student Library 📚
               </h2>
             </h1>
+            <img
+              src="/lanlog.png"
+              alt="LAN Logo"
+              className=" h-16 w-16 lg:h-26 lg:w-26 object-contain"
+            />
           </Link>
         </div>
       </header>

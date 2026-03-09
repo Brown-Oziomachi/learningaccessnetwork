@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle, Sparkles, ArrowRight, X } from 'lucide-react';
+import { CheckCircle, ArrowRight, X } from 'lucide-react';
 import AuthLayout from '@/components/auth/AuthLayout';
 import { createUserAccount } from '@/lib/auth/authHelpers';
 import { db } from '@/lib/firebaseConfig';
@@ -14,10 +14,10 @@ export default function ConfirmClient() {
     const searchParams = useSearchParams();
 
     const [loading, setLoading] = useState(false);
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [showToast, setShowToast] = useState(false);
     const [userRole, setUserRole] = useState('');
     const [accountType, setAccountType] = useState('');
-    const [referredBy, setReferredBy] = useState(''); // ✅ referral code
+    const [referredBy, setReferredBy] = useState('');
     const [formData, setFormData] = useState({
         firstName: '',
         surname: '',
@@ -33,8 +33,6 @@ export default function ConfirmClient() {
         const type = searchParams.get('accountType') || '';
         setAccountType(type);
 
-        // ✅ Get referredBy from sessionStorage (saved in role-selection)
-        // Also check URL as backup
         const refFromSession = sessionStorage.getItem('referredBy') || '';
         const refFromUrl = searchParams.get('referral_code') || '';
         const ref = refFromSession || refFromUrl;
@@ -45,9 +43,20 @@ export default function ConfirmClient() {
             surname: searchParams.get('surname') || '',
             dateOfBirth: searchParams.get('dateOfBirth') || '',
             email: searchParams.get('email') || '',
-            password: searchParams.get('password') || ''
+            password: searchParams.get('password') || '',
+            country: searchParams.get('country') || '', // ✅ add this
         });
     }, [searchParams]);
+
+    const handleRedirect = (role, type) => {
+        if (type === 'university' || role === 'university') {
+            router.push('/register-school?type=university');
+        } else if (role === 'seller') {
+            router.push('/become-seller');
+        } else {
+            router.push('/student/dashboard');
+        }
+    };
 
     const handleSubmit = async () => {
         setLoading(true);
@@ -63,7 +72,7 @@ export default function ConfirmClient() {
         if (result.success) {
             const newUserUid = result.uid;
 
-            // ✅ Resolve shortCode → real referrer UID before creating referral doc
+            // Resolve referral
             if (referredBy && referredBy !== newUserUid) {
                 try {
                     const { query, collection, where, getDocs } = await import('firebase/firestore');
@@ -74,10 +83,9 @@ export default function ConfirmClient() {
                     const snap = await getDocs(q);
 
                     if (!snap.empty) {
-                        const referrerId = snap.docs[0].id; // ✅ real UID of referrer
-
+                        const referrerId = snap.docs[0].id;
                         await addDoc(collection(db, 'referrals'), {
-                            referrerId: referrerId,         // ✅ real UID, not shortCode
+                            referrerId: referrerId,
                             referredUserId: newUserUid,
                             referredEmail: formData.email,
                             referredName: `${formData.firstName} ${formData.surname}`,
@@ -86,9 +94,6 @@ export default function ConfirmClient() {
                             claimed: false,
                             createdAt: serverTimestamp(),
                         });
-                        console.log('✅ Referral created for referrer UID:', referrerId);
-                    } else {
-                        console.warn('⚠️ No user found with referralCode:', referredBy);
                     }
                 } catch (err) {
                     console.error('Error creating referral:', err);
@@ -97,8 +102,13 @@ export default function ConfirmClient() {
 
             sessionStorage.removeItem('userRole');
             sessionStorage.removeItem('referredBy');
-            setShowSuccessModal(true);
-            setTimeout(() => handleModalContinue(), 3000);
+
+            // Show toast briefly then redirect
+            setShowToast(true);
+            setTimeout(() => {
+                setShowToast(false);
+                handleRedirect(userRole, accountType);
+            }, 20000);
 
         } else {
             const error = result.error;
@@ -120,18 +130,6 @@ export default function ConfirmClient() {
         }
     };
 
-    const handleModalContinue = () => {
-        setShowSuccessModal(false);
-
-        if (accountType === 'university' || userRole === 'university') {
-            router.push('/register-school?type=university');
-        } else if (userRole === 'seller') {
-            router.push('/become-seller');
-        } else {
-            router.push('/student/dashboard');
-        }
-    };
-
     const editParams = new URLSearchParams({
         firstName: formData.firstName,
         surname: formData.surname,
@@ -150,12 +148,12 @@ export default function ConfirmClient() {
                     Please review your information before creating your account.
                 </p>
 
-                {/* ✅ Show referral badge if user was referred */}
+                {/* Referral badge */}
                 {referredBy && (
                     <div className="mb-4 bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2 mx-auto">
                         <span className="text-green-600 text-lg">🎉</span>
-                        <p className="text-sm text-green-800 font-medium ">
-                            You were invited by a friend!.
+                        <p className="text-sm text-green-800 font-medium">
+                            You were invited by a friend!
                         </p>
                     </div>
                 )}
@@ -195,6 +193,13 @@ export default function ConfirmClient() {
                                 {formData.email}
                             </p>
                         </div>
+
+                        <div>
+                            <label className="text-sm font-medium uppercase">Country</label>
+                            <p className="text-lg font-semibold">
+                                {formData.country || 'Not provided'}
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -206,10 +211,6 @@ export default function ConfirmClient() {
                     <Link href="/lan/privacy-policy">
                         <button className="text-blue-950 font-medium hover:underline">Privacy Policy</button>
                     </Link>
-                    {/* and{' '}
-                    <Link href="/lan/cookies-policy">
-                        <button className="text-blue-950 font-medium hover:underline">Cookies Policy</button>
-                    </Link>. */}
                 </p>
 
                 <button
@@ -229,99 +230,27 @@ export default function ConfirmClient() {
                 </div>
             </AuthLayout>
 
-            {/* Success Modal */}
-            {showSuccessModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden transform animate-in zoom-in-95 duration-300">
-                        <button
-                            onClick={handleModalContinue}
-                            className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors z-10"
-                        >
-                            <X size={20} className="text-gray-500" />
-                        </button>
-
-                        <div className="relative bg-gradient-to-br from-blue-950 via-blue-800 to-blue-900 p-8 text-center overflow-hidden">
-
-                            {/* <div className="relative mb-4">
-                                <div className="w-20 h-20 bg-white rounded-full mx-auto flex items-center justify-center shadow-lg animate-bounce">
-                                    <CheckCircle size={48} className="text-green-600" strokeWidth={2.5} />
-                                </div>
-                                <Sparkles className="absolute top-0 right-1/3 text-yellow-300 animate-pulse" size={24} />
-                                <Sparkles className="absolute bottom-0 left-1/3 text-yellow-300 animate-pulse delay-150" size={20} />
-                            </div> */}
-                            <p className="text-blue-100 text-sm">
-                                Your account has been created successfully
-                            </p>
-                        </div>
-
-                        <div className="p-8">
-                            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-                                <p className="text-green-800 text-sm font-medium text-center">
-                                    ✓ Account verified and activated
-                                </p>
-                            </div>
-
-                            <div className="space-y-3 mb-6">
-                                <div className="flex items-start gap-3 text-sm text-gray-600">
-                                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <span className="text-blue-600 font-bold text-xs">1</span>
-                                    </div>
-                                    <p>
-                                        <span className="font-semibold text-gray-900">Welcome, {formData.firstName}!</span> Your journey to academic excellence starts now.
-                                    </p>
-                                </div>
-
-                                {accountType === 'university' && (
-                                    <div className="flex items-start gap-3 text-sm text-gray-600">
-                                        <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <span className="text-purple-600 font-bold text-xs">🎓</span>
-                                        </div>
-                                        <p>
-                                            <span className="font-semibold text-gray-900">Next: Register Your Institution</span> Complete your school registration to get verified.
-                                        </p>
-                                    </div>
-                                )}
-
-                                <div className="flex items-start gap-3 text-sm text-gray-600">
-                                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <span className="text-blue-600 font-bold text-xs">2</span>
-                                    </div>
-                                    <p>Access thousands of study materials and connect with learners worldwide.</p>
-                                </div>
-
-                                {userRole === 'seller' && (
-                                    <div className="flex items-start gap-3 text-sm text-gray-600">
-                                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <span className="text-green-600 font-bold text-xs">💰</span>
-                                        </div>
-                                        <p>
-                                            <span className="font-semibold text-gray-900">Author Account Ready!</span> Start uploading and earning from your knowledge.
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-
-                            <button
-                                onClick={handleModalContinue}
-                                className="w-full bg-blue-950 text-white py-4 rounded-2xl font-bold text-lg hover:bg-blue-900 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 group"
-                            >
-                                {accountType === 'university'
-                                    ? 'Register Your School'
-                                    : userRole === 'seller'
-                                        ? 'Go to Author Dashboard'
-                                        : 'Explore Your Dashboard'}
-                                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-                            </button>
-
-                            <p className="text-center text-xs text-gray-500 mt-4">
-                                Redirecting automatically in 3 seconds...
-                            </p>
-                        </div>
-
-                        <div className="h-2 bg-gradient-to-r from-blue-600 via-green-500 to-blue-600"></div>
+            {/* Toast Notification */}
+            {showToast && (
+                <div className="fixed top-6 right-6 z-[100] bg-green-600 text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3 max-w-sm"
+                    style={{ animation: 'slideIn 0.3s ease-out' }}
+                >
+                    <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                        <CheckCircle size={18} />
+                    </div>
+                    <div>
+                        <p className="font-bold text-sm">Account Created! 🎉</p>
+                        <p className="text-green-100 text-xs">Welcome, {formData.firstName}!</p>
                     </div>
                 </div>
             )}
+
+            <style jsx>{`
+                @keyframes slideIn {
+                    from { opacity: 0; transform: translateX(100%); }
+                    to { opacity: 1; transform: translateX(0); }
+                }
+            `}</style>
         </>
     );
 }

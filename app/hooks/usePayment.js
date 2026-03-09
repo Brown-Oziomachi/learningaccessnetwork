@@ -268,8 +268,15 @@ export const usePayment = (book, formData, sellerDetails) => {
             return;
         }
 
-        if (!flutterwaveLoaded || !window.FlutterwaveCheckout) {
-            setError({ message: 'Payment system is loading. Please try again.' });
+        if (!window.FlutterwaveCheckout) {
+            // Try to load it on the spot
+            const script = document.createElement('script');
+            script.src = 'https://checkout.flutterwave.com/v3.js';
+            document.body.appendChild(script);
+            script.onload = () => {
+                setProcessing(false);
+                processFlutterwavePayment();
+            };
             return;
         }
 
@@ -279,10 +286,9 @@ export const usePayment = (book, formData, sellerDetails) => {
         console.log('=== INITIATING PAYMENT ===');
         console.log('Book:', book.id, book.title);
         console.log('Seller:', sellerDetails.id, sellerDetails.name);
-
         const paymentConfig = {
             public_key: process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY,
-            tx_ref: `TXN-${Date.now()}-${book?.id || 'unknown'}`,
+            tx_ref: `TXN-${Date.now()}-${(book?.id || 'unknown').replace('firestore-', '')}`,
             amount: book.price,
             currency: 'NGN',
             payment_options: 'card,ussd,banktransfer',
@@ -296,6 +302,17 @@ export const usePayment = (book, formData, sellerDetails) => {
                 description: `Purchase of ${book.title || 'book'}`,
                 logo: book.image || '',
             },
+
+            // ✅ Split payment automatically to seller's subaccount
+            ...(sellerDetails?.flutterwaveSubaccountId && {
+                subaccounts: [
+                    {
+                        id: sellerDetails.flutterwaveSubaccountId,
+                        transaction_split_ratio: 80,
+                    }
+                ]
+            }),
+
             callback: async (response) => {
                 console.log('=== PAYMENT CALLBACK ===');
                 console.log('Status:', response.status);
@@ -323,10 +340,8 @@ export const usePayment = (book, formData, sellerDetails) => {
                 }
             },
             onclose: () => {
-                if (!paymentSuccess) {
-                    setProcessing(false);
-                }
-            },
+                setProcessing(false);
+            }
         };
 
         window.FlutterwaveCheckout(paymentConfig);

@@ -34,8 +34,14 @@ import WhatIsLanModal from "./WhatIsLanModal";
 export default function BookPreviewPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const bookId = searchParams.get("id");
-
+const rawBookId = searchParams.get("id");
+const bookId = rawBookId?.startsWith("firestore-")
+  ? rawBookId
+  : rawBookId
+    ? `firestore-${rawBookId}`
+    : null;
+  const cleanBookId = rawBookId?.replace("firestore-", "");
+  
   const [book, setBook] = useState(null);
   const [user, setUser] = useState(null);
   const [isPurchased, setIsPurchased] = useState(false);
@@ -540,25 +546,12 @@ useEffect(() => {
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handlePurchase = () => {
-    // If it's already a Firestore book (has firestore- prefix), use as-is
-    // If it's from lib/booksData (numeric ID), don't add prefix
-    let paymentBookId;
-
-    if (bookId?.startsWith("firestore-")) {
-      // Already has prefix, use as-is
-      paymentBookId = bookId;
-    } else if (book?.source === "firestore" && book?.firestoreId) {
-      // Firestore book but ID doesn't have prefix yet
-      paymentBookId = `firestore-${book.firestoreId}`;
-    } else {
-      // Platform book from lib/booksData - use numeric ID
-      paymentBookId = bookId;
-    }
-
-    // console.log("Navigating to payment with bookId:", paymentBookId);
-    router.push(`/payment?bookId=${paymentBookId}`);
-  };
+const handlePurchase = () => {
+  // Always strip firestore- prefix from URL — PaymentClient adds it back internally
+  const cleanId =
+    bookId?.replace("firestore-", "") || book?.firestoreId || bookId;
+  router.push(`/payment?bookId=${cleanId}`);
+};
 
   const handleDownload = () => {
     if (!isPurchased) {
@@ -701,7 +694,7 @@ const submitFeedback = async () => {
       {showNavMenu && (
         <>
           <div
-            className="fixed inset-0 bg-black/50 z-[60]"
+            className="fixed inset-0 bg-black/50 z-60"
             onClick={() => setShowNavMenu(false)}
           />
           <div className="fixed left-0 top-0 bottom-0 w-80 bg-white text-blue-950 z-[70] overflow-y-auto animate-slideRight">
@@ -931,7 +924,7 @@ const submitFeedback = async () => {
                   className="flex items-center text-blue-50 bg-blue-950 justify-center gap-2 px-4 py-2 border  rounded-lg "
                 >
                   <ThumbsUp className="w-4 h-4 " />
-                  <span className="">FeedBack: {bookFeedbackCount}</span>
+                  <span className="">Rate: {bookFeedbackCount}</span>
                 </button>
                 <button className="flex items-center text-blue-50 bg-blue-950 justify-center gap-2 px-4 py-2 border  rounded-lg">
                   <FileText size={18} />
@@ -1233,7 +1226,7 @@ const submitFeedback = async () => {
                 .map((relatedBook) => (
                   <Link
                     key={relatedBook.id}
-                    href={`/book/preview?id=${relatedBook.id}`}
+                    href={`/book/preview?id=${String(relatedBook.id).replace("firestore-", "")}`}
                     className="group"
                   >
                     <div className="relative mb-3">
@@ -1269,7 +1262,7 @@ const submitFeedback = async () => {
               .map((relatedBook) => (
                 <Link
                   key={relatedBook.id}
-                  href={`/book/preview?id=${relatedBook.id}`}
+                  href={`/book/preview?id=${String(relatedBook.id).replace("firestore-", "")}`}
                   className="group"
                 >
                   <div className="relative mb-3">
@@ -1434,7 +1427,7 @@ const submitFeedback = async () => {
                 >
                   <ThumbsUp size={24} className="text-gray-700" />
                   <span className="font-medium text-gray-900 text-lg">
-                    Feedback
+                    Rate
                   </span>
                 </button>
 

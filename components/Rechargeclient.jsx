@@ -371,7 +371,7 @@ export default function RechargeClient() {
       .catch((err) => setPlansError(err.message || "Failed to load plans"))
       .finally(() => setLoadingPlans(false));
   }, [selectedNetwork, tab]);
-    
+
   // ── Auth & load ──
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -446,23 +446,23 @@ export default function RechargeClient() {
     return !!selectedPlan;
   };
 
-const callFlutterwaveVTU = async (type, payload) => {
-  const res = await fetch("/api/recharge", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      type,
-      phone: payload.phone,
-      amount: payload.amount,
-      network: payload.network,
-      item_code: payload.item_code,
-      biller_code: payload.biller_code,
-    }),
-  });
-  const result = await res.json();
-  if (!res.ok) throw new Error(result.error || "Recharge failed");
-  return { ref: result.ref, data: result.data };
-};  
+  const callFlutterwaveVTU = async (type, payload) => {
+    const res = await fetch("/api/recharge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type,
+        phone: payload.phone,
+        amount: payload.amount,
+        network: payload.network,
+        item_code: payload.item_code,
+        biller_code: payload.biller_code,
+      }),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "Recharge failed");
+    return { ref: result.ref, data: result.data };
+  };
 
   // ── Process recharge ──
   const processRecharge = async () => {
@@ -481,13 +481,13 @@ const callFlutterwaveVTU = async (type, payload) => {
         );
       }
 
-   const { ref, data: flwData } = await callFlutterwaveVTU(tab, {
-     phone: cleanPhone,
-     amount: amt,
-     network: net,
-     item_code: selectedPlan?.item_code,
-     biller_code: selectedPlan?.biller_code,
-   });
+      const { ref, data: flwData } = await callFlutterwaveVTU(tab, {
+        phone: cleanPhone,
+        amount: amt,
+        network: net,
+        item_code: selectedPlan?.item_code,
+        biller_code: selectedPlan?.biller_code,
+      });
 
       // 3. Deduct from seller wallet via Firestore transaction
       const sellerRef = doc(db, "sellers", seller.uid);
@@ -807,16 +807,16 @@ const callFlutterwaveVTU = async (type, payload) => {
                                 setCustomAmount("");
                               }}
                               className={`py-3 rounded-xl font-bold text-sm transition-all
-                                                                ${
-                                                                  airtimeAmount ===
-                                                                    String(
-                                                                      amt,
-                                                                    ) &&
-                                                                  airtimeAmount !==
-                                                                    "custom"
-                                                                    ? "bg-blue-950 text-white shadow-sm"
-                                                                    : "bg-gray-50 text-gray-700 border border-gray-200 hover:border-blue-300"
-                                                                }`}
+                              ${
+                                airtimeAmount ===
+                                  String(
+                                    amt,
+                                  ) &&
+                                airtimeAmount !==
+                                  "custom"
+                                  ? "bg-blue-950 text-white shadow-sm"
+                                  : "bg-gray-50 text-gray-700 border border-gray-200 hover:border-blue-300"
+                              }`}
                             >
                               ₦{amt}
                             </button>

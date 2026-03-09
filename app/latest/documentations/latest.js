@@ -347,7 +347,7 @@ export default function LatestDocsClient() {
                         {displayBooks.map((book) => (
                             <a
                                 key={book.id}
-                                href={`/book/preview?id=${book.id}`}
+                                href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
                                 className="group bg-white rounded-xl shadow-md hover:shadow-2xl transition-all duration-300 overflow-hidden transform hover:-translate-y-2"
                             >
                                 <div className="relative">

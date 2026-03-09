@@ -1,13 +1,13 @@
 // app/payment/page.jsx
 import { Suspense } from "react";
-import BestsellersClient from "./bestsellers";
+import LecturersClient from "./lecturers";
 
 export const metadata = {
     title: "Best Sellers in LAN Lib | LAN Libs",
     description: "Welcome the best sellers porter, where the worlds sees the most recognizes writers in LAN Libs"
 };
 
-export default function BestsellersPage() {
+export default function LecturersPage() {
     return (
         <Suspense
             fallback={
@@ -16,7 +16,7 @@ export default function BestsellersPage() {
                 </div>
             }
         >
-            <BestsellersClient />
+            <LecturersClient />
         </Suspense>
     );
 }

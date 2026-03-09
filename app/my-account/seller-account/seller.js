@@ -7,6 +7,7 @@ import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serv
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
+import { backfillFlutterwaveSubaccount } from "@/lib/auth/backfillSubaccount";
 
 const nigerianBanks = [
     { name: "Access Bank", code: "044" },
@@ -69,6 +70,12 @@ export default function SellerAccountClient() {
         phone: "",
         address: ""
     });
+
+    useEffect(() => {
+        if (user?.uid) {
+            backfillFlutterwaveSubaccount(user.uid); // silent, non-blocking
+        }
+    }, [user?.uid]);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -318,6 +325,7 @@ export default function SellerAccountClient() {
         }
     };
     
+    
     const handleSaveBank = async () => {
         // Validate
         if (!bankFormData.accountName || !bankFormData.accountNumber || !bankFormData.bankName) {
@@ -344,6 +352,35 @@ export default function SellerAccountClient() {
                 ...prev,
                 bankDetails: bankFormData
             }));
+
+            // Re-create Flutterwave subaccount with new bank details
+            try {
+                const res = await fetch('/api/flutterwave/create-subaccount', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        uid: user.uid,
+                        email: user.email,
+                        firstName: user.firstName,
+                        surname: user.surname,
+                        phoneNumber: user.phoneNumber || user.phone || '00000000000',
+                        bankCode: bankFormData.bankCode,
+                        accountNumber: bankFormData.accountNumber,
+                        businessName: `${user.firstName} ${user.surname}`,
+                    }),
+                });
+                const flwData = await res.json();
+                if (flwData.success) {
+                    await updateDoc(doc(db, "users", user.uid), {
+                        flutterwaveSubaccountId: flwData.subaccount_id
+                    });
+                    await updateDoc(doc(db, "sellers", user.uid), {
+                        flutterwaveSubaccountId: flwData.subaccount_id
+                    });
+                }
+            } catch (flwErr) {
+                console.error('Flutterwave update failed:', flwErr); // non-blocking
+            }
 
             setShowBankModal(false);
             alert("Bank details updated successfully!");
@@ -445,6 +482,17 @@ export default function SellerAccountClient() {
                 processingNote: "Awaiting admin approval",
             };
 
+            // Add this before the addDoc call in handleWithdraw
+            if (!seller?.transferPin) {
+                setWithdrawalError("Please set up a transfer PIN first in the Transfer page.");
+                return;
+            }
+
+            const enteredPin = prompt("Enter your 4-digit PIN to confirm withdrawal:");
+            if (enteredPin !== seller?.transferPin) {
+                setWithdrawalError("Incorrect PIN. Withdrawal cancelled.");
+                return;
+            }
             await addDoc(collection(db, "withdrawals"), withdrawalData);
 
             await updateDoc(doc(db, "sellers", user.uid), {

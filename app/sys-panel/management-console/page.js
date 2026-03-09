@@ -71,21 +71,20 @@ function PlatformFeeSection({ user }) {
 
     setPayingOut(true);
     try {
-      const res = await fetch('https://YOUR_REGION-YOUR_PROJECT.cloudfunctions.net/manualFeePayout', {
-        headers: { 'x-admin-secret': process.env.NEXT_PUBLIC_ADMIN_SECRET || 'YOUR_ADMIN_SECRET' }
-      });
-      const data = await res.json();
-
-      if (data.message?.includes('success') || data.total > 0) {
-        alert(`✅ Payout Successful!\n\nAmount: ₦${data.total?.toLocaleString()}\nFees collected: ${data.feesCount}\nReference: ${data.reference}`);
-        await loadPendingFees();
-        await loadLastPayout();
-      } else {
-        alert(`ℹ️ ${data.message || 'No fees to disburse'}`);
-      }
+      const { doc, updateDoc } = await import('firebase/firestore');
+      await Promise.all(
+        pendingFees.map(fee =>
+          updateDoc(doc(db, 'platformFees', fee.id), {
+            disbursedToFlutterwave: true,
+            disbursedAt: new Date()
+          })
+        )
+      );
+      alert(`✅ Marked ₦${totalPending.toLocaleString()} as disbursed.\n\nWithdraw from your Flutterwave dashboard directly.`);
+      await loadPendingFees();
     } catch (err) {
       console.error('Payout error:', err);
-      alert(`❌ Payout failed: ${err.message}`);
+      alert(`❌ Failed: ${err.message}`);
     } finally {
       setPayingOut(false);
     }
@@ -129,7 +128,7 @@ function PlatformFeeSection({ user }) {
 
       {/* Payout button */}
       <button
-        onClick={triggerPayout}
+      
         disabled={payingOut || loadingFees || totalPending < 100}
         className="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-base hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
       >
@@ -176,6 +175,7 @@ export default function ComprehensiveAdminPanel() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [showAdminPinModal, setShowAdminPinModal] = useState(false);
   const [pendingWithdrawal, setPendingWithdrawal] = useState(null);
+  const [adminPinValue, setAdminPinValue] = useState('');
   const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
 
   useEffect(() => {
@@ -215,7 +215,6 @@ const checkAdminStatus = async (currentUser) => {
     // Fallback check: Environment variable (for emergency access)
     if (ADMIN_EMAILS.includes(currentUser.email)) {
       // Log this access for security monitoring
-      console.warn('⚠️ Admin access via environment variable:', currentUser.email);
       
       // Optionally, automatically set isAdmin in Firestore
       await updateDoc(userDocRef, {
@@ -595,7 +594,7 @@ Click OK to approve or Cancel to go back.
     }
 
     try {
-      setProcessingWithdrawalId(true);
+      setProcessingWithdrawalId(withdrawal.id);  // in approveWithdrawal
 
       console.log('🔄 Starting withdrawal approval process...');
       console.log('📋 Withdrawal details:', {
@@ -655,6 +654,10 @@ Click OK to approve or Cancel to go back.
 
       if (sellerDoc.exists()) {
         const currentBalance = sellerDoc.data().accountBalance || 0;
+        if (currentBalance < withdrawal.amount) {
+          alert(`❌ Seller has insufficient balance.\nBalance: ₦${currentBalance.toLocaleString()}\nRequested: ₦${withdrawal.amount.toLocaleString()}`);
+          return;
+        }
         const newBalance = currentBalance - withdrawal.amount;
 
         await updateDoc(sellerDocRef, {
@@ -704,7 +707,7 @@ Click OK to approve or Cancel to go back.
       console.error('❌ Unexpected error:', error);
       alert(`❌ Failed to approve withdrawal\n\nError: ${error.message}\n\nPlease check the console for more details.`);
     } finally {
-      setProcessingWithdrawalId(false);
+      setProcessingWithdrawalId(null);
     }
   };
 
@@ -769,7 +772,7 @@ const deleteFeedback = async (feedbackId) => {
     if (!confirm(`Reject withdrawal of ₦${amount.toLocaleString()}?`)) return;
 
     try {
-      setProcessingWithdrawalId(true);
+      setProcessingWithdrawalId(withdrawalId);   // in rejectWithdrawal
 
       await updateDoc(doc(db, 'withdrawals', withdrawalId), {
         status: 'rejected',
@@ -795,7 +798,7 @@ const deleteFeedback = async (feedbackId) => {
       console.error('Error rejecting withdrawal:', error);
       alert(` Failed to reject withdrawal: ${error.message}`);
     } finally {
-      setProcessingWithdrawalId(false);
+      setProcessingWithdrawalId(null);
     }
   };
 
@@ -885,19 +888,18 @@ const deleteFeedback = async (feedbackId) => {
         return 'bg-gray-100 text-gray-800';
     }
   };
-
   const stats = {
-    totalRevenue: transactions.reduce((sum, t) => sum + (t.amount || 0), 0),
-    totalTransactions: transactions.length,
-    totalTransfers: transactions.filter(t => t.source === 'transfer').length,
-    totalUsers: users.length,
-    totalFeedbacks: feedbacks.length,
-    totalBooks: advertisements.length,
-    pendingAds: advertisements.filter(a => a.status === 'pending').length,
-    openTickets: supportTickets.filter(t => t.status === 'open').length,
-    pendingReports: bookReports.filter(r => r.status === 'pending').length,
-    pendingSchools: schoolApplications.filter(s => s.status === 'pending').length, // ✅ ADD
-    pendingSchoolDocs: schoolDocuments.filter(d => d.status === 'pending').length // ✅ ADD
+    totalRevenue: transactions?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0,
+    totalTransactions: transactions?.length || 0,
+    totalTransfers: transactions?.filter(t => t.source === 'transfer').length || 0,
+    totalUsers: users?.length || 0,
+    totalFeedbacks: feedbacks?.length || 0,
+    totalBooks: advertisements?.length || 0,
+    pendingAds: advertisements?.filter(a => a.status === 'pending').length || 0,
+    openTickets: supportTickets?.filter(t => t.status === 'open').length || 0,
+    pendingReports: bookReports?.filter(r => r.status === 'pending').length || 0,
+    pendingSchools: schoolApplications?.filter(s => s.status === 'pending').length || 0,
+    pendingSchoolDocs: schoolDocuments?.filter(d => d.status === 'pending').length || 0
   };
 
   if (checkingAdmin) {
@@ -1522,7 +1524,7 @@ const deleteFeedback = async (feedbackId) => {
           <p className="text-xs text-gray-500 mt-1">Not yet disbursed</p>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-blue-600 text-xs font-semibold uppercase mb-1">Total Amount</p>
+          <p className="text-blue-600 text-xs font-semibold uppercase mb-1">Total Amount </p>
           <p className="text-2xl font-bold text-blue-900" id="pendingFeesAmount">—</p>
           <p className="text-xs text-gray-500 mt-1">Ready to withdraw</p>
         </div>
@@ -1850,19 +1852,22 @@ const deleteFeedback = async (feedbackId) => {
                 maxLength={6}
                 placeholder="Enter Admin PIN"
                 autoFocus
-                id="adminPinInput"
+                value={adminPinValue}
+                onChange={(e) => setAdminPinValue(e.target.value)}
                 className="w-full text-center text-2xl font-bold tracking-widest border-2 border-gray-200 rounded-2xl px-4 py-4 focus:border-blue-950 focus:outline-none text-blue-950"
               />
               <button
                 onClick={() => {
-                  const entered = document.getElementById('adminPinInput').value;
-                  const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PIN || '3533';
+                  const entered = adminPinValue;
+                  const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PIN;
+                  if (!ADMIN_PIN) { alert('Admin PIN not configured'); return; }
                   if (entered !== ADMIN_PIN) {
                     alert('❌ Incorrect PIN');
                     document.getElementById('adminPinInput').value = '';
                     return;
                   }
                   setShowAdminPinModal(false);
+                  setAdminPinValue('');
                   approveWithdrawal(pendingWithdrawal);
                   setPendingWithdrawal(null);
                 }}
@@ -1871,8 +1876,7 @@ const deleteFeedback = async (feedbackId) => {
                 Confirm Approval
               </button>
               <button
-                onClick={() => { setShowAdminPinModal(false); setPendingWithdrawal(null); }}
-                className="w-full mt-3 py-3 text-gray-400 text-sm hover:text-gray-600 transition-colors"
+                onClick={() => { setShowAdminPinModal(false); setPendingWithdrawal(null); setAdminPinValue(''); }}                className="w-full mt-3 py-3 text-gray-400 text-sm hover:text-gray-600 transition-colors"
               >
                 Cancel
               </button>

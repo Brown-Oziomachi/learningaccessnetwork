@@ -374,7 +374,7 @@ export default function SearchClient() {
                         {row.map(book => (
                           <Link
                             key={book.id}
-                            href={`/book/preview?id=${book.id}`}
+                            href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
                             className="flex-none w-[140px] sm:w-[160px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow snap-start"
                           >
                             <div className="relative">
@@ -413,8 +413,8 @@ export default function SearchClient() {
                   {mostSearchedBooks.map(book => (
                     <Link
                       key={book.id}
-                      href={`/book/preview?id=${book.id}`}
-                      className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                      
+className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
                     >
                       <div className="relative">
                         <img
@@ -489,8 +489,7 @@ export default function SearchClient() {
                             {row.map(book => (
                               <Link
                                 key={book.id}
-                                href={`/book/preview?id=${book.id}`}
-                                className="flex-none w-[180px] sm:w-[200px] group snap-start"
+                                href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                                className="flex-none w-[180px] sm:w-[200px] group snap-start"
                               >
                                 <div className="relative mb-3">
                                   <img
@@ -525,7 +524,7 @@ export default function SearchClient() {
                         .map(book => (
                           <Link
                             key={book.id}
-                            href={`/book/preview?id=${book.id}`}
+                            href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
                             className="group"
                           >
                             <div className="relative mb-3">
@@ -569,8 +568,8 @@ export default function SearchClient() {
                             {row.map(book => (
                               <Link
                                 key={book.id}
-                                href={`/book/preview?id=${book.id}`}
-                                className="flex-none w-[180px] sm:w-[200px] group snap-start"
+href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                                
+className="flex-none w-[180px] sm:w-[200px] group snap-start"
                               >
                                 <div className="relative mb-3">
                                   <img
@@ -607,8 +606,7 @@ export default function SearchClient() {
                         .map(book => (
                           <Link
                             key={book.id}
-                            href={`/book/preview?id=${book.id}`}
-                            className="group"
+                            href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                            className="group"
                           >
                             <div className="relative mb-3">
                               <img
@@ -645,8 +643,7 @@ export default function SearchClient() {
                         {row.map(book => (
                           <Link
                             key={book.id}
-                            href={`/book/preview?id=${book.id}`}
-                            className="flex-none w-[180px] sm:w-[200px] group snap-start"
+                            href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                            className="flex-none w-[180px] sm:w-[200px] group snap-start"
                           >
                             <div className="relative mb-3">
                               <img
@@ -685,8 +682,8 @@ export default function SearchClient() {
                   {mostSearchedBooks.map(book => (
                     <Link
                       key={book.id}
-                      href={`/book/preview?id=${book.id}`}
-                      className="group"
+href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                      
+className="group"
                     >
                       <div className="relative mb-3">
                         <img
