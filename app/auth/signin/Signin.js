@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Globe, AlertCircle, CheckCircle, BookOpen, Users, TrendingUp } from 'lucide-react';
+import { Globe, AlertCircle, CheckCircle, BookOpen } from 'lucide-react';
 import Link from 'next/link';
-import AuthLayout from '@/components/auth/AuthLayout';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 import { handleEmailPasswordSignIn } from '@/lib/auth/authHelpers';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,7 +20,6 @@ export default function SignInClient() {
         password: ''
     });
 
-    // Check if redirected after password reset
     useEffect(() => {
         const passwordReset = searchParams.get('passwordReset');
         if (passwordReset === 'success') {
@@ -48,7 +46,6 @@ export default function SignInClient() {
         setSuccessMessage(null);
 
         try {
-            // ✅ STEP 1: Check account status in Firestore BEFORE attempting login
             const { collection, query, where, getDocs } = await import('firebase/firestore');
             const { db } = await import('@/lib/firebaseConfig');
 
@@ -73,14 +70,13 @@ export default function SignInClient() {
                 }
             }
 
-            // ✅ STEP 2: Only proceed with Firebase Auth if account is active
             const result = await handleEmailPasswordSignIn(
                 loginData.email.toLowerCase().trim(),
                 loginData.password
             );
 
             if (result.success) {
-                // Successful login — auth hook handles redirect
+                // auth hook handles redirect
             } else {
                 const errorCode = result.error?.code || result.error?.errorCode || '';
                 switch (errorCode) {
@@ -120,18 +116,17 @@ export default function SignInClient() {
 
     return (
         <div className="min-h-screen flex">
+
+            {/* ── Desktop Left Panel ── */}
             <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-950 via-blue-950 to-blue-950 relative overflow-hidden">
                 <div className="absolute inset-0 flex items-center justify-center p-12">
                     <div className="max-w-lg">
-                        {/* Main Image */}
                         <div className="relative mb-8">
                             <img
                                 src="/lan.png"
                                 alt="Student"
-                                className=" shadow-2xl w-full mt-40"
+                                className="shadow-2xl w-full mt-40"
                             />
-
-                            {/* Floating Card - Books Sold */}
                             <div className="absolute top-8 -right-4 bg-white rounded-2xl shadow-xl p-4 animate-bounce">
                                 <div className="flex items-center gap-3">
                                     <div className="bg-blue-950 p-3 rounded-xl">
@@ -150,189 +145,203 @@ export default function SignInClient() {
                         </div>
                     </div>
                 </div>
-
-                {/* Logo */}
                 <div className="absolute top-0 left-8">
                     <div className="flex items-center gap-2 text-blue-950 px-10 py-3 rounded-xl">
                         <h1
-              className="text-4xl max-md:text-2xl lg:text-6xl font-bold text-gray-50"
-              style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
-            >
-              [LAN Library]
-              <p
-                className="text-xs sm:text-base font-light"
-                style={{ fontFamily: "'Lato', sans-serif" }}
-              >
-                The Global Student Library 📚
-              </p>
-            </h1>
+                            className="text-4xl max-md:text-2xl lg:text-6xl font-bold text-gray-50"
+                            style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
+                        >
+                            [LAN Library]
+                            <p className="text-xs sm:text-base font-light" style={{ fontFamily: "'Lato', sans-serif" }}>
+                                The Global Student Library 📚
+                            </p>
+                        </h1>
                     </div>
                 </div>
             </div>
 
-            {/* Right Side - Sign In Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
-                <div className="w-full max-w-md">
-                    {/* Mobile Logo */}
-                    <div className="lg:hidden mb-8 text-center">
-                        <div className="inline-flex items-center gap-2">
-                           <div className="mx-auto">
-                    <div className="flex items-center gap-2 text-blue-950 px-10 py-3 rounded-xl ">
-                        <h1
-              className="text-2xl sm:text-6xl font-bold text-blue-950 text-center"
-              style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
-            >
-              [LAN Library]
-              <h2
-                className="text-xs sm:text-base font-light"
-                style={{ fontFamily: "'Lato', sans-serif" }}
-              >
-                The Global Student Library 📚
-              </h2>
-            </h1>
+            {/* ── Right Side / Mobile Full Page ── */}
+            <div className="w-full lg:w-1/2 flex flex-col bg-white">
+
+                {/* ── Mobile Hero Image (LAN Library + Globe) ── */}
+                <div className="lg:hidden relative w-full overflow-hidden" style={{ height: '320px' }}>
+                    <img
+                        src="/lanlog.png"
+                        alt="background"
+                        className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    {/* Dark overlay */}
+                    <div className="absolute inset-0 bg-b mask-b-from-0%" />
+
+                    {/* Content on top of image */}
+                    <div className="relative z-10 h-full flex flex-col items-center justify-center gap-5">
+                        {/* <div className="text-center">
+                            <h1
+                                className="text-3xl font-bold text-white"
+                                style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
+                            >
+                                [LAN Library]
+                            </h1>
+                            <p
+                                className="text-sm font-light text-white/90 mt-1"
+                                style={{ fontFamily: "'Lato', sans-serif" }}
+                            >
+                                The Global Student Library 📚
+                            </p>
+                        </div> */}
+
+                        {/* Globe */}
+                        {/* <div className="w-24 h-24 border-4 border-white rounded-full flex items-center justify-center">
+                            <Globe className="w-12 h-12 text-white" />
+                        </div> */}
                     </div>
                 </div>
-                        </div>
-                    </div>
 
-                    {/* Globe Icon */}
-                    <div className="flex justify-center mb-10">
-                        <div className="w-24 h-24 border-4 border-blue-950 rounded-full flex items-center justify-center">
-                            <Globe className="w-12 h-12 text-blue-950" />
-                        </div>
-                    </div>
+                {/* ── Form Section ── */}
+                <div className="flex-1 flex items-start justify-center px-8 pt-8 pb-8">
+                    <div className="w-full max-w-md">
 
-                    {/* Success Message */}
-                    {successMessage && (
-                        <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-                            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                            <p className="text-green-800 text-sm font-semibold">{successMessage}</p>
+                        {/* Desktop Globe (hidden on mobile) */}
+                        <div className="hidden lg:flex justify-center mb-10">
+                            <div className="w-24 h-24 border-4 border-blue-950 rounded-full flex items-center justify-center">
+                                <Globe className="w-12 h-12 text-blue-950" />
+                            </div>
                         </div>
-                    )}
 
-                    {/* Error Message */}
-                    {error === 'suspended' && (
-                        <div className="mb-6 bg-red-600 rounded-2xl overflow-hidden shadow-lg">
-                            <div className="px-5 py-4 text-center">
-                                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <AlertCircle className="w-7 h-7 text-white" />
+                        {/* Success Message */}
+                        {successMessage && (
+                            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                                <p className="text-green-800 text-sm font-semibold">{successMessage}</p>
+                            </div>
+                        )}
+
+                        {/* Error Messages */}
+                        {error === 'suspended' && (
+                            <div className="mb-6 bg-red-600 rounded-2xl overflow-hidden shadow-lg">
+                                <div className="px-5 py-4 text-center">
+                                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <AlertCircle className="w-7 h-7 text-white" />
+                                    </div>
+                                    <p className="text-white font-black text-lg mb-1">Account Suspended</p>
+                                    <p className="text-red-100 text-sm mb-4">
+                                        This account has been suspended due to a violation of our Terms of Service. You cannot log in.
+                                    </p>
+                                    <a
+                                        href="mailto:support@lanlibrary.com"
+                                        className="inline-block bg-white text-red-600 font-bold px-6 py-2 rounded-full text-sm hover:bg-red-50 transition-colors"
+                                    >
+                                        Contact Support
+                                    </a>
                                 </div>
-                                <p className="text-white font-black text-lg mb-1">Account Suspended</p>
-                                <p className="text-red-100 text-sm mb-4">
-                                    This account has been suspended due to a violation of our Terms of Service. You cannot log in.
-                                </p>
-                                <a
-                                    href="mailto:support@lanlibrary.com"
-                                    className="inline-block bg-white text-red-600 font-bold px-6 py-2 rounded-full text-sm hover:bg-red-50 transition-colors"
-                                >
-                                    Contact Support
-                                </a>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {error === 'pending' && (
-                        <div className="mb-6 bg-yellow-500 rounded-2xl overflow-hidden shadow-lg">
-                            <div className="px-5 py-4 text-center">
-                                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <AlertCircle className="w-7 h-7 text-white" />
+                        {error === 'pending' && (
+                            <div className="mb-6 bg-yellow-500 rounded-2xl overflow-hidden shadow-lg">
+                                <div className="px-5 py-4 text-center">
+                                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <AlertCircle className="w-7 h-7 text-white" />
+                                    </div>
+                                    <p className="text-white font-black text-lg mb-1">Account Under Review</p>
+                                    <p className="text-yellow-100 text-sm mb-4">
+                                        Your account is currently under review. You'll be notified once approved.
+                                    </p>
+                                    <a
+                                        href="mailto:support@lanlibrary.com"
+                                        className="inline-block bg-white text-yellow-600 font-bold px-6 py-2 rounded-full text-sm hover:bg-yellow-50 transition-colors"
+                                    >
+                                        Contact Support
+                                    </a>
                                 </div>
-                                <p className="text-white font-black text-lg mb-1">Account Under Review</p>
-                                <p className="text-yellow-100 text-sm mb-4">
-                                    Your account is currently under review. You'll be notified once approved.
-                                </p>
-                                <a
-                                    href="mailto:support@lanlibrary.com"
-                                    className="inline-block bg-white text-yellow-600 font-bold px-6 py-2 rounded-full text-sm hover:bg-yellow-50 transition-colors"
-                                >
-                                    Contact Support
-                                </a>
+                            </div>
+                        )}
+
+                        {error && error !== 'suspended' && error !== 'pending' && (
+                            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                <p className="text-red-800 text-sm">{error}</p>
+                            </div>
+                        )}
+
+                        {/* Google Sign In */}
+                        <div className="mb-8">
+                            <GoogleSignInButton />
+                        </div>
+
+                        {/* OR Divider */}
+                        <div className="mb-8">
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-gray-300"></div>
+                                </div>
+                                <div className="relative flex justify-center text-sm">
+                                    <span className="px-4 bg-white text-gray-500">OR</span>
+                                </div>
                             </div>
                         </div>
-                    )}
 
-                    {error && error !== 'suspended' && error !== 'pending' && (
-                        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                            <p className="text-red-800 text-sm">No network connection. Please try again</p>
+                        {/* Email Input */}
+                        <div className="mb-5">
+                            <input
+                                type="email"
+                                placeholder="Email address"
+                                value={loginData.email}
+                                onChange={(e) => {
+                                    setLoginData(prev => ({ ...prev, email: e.target.value }));
+                                    setError(null);
+                                    setSuccessMessage(null);
+                                }}
+                                className="w-full px-5 py-4 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-950 focus:ring-1 focus:ring-blue-950 transition-colors"
+                                disabled={loading}
+                            />
                         </div>
-                    )}
-                    {/* Google Sign In */}
-                    <div className="mb-8">
-                        <GoogleSignInButton />
-                    </div>
 
-                    {/* OR Divider */}
-                    <div className="mb-8">
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-gray-300"></div>
-                            </div>
-                            <div className="relative flex justify-center text-sm">
-                                <span className="px-4 bg-white text-gray-500">OR</span>
-                            </div>
+                        {/* Password Input */}
+                        <div className="mb-6">
+                            <input
+                                type="password"
+                                placeholder="Password"
+                                value={loginData.password}
+                                onChange={(e) => {
+                                    setLoginData(prev => ({ ...prev, password: e.target.value }));
+                                    setError(null);
+                                    setSuccessMessage(null);
+                                }}
+                                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                                className="w-full px-5 py-4 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-950 focus:ring-1 focus:ring-blue-950 transition-colors"
+                                disabled={loading}
+                            />
                         </div>
-                    </div>
 
-                    {/* Email Input */}
-                    <div className="mb-5">
-                        <input
-                            type="email"
-                            placeholder="Email address"
-                            value={loginData.email}
-                            onChange={(e) => {
-                                setLoginData(prev => ({ ...prev, email: e.target.value }));
-                                setError(null);
-                                setSuccessMessage(null);
-                            }}
-                            className="w-full px-5 py-4 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-950 focus:ring-1 focus:ring-blue-950 transition-colors"
+                        {/* Sign In Button */}
+                        <button
+                            onClick={handleLogin}
                             disabled={loading}
-                        />
-                    </div>
-
-                    {/* Password Input */}
-                    <div className="mb-6">
-                        <input
-                            type="password"
-                            placeholder="Password"
-                            value={loginData.password}
-                            onChange={(e) => {
-                                setLoginData(prev => ({ ...prev, password: e.target.value }));
-                                setError(null);
-                                setSuccessMessage(null);
-                            }}
-                            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                            className="w-full px-5 py-4 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-950 focus:ring-1 focus:ring-blue-950 transition-colors"
-                            disabled={loading}
-                        />
-                    </div>
-
-                    {/* Sign In Button */}
-                    <button
-                        onClick={handleLogin}
-                        disabled={loading}
-                        className="w-full bg-blue-950 text-white py-4 rounded-full font-semibold text-lg hover:bg-blue-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-5"
-                    >
-                        {loading ? 'Logging in...' : 'Log in'}
-                    </button>
-
-                    {/* Forgot Password */}
-                    <div className="text-center mb-32">
-                        <Link href="/auth/forgot-password" className="text-blue-950 hover:underline text-base">
-                            Forgotten password?
-                        </Link>
-                    </div>
-
-                    {/* Create Account Button */}
-                    <Link href="/auth/signup" className="block mb-6">
-                        <button className="w-full bg-white border-2 border-gray-900 text-gray-900 py-4 rounded-full font-semibold text-lg hover:bg-gray-50 transition-colors">
-                            Create new account
+                            className="w-full bg-blue-950 text-white py-4 rounded-full font-semibold text-lg hover:bg-blue-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-5"
+                        >
+                            {loading ? 'Logging in...' : 'Log in'}
                         </button>
-                    </Link>
 
-                    {/* Footer */}
-                    <div className="text-center text-base text-gray-500">
-                        <span>Learning Access Network</span>
+                        {/* Forgot Password */}
+                        <div className="text-center mb-10">
+                            <Link href="/auth/forgot-password" className="text-blue-950 hover:underline text-base">
+                                Forgotten password?
+                            </Link>
+                        </div>
+
+                        {/* Create Account Button */}
+                        <Link href="/auth/signup" className="block mb-6">
+                            <button className="w-full bg-white border-2 border-gray-900 text-gray-900 py-4 rounded-full font-semibold text-lg hover:bg-gray-50 transition-colors">
+                                Create new account
+                            </button>
+                        </Link>
+
+                        {/* Footer */}
+                        <div className="text-center text-base text-gray-500">
+                            <span>Learning Access Network</span>
+                        </div>
+
                     </div>
                 </div>
             </div>

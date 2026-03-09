@@ -12,6 +12,7 @@ import {
   Clock, ThumbsUp
 } from 'lucide-react';
 import { BookApprovalModal, ReplyModal, TransactionModal, UserModal } from '@/components/ApprovalModal';
+import FlwBalanceWidget from '@/components/admin/FlwBalanceWidget';
 
 // ── Platform Fee Section Component ──────────────────────────────────────────
 function PlatformFeeSection({ user }) {
@@ -988,6 +989,7 @@ const deleteFeedback = async (feedbackId) => {
                 </div>
               ))}
             </div>
+            <FlwBalanceWidget />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 { title: 'Pending Book Approvals', count: stats.pendingAds, section: 'advertisements', color: 'yellow', bg: 'yellow-50', border: 'yellow-200' },

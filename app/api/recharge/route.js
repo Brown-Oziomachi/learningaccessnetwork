@@ -19,10 +19,10 @@ const MOCK_PLANS = [
     { id: '10GB', name: '10GB - 30 Days', size: '10GB', price: 3500, item_code: 'TEST_10GB' },
 ];
 
+const ALERT_THRESHOLD = 50000;
 const isTestMode = () =>
     process.env.FLUTTERWAVE_SECRET_KEY?.includes('FLWSECK_TEST') ?? false;
 
-// Node https helper — avoids Windows fetch DNS issues
 function flwRequest(method, path, secretKey, bodyObj = null) {
     return new Promise((resolve, reject) => {
         const bodyStr = bodyObj ? JSON.stringify(bodyObj) : null;
@@ -41,17 +41,35 @@ function flwRequest(method, path, secretKey, bodyObj = null) {
             let data = '';
             res.on('data', (c) => (data += c));
             res.on('end', () => {
-                try {
-                    resolve({ status: res.statusCode, data: JSON.parse(data) });
-                } catch {
-                    reject(new Error('Non-JSON response (' + res.statusCode + '): ' + data.slice(0, 300)));
-                }
+                try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
+                catch { reject(new Error('Non-JSON response (' + res.statusCode + '): ' + data.slice(0, 300))); }
             });
         });
         req.on('error', reject);
         if (bodyStr) req.write(bodyStr);
         req.end();
     });
+}
+
+async function getFlutterwaveBalance(key) {
+    try {
+        const { status, data } = await flwRequest('GET', '/v3/balances/NGN', key);
+        if (status === 200 && data.status === 'success') {
+            return data.data?.available_balance || 0;
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+// Fire-and-forget balance alert check after each purchase
+async function triggerBalanceAlert(baseUrl) {
+    try {
+        await fetch(`${baseUrl}/api/flutterwave-balance-alert`, { method: 'POST' });
+    } catch (e) {
+        console.error('[recharge] Balance alert trigger failed:', e.message);
+    }
 }
 
 // ── GET /api/recharge?network=MTN → fetch data plans ─────────────────────────
@@ -63,7 +81,6 @@ export async function GET(request) {
         return NextResponse.json({ error: 'Invalid network' }, { status: 400 });
     }
 
-    // Test mode → return mock plans
     if (isTestMode()) {
         return NextResponse.json({
             plans: MOCK_PLANS.map((p) => ({ ...p, biller_code: BILLER_CODES[network] })),
@@ -71,28 +88,16 @@ export async function GET(request) {
         });
     }
 
-    // Live mode — correct endpoint: /v3/bill-categories?biller_code=BIL108
     try {
         const key = getV3SecretKey();
         const billerCode = BILLER_CODES[network];
-        const path = '/v3/bill-categories?biller_code=' + billerCode;
-
-        console.log('[recharge] Fetching from:', path);
-
-        const { status, data } = await flwRequest('GET', path, key);
-
-        console.log('[recharge] Status:', status, '| FLW status:', data?.status);
+        const { status, data } = await flwRequest('GET', '/v3/bill-categories?biller_code=' + billerCode, key);
 
         if (status !== 200 || data.status !== 'success') {
-            return NextResponse.json(
-                { error: data.message || 'Failed to fetch plans' },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: data.message || 'Failed to fetch plans' }, { status: 400 });
         }
 
-        const items = Array.isArray(data.data) ? data.data : [];
-
-        const plans = items.map((item) => ({
+        const plans = (Array.isArray(data.data) ? data.data : []).map((item) => ({
             id: String(item.id),
             name: item.name,
             size: item.name,
@@ -103,7 +108,6 @@ export async function GET(request) {
 
         return NextResponse.json({ plans });
     } catch (err) {
-        console.error('Fetch plans error:', err);
         return NextResponse.json({ error: err.message || 'Failed to fetch plans' }, { status: 500 });
     }
 }
@@ -116,52 +120,38 @@ export async function POST(request) {
 
         const formattedPhone = phone.startsWith('0')
             ? '+234' + phone.slice(1)
-            : phone.startsWith('234')
-                ? '+' + phone
-                : phone;
+            : phone.startsWith('234') ? '+' + phone : phone;
 
         const ref = 'LAN_' + type.toUpperCase() + '_' + Date.now() + '_' +
             Math.random().toString(36).slice(2, 8).toUpperCase();
 
-        // Test mode → simulate
+        // ── TEST MODE: reject properly ────────────────────────────────────────
         if (isTestMode()) {
-            return NextResponse.json({
-                ref,
-                data: {
-                    status: 'success',
-                    message: '[TEST] ' + (type === 'airtime' ? 'Airtime' : 'Data') + ' purchase simulated',
-                    data: { phone_number: formattedPhone, amount: Number(amount), network, reference: ref },
-                },
-            });
+            return NextResponse.json(
+                { error: 'Airtime and data top-up is not supported in test mode. Switch to live Flutterwave keys.' },
+                { status: 400 }
+            );
         }
 
-        // Live mode
+        // ── LIVE MODE ─────────────────────────────────────────────────────────
         const key = getV3SecretKey();
-        const payload =
-            type === 'airtime'
-                ? {
-                    country: 'NG',
-                    customer: formattedPhone,
-                    amount: Number(amount),
-                    recurrence: 'ONCE',
-                    type: 'AIRTIME',
-                    reference: ref,
-                }
-                : {
-                    country: 'NG',
-                    customer: formattedPhone,
-                    amount: Number(amount),
-                    recurrence: 'ONCE',
-                    type: item_code,
-                    reference: ref,
-                    biller_code,
-                };
 
-        console.log('[recharge] POST payload:', JSON.stringify(payload));
+        // 1. Check FLW wallet balance
+        const flwBalance = await getFlutterwaveBalance(key);
+        if (flwBalance !== null && flwBalance < Number(amount)) {
+            console.error(`[recharge] FLW wallet ₦${flwBalance} insufficient for ₦${amount}`);
+            return NextResponse.json(
+                { error: 'Service temporarily unavailable. Please try again shortly or contact support.' },
+                { status: 503 }
+            );
+        }
+
+        // 2. Build payload and call Flutterwave
+        const payload = type === 'airtime'
+            ? { country: 'NG', customer: formattedPhone, amount: Number(amount), recurrence: 'ONCE', type: 'AIRTIME', reference: ref }
+            : { country: 'NG', customer: formattedPhone, amount: Number(amount), recurrence: 'ONCE', type: item_code, reference: ref, biller_code };
 
         const { status, data } = await flwRequest('POST', '/v3/bills', key, payload);
-
-        console.log('[recharge] POST response:', JSON.stringify(data).slice(0, 300));
 
         if (status !== 200 || data.status !== 'success') {
             return NextResponse.json(
@@ -170,7 +160,26 @@ export async function POST(request) {
             );
         }
 
-        return NextResponse.json({ ref, data });
+        // 3. Check delivery status
+        const deliveryStatus = data.data?.data?.status || data.data?.status || '';
+        if (deliveryStatus && deliveryStatus.toLowerCase() === 'failed') {
+            return NextResponse.json(
+                { error: 'Top-up delivery failed. Your wallet has not been debited.' },
+                { status: 400 }
+            );
+        }
+
+        // 4. Trigger balance alert check (non-blocking, fire and forget)
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+        triggerBalanceAlert(baseUrl);
+
+        // 5. Also immediately warn in response if balance is getting low
+        const balanceWarning = (flwBalance !== null && flwBalance - Number(amount) < ALERT_THRESHOLD)
+            ? { balanceWarning: true, remainingBalance: flwBalance - Number(amount) }
+            : {};
+
+        return NextResponse.json({ ref, data, ...balanceWarning });
+
     } catch (err) {
         console.error('Recharge error:', err);
         return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
