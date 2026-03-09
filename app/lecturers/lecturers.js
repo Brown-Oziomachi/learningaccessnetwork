@@ -294,7 +294,7 @@ export default function LecturersClient() {
 
                                     {/* CTA */}
                                     <button className="w-full flex items-center justify-center gap-2 bg-blue-950 text-white py-2.5 rounded-xl text-sm font-bold group-hover:bg-blue-800 transition-colors">
-                                        View Profile
+                                        View documents
                                         <ChevronRight size={16} />
                                     </button>
                                 </div>

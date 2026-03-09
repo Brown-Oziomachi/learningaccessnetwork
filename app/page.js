@@ -400,7 +400,7 @@ export default function LearningAccessNetwork() {
             <img
               src="/lanlog.png"
               alt="LAN Logo"
-              className=" h-16 w-16 lg:h-26 lg:w-26 object-contain"
+              className=" h-16 w-16 lg:h-26 lg:w-26 object-contain rounded-full"
             />
           </Link>
         </div>
