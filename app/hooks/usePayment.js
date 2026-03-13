@@ -1,4 +1,4 @@
-// app/hooks/usePayment.js - FIXED VERSION
+// app/hooks/usePayment.js - COMPLETE FIX
 import { useState, useEffect } from 'react';
 import { db, auth } from '@/lib/firebaseConfig';
 import { collection, addDoc, doc, updateDoc, serverTimestamp, increment, getDoc, setDoc } from 'firebase/firestore';
@@ -7,33 +7,19 @@ const calculatePaymentDistribution = (book) => {
     const isPlatformBook = book.source === 'platform' || book.isPlatformBook === true;
 
     if (isPlatformBook) {
-        // Platform book: Owner gets 100%, no platform fee
         return {
             isPlatformBook: true,
             platformFee: 0,
-            sellerAmount: book.price, // 100% to owner
+            sellerAmount: book.price,
             distributionType: 'platform_owner_book'
         };
     } else {
-        // User book: Seller gets 80%, platform gets 25%
         return {
             isPlatformBook: false,
-            platformFee: Math.round(book.price * 0.25),
+            platformFee: Math.round(book.price * 0.20),
             sellerAmount: Math.round(book.price * 0.80),
             distributionType: 'user_seller_book'
         };
-    }
-};
-
-const getPaymentSplitDescription = (book) => {
-    const isPlatformBook = book.source === 'platform' || book.isPlatformBook === true;
-
-    if (isPlatformBook) {
-        return `100% (₦${book.price.toLocaleString()}) to platform owner`;
-    } else {
-        const sellerAmount = Math.round(book.price * 0.80);
-        const platformFee = Math.round(book.price * 0.25);
-        return `80% (₦${sellerAmount.toLocaleString()}) to seller, 25% (₦${platformFee.toLocaleString()}) platform fee`;
     }
 };
 
@@ -43,7 +29,6 @@ export const usePayment = (book, formData, sellerDetails) => {
     const [error, setError] = useState(null);
     const [flutterwaveLoaded, setFlutterwaveLoaded] = useState(false);
 
-    // Load Flutterwave script
     useEffect(() => {
         if (typeof window !== 'undefined' && !window.FlutterwaveCheckout) {
             const script = document.createElement('script');
@@ -56,23 +41,19 @@ export const usePayment = (book, formData, sellerDetails) => {
         }
     }, []);
 
-   
     const saveTransaction = async (paymentData, status = 'completed') => {
         try {
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             console.log('=== SAVING TRANSACTION ===');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-            // CALCULATE PAYMENT DISTRIBUTION (ADD THIS)
             const distribution = calculatePaymentDistribution(book);
-            console.log('Payment Distribution:', distribution);
-            console.log('Split:', getPaymentSplitDescription(book));
+            console.log('💰 Payment Distribution:', distribution);
 
             const currentUser = auth.currentUser;
-            if (!currentUser) {
-                throw new Error('User not authenticated');
-            }
+            if (!currentUser) throw new Error('User not authenticated');
 
             const transactionData = {
-                // Transaction details
                 transactionId: paymentData.transaction_id || paymentData.tx_ref,
                 transactionRef: paymentData.tx_ref,
                 flutterwaveRef: paymentData.flw_ref || null,
@@ -80,45 +61,35 @@ export const usePayment = (book, formData, sellerDetails) => {
                 amount: book.price,
                 currency: 'NGN',
                 paymentMethod: paymentData.payment_type || 'flutterwave',
-
-                // Book details
                 bookId: book.id,
                 firestoreId: book.firestoreId || null,
                 bookTitle: book.title,
                 bookAuthor: book.author,
                 bookPrice: book.price,
                 bookCategory: book.category || null,
-                bookSource: book.source || 'firestore', // ADD THIS
-
-                // Buyer details
+                bookSource: book.source || 'firestore',
                 buyerId: currentUser.uid,
                 buyerEmail: formData.email,
                 buyerName: formData.name,
                 buyerPhone: formData.phone,
-
-                // Seller details
                 sellerId: sellerDetails?.id || null,
                 sellerName: sellerDetails?.name || 'Unknown Seller',
                 sellerEmail: sellerDetails?.email || null,
                 sellerPhone: sellerDetails?.phone || null,
-
-                // UPDATED: Use calculated distribution
                 platformFee: distribution.platformFee,
                 sellerAmount: distribution.sellerAmount,
                 isPlatformBook: distribution.isPlatformBook,
                 distributionType: distribution.distributionType,
-
-                // Timestamps
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
                 purchaseDate: new Date().toISOString(),
             };
 
-            // 1. Save to transactions collection
+            // 1. Save transaction
             const transactionRef = await addDoc(collection(db, 'transactions'), transactionData);
-            console.log('✓ Transaction saved with ID:', transactionRef.id);
+            console.log('✅ Transaction saved:', transactionRef.id);
 
-            // 2. Update buyer's purchased books (UNCHANGED - keep your existing code)
+            // 2. Update buyer
             try {
                 const userRef = doc(db, 'users', currentUser.uid);
                 const userDoc = await getDoc(userRef);
@@ -137,39 +108,39 @@ export const usePayment = (book, formData, sellerDetails) => {
                     pdfUrl: book.pdfUrl || null,
                 };
 
-                const updates = {
-                    updatedAt: serverTimestamp()
-                };
-
+                const updates = { updatedAt: serverTimestamp() };
                 if (!userDoc.exists() || !userDoc.data()?.purchasedBooks) {
                     updates.purchasedBooks = {};
                 }
                 updates[`purchasedBooks.${book.id}`] = purchaseData;
-
-                // Store underfirestoreId if different from main ID
                 if (book.firestoreId && book.firestoreId !== book.id) {
                     updates[`purchasedBooks.${book.firestoreId}`] = purchaseData;
                 }
-                
 
                 await updateDoc(userRef, updates);
-                console.log('✓ Buyer purchase record updated');
+                console.log('✅ Buyer record updated');
             } catch (buyerError) {
-                console.error('✗ Error updating buyer record:', buyerError);
+                console.error('❌ Error updating buyer record:', buyerError);
             }
 
-            // 3. Update seller's records - UPDATED with dynamic amount
+            // 3. ✅ CRITICAL FIX: Update seller wallet - ALWAYS
             if (sellerDetails?.id) {
-                const sellerAmount = distribution.sellerAmount; 
-                const platformFee = distribution.platformFee; 
+                const sellerAmount = distribution.sellerAmount;
+                const platformFee = distribution.platformFee;
+
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.log('💳 UPDATING SELLER WALLET');
+                console.log('Seller ID:', sellerDetails.id);
+                console.log('Amount to credit:', sellerAmount);
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
                 try {
-                    // Update users collection (seller profile)
+                    // Update users collection
                     const userSellerRef = doc(db, 'users', sellerDetails.id);
                     const sellerSnapshot = await getDoc(userSellerRef);
 
                     if (sellerSnapshot.exists()) {
-                        const sellerUpdates = {
+                        await updateDoc(userSellerRef, {
                             [`sales.${transactionRef.id}`]: {
                                 transactionId: transactionRef.id,
                                 bookId: book.id,
@@ -177,7 +148,7 @@ export const usePayment = (book, formData, sellerDetails) => {
                                 amount: book.price,
                                 sellerEarnings: sellerAmount,
                                 platformFee: platformFee,
-                                distributionType: distribution.distributionType, // NEW
+                                distributionType: distribution.distributionType,
                                 buyerId: currentUser.uid,
                                 buyerName: formData.name,
                                 buyerEmail: formData.email,
@@ -189,69 +160,105 @@ export const usePayment = (book, formData, sellerDetails) => {
                             totalEarnings: increment(sellerAmount),
                             lastSaleDate: serverTimestamp(),
                             updatedAt: serverTimestamp()
-                        };
-
-                        await updateDoc(userSellerRef, sellerUpdates);
-                        console.log('✓ Seller user profile updated');
+                        });
+                        console.log('✅ Seller user profile updated');
                     }
 
+                    // ✅ CRITICAL: Update sellers collection - CREATE IF NOT EXISTS
                     const sellersRef = doc(db, 'sellers', sellerDetails.id);
                     const sellerDoc = await getDoc(sellersRef);
 
+                    console.log('📊 Seller doc exists?', sellerDoc.exists());
+
                     if (sellerDoc.exists()) {
+                        const currentData = sellerDoc.data();
+                        console.log('📊 Current seller data:', {
+                            accountBalance: currentData.accountBalance || 0,
+                            totalEarnings: currentData.totalEarnings || 0,
+                            booksSold: currentData.booksSold || 0
+                        });
+
+                        // ✅ Update existing seller document
                         await updateDoc(sellersRef, {
-                            accountBalance: increment(sellerAmount),
+                            accountBalance: increment(sellerAmount),  // ✅ THIS UPDATES BALANCE
                             totalEarnings: increment(sellerAmount),
                             booksSold: increment(1),
                             lastSaleDate: serverTimestamp(),
                             updatedAt: serverTimestamp()
                         });
-                        console.log('✓ Seller account balance updated');
+
+                        console.log('✅ SELLER WALLET UPDATED SUCCESSFULLY');
+                        console.log(`💰 Balance credited: +₦${sellerAmount.toLocaleString()}`);
+
+                        // Verify the update
+                        const verifyDoc = await getDoc(sellersRef);
+                        const verifiedData = verifyDoc.data();
+                        console.log('✅ Verified new balance:', verifiedData.accountBalance);
+
                     } else {
-                        console.log('ℹ️ No seller doc found — skipping seller wallet update');
+                        // ✅ CREATE new seller document if it doesn't exist
+                        console.log('⚠️ Seller document does not exist. Creating...');
+
+                        await setDoc(sellersRef, {
+                            sellerId: sellerDetails.id,
+                            sellerEmail: sellerDetails.email || 'unknown@email.com',
+                            sellerName: sellerDetails.name || 'Unknown Seller',
+                            accountBalance: sellerAmount,  // ✅ INITIAL BALANCE
+                            totalEarnings: sellerAmount,
+                            booksSold: 1,
+                            lastSaleDate: serverTimestamp(),
+                            createdAt: serverTimestamp(),
+                            updatedAt: serverTimestamp()
+                        });
+
+                        console.log('✅ NEW SELLER DOCUMENT CREATED');
+                        console.log(`💰 Initial balance set: ₦${sellerAmount.toLocaleString()}`);
                     }
 
-                    console.log('✓ Seller credited:', {
-                        sellerId: sellerDetails.id,
-                        amount: sellerAmount,
-                        type: distribution.distributionType,
-                        bookTitle: book.title
-                    });
                 } catch (sellerUpdateError) {
-                    console.error('✗ Error updating seller record:', sellerUpdateError);
+                    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.error('❌ CRITICAL ERROR UPDATING SELLER WALLET');
+                    console.error('Error:', sellerUpdateError);
+                    console.error('Error code:', sellerUpdateError.code);
+                    console.error('Error message:', sellerUpdateError.message);
+                    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+                    // Don't throw - allow transaction to complete
+                    // But log it for debugging
                 }
+            } else {
+                console.error('❌ NO SELLER DETAILS PROVIDED');
             }
 
-            // 4. Update book's sales count (UNCHANGED)
+            // 4. Update book sales count
             if (book.firestoreId) {
                 try {
                     const bookRef = doc(db, 'advertMyBook', book.firestoreId);
                     const bookDoc = await getDoc(bookRef);
-
                     if (bookDoc.exists()) {
                         await updateDoc(bookRef, {
                             salesCount: increment(1),
                             lastPurchaseDate: serverTimestamp(),
                             updatedAt: serverTimestamp()
                         });
-                        console.log('✓ Book sales count updated');
+                        console.log('✅ Book sales count updated');
                     }
                 } catch (bookUpdateError) {
-                    console.error('✗ Error updating book sales count:', bookUpdateError);
+                    console.error('❌ Error updating book sales count:', bookUpdateError);
                 }
             }
 
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('✅ TRANSACTION COMPLETE');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
             return transactionRef.id;
         } catch (err) {
-            console.error('✗ CRITICAL Error saving transaction:', err);
+            console.error('❌ CRITICAL Error saving transaction:', err);
             throw err;
         }
     };
 
-
-    /**
-     * Process Flutterwave payment
-     */
     const processFlutterwavePayment = () => {
         if (!book) {
             setError({ message: 'Book information is missing' });
@@ -269,7 +276,6 @@ export const usePayment = (book, formData, sellerDetails) => {
         }
 
         if (!window.FlutterwaveCheckout) {
-            // Try to load it on the spot
             const script = document.createElement('script');
             script.src = 'https://checkout.flutterwave.com/v3.js';
             document.body.appendChild(script);
@@ -284,8 +290,9 @@ export const usePayment = (book, formData, sellerDetails) => {
         setError(null);
 
         console.log('=== INITIATING PAYMENT ===');
-        console.log('Book:', book.id, book.title);
+        console.log('Book:', book.id, book.title, '₦' + book.price);
         console.log('Seller:', sellerDetails.id, sellerDetails.name);
+
         const paymentConfig = {
             public_key: process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY,
             tx_ref: `TXN-${Date.now()}-${(book?.id || 'unknown').replace('firestore-', '')}`,
@@ -302,16 +309,6 @@ export const usePayment = (book, formData, sellerDetails) => {
                 description: `Purchase of ${book.title || 'book'}`,
                 logo: book.image || '',
             },
-
-            // ✅ Split payment automatically to seller's subaccount
-            ...(sellerDetails?.flutterwaveSubaccountId && {
-                subaccounts: [
-                    {
-                        id: sellerDetails.flutterwaveSubaccountId,
-                        transaction_split_ratio: 80,
-                    }
-                ]
-            }),
 
             callback: async (response) => {
                 console.log('=== PAYMENT CALLBACK ===');
@@ -348,7 +345,6 @@ export const usePayment = (book, formData, sellerDetails) => {
     };
 
     const processPayPalPayment = async () => {
-        // PayPal implementation (mock for now)
         setProcessing(true);
         setError(null);
 

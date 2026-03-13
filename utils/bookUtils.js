@@ -91,7 +91,7 @@ export const fetchBookDetails = async (bookId) => {
                 return {
                     ...platformBook,
                     source: 'platform',
-                    isPlatformBook: true, // Make sure this is set
+                    isPlatformBook: true,
                     sellerId: platformBook.sellerId,
                     sellerName: platformBook.sellerName,
                     sellerEmail: platformBook.sellerEmail,
@@ -177,7 +177,7 @@ export const fetchSellerDetails = async (book) => {
                 accountDetails: userData.accountDetails || null,
                 walletId: userData.walletId || null,
                 bankAccount: userData.bankAccount || null,
-                flutterwaveSubaccountId: userData.flutterwaveSubaccountId || null, 
+                flutterwaveSubaccountId: userData.flutterwaveSubaccountId || null,
             };
         }
 
@@ -196,7 +196,7 @@ export const fetchSellerDetails = async (book) => {
                 accountDetails: null,
                 walletId: null,
                 bankAccount: null,
-                flutterwaveSubaccountId: sellerData.flutterwaveSubaccountId || null, 
+                flutterwaveSubaccountId: sellerData.flutterwaveSubaccountId || null,
             };
         }
 
@@ -226,4 +226,70 @@ export const fetchSellerDetails = async (book) => {
             bankAccount: null
         };
     }
+};
+
+// ─── Payment Distribution ──────────────────────────────────────────────────────
+
+/**
+ * Calculate how payment is split between seller and platform
+ * User books:     Seller 80% / Platform 20%
+ * Platform books: Platform owner 100%
+ */
+export const calculatePaymentDistribution = (book, amount) => {
+    const isPlatformBook = book.source === 'platform' || book.isPlatformBook === true;
+
+    if (isPlatformBook) {
+        return {
+            isPlatformBook: true,
+            bookSource: 'platform',
+            platformFee: 0,
+            platformAmount: 0,
+            sellerAmount: amount,           // 100% to platform owner
+            sellerReceivesPayment: true,
+            distributionType: 'platform_owner_book',
+            paymentSplit: '100% to platform owner',
+        };
+    } else {
+        const platformFee = Math.round(amount * 0.20);  // 20%
+        const sellerAmount = amount - platformFee;       // 80%
+
+        return {
+            isPlatformBook: false,
+            bookSource: 'firestore',
+            platformFee,
+            platformAmount: platformFee,
+            sellerAmount,
+            sellerReceivesPayment: true,
+            distributionType: 'user_seller_book',
+            paymentSplit: '80% to seller, 20% to platform',
+        };
+    }
+};
+
+/**
+ * Check whether a seller should be credited after a purchase
+ */
+export const shouldCreditSeller = (book) => {
+    if (book.source === 'platform' || book.isPlatformBook) {
+        return !!book.sellerId;
+    }
+    return book.source === 'firestore' && !!book.sellerId;
+};
+
+/**
+ * Get a human-readable description of who receives payment
+ */
+export const getPaymentRecipient = (book) => {
+    if (book.source === 'platform' || book.isPlatformBook) {
+        return {
+            type: 'platform_owner',
+            message: 'Payment will be credited to platform owner account',
+            percentage: 100
+        };
+    }
+    return {
+        type: 'user_seller',
+        message: 'Payment will be credited to seller account (80%)',
+        percentage: 80
+    };
 };

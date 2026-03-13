@@ -8,6 +8,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
 import { backfillFlutterwaveSubaccount } from "@/lib/auth/backfillSubaccount";
+import NotificationBell from "@/components/NotificationBell";
 
 const nigerianBanks = [
     { name: "Access Bank", code: "044" },
@@ -277,55 +278,11 @@ export default function SellerAccountClient() {
             setTransactions(allTransactions);
 
             // 7. Calculate earnings — exclude transfers from earnings calculation
-            if (allTransactions.length > 0) {
-                const salesOnly = allTransactions.filter(
-                    txn => txn.type !== 'transfer_out' && txn.type !== 'transfer_in'
-                );
-                const calculatedEarnings = salesOnly.reduce((sum, txn) => {
-                    return sum + (txn.sellerAmount || (txn.amount * 0.80));
-                }, 0);
-                const calculatedBooksSold = salesOnly.length;
-
-                const totalWithdrawn = withdrawalsList
-                    .filter(w => w.status === 'completed')
-                    .reduce((sum, w) => sum + (w.amount || 0), 0);
-
-                const totalTransferred = transfersList.reduce((sum, t) => sum + (t.amount || 0), 0);
-                const calculatedBalance = calculatedEarnings - totalWithdrawn - totalTransferred;
-
-                setTotalEarnings(calculatedEarnings);
-                setBooksSold(calculatedBooksSold);
-
-                // Use Firestore balance as source of truth (transfers already update it atomically)
-                const sellerDocRef = doc(db, "sellers", uid);
-                const sellerDoc = await getDoc(sellerDocRef);
-                if (sellerDoc.exists()) {
-                    const firestoreBalance = sellerDoc.data().accountBalance || 0;
-                    setAccountBalance(firestoreBalance);
-                }
-
-                if (sellerDoc.exists()) {
-                    const currentData = sellerDoc.data();
-                    const needsUpdate =
-                        Math.abs(currentData.totalEarnings - calculatedEarnings) > 0.01 ||
-                        currentData.booksSold !== calculatedBooksSold;
-
-                    if (needsUpdate) {
-                        await updateDoc(sellerDocRef, {
-                            totalEarnings: calculatedEarnings,
-                            booksSold: calculatedBooksSold,
-                            updatedAt: serverTimestamp()
-                        });
-                    }
-                }
-            }
-
         } catch (error) {
-            console.error("Error fetching transactions:", error);
+            console.error("Error fetching seller transactions:", error);
         }
     };
-    
-    
+
     const handleSaveBank = async () => {
         // Validate
         if (!bankFormData.accountName || !bankFormData.accountNumber || !bankFormData.bankName) {
@@ -505,8 +462,7 @@ export default function SellerAccountClient() {
 
             alert(`✅ Withdrawal request submitted!\n\nAmount: ₦${amount.toLocaleString()}\nReference: ${withdrawalRef}\n\nYour request is pending admin approval. You will be notified once processed.`);
 
-            await fetchSellerTransactions(user.uid);
-
+            await fetchUserData(user.uid); // re-fetches balance from Firestore after withdrawal
         } catch (error) {
             console.error("Withdrawal error:", error);
             setWithdrawalError("Failed to submit withdrawal request: " + error.message);
@@ -657,21 +613,28 @@ export default function SellerAccountClient() {
                                 </div>
                             </button>
                         </div>
-                        <div className="bg-blue-950 rounded-xl shadow-sm px-4 sm:px-6 py-3 sm:py-4 grid grid-cols-1 gap-2 lg:flex lg:gap-2 w-full sm:w-auto">
-                            <button
-                                onClick={handleButton}
-                                className="bg-pink-500 hover:bg-pink-600 text-white text-xs lg:text-sm font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap"
-                            >
-                               GET HELP
-                            </button>
-                            {user?.role === 'student' && (
-                                <Link href="/student/dashboard">
-                                    <button className="bg-green-600 hover:bg-green-700 text-white text-xs lg:text-sm font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap w-full">
-                                        Student Dashboard
-                                    </button>
-                                </Link>
-                            )}
-                        </div>
+                     <div className="bg-blue-950 rounded-xl shadow-sm px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center gap-2 w-full sm:w-auto">
+
+  <div className="flex-shrink-0">
+    <NotificationBell userId={user?.uid} />
+  </div>
+
+  <button
+    onClick={handleButton}
+    className="bg-pink-500 hover:bg-pink-600 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap w-full sm:w-auto"
+  >
+    GET HELP
+  </button>
+
+  {user?.role === "student" && (
+    <Link href="/student/dashboard" className="w-full sm:w-auto">
+      <button className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap w-full sm:w-auto">
+        Student Dashboard
+      </button>
+    </Link>
+  )}
+
+</div>
                     </div>
                 </div>
 
@@ -766,7 +729,7 @@ export default function SellerAccountClient() {
                                             <p className={`font-bold ${txn.type === 'transfer_out' ? 'text-red-500' : 'text-green-600'}`}>
                                                 {txn.type === 'transfer_out'
                                                     ? `-₦${txn.amount?.toLocaleString()}`
-                                                    : `+₦${(txn.sellerAmount || (txn.amount * 0.85)).toLocaleString()}`}
+                                                    : `+₦${(txn.sellerAmount || (txn.amount * 0.80)).toLocaleString()}`}
                                             </p>
                                             <p className="text-xs text-gray-500">
                                                 {txn.type === 'transfer_out' ? 'Transfer Sent' : 'Success'}
@@ -1068,8 +1031,8 @@ export default function SellerAccountClient() {
                                                 <span className="text-blue-950 font-medium">₦{txn.amount?.toLocaleString()}</span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span className="text-gray-600">Platform Fee (15%):</span>
-                                                <span className="text-red-600 font-medium">-₦{((txn.amount || 0) * 0.15).toLocaleString()}</span>
+                                                <span className="text-gray-600">Platform Fee (20%):</span>
+                                                <span className="text-red-600 font-medium">-₦{((txn.amount || 0) * 0.20).toLocaleString()}</span>
                                             </div>
                                         </div>
                                     </div>

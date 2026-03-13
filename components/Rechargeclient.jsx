@@ -808,12 +808,8 @@ export default function RechargeClient() {
                               }}
                               className={`py-3 rounded-xl font-bold text-sm transition-all
                               ${
-                                airtimeAmount ===
-                                  String(
-                                    amt,
-                                  ) &&
-                                airtimeAmount !==
-                                  "custom"
+                                airtimeAmount === String(amt) &&
+                                airtimeAmount !== "custom"
                                   ? "bg-blue-950 text-white shadow-sm"
                                   : "bg-gray-50 text-gray-700 border border-gray-200 hover:border-blue-300"
                               }`}

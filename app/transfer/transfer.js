@@ -340,40 +340,40 @@ export default function TransferClient() {
     }, []);
 
     const loadRecentTransfers = async (uid) => {
-    try {
-        const sentQ = query(
-            collection(db, 'transfers'),
-            where('senderId', '==', uid),
-            orderBy('createdAt', 'desc'),
-            limit(20)
-        );
-        const receivedQ = query(
-            collection(db, 'transfers'),
-            where('recipientId', '==', uid),
-            orderBy('createdAt', 'desc'),
-            limit(20)
-        );
+        try {
+            const sentQ = query(
+                collection(db, 'transfers'),
+                where('senderId', '==', uid),
+                orderBy('createdAt', 'desc'),
+                limit(20)
+            );
+            const receivedQ = query(
+                collection(db, 'transfers'),
+                where('recipientId', '==', uid),
+                orderBy('createdAt', 'desc'),
+                limit(20)
+            );
 
-        const [sentSnap, receivedSnap] = await Promise.all([
-            getDocs(sentQ),
-            getDocs(receivedQ)
-        ]);
+            const [sentSnap, receivedSnap] = await Promise.all([
+                getDocs(sentQ),
+                getDocs(receivedQ)
+            ]);
 
-        const sent = sentSnap.docs.map(d => ({ id: d.id, ...d.data(), type: 'sent' }));
-        const received = receivedSnap.docs.map(d => ({ id: d.id, ...d.data(), type: 'received' }));
+            const sent = sentSnap.docs.map(d => ({ id: d.id, ...d.data(), type: 'sent' }));
+            const received = receivedSnap.docs.map(d => ({ id: d.id, ...d.data(), type: 'received' }));
 
-        const all = [...sent, ...received].sort((a, b) => {
-            const aTime = a.createdAt?.toMillis?.() || 0;
-            const bTime = b.createdAt?.toMillis?.() || 0;
-            return bTime - aTime;
-        });
+            const all = [...sent, ...received].sort((a, b) => {
+                const aTime = a.createdAt?.toMillis?.() || 0;
+                const bTime = b.createdAt?.toMillis?.() || 0;
+                return bTime - aTime;
+            });
 
-        setRecentTransfers(all.slice(0, 20));
-    } catch (err) {
-        console.error('Recent transfers error:', err);
-    }
+            setRecentTransfers(all.slice(0, 20));
+        } catch (err) {
+            console.error('Recent transfers error:', err);
+        }
     };
-    
+
     // ── Save PIN to Firestore ──
     const handleSavePin = async (pin) => {
         await updateDoc(doc(db, 'sellers', seller.uid), {

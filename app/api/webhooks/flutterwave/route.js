@@ -1,9 +1,20 @@
 // app/api/webhooks/flutterwave/route.js
+// NOTE: Seller wallet crediting and transaction recording are DISABLED here.
+// usePayment.js handles both directly on purchase — running them here too
+// was causing double-increments on booksSold/totalEarnings and
+// inconsistent accountBalance updates.
 
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebaseConfig';
-import { doc, getDoc, setDoc, updateDoc, arrayUnion, serverTimestamp, increment } from 'firebase/firestore';
-import crypto from 'crypto';
+import {
+    doc,
+    getDoc,
+    setDoc,
+    updateDoc,
+    arrayUnion,
+    serverTimestamp,
+    increment,
+} from 'firebase/firestore';
 
 export async function POST(request) {
     try {
@@ -45,97 +56,93 @@ export async function POST(request) {
         const platformFee = amount - netEarning;
 
         // 1. Update buyer's purchased books
+        // (kept here as a safety fallback in case usePayment.js fails)
         const userRef = doc(db, 'users', userId);
         const userDoc = await getDoc(userRef);
 
         if (userDoc.exists()) {
-            const existingPurchases = userDoc.data().purchasedBooks || [];
-            const alreadyPurchased = existingPurchases.some(book => book.id === bookId);
+            const existingPurchases = userDoc.data().purchasedBooks || {};
+            const alreadyPurchased = existingPurchases[bookId] != null;
 
             if (!alreadyPurchased) {
                 await updateDoc(userRef, {
-                    purchasedBooks: arrayUnion({
+                    [`purchasedBooks.${bookId}`]: {
                         id: bookId,
                         title: bookTitle,
                         purchasedAt: new Date().toISOString(),
                         amount: amount,
-                        transactionRef: tx_ref
-                    })
+                        transactionRef: tx_ref,
+                    }
                 });
-                console.log('✓ Added book to user purchases');
+                console.log('✓ Added book to user purchases (webhook fallback)');
             } else {
-                console.log('Book already in user purchases');
+                console.log('Book already in user purchases — skipping');
             }
         }
 
-        // 2. Update or create seller account with earnings
-        const sellerRef = doc(db, 'sellers', sellerId);
-        const sellerDoc = await getDoc(sellerRef);
+        // 2. DISABLED — seller wallet crediting
+        // usePayment.js already does this directly on purchase via setDoc merge:true.
+        // Running it here too was causing double-increments on booksSold and
+        // totalEarnings, and accountBalance was getting inconsistent values.
+        //
+        // const sellerRef = doc(db, 'sellers', sellerId);
+        // const sellerDoc = await getDoc(sellerRef);
+        // if (sellerDoc.exists()) {
+        //     await updateDoc(sellerRef, {
+        //         accountBalance: increment(netEarning),
+        //         totalEarnings: increment(netEarning),
+        //         booksSold: increment(1),
+        //         lastSaleAt: serverTimestamp()
+        //     });
+        // } else {
+        //     await setDoc(sellerRef, {
+        //         sellerId, sellerEmail, sellerName,
+        //         accountBalance: netEarning,
+        //         totalEarnings: netEarning,
+        //         booksSold: 1,
+        //         createdAt: serverTimestamp(),
+        //         lastSaleAt: serverTimestamp()
+        //     });
+        // }
 
-        if (sellerDoc.exists()) {
-            // Update existing seller account
-            await updateDoc(sellerRef, {
-                accountBalance: increment(netEarning),
-                totalEarnings: increment(netEarning),
-                booksSold: increment(1),
-                lastSaleAt: serverTimestamp()
-            });
-            console.log(`✓ Updated seller balance: +₦${netEarning}`);
-        } else {
-            // Create new seller account
-            await setDoc(sellerRef, {
-                sellerId: sellerId,
-                sellerEmail: sellerEmail,
-                sellerName: sellerName,
-                accountBalance: netEarning,
-                totalEarnings: netEarning,
-                booksSold: 1,
-                createdAt: serverTimestamp(),
-                lastSaleAt: serverTimestamp()
-            });
-            console.log(`✓ Created seller account with ₦${netEarning}`);
-        }
-
-        // 3. Record transaction for tracking
-        const transactionRef = doc(db, 'transactions', tx_ref);
-        await setDoc(transactionRef, {
-            transactionRef: tx_ref,
-            userId: userId,
-            buyerEmail: customer.email,
-            buyerName: customer.name,
-            sellerId: sellerId,
-            sellerEmail: sellerEmail,
-            sellerName: sellerName,
-            bookId: bookId,
-            bookTitle: bookTitle,
-            amount: amount,
-            netEarning: netEarning,
-            platformFee: platformFee,
-            currency: currency,
-            status: 'completed',
-            paymentMethod: paymentData.payment_type,
-            date: serverTimestamp(),
-            createdAt: serverTimestamp()
-        });
-        console.log('✓ Transaction recorded');
+        // 3. DISABLED — transaction recording
+        // usePayment.js already saves a full transaction doc to the
+        // 'transactions' collection. Recording it again here created
+        // duplicate transaction entries.
+        //
+        // const transactionRef = doc(db, 'transactions', tx_ref);
+        // await setDoc(transactionRef, {
+        //     transactionRef: tx_ref,
+        //     userId, buyerEmail: customer.email, buyerName: customer.name,
+        //     sellerId, sellerEmail, sellerName,
+        //     bookId, bookTitle, amount, netEarning, platformFee,
+        //     currency, status: 'completed',
+        //     paymentMethod: paymentData.payment_type,
+        //     date: serverTimestamp(), createdAt: serverTimestamp()
+        // });
 
         // 4. Update book purchase count (if book exists in advertMyBook)
-        if (bookId.startsWith('firestore-')) {
-            const firestoreBookId = bookId.replace('firestore-', '');
-            const bookRef = doc(db, 'advertMyBook', firestoreBookId);
-            const bookDoc = await getDoc(bookRef);
+        if (bookId && bookId.startsWith('firestore-')) {
+            try {
+                const firestoreBookId = bookId.replace('firestore-', '');
+                const bookRef = doc(db, 'advertMyBook', firestoreBookId);
+                const bookDoc = await getDoc(bookRef);
 
-            if (bookDoc.exists()) {
-                await updateDoc(bookRef, {
-                    purchases: increment(1),
-                    lastPurchaseAt: serverTimestamp()
-                });
-                console.log('✓ Updated book purchase count');
+                if (bookDoc.exists()) {
+                    await updateDoc(bookRef, {
+                        purchases: increment(1),
+                        lastPurchaseAt: serverTimestamp(),
+                    });
+                    console.log('✓ Updated book purchase count');
+                }
+            } catch (bookErr) {
+                console.error('Failed to update book count:', bookErr);
             }
         }
 
         // 5. Send notification to seller
         try {
+            const sellerRef = doc(db, 'sellers', sellerId);
             const sellerDocData = await getDoc(sellerRef);
             const currentBalance = sellerDocData.exists()
                 ? sellerDocData.data().accountBalance
@@ -150,13 +157,13 @@ export async function POST(request) {
                     amount,
                     netEarning,
                     buyerEmail: customer.email,
-                    currentBalance
-                })
+                    currentBalance,
+                }),
             });
             console.log('✓ Seller notification sent');
         } catch (notifError) {
             console.error('Failed to send seller notification:', notifError);
-            // Don't fail the webhook if notification fails
+            // Non-blocking — don't fail the webhook if notification fails
         }
 
         console.log('✅ Webhook processed successfully');
@@ -167,16 +174,16 @@ export async function POST(request) {
                 buyer: userId,
                 seller: sellerId,
                 book: bookTitle,
-                amount: amount,
-                sellerEarning: netEarning
-            }
+                amount,
+                sellerEarning: netEarning,
+            },
         }, { status: 200 });
 
     } catch (error) {
         console.error('Webhook error:', error);
         return NextResponse.json({
             error: 'Webhook processing failed',
-            details: error.message
+            details: error.message,
         }, { status: 500 });
     }
 }

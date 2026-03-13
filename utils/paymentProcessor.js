@@ -22,8 +22,8 @@ export const calculatePaymentDistribution = (book, amount) => {
             }
         };
     } else {
-        // User-uploaded book: Seller gets 85%, Platform gets 15%
-        const platformFee = Math.round(amount * 0.15);
+        // User-uploaded book: Seller gets 80%, Platform gets 20%
+        const platformFee = Math.round(amount * 0.20);
         const sellerAmount = amount - platformFee;
 
         return {
@@ -34,7 +34,7 @@ export const calculatePaymentDistribution = (book, amount) => {
             sellerAmount: sellerAmount,
             sellerReceivesPayment: true, // YES, user seller gets paid
             distributionType: 'user_seller_book',
-            paymentSplit: '85% to seller, 15% to platform',
+            paymentSplit: '80% to seller, 20% to platform',
             sellerDetails: {
                 sellerId: book.sellerId,
                 sellerName: book.sellerName,
@@ -70,8 +70,8 @@ export const getPaymentRecipient = (book) => {
     } else {
         return {
             type: 'user_seller',
-            message: 'Payment will be credited to seller account (85%)',
-            percentage: 85
+            message: 'Payment will be credited to seller account (80%)',
+            percentage: 80
         };
     }
 };

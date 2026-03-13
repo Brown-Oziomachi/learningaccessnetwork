@@ -207,7 +207,7 @@ export default function LearningAccessNetwork() {
         </h1>
         <div>
           <h2 className="bg-blue-950 text-white text-xs md:text-xl font-semibold mt-3 text-center px-5 py-1 rounded">
-          The Global Student Library 📚         
+            The Global Student Library 📚
           </h2>
         </div>
         <div className="py-5">
@@ -218,12 +218,12 @@ export default function LearningAccessNetwork() {
               <div className="absolute inset-0 bg-gradient-to-br from-blue-950 to-blue-800 rounded-lg shadow-2xl">
                 {/* Spine */}
                 <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-r from-blue-950 to-blue-900 rounded-l-lg"></div>
-                
+
                 {/* Pages turning animation */}
                 <div className="page-turn page-1"></div>
                 <div className="page-turn page-2"></div>
                 <div className="page-turn page-3"></div>
-                
+
                 {/* Cover content that transitions */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="book-content-transition">
@@ -233,7 +233,7 @@ export default function LearningAccessNetwork() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                       </svg>
                     </div>
-                    
+
                     {/* LAN text phase */}
                     <div className="content-phase lan-text-phase">
                       <div className="flex gap-1 text-white font-black text-3xl">
@@ -244,12 +244,12 @@ export default function LearningAccessNetwork() {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Glossy overlay */}
                 <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent rounded-lg pointer-events-none"></div>
               </div>
             </div>
-            
+
             {/* Loading indicator */}
             <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
               <div className="w-2 h-2 bg-blue-950 rounded-full loading-dot" style={{ animationDelay: '0s' }}></div>
@@ -430,16 +430,15 @@ export default function LearningAccessNetwork() {
           <h1 className="text-4xl font-black text-white mb-4 leading-tight ">
             The Global Student Library 📚
           </h1>
-            <h1 className="text-xl text-yellow-300 mb-1 font-bold">
-                  Share the wealth [of knowledge].
-                  </h1>
-                <p className="text-lg mb-4 leading-relaxed font-bold">Turn your books into income. Upload your work, reach a global audience [90M+], and earn whenever readers discover and purchase your content.
-                </p>
+          <h1 className="text-xl text-yellow-300 mb-1 font-bold">
+            Share the wealth [of knowledge].
+          </h1>
+          <p className="text-lg mb-4 leading-relaxed font-bold">Turn your books into income. Upload your work, reach a global audience [90M+], and earn whenever readers discover and purchase your content.
+          </p>
           <p className="text-white text-lg mb-6 leading-relaxed">
             A secure marketplace where <span className="font-bold text-yellow-300">students and authors sell original works</span> and <span className="font-bold text-yellow-300">learners access course-specific knowledge</span> they need to excel.
           </p>
           <div className="flex flex-col gap-3">
-
             <a href="/auth/signin" target="_blank"
               className="bg-white text-center text-blue-950 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
             >
@@ -506,7 +505,7 @@ export default function LearningAccessNetwork() {
                     Browse Books
                     <ArrowRight className="w-5 h-5" />
                   </a>
-                  <button 
+                  <button
                     onClick={() => setShowWhatIsLanModal(true)}
                     className="cursor-pointer px-8 py-4 border-2 border-white text-white font-bold rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
                   >
@@ -648,11 +647,11 @@ export default function LearningAccessNetwork() {
                   </li>
                 </ul>
                 <div className='mt-5'>
-                <a href="/auth/signin" target="_blank"
-                  className=" px-8 py-4 bg-blue-950 text-white font-bold rounded-lg hover:bg-blue-900 transition-all shadow-lg"
-                >
-                  Start Learning →
-                </a>
+                  <a href="/auth/signin" target="_blank"
+                    className=" px-8 py-4 bg-blue-950 text-white font-bold rounded-lg hover:bg-blue-900 transition-all shadow-lg"
+                  >
+                    Start Learning →
+                  </a>
                 </div>
               </div>
             </motion.div>
@@ -842,12 +841,12 @@ export default function LearningAccessNetwork() {
                   </li>
                 </ul>
                 <div className='mt-5'>
-                <a href="/auth/signin" target="_blank"
-                  className="mt-8 px-8 py-4 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-all shadow-lg"
-                >
-                  Start Selling →
+                  <a href="/auth/signin" target="_blank"
+                    className="mt-8 px-8 py-4 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-all shadow-lg"
+                  >
+                    Start Selling →
                   </a>
-                  </div>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -916,342 +915,520 @@ export default function LearningAccessNetwork() {
         </div>
       </section>
 
-{/* Key Benefits Section */}
-<section className="py-20 bg-white">
-  <div className="max-w-5xl mx-auto px-6 text-center">
-    
-    {/* Header */}
-    <h2 className="text-5xl font-black text-gray-900 mb-4">Key Benefits</h2>
-    <p className="text-gray-500 text-lg max-w-2xl mx-auto mb-16">
-      Our payment system is designed for sellers on LAN Library who need fast, 
-      reliable access to their earnings without delays or complications.
-    </p>
+      {/* Key Benefits Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-5xl mx-auto px-6 text-center">
 
-    {/* Top 3 Benefits */}
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-16">
-      
-      {/* Instant Payout */}
-      <div className="flex flex-col items-center text-center">
-        <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
-          <span className="text-5xl">⚡</span>
-        </div>
-        <h3 className="text-xl font-black text-gray-900 mb-3">Instant seller payout</h3>
-        <p className="text-gray-500 text-base leading-relaxed">
-          Get paid immediately after a buyer purchases your book, directly into your LAN wallet.
-        </p>
-      </div>
+          {/* Header */}
+          <h2 className="text-5xl font-black text-gray-900 mb-4">Key Benefits</h2>
+          <p className="text-gray-500 text-lg max-w-2xl mx-auto mb-16">
+            Our payment system is designed for sellers on LAN Library who need fast,
+            reliable access to their earnings without delays or complications.
+          </p>
 
-      {/* Flexible Withdrawal */}
-      <div className="flex flex-col items-center text-center">
-        <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
-          <span className="text-5xl">🔄</span>
-        </div>
-        <h3 className="text-xl font-black text-gray-900 mb-3">Flexible withdrawal</h3>
-        <p className="text-gray-500 text-base leading-relaxed">
-          Withdraw your earnings at any time that suits you, to any Nigerian bank account.
-        </p>
-      </div>
+          {/* Top 3 Benefits */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-16">
 
-      {/* No Hidden Fees */}
-      <div className="flex flex-col items-center text-center">
-        <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
-          <span className="text-5xl">🚫</span>
-        </div>
-        <h3 className="text-xl font-black text-gray-900 mb-3">No hidden charges</h3>
-        <p className="text-gray-500 text-base leading-relaxed">
-          Transfer your money without surprise fees or physical paperwork. What you earn is what you get.
-        </p>
-      </div>
-
-    </div>
-
-    {/* Bottom Center Benefit */}
-    <div className="flex flex-col items-center text-center max-w-xs mx-auto">
-      <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
-        <span className="text-5xl">💰</span>
-      </div>
-      <h3 className="text-xl font-black text-gray-900 mb-3">Earn up to ₦500K monthly</h3>
-      <p className="text-gray-500 text-base leading-relaxed">
-        Top sellers on LAN Library earn consistently, from small daily sales to large monthly payouts.
-      </p>
-    </div>
-
-  </div>
-      </section>
-      
-      {/* Featured Books Section */}
-      {!loadingBooks && featuredBooks.length > 0 && (
-        <section className="py-20 bg-white">
-          <div className="max-w-7xl mx-auto px-4">
-            <div className="text-center mb-12">
-              <h2 className="text-4xl font-black text-gray-900 mb-4">Featured Books</h2>
-              <p className="text-gray-600 text-lg">Recently published by our community</p>
+            {/* Instant Payout */}
+            <div className="flex flex-col items-center text-center">
+              <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
+                <span className="text-5xl">⚡</span>
+              </div>
+              <h3 className="text-xl font-black text-gray-900 mb-3">Instant seller payout</h3>
+              <p className="text-gray-500 text-base leading-relaxed">
+                Get paid immediately after a buyer purchases your book, directly into your LAN wallet.
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-              {featuredBooks.slice(0, 10).map((book) => (
+            {/* Flexible Withdrawal */}
+            <div className="flex flex-col items-center text-center">
+              <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
+                <span className="text-5xl">🔄</span>
+              </div>
+              <h3 className="text-xl font-black text-gray-900 mb-3">Flexible withdrawal</h3>
+              <p className="text-gray-500 text-base leading-relaxed">
+                Withdraw your earnings at any time that suits you, to any Nigerian bank account.
+              </p>
+            </div>
+
+            {/* No Hidden Fees */}
+            <div className="flex flex-col items-center text-center">
+              <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
+                <span className="text-5xl">🚫</span>
+              </div>
+              <h3 className="text-xl font-black text-gray-900 mb-3">No hidden charges</h3>
+              <p className="text-gray-500 text-base leading-relaxed">
+                Transfer your money without surprise fees or physical paperwork. What you earn is what you get.
+              </p>
+            </div>
+
+          </div>
+
+          {/* Bottom Center Benefit */}
+          <div className="flex flex-col items-center text-center max-w-xs mx-auto">
+            <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
+              <span className="text-5xl">💰</span>
+            </div>
+            <h3 className="text-xl font-black text-gray-900 mb-3">Earn up to ₦500K monthly</h3>
+            <p className="text-gray-500 text-base leading-relaxed">
+              Top sellers on LAN Library earn consistently, from small daily sales to large monthly payouts.
+            </p>
+          </div>
+
+        </div>
+      </section>
+
+      <div className="px-4 py-6">
+
+        {/* Recharge Services Section - Add this before the footer in your landing page */}
+        <section className="relative z-10 py-16 px-4 bg-gradient-to-br from-white via-blue-50 to-white">
+          <div className="max-w-7xl mx-auto">
+            {/* Section Header */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              className="text-center mb-12"
+            >
+              <div className="inline-block mb-4">
+                <span className="bg-blue-950 text-white px-6 py-2 rounded-full text-sm font-bold uppercase tracking-wider">
+                  Beyond Books
+                </span>
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 mt-2">
+                The smartest fintech platform for students.
+              </h2>
+              <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-blue-950 mb-4">
+                Campus Life Made Easy
+              </h2>
+              <p className="text-xl md:text-2xl text-gray-700 max-w-3xl mx-auto font-semibold">
+                Buy books, sell notes, and recharge everything—all in one platform
+              </p>
+            </motion.div>
+
+            {/* Services Grid - Desktop & Mobile Optimized */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6"
+            >
+              {/* Item 1: Airtime */}
+              <div className="group bg-gradient-to-br from-orange-500 to-orange-600 p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 cursor-pointer relative overflow-hidden">
+                {/* Decorative Background Pattern */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+
+                <div className="relative z-10">
+                  <div className="w-14 h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                    <svg className="w-7 h-7 md:w-9 md:h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="font-black text-white text-lg md:text-2xl mb-2">Airtime</h3>
+                  <p className="text-orange-100 text-xs md:text-sm font-semibold leading-tight">
+                    Instant top-up for all networks
+                  </p>
+                  <div className="mt-4 text-white/80 text-xs md:text-sm font-bold">
+                    From ₦50 →
+                  </div>
+                </div>
+              </div>
+
+              {/* Item 2: Data */}
+              <div className="group bg-gradient-to-br from-blue-600 to-blue-700 p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 cursor-pointer relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+
+                <div className="relative z-10">
+                  <div className="w-14 h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                    <svg className="w-7 h-7 md:w-9 md:h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8.111 16.404a5.5 5.5 0 117.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                    </svg>
+                  </div>
+                  <h3 className="font-black text-white text-lg md:text-2xl mb-2">Cheap Data</h3>
+                  <p className="text-blue-100 text-xs md:text-sm font-semibold leading-tight">
+                    SME bundles from ₦250
+                  </p>
+                  <div className="mt-4 text-white/80 text-xs md:text-sm font-bold">
+                    Save up to 40% →
+                  </div>
+                </div>
+              </div>
+
+              {/* Item 3: Electricity */}
+              <div className="group bg-gradient-to-br from-green-500 to-green-600 p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 cursor-pointer relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+
+                <div className="relative z-10">
+                  <div className="w-14 h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                    <svg className="w-7 h-7 md:w-9 md:h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <h3 className="font-black text-white text-lg md:text-2xl mb-2">Electricity</h3>
+                  <p className="text-green-100 text-xs md:text-sm font-semibold leading-tight">
+                    Pay for your hostel units
+                  </p>
+                  <div className="mt-4 text-white/80 text-xs md:text-sm font-bold">
+                    All discos supported →
+                  </div>
+                </div>
+              </div>
+
+              {/* Item 4: TV/Cable */}
+              <div className="group bg-gradient-to-br from-purple-600 to-purple-700 p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 cursor-pointer relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+
+                <div className="relative z-10">
+                  <div className="w-14 h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                    <svg className="w-7 h-7 md:w-9 md:h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="font-black text-white text-lg md:text-2xl mb-2">TV/Cable</h3>
+                  <p className="text-purple-100 text-xs md:text-sm font-semibold leading-tight">
+                    DSTV, GOTV & Startimes
+                  </p>
+                  <div className="mt-4 text-white/80 text-xs md:text-sm font-bold">
+                    Quick renewal →
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* CTA Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+              className="mt-12 text-center"
+            >
+              <div className="bg-blue-950 text-white p-8 md:p-12 rounded-3xl shadow-2xl max-w-4xl mx-auto">
+                <h3 className="text-2xl md:text-4xl font-black mb-4">
+                  One Platform. Everything You Need. 🚀
+                </h3>
+                <p className="text-blue-100 text-lg md:text-xl mb-6 font-semibold">
+                  Study smarter, earn money, and manage your campus life—all from your phone
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                  <a href="/auth/signin" className="bg-white text-blue-950 px-8 py-4 rounded-full font-black text-lg hover:bg-blue-50 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105">
+                    Get Started Free
+                  </a>
+                  
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Trust Badges */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.6 }}
+              className="mt-12 flex flex-wrap justify-center items-center gap-8 text-gray-600"
+            >
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="font-bold text-sm">Instant Delivery</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="font-bold text-sm">100% Secure</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="font-bold text-sm">24/7 Support</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="font-bold text-sm">Best Rates</span>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Featured Books Section */}
+        {!loadingBooks && featuredBooks.length > 0 && (
+          <section className="py-20 bg-white">
+            <div className="max-w-7xl mx-auto px-4">
+              <div className="text-center mb-12">
+                <h2 className="text-4xl font-black text-gray-900 mb-4">Featured Books</h2>
+                <p className="text-gray-600 text-lg">Recently published by our community</p>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                {featuredBooks.slice(0, 10).map((book) => (
+                  <button
+                    key={book.id}
+                    onClick={() => navigateToSignIn()}
+                    className="group text-left"
+                  >
+                    <div className="relative mb-3 overflow-hidden shadow-lg">
+                      <img
+                        src={book.image}
+                        alt={book.title}
+                        className="w-full h-72 object-cover group-hover:scale-110 transition-transform duration-300"
+                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+                        <span className="text-white font-bold">Sign in to view</span>
+                      </div>
+                    </div>
+                    <h3 className="font-bold text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-950">
+                      {book.title}
+                    </h3>
+                    <p className="text-gray-600 text-sm mb-2">{book.author}</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                        <span className="text-sm font-semibold">{book.rating}</span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Testimonials Section */}
+        <section className="py-20 bg-gray-50">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="text-center mb-16">
+              <h2 className="text-5xl md:text-6xl font-black text-gray-900 mb-6">
+                Over 10,000+ people love us. You will too.
+              </h2>
+              <p className="text-2xl text-gray-600">Watch The Video And Learn More About Us.</p>
+            </div>
+
+            <div className="grid lg:grid-cols-3 gap-8">
+              {/* Left Column */}
+              <div className="space-y-8">
+                <div className="bg-white rounded-2xl p-8 shadow-lg">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Unimaginably Excellent</h3>
+                  <p className="text-gray-700 leading-relaxed mb-6">
+                    I could not imagine how great LAN Library works until I signed up with them. Honestly, this is my first time reviewing about any website but I must say that I'm happy to write how excellent this platform operates.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-yellow-500 rounded-full flex items-center justify-center text-white font-bold">
+                      K
+                    </div>
+                    <span className="font-semibold text-gray-900">Kevin</span>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-8 shadow-lg">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Best in Class Support</h3>
+                  <p className="text-gray-700 leading-relaxed mb-6">
+                    LAN Library is a great company with one of the best supports I've ever seen.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold">
+                      T
+                    </div>
+                    <span className="font-semibold text-gray-900">Theresa</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Center Column - Video */}
+              <div className="lg:row-span-1">
                 <button
-                  key={book.id}
-                  onClick={() => navigateToSignIn()}
-                  className="group text-left"
+                  onClick={() => handleVideoClick(videos[1])}
+                  className="group relative w-full h-full min-h-[500px] rounded-2xl overflow-hidden shadow-2xl"
                 >
-                  <div className="relative mb-3 overflow-hidden shadow-lg">
-                    <img
-                      src={book.image}
-                      alt={book.title}
-                      className="w-full h-72 object-cover group-hover:scale-110 transition-transform duration-300"
-                      onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
-                      <span className="text-white font-bold">Sign in to view</span>
+                  <img
+                    src="/lanlogo.jpg"
+                    alt="Testimonial video"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 to-transparent" />
+
+                  {/* Play Button */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-xl">
+                      <Play className="w-10 h-10 text-gray-900 fill-gray-900 ml-1" />
                     </div>
                   </div>
-                  <h3 className="font-bold text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-950">
-                    {book.title}
-                  </h3>
-                  <p className="text-gray-600 text-sm mb-2">{book.author}</p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                      <span className="text-sm font-semibold">{book.rating}</span>
+
+                  {/* Name at Bottom */}
+                  <div className="absolute bottom-8 left-8 flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-950 to-blue-950 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                      LAN
                     </div>
+                    <span className="text-blue-950 font-bold text-xl">LAN Library</span>
                   </div>
                 </button>
-              ))}
+              </div>
+
+              {/* Right Column */}
+              <div className="space-y-8">
+                <div className="bg-white rounded-2xl p-8 shadow-lg">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Best exchange rates</h3>
+                  <p className="text-gray-700 leading-relaxed mb-6">
+                    The platform is intuitive, seamless and easy to use. It is also the platform with the best prices for buying books and materials.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold">
+                      B
+                    </div>
+                    <span className="font-semibold text-gray-900">Banji</span>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-8 shadow-lg">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Seamless for Purchases</h3>
+                  <p className="text-gray-700 leading-relaxed mb-6">
+                    LAN Library has been helping me since last year that I found it, I don't have to stress about finding books anymore as it comes quickly and very fast.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold">
+                      B
+                    </div>
+                    <span className="font-semibold text-gray-900">Blessing</span>
+                  </div>
+                </div>
+              </div>
+              <a href="/learn/make-money" target="_blank"
+                className="px-10 py-4 bg-white text-blue-950 font-black rounded-lg hover:bg-gray-100 transition-all shadow-xl text-lg mx-auto"
+              >
+                Watch More Videos
+              </a>
             </div>
           </div>
         </section>
-      )}
 
-      {/* Testimonials Section */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-5xl md:text-6xl font-black text-gray-900 mb-6">
-              Over 10,000+ people love us. You will too.
-            </h2>
-            <p className="text-2xl text-gray-600">Watch The Video And Learn More About Us.</p>
-          </div>
+        {/* CTA Section */}
+        <section className="py-20 bg-gradient-to-br from-blue-950 to-indigo-950 text-white">
+          <div className="max-w-4xl mx-auto px-4 text-center">
+            <h2 className="text-5xl font-black mb-6">Ready to Start Earning?</h2>
+            <p className="text-xl text-blue-100 mb-10">
+              Join thousands of sellers making money with their knowledge. Get 80% revenue share on every sale.
+            </p>
 
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Left Column */}
-            <div className="space-y-8">
-              <div className="bg-white rounded-2xl p-8 shadow-lg">
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Unimaginably Excellent</h3>
-                <p className="text-gray-700 leading-relaxed mb-6">
-                  I could not imagine how great LAN Library works until I signed up with them. Honestly, this is my first time reviewing about any website but I must say that I'm happy to write how excellent this platform operates.
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-yellow-500 rounded-full flex items-center justify-center text-white font-bold">
-                    K
-                  </div>
-                  <span className="font-semibold text-gray-900">Kevin</span>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl p-8 shadow-lg">
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Best in Class Support</h3>
-                <p className="text-gray-700 leading-relaxed mb-6">
-                  LAN Library is a great company with one of the best supports I've ever seen.
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold">
-                    T
-                  </div>
-                  <span className="font-semibold text-gray-900">Theresa</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Center Column - Video */}
-            <div className="lg:row-span-1">
-              <button
-                onClick={() => handleVideoClick(videos[1])}
-                className="group relative w-full h-full min-h-[500px] rounded-2xl overflow-hidden shadow-2xl"
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <a href='/auth/signin' target="_blank"
+                className="px-10 py-4 bg-white text-blue-950 font-black rounded-lg hover:bg-gray-100 transition-all shadow-xl text-lg"
               >
-                <img
-                  src="/lanlogo.jpg"
-                  alt="Testimonial video"
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 to-transparent" />
-
-                {/* Play Button */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-xl">
-                    <Play className="w-10 h-10 text-gray-900 fill-gray-900 ml-1" />
-                  </div>
-                </div>
-
-                {/* Name at Bottom */}
-                <div className="absolute bottom-8 left-8 flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-950 to-blue-950 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                    LAN
-                  </div>
-                  <span className="text-blue-950 font-bold text-xl">LAN Library</span>
-                </div>
+                Start Selling Now
+              </a>
+              <button
+                onClick={() => navigateToSignIn()}
+                className="px-10 py-4 border-2 border-white text-white font-black rounded-lg hover:bg-white/10 transition-all text-lg"
+              >
+                Browse Books
               </button>
             </div>
 
-            {/* Right Column */}
-            <div className="space-y-8">
-              <div className="bg-white rounded-2xl p-8 shadow-lg">
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Best exchange rates</h3>
-                <p className="text-gray-700 leading-relaxed mb-6">
-                  The platform is intuitive, seamless and easy to use. It is also the platform with the best prices for buying books and materials.
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold">
-                    B
-                  </div>
-                  <span className="font-semibold text-gray-900">Banji</span>
-                </div>
+            <div className="mt-16 grid grid-cols-3 gap-8">
+              <div>
+                <div className="text-4xl font-black mb-2">80%</div>
+                <div className="text-blue-200">Revenue Share</div>
               </div>
-
-              <div className="bg-white rounded-2xl p-8 shadow-lg">
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Seamless for Purchases</h3>
-                <p className="text-gray-700 leading-relaxed mb-6">
-                  LAN Library has been helping me since last year that I found it, I don't have to stress about finding books anymore as it comes quickly and very fast.
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold">
-                    B
-                  </div>
-                  <span className="font-semibold text-gray-900">Blessing</span>
-                </div>
+              <div>
+                <div className="text-4xl font-black mb-2">90M+</div>
+                <div className="text-blue-200">Global Reach</div>
+              </div>
+              <div>
+                <div className="text-4xl font-black mb-2">24/7</div>
+                <div className="text-blue-200">Support</div>
               </div>
             </div>
-            <div>
-            </div>
-            <a href="/learn/make-money" target="_blank"
-              className="px-10 py-4 bg-white text-blue-950 font-black rounded-lg hover:bg-gray-100 transition-all shadow-xl text-lg mx-auto"
-            >
-              Watch More Videos
-            </a>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-br from-blue-950 to-indigo-950 text-white">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <h2 className="text-5xl font-black mb-6">Ready to Start Earning?</h2>
-          <p className="text-xl text-blue-100 mb-10">
-            Join thousands of sellers making money with their knowledge. Get 80% revenue share on every sale.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href='/auth/signin' target="_blank"
-              className="px-10 py-4 bg-white text-blue-950 font-black rounded-lg hover:bg-gray-100 transition-all shadow-xl text-lg"
-            >
-              Start Selling Now
-            </a>
-            <button
-              onClick={() => navigateToSignIn()}
-              className="px-10 py-4 border-2 border-white text-white font-black rounded-lg hover:bg-white/10 transition-all text-lg"
-            >
-              Browse Books
-            </button>
-          </div>
-
-          <div className="mt-16 grid grid-cols-3 gap-8">
-            <div>
-              <div className="text-4xl font-black mb-2">80%</div>
-              <div className="text-blue-200">Revenue Share</div>
-            </div>
-            <div>
-              <div className="text-4xl font-black mb-2">90M+</div>
-              <div className="text-blue-200">Global Reach</div>
-            </div>
-            <div>
-              <div className="text-4xl font-black mb-2">24/7</div>
-              <div className="text-blue-200">Support</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-white text-blue-950 py-12">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-              <h1
-                className="text-4xl sm:text-6xl font-bold text-blue-950"
-                style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
-              >
-                [LAN Library]
-                <h2
-                  className="text-xs sm:text-base font-light"
-                  style={{ fontFamily: "'Lato', sans-serif" }}
+        {/* Footer */}
+        <footer className="bg-white text-blue-950 py-12">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="grid md:grid-cols-4 gap-8 mb-8">
+              <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+                <h1
+                  className="text-4xl sm:text-6xl font-bold text-blue-950"
+                  style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
                 >
-                  The Global Student Library 📚
-                </h2>
-              </h1>
-            </Link>
+                  [LAN Library]
+                  <h2
+                    className="text-xs sm:text-base font-light"
+                    style={{ fontFamily: "'Lato', sans-serif" }}
+                  >
+                    The Global Student Library 📚
+                  </h2>
+                </h1>
+              </Link>
 
-            <div>
-              <h3 className="font-bold mb-4">For Students</h3>
-              <ul className="space-y-2 text-blue-950">
-                <li><button onClick={() => navigateToSignIn()} className="hover:text-white">Browse Books</button></li>
-                <li><button onClick={() => navigateToSignIn()} className="hover:text-white">Categories</button></li>
-                <li><button onClick={() => navigateToSignIn()} className="hover:text-white">My Books</button></li>
-                <li><button onClick={() => navigateToSignIn()} className="hover:text-white">Saved Books</button></li>
-              </ul>
+              <div>
+                <h3 className="font-bold mb-4">For Students</h3>
+                <ul className="space-y-2 text-blue-950">
+                  <li><button onClick={() => navigateToSignIn()} className="hover:text-white">Browse Books</button></li>
+                  <li><button onClick={() => navigateToSignIn()} className="hover:text-white">Categories</button></li>
+                  <li><button onClick={() => navigateToSignIn()} className="hover:text-white">My Books</button></li>
+                  <li><button onClick={() => navigateToSignIn()} className="hover:text-white">Saved Books</button></li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="font-bold mb-4">For Sellers</h3>
+                <ul className="space-y-2 text-blue-950">
+                  <li><button onClick={() => navigateToSignIn('wallet')} className="hover:text-white">LAN Wallet</button></li>
+                  <li><button onClick={() => navigateToSignIn('transfer')} className="hover:text-white">Transfer</button></li>
+                  <li><button onClick={() => navigateToSignIn('recharge')} className="hover:text-white">Recharge</button></li>
+                  <li><button onClick={() => navigateToSignIn('referral')} className="hover:text-white">Referral</button></li>
+
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="font-bold mb-4">Company</h3>
+                <ul className="space-y-2 text-blue-950">
+                  <li><button onClick={() => setShowWhatIsLanModal(true)} className="hover:text-white">Plateform guide</button></li>
+                  <li><Link href="/lan/privacy-policy" className="hover:text-white">Privacy Policy</Link></li>
+                  <li><Link href="/lan/terms-of-service" className="hover:text-white">Terms of Service</Link></li>
+                </ul>
+              </div>
             </div>
 
-            <div>
-              <h3 className="font-bold mb-4">For Sellers</h3>
-              <ul className="space-y-2 text-blue-950">
-                <li><button onClick={() => navigateToSignIn('wallet')} className="hover:text-white">LAN Wallet</button></li>
-                <li><button onClick={() => navigateToSignIn('transfer')} className="hover:text-white">Transfer</button></li>
-                <li><button onClick={() => navigateToSignIn('recharge')} className="hover:text-white">Recharge</button></li>
-                <li><button onClick={() => navigateToSignIn('referral')} className="hover:text-white">Referral</button></li>
-
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-bold mb-4">Company</h3>
-              <ul className="space-y-2 text-blue-950">
-                <li><button onClick={() => setShowWhatIsLanModal(true)} className="hover:text-white">Plateform guide</button></li>
-                <li><Link href="/lan/privacy-policy" className="hover:text-white">Privacy Policy</Link></li>
-                <li><Link href="/lan/terms-of-service" className="hover:text-white">Terms of Service</Link></li>
-              </ul>
+            <div className="border-t border-gray-800 pt-8 text-center text-blue-950">
+              <p>&copy; {currentYear} [ LAN Library ] - Learning Access Network. All rights reserved.</p>
             </div>
           </div>
+        </footer>
 
-          <div className="border-t border-gray-800 pt-8 text-center text-blue-950">
-            <p>&copy; {currentYear} [ LAN Library ] - Learning Access Network. All rights reserved.</p>
+        {/* Video Modal */}
+        {showVideoModal && selectedVideo && (
+          <div className="fixed inset-0 bg-black z-[100] flex items-center justify-center p-4">
+            <button
+              onClick={() => setShowVideoModal(false)}
+              className="absolute top-4 right-4 z-[110] bg-white/10 hover:bg-white/20 p-3 rounded-full"
+            >
+              <X className="w-6 h-6 text-white" />
+            </button>
+            <div className="w-full h-full max-w-5xl max-h-[80vh]">
+              <video
+                src={selectedVideo.videoUrl}
+                title={selectedVideo.title}
+                className="w-full h-full rounded-lg"
+                controls
+                autoPlay
+              />
+            </div>
           </div>
-        </div>
-      </footer>
+        )}
 
-      {/* Video Modal */}
-      {showVideoModal && selectedVideo && (
-        <div className="fixed inset-0 bg-black z-[100] flex items-center justify-center p-4">
-          <button
-            onClick={() => setShowVideoModal(false)}
-            className="absolute top-4 right-4 z-[110] bg-white/10 hover:bg-white/20 p-3 rounded-full"
-          >
-            <X className="w-6 h-6 text-white" />
-          </button>
-          <div className="w-full h-full max-w-5xl max-h-[80vh]">
-            <video
-              src={selectedVideo.videoUrl}
-              title={selectedVideo.title}
-              className="w-full h-full rounded-lg"
-              controls
-              autoPlay
-            />
-          </div>
-        </div>
-      )}
-
-      <WhatIsLanModal
-        isOpen={showWhatIsLanModal}
-        onClose={() => setShowWhatIsLanModal(false)}
-      />
+        <WhatIsLanModal
+          isOpen={showWhatIsLanModal}
+          onClose={() => setShowWhatIsLanModal(false)}
+        />
+      </div>
     </div>
   );
 }
