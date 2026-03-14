@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, addDoc, serverTimestamp, where } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, addDoc, serverTimestamp, increment, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '@/lib/firebaseConfig';
 import {
@@ -649,30 +649,23 @@ Click OK to approve or Cancel to go back.
 
       console.log('✅ Withdrawal status updated in Firestore');
 
-      // Step 3: Update seller balance
+      // Step 3: Update seller statistics (DO NOT subtract balance again!)
+      // Logic: The balance was already deducted on the seller's dashboard at request time.
+      // We only update the 'totalWithdrawn' stat to reflect a successful payout.
       const sellerDocRef = doc(db, 'sellers', withdrawal.sellerId);
       const sellerDoc = await getDoc(sellerDocRef);
 
       if (sellerDoc.exists()) {
-        const currentBalance = sellerDoc.data().accountBalance || 0;
-        if (currentBalance < withdrawal.amount) {
-          alert(`❌ Seller has insufficient balance.\nBalance: ₦${currentBalance.toLocaleString()}\nRequested: ₦${withdrawal.amount.toLocaleString()}`);
-          return;
-        }
-        const newBalance = currentBalance - withdrawal.amount;
+        const currentTotalWithdrawn = sellerDoc.data().totalWithdrawn || 0;
 
         await updateDoc(sellerDocRef, {
-          accountBalance: newBalance,
-          totalWithdrawn: (sellerDoc.data().totalWithdrawn || 0) + withdrawal.amount,
+          // Record the success by adding the amount to their lifetime withdrawals
+          totalWithdrawn: currentTotalWithdrawn + withdrawal.amount,
           lastWithdrawalDate: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
 
-        console.log('✅ Seller balance updated:', {
-          oldBalance: currentBalance,
-          newBalance: newBalance,
-          withdrawn: withdrawal.amount
-        });
+        console.log('✅ Seller stats updated. (Balance was already deducted at the time of request)');
       }
 
       // Step 4: Send notification
@@ -762,6 +755,7 @@ const deleteFeedback = async (feedbackId) => {
 };
 
   //  REJECT WITHDRAWAL FUNCTION
+  // 🟢 UPDATED REJECT WITHDRAWAL FUNCTION (With Refund Logic)
   const rejectWithdrawal = async (withdrawalId, sellerId, amount) => {
     const reason = prompt('Enter rejection reason (will be shown to seller):');
 
@@ -773,8 +767,9 @@ const deleteFeedback = async (feedbackId) => {
     if (!confirm(`Reject withdrawal of ₦${amount.toLocaleString()}?`)) return;
 
     try {
-      setProcessingWithdrawalId(withdrawalId);   // in rejectWithdrawal
+      setProcessingWithdrawalId(withdrawalId);
 
+      // 1. Update the withdrawal document status
       await updateDoc(doc(db, 'withdrawals', withdrawalId), {
         status: 'rejected',
         processedAt: serverTimestamp(),
@@ -782,17 +777,26 @@ const deleteFeedback = async (feedbackId) => {
         processedBy: user.email
       });
 
-      // Send notification to seller
+      // 2. REFUND THE SELLER (Since money was deducted on request)
+      const { increment } = await import('firebase/firestore'); // Ensure increment is available
+      const sellerDocRef = doc(db, 'sellers', sellerId);
+
+      await updateDoc(sellerDocRef, {
+        accountBalance: increment(amount), // Add the money back
+        updatedAt: serverTimestamp()
+      });
+
+      // 3. Send notification to seller
       await addDoc(collection(db, 'notifications'), {
         userId: sellerId,
         type: 'withdrawal_rejected',
-        title: 'Withdrawal Request Rejected',
-        message: `Your withdrawal request for ₦${amount.toLocaleString()} was rejected.\n\nReason: ${reason}\n\nPlease contact support if you have questions.`,
+        title: 'Withdrawal Request Rejected ❌',
+        message: `Your withdrawal request for ₦${amount.toLocaleString()} was rejected and the funds have been returned to your wallet.\n\nReason: ${reason}`,
         createdAt: serverTimestamp(),
         read: false
       });
 
-      alert(' Withdrawal rejected. The seller has been notified.');
+      alert('✅ Withdrawal rejected and funds refunded to seller.');
       await fetchWithdrawals();
 
     } catch (error) {

@@ -38,6 +38,151 @@ const nigerianBanks = [
     { name: "Zenith Bank", code: "057" },
 ];
 
+// 2. Add this self-contained PinModal component OUTSIDE your SellerAccountClient function
+function PinModal({ amount, bankDetails, pinError, onDigit, onDelete, onConfirm, onClose, pinValue }) {
+    const dots = Array.from({ length: 4 }, (_, i) => i < pinValue.length);
+    const maskedAccount = bankDetails?.accountNumber
+        ? `***${bankDetails.accountNumber.slice(-4)}`
+        : "your account";
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl">
+                {/* Header */}
+                <div className="bg-blue-950 px-6 py-5 flex items-center justify-between">
+                    <div>
+                        <p className="text-blue-300 text-xs mb-1">Confirm withdrawal</p>
+                        <p className="text-white text-lg font-semibold">Enter your PIN</p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="w-9 h-9 rounded-full border border-white/20 flex items-center justify-center text-blue-300 hover:text-white hover:border-white/40 transition-colors"
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+
+                <div className="p-6">
+                    {/* Summary */}
+                    <p className="text-sm text-gray-500 text-center mb-5">
+                        Authorise withdrawal of{" "}
+                        <strong className="text-blue-950">₦{Number(amount).toLocaleString()}</strong>{" "}
+                        to {bankDetails?.bankName} {maskedAccount}
+                    </p>
+
+                    {/* PIN dots */}
+                    <div className="flex justify-center gap-3 mb-5">
+                        {dots.map((filled, i) => (
+                            <div
+                                key={i}
+                                className={`w-13 h-14 rounded-xl border-2 flex items-center justify-center text-2xl transition-all duration-150 ${filled
+                                        ? "border-blue-950 text-blue-950"
+                                        : "border-gray-200 text-gray-300"
+                                    }`}
+                                style={{ width: 52, height: 56 }}
+                            >
+                                {filled ? "●" : "○"}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Error */}
+                    {pinError && (
+                        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+                            <AlertCircle size={16} className="text-red-500 flex-shrink-0" />
+                            <p className="text-sm text-red-600">{pinError}</p>
+                        </div>
+                    )}
+
+                    {/* Numpad */}
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                            <button
+                                key={n}
+                                onClick={() => onDigit(String(n))}
+                                disabled={pinValue.length >= 4}
+                                className="h-13 rounded-xl border border-gray-200 text-lg font-semibold text-blue-950 hover:bg-blue-50 active:scale-95 transition-all disabled:opacity-40"
+                                style={{ height: 52 }}
+                            >
+                                {n}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mb-5">
+                        <div />
+                        <button
+                            onClick={() => onDigit("0")}
+                            disabled={pinValue.length >= 4}
+                            className="h-13 rounded-xl border border-gray-200 text-lg font-semibold text-blue-950 hover:bg-blue-50 active:scale-95 transition-all disabled:opacity-40"
+                            style={{ height: 52 }}
+                        >
+                            0
+                        </button>
+                        <button
+                            onClick={onDelete}
+                            className="h-13 rounded-xl border border-gray-200 text-lg text-gray-400 hover:bg-gray-50 active:scale-95 transition-all"
+                            style={{ height: 52 }}
+                        >
+                            ⌫
+                        </button>
+                    </div>
+
+                    {/* Confirm */}
+                    <button
+                        onClick={onConfirm}
+                        disabled={pinValue.length < 4}
+                        className="w-full bg-blue-950 text-white py-3.5 rounded-xl font-semibold hover:bg-blue-900 active:scale-[0.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        Confirm withdrawal
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function SuccessModal({ amount, reference, onClose }) {
+    return (
+        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl">
+                <div className="bg-blue-950 px-6 py-8 flex flex-col items-center text-center">
+                    <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
+                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <p className="text-white text-xl font-bold mb-1">Request Submitted!</p>
+                    <p className="text-blue-300 text-sm">Your withdrawal is pending approval</p>
+                </div>
+
+                <div className="p-6 space-y-3">
+                    <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Amount</span>
+                        <span className="font-bold text-blue-950">₦{Number(amount).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Reference</span>
+                        <span className="font-mono text-xs text-blue-950 break-all text-right max-w-[180px]">{reference}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Status</span>
+                        <span className="bg-yellow-50 text-yellow-600 text-xs px-2 py-1 rounded-full font-semibold">⏳ Pending</span>
+                    </div>
+                    <p className="text-xs text-gray-400 text-center pt-2">
+                        You'll receive an email once your request is processed (24–48 hrs)
+                    </p>
+                    <button
+                        onClick={onClose}
+                        className="w-full bg-blue-950 text-white py-3 rounded-xl font-semibold hover:bg-blue-900 transition-colors mt-2"
+                    >
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function SellerAccountClient() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -55,6 +200,10 @@ export default function SellerAccountClient() {
     const [withdrawing, setWithdrawing] = useState(false);
     const [withdrawalError, setWithdrawalError] = useState("");
     const [seller, setSeller] = useState(null); // ✅ ADD THIS
+    const [successData, setSuccessData] = useState(null); // { amount, reference }
+        const [showPinModal, setShowPinModal] = useState(false);
+    const [pinValue, setPinValue] = useState("");
+    const [pinError, setPinError] = useState("");
     const router = useRouter();
     const [showBankModal, setShowBankModal] = useState(false);
     const [bankFormData, setBankFormData] = useState({
@@ -72,6 +221,7 @@ export default function SellerAccountClient() {
         address: ""
     });
 
+    
     useEffect(() => {
         if (user?.uid) {
             backfillFlutterwaveSubaccount(user.uid); // silent, non-blocking
@@ -385,6 +535,84 @@ export default function SellerAccountClient() {
         }
     };
 
+    const handlePinConfirm = async () => {
+        if (pinValue !== seller?.transferPin) {
+            setPinError("Incorrect PIN. Please try again.");
+            setPinValue("");
+            return;
+        }
+
+        setShowPinModal(false);
+
+        try {
+            setWithdrawing(true);
+            const amountToDeduct = parseFloat(withdrawAmount);
+
+            const timestamp = Date.now();
+            const randomStr = Math.random().toString(36).substring(2, 9);
+            const userShort = user.uid.substring(0, 6);
+            const withdrawalRef = `WD-${timestamp}-${randomStr}-${userShort}`;
+
+            const withdrawalData = {
+                sellerId: user.uid,
+                sellerName: user.displayName || `${user.firstName} ${user.surname}`,
+                sellerEmail: user.email,
+                sellerPhone: user.phone || user.phoneNumber || null,
+                amount: amountToDeduct,
+                status: "pending",
+                requestedAt: serverTimestamp(),
+                processedAt: null,
+                reference: withdrawalRef,
+                bankDetails: {
+                    accountName: user.bankDetails.accountName,
+                    accountNumber: user.bankDetails.accountNumber,
+                    bankName: user.bankDetails.bankName,
+                    bankCode: user.bankDetails.bankCode || null,
+                },
+                flutterwaveTransferId: null,
+                processingMethod: "admin_approval_required",
+                processingNote: "Awaiting admin approval",
+            };
+
+            // 1. Create the withdrawal record
+            await addDoc(collection(db, "withdrawals"), withdrawalData);
+
+            // 2. IMMEDIATELY deduct the balance so they can't request it again
+            // We use increment(-amount) for atomicity
+            await updateDoc(doc(db, "sellers", user.uid), {
+                accountBalance: increment(-amountToDeduct),
+                lastWithdrawalRequestDate: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
+
+            setWithdrawAmount("");
+            setSuccessData({ amount: amountToDeduct, reference: withdrawalRef });
+
+            // 3. Refresh the UI balance
+            await refreshBalanceOnly(user.uid);
+
+        } catch (error) {
+            console.error("Withdrawal error:", error);
+            setWithdrawalError("Failed to submit withdrawal request: " + error.message);
+        } finally {
+            setWithdrawing(false);
+        }
+    };
+
+    const refreshBalanceOnly = async (uid) => {
+    try {
+        const sellerDoc = await getDoc(doc(db, "sellers", uid));
+        if (sellerDoc.exists()) {
+            const sellerData = sellerDoc.data();
+            setAccountBalance(sellerData.accountBalance || 0);
+            setTotalEarnings(sellerData.totalEarnings || 0);
+            setBooksSold(sellerData.booksSold || 0);
+        }
+    } catch (error) {
+        console.error("Error refreshing balance:", error);
+    }
+    };
+    
     const handleWithdraw = async () => {
         const amount = parseFloat(withdrawAmount);
         setWithdrawalError("");
@@ -409,66 +637,16 @@ export default function SellerAccountClient() {
             return;
         }
 
-        try {
-            setWithdrawing(true);
-
-            // ✅ IMPROVED: More unique reference with timestamp + random string
-            const timestamp = Date.now();
-            const randomStr = Math.random().toString(36).substring(2, 9);
-            const userShort = user.uid.substring(0, 6);
-            const withdrawalRef = `WD-${timestamp}-${randomStr}-${userShort}`;
-
-            const withdrawalData = {
-                sellerId: user.uid,
-                sellerName: user.displayName || `${user.firstName} ${user.surname}`,
-                sellerEmail: user.email,
-                sellerPhone: user.phone || user.phoneNumber || null,
-                amount: amount,
-                status: "pending",
-                requestedAt: serverTimestamp(),
-                processedAt: null,
-                reference: withdrawalRef,
-                bankDetails: {
-                    accountName: user.bankDetails.accountName,
-                    accountNumber: user.bankDetails.accountNumber,
-                    bankName: user.bankDetails.bankName,
-                    bankCode: user.bankDetails.bankCode || null,
-                },
-                flutterwaveTransferId: null,
-                processingMethod: "admin_approval_required",
-                processingNote: "Awaiting admin approval",
-            };
-
-            // Add this before the addDoc call in handleWithdraw
-            if (!seller?.transferPin) {
-                setWithdrawalError("Please set up a transfer PIN first in the Transfer page.");
-                return;
-            }
-
-            const enteredPin = prompt("Enter your 4-digit PIN to confirm withdrawal:");
-            if (enteredPin !== seller?.transferPin) {
-                setWithdrawalError("Incorrect PIN. Withdrawal cancelled.");
-                return;
-            }
-            await addDoc(collection(db, "withdrawals"), withdrawalData);
-
-            await updateDoc(doc(db, "sellers", user.uid), {
-                lastWithdrawalRequestDate: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
-
-            setWithdrawAmount("");
-            setShowWithdrawModal(false);
-
-            alert(`✅ Withdrawal request submitted!\n\nAmount: ₦${amount.toLocaleString()}\nReference: ${withdrawalRef}\n\nYour request is pending admin approval. You will be notified once processed.`);
-
-            await fetchUserData(user.uid); // re-fetches balance from Firestore after withdrawal
-        } catch (error) {
-            console.error("Withdrawal error:", error);
-            setWithdrawalError("Failed to submit withdrawal request: " + error.message);
-        } finally {
-            setWithdrawing(false);
+        if (!seller?.transferPin) {
+            setWithdrawalError("Please set up a transfer PIN first in the Transfer page.");
+            return;
         }
+
+        // All checks passed — open PIN modal to confirm
+        setShowWithdrawModal(false);
+        setPinValue("");
+        setPinError("");
+        setShowPinModal(true);
     };
 
     const sellerName = user?.bankDetails?.accountName || user?.businessInfo?.businessName || 'Unknown Seller';
@@ -1304,6 +1482,7 @@ export default function SellerAccountClient() {
                                 </div>
                             )}
 
+
                             <div className="space-y-4">
                                 <div>
                                     <label className="font-semibold block mb-2 text-gray-700">
@@ -1419,6 +1598,31 @@ export default function SellerAccountClient() {
                 </div>
             )}
 
+                        {/* PIN Modal */}
+                        {showPinModal && (
+                            <PinModal
+                                amount={withdrawAmount}
+                                bankDetails={user?.bankDetails}
+                                pinValue={pinValue}
+                                pinError={pinError}
+                                onDigit={(d) => pinValue.length < 4 && setPinValue((p) => p + d)}
+                                onDelete={() => setPinValue((p) => p.slice(0, -1))}
+                                onConfirm={handlePinConfirm}
+                                onClose={() => {
+                                    setShowPinModal(false);
+                                    setPinValue("");
+                                    setPinError("");
+                                }}
+                            />
+                        )}
+
+                        {successData && (
+                            <SuccessModal
+                                amount={successData.amount}
+                                reference={successData.reference}
+                                onClose={() => setSuccessData(null)}
+                            />
+                        )}
             {/* Bottom Navigation - Mobile Only */}
             <div className="fixed -bottom-7  left-0 right-0 bg-blue-950 border-t border-blue-800 lg:hidden">
                 <div className="flex justify-around items-center py-3 px-2">
