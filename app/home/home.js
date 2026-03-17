@@ -13,15 +13,33 @@ import InstitutionalLibraryPage from '@/components/InstitutionalLib';
 import Footer from '@/components/FooterComp';
 
 const documentTypes = [
-    { name: 'Textbook', image: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400', description: 'Standard educational books' },
-    { name: 'Lecture Note', image: 'https://images.unsplash.com/photo-1517842645767-c639042777db?w=400', description: 'Summarized class materials' },
-    { name: 'Past Question', image: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=400', description: 'Previous exam papers' },
-    { name: 'Thesis', image: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400', description: 'Academic research papers' },
-    { name: 'Summary', image: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=400', description: 'Quick study breakdowns' },
-    { name: 'Syllabus', image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400', description: 'Course requirements' },
-    { name: 'Course Outline', image: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=400', description: 'Topic distributions' },
-    { name: 'Assignment', image: 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=400', description: 'Practice tasks and projects' },
-    { name: 'Project', image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400', description: 'Detailed student projects' },
+    { name: 'Textbook', slug: 'textbook', image: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400', description: 'Standard educational books' },
+    { name: 'Lecture Note', slug: 'lecture-note', image: 'https://images.unsplash.com/photo-1517842645767-c639042777db?w=400', description: 'Summarized class materials' },
+    { name: 'Past Question', slug: 'past-question', image: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=400', description: 'Previous exam papers' },
+    { name: 'Thesis', slug: 'thesis', image: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400', description: 'Academic research papers' },
+    { name: 'Summary', slug: 'summary', image: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=400', description: 'Quick study breakdowns' },
+    { name: 'Syllabus', slug: 'syllabus', image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400', description: 'Course requirements' },
+    { name: 'Course Outline', slug: 'course-outline', image: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=400', description: 'Topic distributions' },
+    { name: 'Assignment', slug: 'assignment', image: 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=400', description: 'Practice tasks and projects' },
+    { name: 'Project', slug: 'project', image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400', description: 'Detailed student projects' },
+
+    // NEW CATEGORIES
+    { name: 'Lab Manual', slug: 'lab-manual', image: 'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=400', description: 'Practical guides and lab reports' },
+    { name: 'Handwritten Notes', slug: 'handwritten-notes', image: 'https://images.unsplash.com/photo-1503467913725-8484b65b0715?w=400', description: 'Authentic student class notes' },
+    { name: 'Exam Revision', slug: 'exam-revision', image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400', description: 'Highly focused exam prep materials' },
+    { name: 'Scholarship Guide', slug: 'scholarship-guide', image: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=400', description: 'Funding and application tips' },
+    { name: 'Research Proposal', slug: 'research-proposal', image: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=400', description: 'Initial project outlines and methodology' },
+    { name: 'Seminar Paper', slug: 'seminar-paper', image: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=400', description: 'Presentations for departmental seminars' },
+
+    // PRACTICAL & TECHNICAL
+    { name: 'Technical Drawing', slug: 'technical-drawing', image: 'https://images.unsplash.com/photo-1503387762-592dec58ef4e?w=400', description: 'Engineering and architectural designs' },
+
+    // STUDY AIDS
+    { name: 'Case Study', slug: 'case-study', image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=400', description: 'Analysis of real-world scenarios (Law/Business)' },
+
+    // ADMINISTRATIVE & CAREER
+    { name: 'Internship Report', slug: 'internship-report', image: 'https://images.unsplash.com/photo-1521791136064-7986c2959d99?w=400', description: 'SIWES or industrial training documentation' },
+    { name: 'Clearance Guide', slug: 'clearance-guide', image: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400', description: 'Step-by-step for graduation clearance' }
 ];
 
 // Category data

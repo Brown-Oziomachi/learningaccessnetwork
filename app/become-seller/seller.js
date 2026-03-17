@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
-import { doc, getDoc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc, writeBatch, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import Navbar from '@/components/NavBar';
 
@@ -163,96 +163,93 @@ export default function BecomeSellerClient() {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = async () => {
-        if (!validateForm()) {
-            return;
+
+const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    setSubmitting(true);
+
+    try {
+        // 1. Create Flutterwave Subaccount
+        // We do this first because if it fails, we shouldn't update the Database.
+        const flwRes = await fetch('/api/flutterwave/create-subaccount', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                uid: user.uid,
+                email: formData.email,
+                firstName: formData.firstName,
+                surname: formData.surname,
+                phoneNumber: formData.phoneNumber,
+                bankCode: formData.bankCode,
+                accountNumber: formData.accountNumber,
+                businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
+            }),
+        });
+
+        const flwData = await flwRes.json();
+
+        if (!flwData.success) {
+            throw new Error(flwData.error || "Failed to create Flutterwave subaccount.");
         }
 
-        try {
-            // ── Create Flutterwave subaccount ──────────────────────────────────
-            let flutterwaveSubaccountId = null;
-            try {
-                const flwRes = await fetch('/api/flutterwave/create-subaccount', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        uid: user.uid,
-                        email: formData.email,
-                        firstName: formData.firstName,
-                        surname: formData.surname,
-                        phoneNumber: formData.phoneNumber,
-                        bankCode: formData.bankCode,
-                        accountNumber: formData.accountNumber,
-                        businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
-                    }),
-                });
-                const flwData = await flwRes.json();
-                if (flwData.success) {
-                    flutterwaveSubaccountId = flwData.subaccount_id;
-                } else {
-                    console.error('Flutterwave error:', flwData.error);
-                }
-            } catch (flwErr) {
-                console.error('Flutterwave call failed:', flwErr);
-            }
-            // ───────────────────────────────────────────────────────────────────
+        const flutterwaveSubaccountId = flwData.subaccount_id;
 
-            setSubmitting(true);
+        // 2. Initialize Firestore Batch
+        // A batch ensures that EITHER both documents save, OR neither does.
+        const batch = writeBatch(db);
+        const userRef = doc(db, "users", user.uid);
+        const sellerRef = doc(db, "sellers", user.uid);
 
-            const timeout = (ms) => new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Operation timeout')), ms)
-            );
+        // Prepare User Document Update
+        batch.update(userRef, {
+            isSeller: true,
+            phoneNumber: formData.phoneNumber,
+            flutterwaveSubaccountId: flutterwaveSubaccountId,
+            updatedAt: serverTimestamp()
+        });
 
-            await Promise.race([
-                updateDoc(doc(db, "users", user.uid), {
-                    isSeller: true,
-                    phoneNumber: formData.phoneNumber,
-                    flutterwaveSubaccountId: flutterwaveSubaccountId, // ✅ add this line
-                    updatedAt: serverTimestamp()
-                }),
-                timeout(10000)
-            ]);
+        // Prepare Seller Document Creation
+        batch.set(sellerRef, {
+            accountBalance: 0, 
+            totalEarnings: 0,
+            booksSold: 0,
+            bankDetails: {
+                bankName: formData.bankName,
+                bankCode: formData.bankCode,
+                accountNumber: formData.accountNumber,
+                accountName: formData.accountName,
+                flutterwaveSubaccountId: flutterwaveSubaccountId,
+            },
+            businessInfo: {
+                businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
+                businessDescription: formData.businessDescription
+            },
+            title: formData.title || "",
+            sellerName: `${formData.firstName} ${formData.surname}`.trim(),
+            createdAt: serverTimestamp(),
+            status: "active"
+        });
 
-            await Promise.race([
-                setDoc(doc(db, "sellers", user.uid), {
-                    accountBalance: 100,
-                    totalEarnings: 100,
-                    booksSold: 0,
-                    bankDetails: {
-                        bankName: formData.bankName,
-                        bankCode: formData.bankCode, // ✅ ADDED
-                        accountNumber: formData.accountNumber,
-                        accountName: formData.accountName,
-                        flutterwaveSubaccountId: flutterwaveSubaccountId, // ✅ add this line
-                    },
-                    businessInfo: {
-                        businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
-                        businessDescription: formData.businessDescription
-                    },
-                    title: formData.title || "",
-                    sellerName: `${formData.firstName} ${formData.surname}`.trim(),
-                    createdAt: serverTimestamp(),
-                    status: "active"
-                }),
-                timeout(10000)
-            ]);
+        // 3. Commit the Batch
+        await batch.commit();
 
-            alert("Seller account created successfully! 🎉");
-            router.push('/my-account/seller-account');
-        } catch (error) {
-            console.error("Error creating seller account:", error);
+        alert("Seller account created successfully! 🎉");
+        router.push('/my-account/seller-account');
 
-            if (error.message === 'Operation timeout') {
-                alert("Request timed out. Please check your internet connection and try again.");
-            } else if (error.code === 'unavailable') {
-                alert(" Please check your internet connection.");
-            } else {
-                alert("Failed to create seller account: " + error.message);
-            }
-        } finally {
-            setSubmitting(false);
+    } catch (error) {
+        console.error("Onboarding Error:", error);
+        
+        // Friendly error messages for the UI
+        if (error.message.includes("timeout")) {
+            alert("Request timed out. Please check your connection.");
+        } else {
+            alert(`Setup failed: ${error.message}`);
         }
-    };
+    } finally {
+        setSubmitting(false);
+    }
+};
 
     if (loading) {
         return (

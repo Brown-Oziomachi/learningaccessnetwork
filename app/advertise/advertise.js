@@ -22,6 +22,7 @@ export default function AdvertiseClient() {
     const [selectedCoverImage, setSelectedCoverImage] = useState(null);
     const [uploadingFile, setUploadingFile] = useState(false);
     const [uploadPercentage, setUploadPercentage] = useState(0);
+    const [level, setLevel] = useState('100'); // Default to 100L
     const [formData, setFormData] = useState({
         name: "",
         email: "",
@@ -36,6 +37,7 @@ export default function AdvertiseClient() {
         docType: "Textbook",
         price: "",
         format: "PDF",
+        level: '100',
         pages: "",
         description: "",
         message: "",
@@ -353,6 +355,7 @@ const handleFileSelect = (e) => {
             semester: formData.semester || null,
             session: formData.session || null,
             docType: formData.docType,
+            level: formData.level, 
             price: Number(formData.price),
             format: formData.format,
             pages: Number(formData.pages),
@@ -548,6 +551,22 @@ useEffect(() => {
                                     {docTypes.map(type => (
                                         <option key={type} value={type}>{type}</option>
                                     ))}
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-gray-700">Level</label>
+                                <select
+                                    value={level}
+                                    onChange={(e) => setLevel(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-950"
+                                    required
+                                >
+                                    <option value="100">100 Level</option>
+                                    <option value="200">200 Level</option>
+                                    <option value="300">300 Level</option>
+                                    <option value="400">400 Level</option>
+                                    <option value="500">500 Level</option>
+                                    <option value="pg">Post-Graduate</option>
                                 </select>
                             </div>
                         </div>

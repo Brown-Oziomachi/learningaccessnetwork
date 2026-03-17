@@ -29,9 +29,7 @@ export default function LearningAccessNetwork() {
   const [selectedVideo, setSelectedVideo] = useState(null);
 
   const heroImages = [
-    'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=1920&h=1080&fit=crop',
-    'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=1920&h=1080&fit=crop',
-    'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=1920&h=1080&fit=crop',
+    '/headpics.jpg', // university students
   ];
 
   // Student activity images - showing students using LAN Library

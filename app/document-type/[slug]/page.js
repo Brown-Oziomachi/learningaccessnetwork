@@ -19,7 +19,18 @@ export default function DocumentTypePage() {
     const [sortBy, setSortBy] = useState('popularity');
     const [allBooks, setAllBooks] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedLevel, setSelectedLevel] = useState('all');
     const [bookSalesCount, setBookSalesCount] = useState({});
+
+    const universityLevels = [
+        { name: 'All Levels', value: 'all' },
+        { name: '100 Level', value: '100' },
+        { name: '200 Level', value: '200' },
+        { name: '300 Level', value: '300' },
+        { name: '400 Level', value: '400' },
+        { name: '500 Level', value: '500' },
+        { name: 'Post-Graduate', value: 'pg' },
+    ];
 
     const documentTypes = [
         { name: 'Textbook', slug: 'textbook', image: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400', description: 'Standard educational books' },
@@ -31,7 +42,26 @@ export default function DocumentTypePage() {
         { name: 'Course Outline', slug: 'course-outline', image: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=400', description: 'Topic distributions' },
         { name: 'Assignment', slug: 'assignment', image: 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=400', description: 'Practice tasks and projects' },
         { name: 'Project', slug: 'project', image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400', description: 'Detailed student projects' },
+
+        // NEW CATEGORIES
+        { name: 'Lab Manual', slug: 'lab-manual', image: 'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=400', description: 'Practical guides and lab reports' },
+        { name: 'Handwritten Notes', slug: 'handwritten-notes', image: 'https://images.unsplash.com/photo-1503467913725-8484b65b0715?w=400', description: 'Authentic student class notes' },
+        { name: 'Exam Revision', slug: 'exam-revision', image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400', description: 'Highly focused exam prep materials' },
+        { name: 'Scholarship Guide', slug: 'scholarship-guide', image: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=400', description: 'Funding and application tips' },
+        { name: 'Research Proposal', slug: 'research-proposal', image: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=400', description: 'Initial project outlines and methodology' },
+        { name: 'Seminar Paper', slug: 'seminar-paper', image: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=400', description: 'Presentations for departmental seminars' },
+
+        // PRACTICAL & TECHNICAL
+        { name: 'Technical Drawing', slug: 'technical-drawing', image: 'https://images.unsplash.com/photo-1503387762-592dec58ef4e?w=400', description: 'Engineering and architectural designs' },
+
+        // STUDY AIDS
+        { name: 'Case Study', slug: 'case-study', image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=400', description: 'Analysis of real-world scenarios (Law/Business)' },
+
+        // ADMINISTRATIVE & CAREER
+        { name: 'Internship Report', slug: 'internship-report', image: 'https://images.unsplash.com/photo-1521791136064-7986c2959d99?w=400', description: 'SIWES or industrial training documentation' },
+        { name: 'Clearance Guide', slug: 'clearance-guide', image: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400', description: 'Step-by-step for graduation clearance' }
     ];
+
 
     const getThumbnailUrl = (book) => {
         if (!book) return 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
@@ -143,6 +173,7 @@ export default function DocumentTypePage() {
                         driveFileId: data.driveFileId || data.fileId || data.driveId || data.googleDriveId,
                         pdfUrl: data.pdfUrl || data.pdf || data.documentUrl,
                         previewUrl: data.previewUrl,
+                        level: data.level || 'all', 
                         embedUrl: data.embedUrl || data.embed,
                         isFromFirestore: true
                     };
@@ -220,28 +251,19 @@ export default function DocumentTypePage() {
     }, [allBooks]);
 
     const typeBooks = useMemo(() => {
-        console.log('🔍 Filtering books for typeSlug:', typeSlug);
-        console.log('📚 Total books available:', allBooks.length);
+        return allBooks.filter(book => {
+            if (!book.documentType) return false;
 
-        const filtered = allBooks.filter(book => {
-            if (!book.documentType) {
-                console.log('⚠️ Book missing documentType:', book.title);
-                return false;
-            }
+            // Normalize Type (e.g., "Past Question" -> "past-question")
+            const bookTypeSlug = book.documentType.toLowerCase().trim().replace(/\s+/g, '-');
+            const matchesType = bookTypeSlug === typeSlug;
 
-            // Convert both to same format for comparison
-            const bookTypeSlug = book.documentType.toLowerCase()
-                .replace(/ /g, '-')
-                .trim();
+            // Check Level (If 'all' is selected, show everything for that type)
+            const matchesLevel = selectedLevel === 'all' || String(book.level) === selectedLevel;
 
-            console.log(`Comparing: "${bookTypeSlug}" === "${typeSlug}"`, bookTypeSlug === typeSlug);
-
-            return bookTypeSlug === typeSlug;
+            return matchesType && matchesLevel;
         });
-
-        console.log('✅ Filtered books:', filtered.length);
-        return filtered;
-    }, [allBooks, typeSlug]);
+    }, [allBooks, typeSlug, selectedLevel]); // Add selectedLevel to dependencies!
 
     const sortBooks = (books) => {
         const sorted = [...books];
@@ -401,23 +423,42 @@ export default function DocumentTypePage() {
                     </p>
                 </div>
 
+                {/* FILTER & SORT SECTION */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
                     <div className="flex items-center gap-2">
                         <span className="text-gray-700 font-semibold">Documents recommended for you</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-gray-700 text-sm">Sort by:</span>
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value)}
-                            className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-950"
-                        >
-                            <option value="popularity">Popularity</option>
-                            <option value="price-low">Price: Low to High</option>
-                            <option value="price-high">Price: High to Low</option>
-                            <option value="newest">Newest First</option>
-                            <option value="rating">Highest Rated</option>
-                        </select>
+
+                    <div className="flex flex-wrap items-center gap-4">
+                        {/* NEW: Level Filter Dropdown */}
+                        <div className="flex items-center gap-2 text-blue-950">
+                            <span className="text-blue-950 text-sm">Level:</span>
+                            <select
+                                value={selectedLevel}
+                                onChange={(e) => setSelectedLevel(e.target.value)}
+                                className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-950 bg-white"
+                            >
+                                {universityLevels.map((lvl) => (
+                                    <option key={lvl.value} value={lvl.value}>{lvl.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Existing Sort Dropdown */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-gray-700 text-sm">Sort by:</span>
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="border border-gray-300 text-blue-950 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-950 bg-white"
+                            >
+                                <option value="popularity">Popularity</option>
+                                <option value="price-low">Price: Low to High</option>
+                                <option value="price-high">Price: High to Low</option>
+                                <option value="newest">Newest First</option>
+                                <option value="rating">Highest Rated</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 

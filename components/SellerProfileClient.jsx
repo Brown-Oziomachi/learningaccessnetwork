@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { 
+  collection, getDocs, doc, getDoc, setDoc, 
+  deleteDoc, query, where, updateDoc, increment // <-- Add these
+} from "firebase/firestore";
+
 import { auth, db } from "@/lib/firebaseConfig";
 import {
   ArrowLeft,
@@ -14,6 +18,9 @@ import {
   GraduationCap,
   BookMarked,
   Building,
+  UserPlus,
+  UserCheck,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import Navbar from "@/components/NavBar";
@@ -30,6 +37,9 @@ export default function SellerProfileClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const user = auth.currentUser;
   const [stats, setStats] = useState({
     totalSold: 0,
     totalEarnings: 0,
@@ -69,6 +79,80 @@ export default function SellerProfileClient() {
     return (
       t === "lecturer" || t === "dr." || t === "prof." || t === "professor"
     );
+  };
+
+  // 1. Check if following on load
+  useEffect(() => {
+    const checkFollowStatus = async () => {
+      if (!user || !sellerId) return;
+      const followId = `${user.uid}_${sellerId}`;
+      const followDoc = await getDoc(doc(db, "follows", followId));
+      setIsFollowing(followDoc.exists());
+
+      // Get total follower count
+      const q = query(
+        collection(db, "follows"),
+        where("lecturerId", "==", sellerId),
+      );
+      const snap = await getDocs(q);
+      setFollowerCount(snap.size);
+    };
+    checkFollowStatus();
+  }, [user, sellerId]);
+
+  // 2. The Toggle Function
+  const toggleFollow = async () => {
+    if (!user) {
+      alert("Please sign in to follow lecturers");
+      return;
+    }
+
+    const followId = `${user.uid}_${sellerId}`;
+    const followRef = doc(db, "follows", followId);
+    const sellerRef = doc(db, "sellers", sellerId); // Reference to the seller's doc
+
+    try {
+      if (isFollowing) {
+        // 1. Delete follow record
+        await deleteDoc(followRef);
+
+        // 2. Decrement count in the sellers collection
+        // We use try-catch inside in case the 'sellers' doc doesn't exist yet
+        try {
+          await updateDoc(sellerRef, {
+            followersCount: increment(-1),
+          });
+        } catch (e) {
+          console.log("Seller doc not found for decrement");
+        }
+
+        setIsFollowing(false);
+        setFollowerCount((prev) => Math.max(0, prev - 1));
+      } else {
+        // 1. Create follow record
+        await setDoc(followRef, {
+          followerId: user.uid,
+          lecturerId: sellerId,
+          lecturerName: seller.sellerName,
+          createdAt: new Date(),
+        });
+
+        // 2. Increment count in the sellers collection
+        try {
+          await updateDoc(sellerRef, {
+            followersCount: increment(1),
+          });
+        } catch (e) {
+          // If the seller doc doesn't exist, create it with count 1
+          await setDoc(sellerRef, { followersCount: 1 }, { merge: true });
+        }
+
+        setIsFollowing(true);
+        setFollowerCount((prev) => prev + 1);
+      }
+    } catch (error) {
+      console.error("Follow error:", error);
+    }
   };
 
   // ─── FETCH SELLER + BOOKS + STATS ────────────────────────
@@ -118,30 +202,30 @@ export default function SellerProfileClient() {
         const advertSnapshot = await getDocs(collection(db, "advertMyBook"));
         const uploadedBooks = [];
 
-    advertSnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      if (
-        (data.userId === sellerId || data.sellerId === sellerId) &&
-        data.status === "approved"
-      ) {
-        uploadedBooks.push({
-          id: `firestore-${docSnap.id}`,
-          firestoreId: docSnap.id,
-          title: data.bookTitle || data.title,
-          author: data.author || "Unknown",
-          category: (data.category || "General").toLowerCase(),
-          price: Number(data.price) || 0,
-          pages: data.pages || 0,
-          format: data.format || "PDF",
-          description: data.description || "",
-          driveFileId: data.driveFileId,
-          pdfUrl: data.pdfUrl || data.pdfLink,
-          embedUrl: data.embedUrl,
-          status: data.status || "pending",
-          isFromFirestore: true,
+        advertSnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          if (
+            (data.userId === sellerId || data.sellerId === sellerId) &&
+            data.status === "approved"
+          ) {
+            uploadedBooks.push({
+              id: `firestore-${docSnap.id}`,
+              firestoreId: docSnap.id,
+              title: data.bookTitle || data.title,
+              author: data.author || "Unknown",
+              category: (data.category || "General").toLowerCase(),
+              price: Number(data.price) || 0,
+              pages: data.pages || 0,
+              format: data.format || "PDF",
+              description: data.description || "",
+              driveFileId: data.driveFileId,
+              pdfUrl: data.pdfUrl || data.pdfLink,
+              embedUrl: data.embedUrl,
+              status: data.status || "pending",
+              isFromFirestore: true,
+            });
+          }
         });
-      }
-    });
 
         // Add thumbnail
         uploadedBooks.forEach((book) => {
@@ -305,103 +389,109 @@ export default function SellerProfileClient() {
 
       {/* ── Profile Header Banner ── */}
       <div className="max-w-7xl mx-auto px-4 mt-4">
-        <div
-          className={`rounded-2xl p-6 md:p-8 text-white relative overflow-hidden ${
-            lecturerMode
-              ? "bg-gradient-to-r from-blue-950 via-blue-900 to-indigo-900"
-              : "bg-gradient-to-r from-blue-950 via-blue-900 to-blue-800"
-          }`}
-        >
-          {/* Decorative circles */}
-          <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
-          <div className="absolute -bottom-8 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+        <div className="relative rounded-2xl p-6 md:p-8 text-white overflow-hidden min-h-[200px] flex items-center">
+          {/* Background Image with Overlay */}
+          <div className="absolute inset-0 z-0">
+            <img
+              src="/lanlog.png" // REPLACE with your image URL
+              alt="Banner Background"
+              className="w-full h-full object-cover"
+            />
+            {/* Dark overlay to ensure text is always readable */}
+            <div className="absolute inset-0 bg-blue-950/80 backdrop-blur-[2px]" />
+          </div>
 
-          <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-start gap-5">
+          <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-6 w-full">
             {/* Avatar */}
             <div
-              className={`w-20 h-20 md:w-24 md:h-24 rounded-full border-4 flex items-center justify-center flex-shrink-0 ${
+              className={`w-20 h-20 md:w-28 md:h-28 rounded-full border-4 flex items-center justify-center flex-shrink-0 shadow-xl ${
                 lecturerMode
                   ? "bg-indigo-800/50 border-indigo-400/40"
                   : "bg-white/10 border-white/30"
               }`}
             >
               {lecturerMode ? (
-                <GraduationCap size={40} className="text-indigo-200" />
+                <GraduationCap size={48} className="text-indigo-200" />
               ) : (
-                <span className="text-3xl md:text-4xl font-black text-white">
+                <span className="text-3xl md:text-5xl font-black text-white">
                   {seller.sellerName?.charAt(0)?.toUpperCase() || "?"}
                 </span>
               )}
             </div>
 
-            {/* Info */}
-            <div className="flex-1 text-center sm:text-left">
-              {/* Title + Name */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
-                {lecturerMode && (
-                  <span className="inline-flex items-center gap-1.5 bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 text-xs font-bold px-3 py-1 rounded-full">
-                    <GraduationCap size={12} />
-                    {seller.sellerTitle}
-                  </span>
-                )}
+            {/* Info Section */}
+            <div className="flex-1 w-full">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="text-center sm:text-left">
+                  {lecturerMode && (
+                    <span className="inline-flex items-center gap-1.5 bg-indigo-500/40 border border-indigo-400/40 text-white text-xs font-bold px-3 py-1 rounded-full mb-2">
+                      <GraduationCap size={12} />
+                      {seller.sellerTitle || "Lecturer"}
+                    </span>
+                  )}
+                  <h1 className="text-2xl md:text-4xl font-black tracking-tight">
+                    {seller.sellerName}
+                  </h1>
+                  <p className="text-blue-200 text-sm mt-1 font-medium">
+                    {lecturerMode
+                      ? "Verified University Lecturer"
+                      : "Verified Seller on LAN Library"}
+                  </p>
+                </div>
+
+                {/* Follow Button */}
+                <button
+                  onClick={toggleFollow}
+                  className={`flex items-center justify-center gap-2 px-8 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95 ${
+                    isFollowing
+                      ? "bg-white/20 border border-white/40 text-white backdrop-blur-md"
+                      : "bg-white text-blue-950 hover:bg-blue-50"
+                  }`}
+                >
+                  {isFollowing ? (
+                    <UserCheck size={20} />
+                  ) : (
+                    <UserPlus size={20} />
+                  )}
+                  {isFollowing ? "Following" : "Follow"}
+                </button>
               </div>
-              <h1 className="text-2xl md:text-3xl font-black">
-                {seller.sellerName}
-              </h1>
 
-              {/* Lecturer-specific info */}
-              {lecturerMode && (
-                <div className="mt-2 space-y-1">
-                  {seller.sellerDepartment && (
-                    <p className="text-indigo-200 text-sm flex items-center justify-center sm:justify-start gap-1.5">
-                      <BookMarked size={14} />
-                      {seller.sellerDepartment}
-                    </p>
-                  )}
-                  {seller.sellerUniversity && (
-                    <p className="text-indigo-200 text-sm flex items-center justify-center sm:justify-start gap-1.5">
-                      <Building size={14} />
-                      {seller.sellerUniversity}
-                    </p>
-                  )}
-                  {!seller.sellerDepartment && !seller.sellerUniversity && (
-                    <p className="text-indigo-300 text-sm">
-                      Verified University Lecturer
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {!lecturerMode && (
-                <p className="text-blue-200 text-sm mt-1">
-                  Verified Seller on LAN Library
-                </p>
-              )}
-
-              {/* Stats row */}
-              <div className="flex flex-wrap justify-center sm:justify-start gap-4 mt-4">
-                <div className="bg-white/10 rounded-xl px-4 py-2 flex items-center gap-2">
-                  <BookOpen size={18} className="text-blue-200" />
+              {/* Stats Row */}
+              <div className="flex flex-wrap justify-center sm:justify-start gap-3 mt-6">
+                {/* Followers Stat */}
+                <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl px-5 py-3 flex items-center gap-3 min-w-[100px]">
+                  <Users size={20} className="text-blue-300" />
                   <div>
-                    <p className="text-xs text-blue-200">
-                      {lecturerMode ? "Materials" : "Uploads"}
+                    <p className="text-[10px] uppercase tracking-wider text-blue-200 font-bold">
+                      Followers
                     </p>
-                    <p className="font-bold text-base">{stats.totalBooks}</p>
+                    <p className="font-bold text-lg leading-none">
+                      {followerCount || 0}
+                    </p>
                   </div>
                 </div>
-                <div className="bg-white/10 rounded-xl px-4 py-2 flex items-center gap-2">
-                  <ShoppingBag size={18} className="text-blue-200" />
+
+                <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl px-5 py-3 flex items-center gap-3 min-w-[100px]">
+                  <BookOpen size={20} className="text-blue-300" />
                   <div>
-                    <p className="text-xs text-blue-200">Sold</p>
-                    <p className="font-bold text-base">{stats.totalSold}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-blue-200 font-bold">
+                      Materials
+                    </p>
+                    <p className="font-bold text-lg leading-none">
+                      {stats.totalBooks}
+                    </p>
                   </div>
                 </div>
-                <div className="bg-white/10 rounded-xl px-4 py-2 flex items-center gap-2">
-                  <TrendingUp size={18} className="text-blue-200" />
+
+                <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl px-5 py-3 flex items-center gap-3 min-w-[100px]">
+                  <ShoppingBag size={20} className="text-blue-300" />
                   <div>
-                    <p className="text-xs text-blue-200">Earnings</p>
-                    <p className="font-bold text-base">
-                      ₦{stats.totalEarnings.toLocaleString()}
+                    <p className="text-[10px] uppercase tracking-wider text-blue-200 font-bold">
+                      Sold
+                    </p>
+                    <p className="font-bold text-lg leading-none">
+                      {stats.totalSold}
                     </p>
                   </div>
                 </div>

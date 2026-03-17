@@ -1,9 +1,9 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, BookOpen, ChevronRight, Search, X, GraduationCap, BookMarked, Users } from 'lucide-react';
-import Link from 'next/link';
+import { ArrowLeft, BookOpen, ChevronRight, Search, X, GraduationCap, BookMarked, CheckCircle2, UserPlus, UserCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import Link from 'next/link';
+import { collection, getDocs, query, where, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from "@/lib/firebaseConfig";
 import Navbar from '@/components/NavBar';
 import Footer from '@/components/FooterComp';
@@ -16,12 +16,13 @@ export default function LecturersClient() {
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [followingIds, setFollowingIds] = useState(new Set());
 
-    // Auth check
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             if (currentUser) {
                 setUser(currentUser);
+                fetchFollowing(currentUser.uid);
             } else {
                 router.push('/auth/signin');
             }
@@ -29,281 +30,202 @@ export default function LecturersClient() {
         return () => unsubscribe();
     }, [router]);
 
-    // Fetch lecturers from sellers collection
+    const fetchFollowing = async (userId) => {
+        const q = query(collection(db, "follows"), where("followerId", "==", userId));
+        const snap = await getDocs(q);
+        const ids = new Set(snap.docs.map(doc => doc.data().lecturerId));
+        setFollowingIds(ids);
+    };
+
+    const handleFollow = async (e, lecturerId) => {
+        e.preventDefault(); // Prevent navigation
+        if (!user) return;
+
+        try {
+            if (followingIds.has(lecturerId)) {
+                // Unfollow logic
+                const q = query(collection(db, "follows"),
+                    where("followerId", "==", user.uid),
+                    where("lecturerId", "==", lecturerId));
+                const snap = await getDocs(q);
+                await deleteDoc(snap.docs[0].ref);
+                followingIds.delete(lecturerId);
+            } else {
+                // Follow logic
+                await addDoc(collection(db, "follows"), {
+                    followerId: user.uid,
+                    lecturerId: lecturerId,
+                    createdAt: serverTimestamp()
+                });
+                followingIds.add(lecturerId);
+            }
+            setFollowingIds(new Set(followingIds));
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     useEffect(() => {
         const fetchLecturers = async () => {
             try {
                 setLoading(true);
-
-                // Fetch all sellers — filter by title === 'Lecturer' (case-insensitive)
                 const sellersSnapshot = await getDocs(collection(db, 'sellers'));
                 const lecturerList = [];
 
-                sellersSnapshot.docs.forEach((docSnap) => {
+                for (const docSnap of sellersSnapshot.docs) {
                     const data = docSnap.data();
                     const title = (data.title || '').toLowerCase();
-                    if (title === 'lecturer' || title === 'dr.' || title === 'prof.' || title === 'professor') {
+                    const academicTitles = ['lecturer', 'dr.', 'prof.', 'professor', 'mrs', 'mr'];
+
+                    if (academicTitles.some(t => title.includes(t))) {
                         lecturerList.push({
                             sellerId: docSnap.id,
                             sellerName: data.sellerName || data.displayName || 'Unknown Lecturer',
                             title: data.title || 'Lecturer',
-                            department: data.department || '',
-                            university: data.university || '',
-                            totalBooks: data.booksSold || 0,
-                            accountBalance: data.accountBalance || 0,
-                            totalEarnings: data.totalEarnings || 0,
+                            department: data.department || 'General Studies',
+                            university: data.university || 'University Member',
+                            isVerified: data.verifiedSchool || false,
+                            uploadedBooks: 0
                         });
                     }
-                });
+                }
 
-                // For each lecturer, count their uploaded books from advertMyBook
-                const advertSnapshot = await getDocs(collection(db, 'advertMyBook'));
-                const bookCountMap = {};
-                advertSnapshot.docs.forEach((docSnap) => {
-                    const data = docSnap.data();
-                    const sid = data.userId || data.sellerId;
-                    if (sid && data.status === 'approved') {
-                        bookCountMap[sid] = (bookCountMap[sid] || 0) + 1;
-                    }
-                });
+                await Promise.all(lecturerList.map(async (lecturer) => {
+                    const booksQuery = query(
+                        collection(db, 'advertMyBook'),
+                        where('userId', '==', lecturer.sellerId),
+                        where('status', '==', 'approved')
+                    );
+                    const bookSnap = await getDocs(booksQuery);
+                    lecturer.uploadedBooks = bookSnap.size;
+                }));
 
-                // Attach book count
-                lecturerList.forEach((l) => {
-                    l.uploadedBooks = bookCountMap[l.sellerId] || 0;
-                });
-
-                // Sort by most books uploaded
                 lecturerList.sort((a, b) => b.uploadedBooks - a.uploadedBooks);
-
                 setLecturers(lecturerList);
                 setFilteredLecturers(lecturerList);
             } catch (error) {
-                console.error('Error fetching lecturers:', error);
-                setLecturers([]);
-                setFilteredLecturers([]);
+                console.error('Error:', error);
             } finally {
                 setLoading(false);
             }
         };
-
         fetchLecturers();
     }, []);
 
-    // Search filter
+    // Search logic remains same...
     useEffect(() => {
         const q = searchTerm.toLowerCase();
-        if (!q) {
-            setFilteredLecturers(lecturers);
-            return;
-        }
-        setFilteredLecturers(
-            lecturers.filter((l) =>
-                l.sellerName?.toLowerCase().includes(q) ||
-                l.department?.toLowerCase().includes(q) ||
-                l.university?.toLowerCase().includes(q)
-            )
-        );
+        setFilteredLecturers(lecturers.filter(l =>
+            l.sellerName?.toLowerCase().includes(q) ||
+            l.department?.toLowerCase().includes(q) ||
+            l.university?.toLowerCase().includes(q)
+        ));
     }, [searchTerm, lecturers]);
 
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-white">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-950 mx-auto"></div>
-                    <p className="mt-4 text-blue-950 text-lg" style={{ fontFamily: 'Georgia, serif' }}>
-                        Loading Lecturers...
-                    </p>
-                </div>
-            </div>
-        );
-    }
+    if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-slate-50">
             <Navbar />
 
-            {/* Header */}
-            <div className="border-b-4 border-blue-950">
-                <div className="max-w-7xl mx-auto px-4 py-8">
-                    <button
-                        onClick={() => router.back()}
-                        className="flex items-center gap-2 text-gray-600 hover:text-blue-950 mb-6 transition-colors"
-                    >
-                        <ArrowLeft size={20} />
-                        <span className="text-sm font-medium">Back</span>
+            {/* Premium Header Section */}
+            <div className="bg-blue-950 text-white py-16 relative overflow-hidden">
+                <div className="absolute top-0 right-0 opacity-10 translate-x-1/4 -translate-y-1/4">
+                    <GraduationCap size={400} />
+                </div>
+
+                <div className="max-w-7xl mx-auto px-4 relative z-10">
+                    <button onClick={() => router.back()} className="flex items-center gap-2 text-blue-200 hover:text-white mb-8 transition-all">
+                        <ArrowLeft size={18} /> <span>Return to Library</span>
                     </button>
 
-                    <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
-                        <div>
-                            <div className="flex items-center gap-3 mb-2">
-                                <GraduationCap className="w-8 h-8 text-blue-950" />
-                                <span className="text-xs font-bold tracking-widest text-gray-500 uppercase">
-                                    LAN Library
-                                </span>
-                            </div>
-                            <h1
-                                className="text-4xl md:text-5xl font-bold text-blue-950 mb-2"
-                                style={{ fontFamily: 'Georgia, "Times New Roman", serif', letterSpacing: '-0.02em' }}
-                            >
-                                University Lecturers
-                            </h1>
-                            <p className="text-gray-500 text-base" style={{ fontFamily: 'Georgia, serif' }}>
-                                Browse academic materials from verified university lecturers.
-                            </p>
-                        </div>
-
-                        {/* Stats pill */}
-                        <div className="flex gap-4">
-                            <div className="bg-blue-950 text-white rounded-2xl px-5 py-3 text-center">
-                                <p className="text-2xl font-bold">{lecturers.length}</p>
-                                <p className="text-xs text-blue-300 uppercase tracking-wide">Lecturers</p>
-                            </div>
-                            <div className="bg-gray-100 text-blue-950 rounded-2xl px-5 py-3 text-center">
-                                <p className="text-2xl font-bold">
-                                    {lecturers.reduce((sum, l) => sum + l.uploadedBooks, 0)}
-                                </p>
-                                <p className="text-xs text-gray-500 uppercase tracking-wide">Materials</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Search Bar */}
-            <div className="max-w-7xl mx-auto px-4 py-6">
-                <div className="relative max-w-xl">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                    <input
-                        type="text"
-                        placeholder="Search by name, department or university..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-11 pr-10 py-3 border-2 border-gray-200 rounded-xl text-blue-950 focus:outline-none focus:border-blue-950 transition-colors bg-gray-50"
-                        style={{ fontFamily: 'Georgia, serif' }}
-                    />
-                    {searchTerm && (
-                        <button
-                            onClick={() => setSearchTerm('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                            <X size={18} />
-                        </button>
-                    )}
-                </div>
-                {searchTerm && (
-                    <p className="text-sm text-gray-500 mt-2">
-                        {filteredLecturers.length} result{filteredLecturers.length !== 1 ? 's' : ''} for "{searchTerm}"
+                    <h1 className="text-5xl font-serif font-bold mb-4 tracking-tight">Academic Directory</h1>
+                    <p className="text-blue-100 text-lg max-w-2xl font-light">
+                        Connect with distinguished educators and access verified course materials,
+                        lecture notes, and academic publications.
                     </p>
-                )}
+
+                    <div className="flex gap-6 mt-10">
+                        <div className="border-l-2 border-blue-400 pl-4">
+                            <p className="text-3xl font-bold">{lecturers.length}</p>
+                            <p className="text-xs uppercase tracking-widest text-blue-300">Verified Faculty</p>
+                        </div>
+                        <div className="border-l-2 border-blue-400 pl-4">
+                            <p className="text-3xl font-bold">{lecturers.reduce((s, l) => s + l.uploadedBooks, 0)}</p>
+                            <p className="text-xs uppercase tracking-widest text-blue-300">Total Publications</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            {/* Lecturers Grid */}
-            <main className="max-w-7xl mx-auto px-4 pb-16">
-                {filteredLecturers.length === 0 ? (
-                    <div className="text-center py-24 border-t border-gray-200">
-                        <GraduationCap className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <h3
-                            className="text-2xl font-bold text-gray-900 mb-2"
-                            style={{ fontFamily: 'Georgia, serif' }}
-                        >
-                            {searchTerm ? 'No lecturers found' : 'No Lecturers Yet'}
-                        </h3>
-                        <p className="text-gray-500" style={{ fontFamily: 'Georgia, serif' }}>
-                            {searchTerm
-                                ? 'Try a different search term.'
-                                : 'Lecturers who register on the platform will appear here.'}
-                        </p>
-                        {searchTerm && (
-                            <button
-                                onClick={() => setSearchTerm('')}
-                                className="mt-4 bg-blue-950 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-blue-900"
-                            >
-                                Clear Search
-                            </button>
-                        )}
+            {/* Search & Results */}
+            <div className="max-w-7xl mx-auto px-4 -mt-8">
+                <div className="bg-white p-2 rounded-2xl shadow-xl border border-gray-100 mb-12">
+                    <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Find a lecturer, department, or university..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-12 pr-4 py-4 rounded-xl focus:ring-2 focus:ring-blue-900 outline-none text-lg"
+                        />
                     </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {filteredLecturers.map((lecturer, index) => (
-                            <Link
-                                key={lecturer.sellerId}
-                                href={`/seller-profile?sellerId=${lecturer.sellerId}`}
-                                className="group bg-white border-2 border-gray-100 rounded-2xl overflow-hidden hover:border-blue-950 hover:shadow-xl transition-all duration-300"
-                            >
-                                {/* Top color bar */}
-                                <div className="h-2 bg-gradient-to-r from-blue-950 to-blue-700" />
+                </div>
 
-                                <div className="p-6">
-                                    {/* Rank + Avatar */}
-                                    <div className="flex items-center gap-4 mb-4">
-                                        <div className="relative">
-                                            <div className="w-16 h-16 rounded-full bg-blue-950 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                                                <span className="text-2xl font-black text-white">
-                                                    {lecturer.sellerName?.charAt(0)?.toUpperCase() || '?'}
-                                                </span>
-                                            </div>
-                                            {/* Rank badge */}
-                                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-gray-200 text-gray-600 rounded-full text-xs font-bold flex items-center justify-center">
-                                                {index + 1}
-                                            </span>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            {/* Title badge */}
-                                            <span className="inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full mb-1">
-                                                {lecturer.title}
-                                            </span>
-                                            <h3
-                                                className="font-bold text-base text-gray-900 leading-tight truncate group-hover:text-blue-950"
-                                                style={{ fontFamily: 'Georgia, serif' }}
-                                            >
-                                                {lecturer.sellerName}
-                                            </h3>
-                                        </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-20">
+                    {filteredLecturers.map((lecturer) => (
+                        <div key={lecturer.sellerId} className="bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-2xl transition-all duration-500 group overflow-hidden">
+                            <div className="p-8">
+                                <div className="flex justify-between items-start mb-6">
+                                    <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-950 text-3xl font-serif font-bold group-hover:bg-blue-950 group-hover:text-white transition-colors duration-300">
+                                        {lecturer.sellerName.charAt(0)}
                                     </div>
-
-                                    {/* Department / University */}
-                                    {(lecturer.department || lecturer.university) && (
-                                        <div className="mb-4 bg-gray-50 rounded-xl p-3 space-y-1">
-                                            {lecturer.department && (
-                                                <p className="text-xs text-gray-600 flex items-center gap-1.5">
-                                                    <BookMarked size={12} className="text-blue-950 flex-shrink-0" />
-                                                    <span className="truncate">{lecturer.department}</span>
-                                                </p>
-                                            )}
-                                            {lecturer.university && (
-                                                <p className="text-xs text-gray-600 flex items-center gap-1.5">
-                                                    <GraduationCap size={12} className="text-blue-950 flex-shrink-0" />
-                                                    <span className="truncate">{lecturer.university}</span>
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Stats */}
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-1.5 text-gray-600">
-                                            <BookOpen size={14} />
-                                            <span className="text-sm font-semibold text-gray-900">
-                                                {lecturer.uploadedBooks}
-                                            </span>
-                                            <span className="text-xs text-gray-500">
-                                                {lecturer.uploadedBooks === 1 ? 'material' : 'materials'}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* CTA */}
-                                    <button className="w-full flex items-center justify-center gap-2 bg-blue-950 text-white py-2.5 rounded-xl text-sm font-bold group-hover:bg-blue-800 transition-colors">
-                                        View documents
-                                        <ChevronRight size={16} />
+                                    <button
+                                        onClick={(e) => handleFollow(e, lecturer.sellerId)}
+                                        className={`p-3 rounded-xl transition-all ${followingIds.has(lecturer.sellerId) ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600'}`}
+                                    >
+                                        {followingIds.has(lecturer.sellerId) ? <UserCheck size={22} /> : <UserPlus size={22} />}
                                     </button>
                                 </div>
-                            </Link>
-                        ))}
-                    </div>
-                )}
-            </main>
 
+                                <div className="mb-6">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="text-xl font-bold text-gray-900 font-serif leading-tight">{lecturer.sellerName}</h3>
+                                        {lecturer.isVerified && <CheckCircle2 size={18} className="text-blue-600" fill="currentColor" fillOpacity={0.1} />}
+                                    </div>
+                                    <p className="text-blue-700 font-medium text-sm">{lecturer.title}</p>
+                                </div>
+
+                                <div className="space-y-3 mb-8">
+                                    <div className="flex items-center gap-3 text-gray-500 text-sm">
+                                        <BookMarked size={16} className="text-gray-400" />
+                                        <span>{lecturer.department}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-gray-500 text-sm">
+                                        <GraduationCap size={16} className="text-gray-400" />
+                                        <span>{lecturer.university}</span>
+                                    </div>
+                                </div>
+
+                                <div className="pt-6 border-t border-gray-50 flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-gray-900">
+                                        <BookOpen size={16} className="text-blue-900" />
+                                        <span className="font-bold">{lecturer.uploadedBooks}</span>
+                                        <span className="text-sm text-gray-500">Files</span>
+                                    </div>
+                                    <Link
+                                        href={`/seller-profile?sellerId=${lecturer.sellerId}`}
+                                        className="text-blue-950 font-bold text-sm flex items-center gap-1 hover:gap-3 transition-all"
+                                    >
+                                        View Profile <ChevronRight size={18} />
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
             <Footer />
         </div>
     );

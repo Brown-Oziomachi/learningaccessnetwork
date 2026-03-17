@@ -1,11 +1,19 @@
-// app/hooks/usePayment.js - COMPLETE FIX
+// app/hooks/usePayment.js
 import { useState, useEffect } from 'react';
 import { db, auth } from '@/lib/firebaseConfig';
-import { collection, addDoc, doc, updateDoc, serverTimestamp, increment, getDoc, setDoc } from 'firebase/firestore';
+import {
+    collection,
+    addDoc,
+    doc,
+    updateDoc,
+    serverTimestamp,
+    increment,
+    getDoc,
+    runTransaction
+} from 'firebase/firestore';
 
 const calculatePaymentDistribution = (book) => {
     const isPlatformBook = book.source === 'platform' || book.isPlatformBook === true;
-
     if (isPlatformBook) {
         return {
             isPlatformBook: true,
@@ -28,6 +36,10 @@ export const usePayment = (book, formData, sellerDetails) => {
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [error, setError] = useState(null);
     const [flutterwaveLoaded, setFlutterwaveLoaded] = useState(false);
+    const [newBalance, setNewBalance] = useState(null);
+    const [showPin, setShowPin] = useState(false);
+    const [withdrawalStep, setWithdrawalStep] = useState('INIT'); // INIT, OTP_REQUIRED, PROCESSING
+    const [tempWithdrawalData, setTempWithdrawalData] = useState(null);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && !window.FlutterwaveCheckout) {
@@ -36,334 +48,318 @@ export const usePayment = (book, formData, sellerDetails) => {
             script.async = true;
             script.onload = () => setFlutterwaveLoaded(true);
             document.body.appendChild(script);
-        } else if (window.FlutterwaveCheckout) {
+        } else if (typeof window !== 'undefined' && window.FlutterwaveCheckout) {
             setFlutterwaveLoaded(true);
         }
     }, []);
 
+
+    const processWithdrawal = async (amount, pin, otp = null) => {
+        setProcessing(true);
+        setError(null);
+        const WITHDRAWAL_THRESHOLD = 5000;
+
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) throw new Error("Authentication required.");
+
+            // 1. VERIFY PIN (Every withdrawal needs a PIN)
+            const sellerRef = doc(db, 'sellers', currentUser.uid);
+            const sellerSnap = await getDoc(sellerRef);
+            const sellerData = sellerSnap.data();
+
+            if (pin.toString().trim() !== sellerData.transactionPin?.toString().trim()) {
+                throw new Error("Incorrect PIN.");
+            }
+
+            // 2. CHECK THRESHOLD FOR OTP
+            if (amount > WITHDRAWAL_THRESHOLD && !otp) {
+                // This is the first attempt and it's a large amount
+                const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
+                // Store OTP in Firebase temporarily to verify later
+                await updateDoc(sellerRef, {
+                    withdrawalOtp: generatedOtp,
+                    otpExpiry: Date.now() + 600000 // 10 mins
+                });
+
+                console.log(`[SECURITY] Withdrawal OTP sent: ${generatedOtp}`); // Replace with actual Email service
+
+                setTempWithdrawalData({ amount, pin });
+                setWithdrawalStep('OTP_REQUIRED');
+                return { status: "OTP_SENT" };
+            }
+
+            // 3. VERIFY OTP (If it was required)
+            if (otp) {
+                if (otp !== sellerData.withdrawalOtp || Date.now() > sellerData.otpExpiry) {
+                    throw new Error("Invalid or expired OTP.");
+                }
+            }
+
+            // 4. EXECUTE WITHDRAWAL (Using a Transaction for safety)
+            await runTransaction(db, async (transaction) => {
+                const freshSnap = await transaction.get(sellerRef);
+                const balance = freshSnap.data().accountBalance || 0;
+
+                if (balance < amount) throw new Error("Insufficient funds.");
+
+                // Deduct from balance
+                transaction.update(sellerRef, {
+                    accountBalance: increment(-amount),
+                    withdrawalOtp: null, // Clear OTP after use
+                    otpExpiry: null
+                });
+
+                // Log the withdrawal
+                const withdrawalLogRef = doc(collection(db, 'withdrawals'));
+                transaction.set(withdrawalLogRef, {
+                    userId: currentUser.uid,
+                    amount: amount,
+                    status: 'completed',
+                    type: 'withdrawal',
+                    createdAt: serverTimestamp()
+                });
+            });
+
+            setPaymentSuccess(true);
+            setWithdrawalStep('COMPLETED');
+
+        } catch (err) {
+            setError({ message: err.message });
+        } finally {
+            setProcessing(false);
+        }
+    };
+
     const saveTransaction = async (paymentData, status = 'completed') => {
         try {
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-            console.log('=== SAVING TRANSACTION ===');
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
             const distribution = calculatePaymentDistribution(book);
-            console.log('💰 Payment Distribution:', distribution);
-
             const currentUser = auth.currentUser;
             if (!currentUser) throw new Error('User not authenticated');
 
             const transactionData = {
                 transactionId: paymentData.transaction_id || paymentData.tx_ref,
                 transactionRef: paymentData.tx_ref,
-                flutterwaveRef: paymentData.flw_ref || null,
-                status: status,
+                status,
                 amount: book.price,
                 currency: 'NGN',
-                paymentMethod: paymentData.payment_type || 'flutterwave',
+                paymentMethod: paymentData.payment_type || 'external',
                 bookId: book.id,
-                firestoreId: book.firestoreId || null,
                 bookTitle: book.title,
-                bookAuthor: book.author,
-                bookPrice: book.price,
-                bookCategory: book.category || null,
-                bookSource: book.source || 'firestore',
                 buyerId: currentUser.uid,
                 buyerEmail: formData.email,
-                buyerName: formData.name,
-                buyerPhone: formData.phone,
                 sellerId: sellerDetails?.id || null,
-                sellerName: sellerDetails?.name || 'Unknown Seller',
-                sellerEmail: sellerDetails?.email || null,
-                sellerPhone: sellerDetails?.phone || null,
                 platformFee: distribution.platformFee,
                 sellerAmount: distribution.sellerAmount,
-                isPlatformBook: distribution.isPlatformBook,
-                distributionType: distribution.distributionType,
                 createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                purchaseDate: new Date().toISOString(),
             };
 
-            // 1. Save transaction
             const transactionRef = await addDoc(collection(db, 'transactions'), transactionData);
-            console.log('✅ Transaction saved:', transactionRef.id);
-
-            // 2. Update buyer
-            try {
-                const userRef = doc(db, 'users', currentUser.uid);
-                const userDoc = await getDoc(userRef);
-
-                const purchaseData = {
+            const userRef = doc(db, 'users', currentUser.uid);
+            await updateDoc(userRef, {
+                [`purchasedBooks.${book.id}`]: {
                     id: book.id,
-                    bookId: book.id,
-                    firestoreId: book.firestoreId || null,
                     title: book.title,
-                    author: book.author,
                     purchaseDate: new Date().toISOString(),
-                    transactionId: transactionRef.id,
-                    amount: book.price,
-                    sellerId: sellerDetails?.id,
-                    sellerName: sellerDetails?.name,
-                    pdfUrl: book.pdfUrl || null,
-                };
-
-                const updates = { updatedAt: serverTimestamp() };
-                if (!userDoc.exists() || !userDoc.data()?.purchasedBooks) {
-                    updates.purchasedBooks = {};
+                    transactionId: transactionRef.id
                 }
-                updates[`purchasedBooks.${book.id}`] = purchaseData;
-                if (book.firestoreId && book.firestoreId !== book.id) {
-                    updates[`purchasedBooks.${book.firestoreId}`] = purchaseData;
-                }
+            });
 
-                await updateDoc(userRef, updates);
-                console.log('✅ Buyer record updated');
-            } catch (buyerError) {
-                console.error('❌ Error updating buyer record:', buyerError);
+            if (sellerDetails?.id && !distribution.isPlatformBook) {
+                const sellersRef = doc(db, 'sellers', sellerDetails.id);
+                await updateDoc(sellersRef, {
+                    accountBalance: increment(distribution.sellerAmount),
+                    totalEarnings: increment(distribution.sellerAmount),
+                    updatedAt: serverTimestamp()
+                });
             }
-
-            // 3. ✅ CRITICAL FIX: Update seller wallet - ALWAYS
-            if (sellerDetails?.id) {
-                const sellerAmount = distribution.sellerAmount;
-                const platformFee = distribution.platformFee;
-
-                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-                console.log('💳 UPDATING SELLER WALLET');
-                console.log('Seller ID:', sellerDetails.id);
-                console.log('Amount to credit:', sellerAmount);
-                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-                try {
-                    // Update users collection
-                    const userSellerRef = doc(db, 'users', sellerDetails.id);
-                    const sellerSnapshot = await getDoc(userSellerRef);
-
-                    if (sellerSnapshot.exists()) {
-                        await updateDoc(userSellerRef, {
-                            [`sales.${transactionRef.id}`]: {
-                                transactionId: transactionRef.id,
-                                bookId: book.id,
-                                bookTitle: book.title,
-                                amount: book.price,
-                                sellerEarnings: sellerAmount,
-                                platformFee: platformFee,
-                                distributionType: distribution.distributionType,
-                                buyerId: currentUser.uid,
-                                buyerName: formData.name,
-                                buyerEmail: formData.email,
-                                saleDate: new Date().toISOString(),
-                                status: status,
-                            },
-                            totalSales: increment(1),
-                            totalRevenue: increment(book.price),
-                            totalEarnings: increment(sellerAmount),
-                            lastSaleDate: serverTimestamp(),
-                            updatedAt: serverTimestamp()
-                        });
-                        console.log('✅ Seller user profile updated');
-                    }
-
-                    // ✅ CRITICAL: Update sellers collection - CREATE IF NOT EXISTS
-                    const sellersRef = doc(db, 'sellers', sellerDetails.id);
-                    const sellerDoc = await getDoc(sellersRef);
-
-                    console.log('📊 Seller doc exists?', sellerDoc.exists());
-
-                    if (sellerDoc.exists()) {
-                        const currentData = sellerDoc.data();
-                        console.log('📊 Current seller data:', {
-                            accountBalance: currentData.accountBalance || 0,
-                            totalEarnings: currentData.totalEarnings || 0,
-                            booksSold: currentData.booksSold || 0
-                        });
-
-                        // ✅ Update existing seller document
-                        await updateDoc(sellersRef, {
-                            accountBalance: increment(sellerAmount),  // ✅ THIS UPDATES BALANCE
-                            totalEarnings: increment(sellerAmount),
-                            booksSold: increment(1),
-                            lastSaleDate: serverTimestamp(),
-                            updatedAt: serverTimestamp()
-                        });
-
-                        console.log('✅ SELLER WALLET UPDATED SUCCESSFULLY');
-                        console.log(`💰 Balance credited: +₦${sellerAmount.toLocaleString()}`);
-
-                        // Verify the update
-                        const verifyDoc = await getDoc(sellersRef);
-                        const verifiedData = verifyDoc.data();
-                        console.log('✅ Verified new balance:', verifiedData.accountBalance);
-
-                    } else {
-                        // ✅ CREATE new seller document if it doesn't exist
-                        console.log('⚠️ Seller document does not exist. Creating...');
-
-                        await setDoc(sellersRef, {
-                            sellerId: sellerDetails.id,
-                            sellerEmail: sellerDetails.email || 'unknown@email.com',
-                            sellerName: sellerDetails.name || 'Unknown Seller',
-                            accountBalance: sellerAmount,  // ✅ INITIAL BALANCE
-                            totalEarnings: sellerAmount,
-                            booksSold: 1,
-                            lastSaleDate: serverTimestamp(),
-                            createdAt: serverTimestamp(),
-                            updatedAt: serverTimestamp()
-                        });
-
-                        console.log('✅ NEW SELLER DOCUMENT CREATED');
-                        console.log(`💰 Initial balance set: ₦${sellerAmount.toLocaleString()}`);
-                    }
-
-                } catch (sellerUpdateError) {
-                    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-                    console.error('❌ CRITICAL ERROR UPDATING SELLER WALLET');
-                    console.error('Error:', sellerUpdateError);
-                    console.error('Error code:', sellerUpdateError.code);
-                    console.error('Error message:', sellerUpdateError.message);
-                    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-                    // Don't throw - allow transaction to complete
-                    // But log it for debugging
-                }
-            } else {
-                console.error('❌ NO SELLER DETAILS PROVIDED');
-            }
-
-            // 4. Update book sales count
-            if (book.firestoreId) {
-                try {
-                    const bookRef = doc(db, 'advertMyBook', book.firestoreId);
-                    const bookDoc = await getDoc(bookRef);
-                    if (bookDoc.exists()) {
-                        await updateDoc(bookRef, {
-                            salesCount: increment(1),
-                            lastPurchaseDate: serverTimestamp(),
-                            updatedAt: serverTimestamp()
-                        });
-                        console.log('✅ Book sales count updated');
-                    }
-                } catch (bookUpdateError) {
-                    console.error('❌ Error updating book sales count:', bookUpdateError);
-                }
-            }
-
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-            console.log('✅ TRANSACTION COMPLETE');
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
             return transactionRef.id;
         } catch (err) {
-            console.error('❌ CRITICAL Error saving transaction:', err);
             throw err;
         }
     };
 
     const processFlutterwavePayment = () => {
-        if (!book) {
-            setError({ message: 'Book information is missing' });
+        if (!book || !formData.email) {
+            setError({ message: "Please fill in your email before paying." });
             return;
         }
 
-        if (!sellerDetails) {
-            setError({ message: 'Seller information is missing. Cannot process payment.' });
+        if (!flutterwaveLoaded || !window.FlutterwaveCheckout) {
+            setError({ message: "Payment gateway is still loading. Please try again." });
             return;
         }
 
-        if (!formData.email || !formData.phone || !formData.name) {
-            setError({ message: 'Please fill in all required fields' });
-            return;
-        }
+        const txRef = `TXN-FLW-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-        if (!window.FlutterwaveCheckout) {
-            const script = document.createElement('script');
-            script.src = 'https://checkout.flutterwave.com/v3.js';
-            document.body.appendChild(script);
-            script.onload = () => {
-                setProcessing(false);
-                processFlutterwavePayment();
-            };
-            return;
-        }
-
-        setProcessing(true);
-        setError(null);
-
-        console.log('=== INITIATING PAYMENT ===');
-        console.log('Book:', book.id, book.title, '₦' + book.price);
-        console.log('Seller:', sellerDetails.id, sellerDetails.name);
-
-        const paymentConfig = {
+        window.FlutterwaveCheckout({
             public_key: process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY,
-            tx_ref: `TXN-${Date.now()}-${(book?.id || 'unknown').replace('firestore-', '')}`,
+            tx_ref: txRef,
             amount: book.price,
-            currency: 'NGN',
-            payment_options: 'card,ussd,banktransfer',
+            currency: "NGN",
+            payment_options: "card,ussd,banktransfer",
             customer: {
                 email: formData.email,
-                phone_number: formData.phone,
-                name: formData.name,
+                phone_number: formData.phone || "",
+                name: formData.name || formData.email,
             },
             customizations: {
-                title: book.title || 'Book Purchase',
-                description: `Purchase of ${book.title || 'book'}`,
-                logo: book.image || '',
+                title: "LAN Library",
+                description: `Purchase: ${book.title}`,
+                logo: "/lan-logo.png",
             },
-
             callback: async (response) => {
-                console.log('=== PAYMENT CALLBACK ===');
-                console.log('Status:', response.status);
-
-                if (response.status === 'successful') {
+                if (response.status === "successful" || response.status === "completed") {
                     try {
-                        const transactionId = await saveTransaction(response, 'completed');
-                        console.log('✓ Payment processed successfully');
-                        console.log('Transaction ID:', transactionId);
+                        setProcessing(true);
+                        await saveTransaction(response, 'completed');
                         setPaymentSuccess(true);
                     } catch (err) {
-                        console.error('✗ Error processing payment:', err);
-                        setError({
-                            message: 'Payment successful but failed to save transaction. Please contact support with reference: ' + response.tx_ref
-                        });
+                        setError({ message: "Payment recorded but failed to save. Contact support." });
                     } finally {
                         setProcessing(false);
                     }
-                } else if (response.status === 'cancelled') {
-                    setError({ message: 'Payment was cancelled' });
-                    setProcessing(false);
                 } else {
-                    setError({ message: `Payment failed: ${response.status}` });
-                    setProcessing(false);
+                    setError({ message: "Payment was not completed. Please try again." });
                 }
             },
             onclose: () => {
-                setProcessing(false);
-            }
-        };
-
-        window.FlutterwaveCheckout(paymentConfig);
+                console.log("Flutterwave modal closed");
+            },
+        });
     };
 
-    const processPayPalPayment = async () => {
-        setProcessing(true);
-        setError(null);
-
+    const processPayPalPayment = async (details) => {
+        if (!details) return;
         try {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            const mockPayPalResponse = {
-                transaction_id: `PAYPAL-${Date.now()}`,
-                tx_ref: `TXN-${Date.now()}-${book.id}`,
+            setProcessing(true);
+            await saveTransaction({
+                transaction_id: details.id || `PP-${Date.now()}`,
+                tx_ref: `TXN-PP-${Date.now()}`,
                 payment_type: 'paypal',
-                status: 'successful'
-            };
-
-            const transactionId = await saveTransaction(mockPayPalResponse, 'completed');
-            console.log('PayPal payment processed. Transaction ID:', transactionId);
+            }, 'completed');
             setPaymentSuccess(true);
         } catch (err) {
-            console.error('PayPal payment error:', err);
-            setError({ message: 'PayPal payment failed: ' + err.message });
+            setError({ message: "Failed to record PayPal payment." });
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const setupInitialPin = async (newPin) => {
+        setProcessing(true);
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) throw new Error("Auth required");
+            const sellerRef = doc(db, 'sellers', currentUser.uid);
+            await updateDoc(sellerRef, {
+                transactionPin: newPin.toString().trim(),
+                transferPin: newPin.toString().trim(),
+                updatedAt: serverTimestamp()
+            });
+            return { success: true };
+        } catch (err) {
+            setError({ message: "Failed to set PIN. Please try again." });
+            return { success: false };
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const requestPinReset = async () => {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return { success: false };
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        try {
+            const sellerRef = doc(db, 'sellers', currentUser.uid);
+            await updateDoc(sellerRef, {
+                resetOtp: otp,
+                otpExpiry: Date.now() + 600000
+            });
+            console.log(`[SECURITY] OTP: ${otp}`);
+            return { success: true };
+        } catch (err) {
+            return { success: false };
+        }
+    };
+
+    const verifyOtpAndSetPin = async (enteredOtp, newPin) => {
+        const currentUser = auth.currentUser;
+        const sellerRef = doc(db, 'sellers', currentUser.uid);
+        const sellerSnap = await getDoc(sellerRef);
+        const data = sellerSnap.data();
+
+        if (enteredOtp === data?.resetOtp && Date.now() < data?.otpExpiry) {
+            await updateDoc(sellerRef, {
+                transactionPin: newPin.toString().trim(),
+                transferPin: newPin.toString().trim(),
+                resetOtp: null,
+                otpExpiry: null
+            });
+            return true;
+        } else {
+            throw new Error("Invalid or expired code.");
+        }
+    };
+
+    const processWalletPayment = async (enteredPin) => {
+        setProcessing(true);
+        setError(null);
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) throw new Error("Please log in.");
+            if (!enteredPin || enteredPin.toString().trim().length < 4) {
+                throw new Error("Please enter your 4-digit PIN.");
+            }
+
+            const sellerRef = doc(db, 'sellers', currentUser.uid);
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            let updatedBalance = null;
+
+            await runTransaction(db, async (transaction) => {
+                const sellerSnap = await transaction.get(sellerRef);
+                if (!sellerSnap.exists()) throw new Error("Wallet not active. Become a seller to use LAN wallet");
+
+                const sellerData = sellerSnap.data();
+                const storedValue = sellerData.transactionPin || sellerData.transferPin;
+
+                if (storedValue === undefined || storedValue === null) {
+                    throw new Error("PIN_NOT_SET");
+                }
+
+                if (enteredPin.toString().trim() !== storedValue.toString().trim()) {
+                    throw new Error("Incorrect PIN. Please try again.");
+                }
+
+                const currentBalance = sellerData.accountBalance || 0;
+                if (currentBalance < book.price) {
+                    throw new Error(`Insufficient funds. Balance: ₦${currentBalance.toLocaleString()}`);
+                }
+
+                updatedBalance = currentBalance - book.price;
+                transaction.update(sellerRef, {
+                    accountBalance: updatedBalance,
+                    updatedAt: serverTimestamp()
+                });
+            });
+
+            const walletResponse = {
+                transaction_id: `WAL-${Date.now()}`,
+                tx_ref: `TXN-WAL-${Date.now()}`,
+                payment_type: 'lan_wallet',
+            };
+            await saveTransaction(walletResponse, 'completed');
+            setNewBalance(updatedBalance);
+            setPaymentSuccess(true);
+
+        } catch (err) {
+            setError({
+                message: err.message === "PIN_NOT_SET"
+                    ? "You haven't set a PIN yet. Please set one to continue."
+                    : err.message
+            });
         } finally {
             setProcessing(false);
         }
@@ -372,10 +368,17 @@ export const usePayment = (book, formData, sellerDetails) => {
     return {
         processing,
         paymentSuccess,
+        setPaymentSuccess,
         error,
-        flutterwaveLoaded,
+        setError,
+        newBalance,
+        showPin,
+        setShowPin,
         processFlutterwavePayment,
         processPayPalPayment,
-        saveTransaction
+        processWalletPayment,
+        setupInitialPin,
+        requestPinReset,
+        verifyOtpAndSetPin
     };
 };

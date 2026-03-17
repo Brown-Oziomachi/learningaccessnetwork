@@ -538,7 +538,7 @@ export default function TransferClient() {
                 <div className="bg-white rounded-2xl p-8 text-center max-w-md shadow border border-gray-200">
                     <Wallet size={48} className="mx-auto text-gray-300 mb-4" />
                     <h2 className="text-xl font-bold text-gray-900 mb-2">No Seller Account</h2>
-                    <p className="text-gray-500">You need a seller account to use LAN Bank transfers.</p>
+                    <p className="text-gray-500">You need a seller account to use LAN wallet transfers.</p>
                 </div>
             </div>
         );

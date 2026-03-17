@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
 import { backfillFlutterwaveSubaccount } from "@/lib/auth/backfillSubaccount";
 import NotificationBell from "@/components/NotificationBell";
+import { usePayment } from "@/app/hooks/usePayment";
 
 const nigerianBanks = [
     { name: "Access Bank", code: "044" },
@@ -76,8 +77,8 @@ function PinModal({ amount, bankDetails, pinError, onDigit, onDelete, onConfirm,
                             <div
                                 key={i}
                                 className={`w-13 h-14 rounded-xl border-2 flex items-center justify-center text-2xl transition-all duration-150 ${filled
-                                        ? "border-blue-950 text-blue-950"
-                                        : "border-gray-200 text-gray-300"
+                                    ? "border-blue-950 text-blue-950"
+                                    : "border-gray-200 text-gray-300"
                                     }`}
                                 style={{ width: 52, height: 56 }}
                             >
@@ -201,9 +202,16 @@ export default function SellerAccountClient() {
     const [withdrawalError, setWithdrawalError] = useState("");
     const [seller, setSeller] = useState(null); // ✅ ADD THIS
     const [successData, setSuccessData] = useState(null); // { amount, reference }
-        const [showPinModal, setShowPinModal] = useState(false);
+    const [showPinModal, setShowPinModal] = useState(false);
     const [pinValue, setPinValue] = useState("");
     const [pinError, setPinError] = useState("");
+    const [showResetPinModal, setShowResetPinModal] = useState(false);
+    const [resetPinView, setResetPinView] = useState('forgot'); // 'forgot' | 'otp'
+    const [resetOtpInput, setResetOtpInput] = useState('');
+    const [resetNewPin, setResetNewPin] = useState('');
+    const [resetPinError, setResetPinError] = useState('');
+    const [Processing, setProcessing] = useState(false);
+    const [resetPinSuccess, setResetPinSuccess] = useState(false);
     const router = useRouter();
     const [showBankModal, setShowBankModal] = useState(false);
     const [bankFormData, setBankFormData] = useState({
@@ -218,10 +226,15 @@ export default function SellerAccountClient() {
         surname: "",
         dateOfBirth: "",
         phone: "",
-        address: ""
+        address: "",
+        country: ""
     });
+    const {
+        processing: pinProcessing,
+        requestPinReset,
+        verifyOtpAndSetPin
+    } = usePayment(null, formData, null);
 
-    
     useEffect(() => {
         if (user?.uid) {
             backfillFlutterwaveSubaccount(user.uid); // silent, non-blocking
@@ -299,7 +312,8 @@ export default function SellerAccountClient() {
                     surname: userData.surname || "",
                     dateOfBirth: userData.dateOfBirth || "",
                     phone: userData.phone || "",
-                    address: userData.address || ""
+                    address: userData.address || "",
+                    country: userData.country || ""
                 });
 
                 await fetchSellerTransactions(uid);
@@ -311,7 +325,7 @@ export default function SellerAccountClient() {
         }
     };
 
-    
+
     const fetchSellerTransactions = async (uid) => {
         try {
             let allTransactions = [];
@@ -500,6 +514,7 @@ export default function SellerAccountClient() {
         }
     };
 
+
     const handleImageUpload = (e) => {
         const file = e.target.files[0];
         if (!file || !file.type.startsWith("image/")) return;
@@ -525,13 +540,26 @@ export default function SellerAccountClient() {
     const handleSave = async () => {
         try {
             await updateDoc(doc(db, "users", user.uid), {
-                ...formData,
-                displayName: `${formData.firstName} ${formData.surname}`
+                firstName: formData.firstName,
+                surname: formData.surname,
+                dateOfBirth: formData.dateOfBirth,
+                phone: formData.phone,
+                address: formData.address,
+                country: formData.country,
+                displayName: `${formData.firstName} ${formData.surname}`,
+                updatedAt: serverTimestamp()
             });
-            setUser((prev) => ({ ...prev, ...formData, displayName: `${formData.firstName} ${formData.surname}` }));
+            setUser((prev) => ({ 
+                ...prev, 
+                ...formData, 
+                displayName: `${formData.firstName} ${formData.surname}`,
+                updatedAt: new Date()
+            }));
             setIsEditing(false);
+            alert("Profile updated successfully!");
         } catch (error) {
-            alert("Failed to save profile");
+            console.error("Error saving profile:", error);
+            alert("Failed to save profile: " + error.message);
         }
     };
 
@@ -600,19 +628,19 @@ export default function SellerAccountClient() {
     };
 
     const refreshBalanceOnly = async (uid) => {
-    try {
-        const sellerDoc = await getDoc(doc(db, "sellers", uid));
-        if (sellerDoc.exists()) {
-            const sellerData = sellerDoc.data();
-            setAccountBalance(sellerData.accountBalance || 0);
-            setTotalEarnings(sellerData.totalEarnings || 0);
-            setBooksSold(sellerData.booksSold || 0);
+        try {
+            const sellerDoc = await getDoc(doc(db, "sellers", uid));
+            if (sellerDoc.exists()) {
+                const sellerData = sellerDoc.data();
+                setAccountBalance(sellerData.accountBalance || 0);
+                setTotalEarnings(sellerData.totalEarnings || 0);
+                setBooksSold(sellerData.booksSold || 0);
+            }
+        } catch (error) {
+            console.error("Error refreshing balance:", error);
         }
-    } catch (error) {
-        console.error("Error refreshing balance:", error);
-    }
     };
-    
+
     const handleWithdraw = async () => {
         const amount = parseFloat(withdrawAmount);
         setWithdrawalError("");
@@ -791,28 +819,28 @@ export default function SellerAccountClient() {
                                 </div>
                             </button>
                         </div>
-                     <div className="bg-blue-950 rounded-xl shadow-sm px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        <div className="bg-blue-950 rounded-xl shadow-sm px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center gap-2 w-full sm:w-auto">
 
-  <div className="flex-shrink-0">
-    <NotificationBell userId={user?.uid} />
-  </div>
+                            <div className="flex-shrink-0">
+                                <NotificationBell userId={user?.uid} />
+                            </div>
 
-  <button
-    onClick={handleButton}
-    className="bg-pink-500 hover:bg-pink-600 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap w-full sm:w-auto"
-  >
-    GET HELP
-  </button>
+                            <button
+                                onClick={handleButton}
+                                className="bg-pink-500 hover:bg-pink-600 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap w-full sm:w-auto"
+                            >
+                                GET HELP
+                            </button>
 
-  {user?.role === "student" && (
-    <Link href="/student/dashboard" className="w-full sm:w-auto">
-      <button className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap w-full sm:w-auto">
-        Student Dashboard
-      </button>
-    </Link>
-  )}
+                            {user?.role === "student" && (
+                                <Link href="/student/dashboard" className="w-full sm:w-auto">
+                                    <button className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap w-full sm:w-auto">
+                                        Student Dashboard
+                                    </button>
+                                </Link>
+                            )}
 
-</div>
+                        </div>
                     </div>
                 </div>
 
@@ -854,13 +882,13 @@ export default function SellerAccountClient() {
                                     </button>
 
                                     <a href="/transfer"
-                                    className="flex-1 sm:flex-none text-center bg-blue-950 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold text-sm sm:text-base hover:bg-gray-950 transition-colors"
-                    >
-                                    Transfer
-                                </a>
+                                        className="flex-1 sm:flex-none text-center bg-blue-950 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold text-sm sm:text-base hover:bg-gray-950 transition-colors"
+                                    >
+                                        Transfer
+                                    </a>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
                         {/* Stats Grid */}
                         <div className="grid grid-cols-2 gap-4">
@@ -1025,578 +1053,612 @@ export default function SellerAccountClient() {
                             </div>
                         )}
 
-            {/* Profile Modal */}
-            {showProfileModal && (
-                <div className="fixed inset-0 bg-white z-50 flex flex-col">
-                    <div className="bg-blue-950 p-6 text-center relative">
-                        <button
-                            onClick={() => setShowProfileModal(false)}
-                            className="absolute top-4 right-4 text-gray-50 hover:text-gray-300"
-                        >
-                            <X size={24} />
-                        </button>
-                            <div className="flex flex-col items-center">
-                                <div className="relative mb-3">
-                                    <img
-                                        src={user?.photoBase64 || "/lan-logo.png"}
-                                        className="w-20 h-20 rounded-full object-cover border-4 border-white"
-                                        alt="Profile"
-                                    />
-                                </div>
-                                <p className="text-2xl font-bold text-gray-50">{user?.displayName || `${user?.firstName} ${user?.surname}`}</p>
-                                <p className="text-sm text-gray-300">+234{user?.phone || '0000000000'}</p>
-                            </div>
-                    </div>
-
-                    <div className="flex-1 bg-gray-100 overflow-y-auto">
-                        <div className="p-4 space-y-2">
-                            <button
-                                onClick={() => {
-                                    setShowProfileModal(false);
-                                    setIsEditing(true);
-                                }}
-                                className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-white p-2 rounded-lg">
-                                        <User size={20} className="text-blue-950" />
-                                    </div>
-                                    <span className="font-semibold text-white">My Profile</span>
-                                </div>
-                                <ChevronRight size={20} className="text-gray-300" />
-                            </button>
-
-                            <button
-                                onClick={() => {
-                                    setShowProfileModal(false);
-                                    setShowBankModal(true);
-                                    // Pre-fill form with existing bank details
-                                    if (user?.bankDetails) {
-                                        setBankFormData({
-                                            accountName: user.bankDetails.accountName || "",
-                                            accountNumber: user.bankDetails.accountNumber || "",
-                                            bankName: user.bankDetails.bankName || "",
-                                            bankCode: user.bankDetails.bankCode || ""
-                                        });
-                                    }
-                                }}
-                                className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-white p-2 rounded-lg">
-                                        <Building size={20} className="text-blue-950" />
-                                    </div>
-                                    <span className="font-semibold text-white">Bank Details</span>
-                                </div>
-                                <ChevronRight size={20} className="text-gray-300" />
-                            </button>
-
-                            <div className="w-full bg-blue-950 rounded-xl p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-white p-2 rounded-lg">
-                                            <Settings size={20} className="text-blue-950" />
-                                        </div>
-                                        <span className="font-semibold text-white">Other Information</span>
-                                    </div>
-                                </div>
-                                <div className="space-y-3 pl-11 text-sm text-white">
-                                    <div className="flex justify-between py-2 border-b border-blue-800">
-                                        <span className="text-gray-300">Email</span>
-                                        <span className="text-right break-all">{user?.email}</span>
-                                    </div>
-                                    <div className="flex justify-between py-2 border-b border-blue-800">
-                                        <span className="text-gray-300">Date of Birth</span>
-                                        <span>{user?.dateOfBirth || 'Not set'}</span>
-                                    </div>
-                                    <div className="flex justify-between py-2 border-b border-blue-800">
-                                        <span className="text-gray-300">Address</span>
-                                        <span className="text-right">{user?.address || 'Not set'}</span>
-                                    </div>
-                                    <div className="flex justify-between py-2">
-                                        <span className="text-gray-300">Account Type</span>
-                                        <span className="bg-white text-blue-950 px-2 py-1 rounded font-semibold text-xs">Verified Seller</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={handleButton}
-                                className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-white p-2 rounded-lg">
-                                        <AlertCircle size={20} className="text-blue-950" />
-                                    </div>
-                                    <span className="font-semibold text-white">Help</span>
-                                </div>
-                                <ChevronRight size={20} className="text-gray-300" />
-                            </button>
-
-                            <button
-                                onClick={() => {
-                                    setShowProfileModal(false);
-                                    setShowTransactionHistory(true);
-                                }}
-                                className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-white p-2 rounded-lg">
-                                        <TrendingUp size={20} className="text-blue-950" />
-                                    </div>
-                                    <span className="font-semibold text-white">History</span>
-                                </div>
-                                <ChevronRight size={20} className="text-gray-300" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Transaction History Modal */}
-            {showTransactionHistory && (
-                <div className="fixed inset-0 bg-white z-50 flex flex-col">
-                    <div className="bg-blue-950 p-4 flex items-center gap-4 text-white">
-                        <button onClick={() => setShowTransactionHistory(false)}>
-                            <X size={24} />
-                        </button>
-                        <h2 className="text-xl font-bold">Transaction History</h2>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-4 bg-gray-100">
-                        {transactions.length === 0 ? (
-                            <div className="text-center py-12">
-                                <ShoppingBag size={48} className="mx-auto text-gray-400 mb-4" />
-                                <p className="text-gray-600">No transactions yet</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {transactions.map((txn) => (
-                                    <div key={txn.id} className="bg-white rounded-xl p-4 shadow-sm">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`p-2 rounded-lg ${txn.type === 'transfer_out' ? 'bg-red-100' :
-                                                        txn.type === 'transfer_in' ? 'bg-green-100' :
-                                                            'bg-blue-100'
-                                                    }`}>
-                                                    {txn.type === 'transfer_out'
-                                                        ? <ArrowUpRight size={18} className="text-red-500" />
-                                                        : txn.type === 'transfer_in'
-                                                            ? <ArrowDownLeft size={18} className="text-green-600" />
-                                                            : <ShoppingBag size={18} className="text-blue-950" />}
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-blue-950">{txn.bookTitle}</p>
-                                                    <p className="text-xs text-gray-500">
-                                                        {txn.createdAtDate?.toLocaleDateString()} at {txn.createdAtDate?.toLocaleTimeString()}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-green-600 font-bold">
-                                                    +₦{(txn.sellerAmount || (txn.amount * 0.85)).toLocaleString()}
-                                                </p>
-                                                <p className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">Success</p>
-                                            </div>
-                                        </div>
-                                        <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-600">Buyer:</span>
-                                                <span className="text-blue-950 font-medium">{txn.buyerName}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-600">Price:</span>
-                                                <span className="text-blue-950 font-medium">₦{txn.amount?.toLocaleString()}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-600">Platform Fee (20%):</span>
-                                                <span className="text-red-600 font-medium">-₦{((txn.amount || 0) * 0.20).toLocaleString()}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {withdrawals.length > 0 && (
-                            <div className="mt-6">
-                                <h3 className="font-bold text-lg mb-3 text-blue-950">Withdrawal History</h3>
-                                <div className="space-y-3">
-                                    {withdrawals.map((w) => (
-                                        <div key={w.id} className="bg-white rounded-xl p-4 shadow-sm">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`p-2 rounded-lg ${w.status === 'pending' ? 'bg-yellow-100' :
-                                                        w.status === 'completed' ? 'bg-red-100' :
-                                                            w.status === 'rejected' ? 'bg-red-100' :
-                                                                'bg-gray-100'
-                                                        }`}>
-                                                        <Download size={18} className={
-                                                            w.status === 'pending' ? 'text-yellow-600' :
-                                                                w.status === 'completed' ? 'text-red-600' :
-                                                                    w.status === 'rejected' ? 'text-red-600' :
-                                                                        'text-gray-600'
-                                                        } />
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-semibold text-blue-950">Withdrawal Request</p>
-                                                        <p className="text-xs text-gray-500">
-                                                            {w.requestedAtDate?.toLocaleDateString()} at {w.requestedAtDate?.toLocaleTimeString()}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-red-600 font-bold">₦{w.amount?.toLocaleString()}</p>
-                                                    <p className={`text-xs px-2 py-1 rounded ${w.status === 'pending' ? 'text-yellow-600 bg-yellow-50' :
-                                                        w.status === 'completed' ? 'text-green-600 bg-green-50' :
-                                                            w.status === 'rejected' ? 'text-red-600 bg-red-50' :
-                                                                'text-gray-600 bg-gray-50'
-                                                        }`}>
-                                                        {w.status === 'pending' ? '⏳ Pending Approval' :
-                                                            w.status === 'completed' ? '✅ Completed' :
-                                                                w.status === 'rejected' ? '❌ Rejected' : w.status}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            {w.reference && (
-                                                <p className="text-xs text-gray-500 mt-2 bg-gray-50 p-2 rounded">
-                                                    Ref: {w.reference}
-                                                </p>
-                                            )}
-                                            {w.adminNote && (
-                                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mt-2">
-                                                    <p className="text-xs font-semibold text-blue-900 mb-1">Admin Note:</p>
-                                                    <p className="text-xs text-blue-700">{w.adminNote}</p>
-                                                </div>
-                                            )}
-                                            {w.status === 'pending' && (
-                                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mt-2">
-                                                    <p className="text-xs text-yellow-700">
-                                                     Your withdrawal request is being reviewed by our team. You'll receive an email notification once it's processed.
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Withdraw Modal */}
-            {showWithdrawModal && (
-                <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
-                    <div className="bg-white w-full h-full md:h-auto md:max-w-2xl overflow-y-auto">
-                        <div className="sticky top-0 bg-blue-950 px-6 py-4 flex justify-between items-center text-white">
-                            <h2 className="text-2xl font-bold">Withdraw Funds</h2>
-                            <button onClick={() => {
-                                setShowWithdrawModal(false);
-                                setWithdrawalError("");
-                                setWithdrawAmount("");
-                            }}>
-                                <X size={24} />
-                            </button>
-                        </div>
-
-                        <div className="p-6 border-b border-gray-200">
-                            <div className="flex items-center gap-2 text-yellow-600 mb-2">
-                                <AlertCircle size={18} />
-                                <p className="text-sm font-semibold">LAN Approval Required</p>
-                            </div>
-                            <p className="text-xs text-gray-600 mt-2">
-                                Your withdrawal request will be reviewed and processed within 24-48 hours. You'll receive an email notification once approved.
-                            </p>
-                        </div>
-                        {user?.bankDetails ? (
-                            <div className="p-6 border-b border-gray-200 bg-blue-50">
-                                <p className="text-sm font-semibold text-gray-700 mb-2">Withdrawal will be sent to:</p>
-                                <div className="space-y-1 text-sm text-gray-600">
-                                    <p><strong>Account Name:</strong> {user.bankDetails.accountName}</p>
-                                    <p><strong>Account Number:</strong> {user.bankDetails.accountNumber}</p>
-                                    <p><strong>Bank:</strong> {user.bankDetails.bankName}</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="p-6 border-b border-gray-200 bg-yellow-50">
-                                <div className="flex items-start gap-2">
-                                    <AlertCircle size={18} className="text-yellow-600 flex-shrink-0 mt-0.5" />
-                                    <p className="text-sm text-yellow-600">Please add bank details to your profile first</p>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="p-6">
-                            <div className="bg-blue-950 p-4 rounded-xl mb-4">
-                                <p className="text-sm text-gray-300">Available Balance</p>
-                                <p className="text-3xl font-bold text-white">₦{accountBalance.toLocaleString()}</p>
-                            </div>
-
-                            {withdrawalError && (
-                                <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
-                                    <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
-                                    <p className="text-sm text-red-600">{withdrawalError}</p>
-                                </div>
-                            )}
-
-                            <label className="font-semibold block mb-2 text-gray-700">Amount</label>
-                            <input
-                                type="number"
-                                value={withdrawAmount}
-                                onChange={(e) => {
-                                    setWithdrawAmount(e.target.value);
-                                    setWithdrawalError("");
-                                }}
-                                placeholder="Enter amount"
-                                className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl mb-2 focus:border-blue-950 focus:outline-none"
-                                min="1000"
-                                max={accountBalance}
-                            />
-                            <p className="text-sm text-gray-600 mb-4">Minimum: ₦1,000</p>
-
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        setShowWithdrawModal(false);
-                                        setWithdrawalError("");
-                                        setWithdrawAmount("");
-                                    }}
-                                    className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleWithdraw}
-                                    disabled={withdrawing || !user?.bankDetails}
-                                    className="flex-1 bg-blue-950 text-white px-6 py-3 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:bg-blue-900 transition-colors"
-                                >
-                                    {withdrawing ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                            Processing...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Download size={18} />
-                                            Withdraw Now
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Edit Profile Modal */}
-            {isEditing && (
-                <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
-                    <div className="bg-white w-full h-full md:h-auto md:max-w-2xl overflow-y-auto">
-                        <div className="sticky top-0 bg-blue-950 px-6 py-4 flex justify-between items-center text-white">
-                            <h2 className="text-2xl font-bold">Edit Profile</h2>
-                            <button onClick={() => setIsEditing(false)}><X size={24} /></button>
-                        </div>
-                        <div className="p-6">
-                            <div className="flex justify-center mb-6">
-                                <div className="relative">
-                                    <img src={user?.photoBase64 || "/api/placeholder/128/128"} className="w-32 h-32 rounded-full border-4 border-blue-950 object-cover" alt="profile" />
-                                    <label className="absolute bottom-0 right-0 bg-blue-950 p-3 rounded-full cursor-pointer hover:bg-blue-900">
-                                        <Camera size={18} className="text-white" />
-                                        <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                                    </label>
-                                </div>
-                            </div>
-                            <div className="grid sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="font-semibold block mb-2 text-gray-700">First Name</label>
-                                    <input value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
-                                </div>
-                                <div>
-                                    <label className="font-semibold block mb-2 text-gray-700">Surname</label>
-                                    <input value={formData.surname} onChange={(e) => setFormData({ ...formData, surname: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
-                                </div>
-                                <div>
-                                    <label className="font-semibold block mb-2 text-gray-700">Phone</label>
-                                    <input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
-                                </div>
-                                <div>
-                                    <label className="font-semibold block mb-2 text-gray-700">Date of Birth</label>
-                                    <input type="date" value={formData.dateOfBirth} onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
-                                </div>
-                                <div className="sm:col-span-2">
-                                    <label className="font-semibold block mb-2 text-gray-700">Address</label>
-                                    <input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
-                                </div>
-                            </div>
-                            <div className="mt-6 flex gap-3">
-                                <button onClick={() => setIsEditing(false)} className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-300">Cancel</button>
-                                <button onClick={handleSave} className="flex-1 bg-blue-950 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-900">
-                                    <Save size={18} />Save
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Bank Details Modal */}
-            {showBankModal && (
-                <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
-                    <div className="bg-white w-full h-full md:h-auto md:max-w-2xl md:rounded-2xl overflow-y-auto">
-                        <div className="sticky top-0 bg-blue-950 px-6 py-4 flex justify-between items-center md:rounded-t-2xl text-white">
-                            <h2 className="text-2xl font-bold">Bank Details</h2>
-                            <button
-                                onClick={() => {
-                                    setShowBankModal(false);
-                                    setBankFormData({
-                                        accountName: "",
-                                        accountNumber: "",
-                                        bankName: "",
-                                        bankCode: ""
-                                    });
-                                }}
-                            >
-                                <X size={24} />
-                            </button>
-                        </div>
-
-                        <div className="p-6">
-                            {user?.bankDetails && (
-                                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-                                    <p className="text-sm font-semibold text-blue-900 mb-3">Current Bank Details:</p>
-                                    <div className="space-y-2 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">Account Name:</span>
-                                            <span className="font-semibold text-blue-950">{user.bankDetails.accountName}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">Account Number:</span>
-                                            <span className="font-semibold text-blue-950">{user.bankDetails.accountNumber}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">Bank:</span>
-                                            <span className="font-semibold text-blue-950">{user.bankDetails.bankName}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="font-semibold block mb-2 text-gray-700">
-                                        Account Name <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={bankFormData.accountName}
-                                        onChange={(e) => setBankFormData({ ...bankFormData, accountName: e.target.value })}
-                                        placeholder="Enter account holder name"
-                                        className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="font-semibold block mb-2 text-gray-700">
-                                        Account Number <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={bankFormData.accountNumber}
-                                        onChange={(e) => setBankFormData({ ...bankFormData, accountNumber: e.target.value })}
-                                        placeholder="Enter account number"
-                                        className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none"
-                                        maxLength="10"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="font-semibold block mb-2 text-gray-700">
-                                        Bank Name <span className="text-red-500">*</span>
-                                    </label>
-                                    <select
-                                        value={bankFormData.bankName}
-                                        onChange={(e) => {
-                                            const selectedBank = nigerianBanks.find(bank => bank.name === e.target.value);
-                                            setBankFormData({
-                                                ...bankFormData,
-                                                bankName: e.target.value,
-                                                bankCode: selectedBank ? selectedBank.code : ""
-                                            });
-                                        }}
-                                        className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none overflow-visible"
+                        {/* Profile Modal */}
+                        {showProfileModal && (
+                            <div className="fixed inset-0 bg-white z-50 flex flex-col">
+                                <div className="bg-blue-950 p-6 text-center relative">
+                                    <button
+                                        onClick={() => setShowProfileModal(false)}
+                                        className="absolute top-4 right-4 text-gray-50 hover:text-gray-300"
                                     >
-                                        <option value="">Select your bank</option>
-                                        {nigerianBanks.map((bank) => (
-                                            <option
-                                                key={bank.code}
-                                                value={bank.name}
-                                                className="py-2"
-                                            >
-                                                {bank.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <X size={24} />
+                                    </button>
+                                    <div className="flex flex-col items-center">
+                                        <div className="relative mb-3">
+                                            <img
+                                                src={user?.photoBase64 || "/lan-logo.png"}
+                                                className="w-20 h-20 rounded-full object-cover border-4 border-white"
+                                                alt="Profile"
+                                            />
+                                        </div>
+                                        <p className="text-2xl font-bold text-gray-50">{user?.displayName || `${user?.firstName} ${user?.surname}`}</p>
+                                        <p className="text-sm text-gray-300">+234{user?.phone || '0000000000'}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="font-semibold block mb-2 text-gray-700">
-                                        Bank Code
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={bankFormData.bankCode}
-                                        readOnly
-                                        placeholder="Auto-filled when you select bank"
-                                        className="w-full bg-gray-100 text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl cursor-not-allowed"
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">✓ Bank code is automatically filled when you select a bank</p>
+
+                                <div className="flex-1 bg-gray-100 overflow-y-auto">
+                                    <div className="p-4 space-y-2">
+                                        <button
+                                            onClick={() => {
+                                                setShowProfileModal(false);
+                                                setIsEditing(true);
+                                            }}
+                                            className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-white p-2 rounded-lg">
+                                                    <User size={20} className="text-blue-950" />
+                                                </div>
+                                                <span className="font-semibold text-white">My Profile</span>
+                                            </div>
+                                            <ChevronRight size={20} className="text-gray-300" />
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                setShowProfileModal(false);
+                                                setShowBankModal(true);
+                                                // Pre-fill form with existing bank details
+                                                if (user?.bankDetails) {
+                                                    setBankFormData({
+                                                        accountName: user.bankDetails.accountName || "",
+                                                        accountNumber: user.bankDetails.accountNumber || "",
+                                                        bankName: user.bankDetails.bankName || "",
+                                                        bankCode: user.bankDetails.bankCode || ""
+                                                    });
+                                                }
+                                            }}
+                                            className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-white p-2 rounded-lg">
+                                                    <Building size={20} className="text-blue-950" />
+                                                </div>
+                                                <span className="font-semibold text-white">Bank Details</span>
+                                            </div>
+                                            <ChevronRight size={20} className="text-gray-300" />
+                                        </button>
+
+                                        <div className="w-full bg-blue-950 rounded-xl p-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-white p-2 rounded-lg">
+                                                        <Settings size={20} className="text-blue-950" />
+                                                    </div>
+                                                    <span className="font-semibold text-white">Other Information</span>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-3 pl-11 text-sm text-white">
+                                                <div className="flex justify-between py-2 border-b border-blue-800">
+                                                    <span className="text-gray-300">Email</span>
+                                                    <span className="text-right break-all">{user?.email}</span>
+                                                </div>
+                                                <div className="flex justify-between py-2 border-b border-blue-800">
+                                                    <span className="text-gray-300">Date of Birth</span>
+                                                    <span>{user?.dateOfBirth || 'Not set'}</span>
+                                                </div>
+                                                <div className="flex justify-between py-2 border-b border-blue-800">
+                                                    <span className="text-gray-300">Address</span>
+                                                    <span className="text-right">{user?.address || 'Not set'}</span>
+                                                </div>
+                                                <div className="flex justify-between py-2 border-b border-blue-800">
+                                                    <span className="text-gray-300">Country</span>
+                                                    <span className="text-right">{user?.country || 'Not set'}</span>
+                                                </div>
+                                                <div className="flex justify-between py-2">
+                                                    <span className="text-gray-300">Account Type</span>
+                                                    <span className="bg-white text-blue-950 px-2 py-1 rounded font-semibold text-xs">Verified Seller</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={handleButton}
+                                            className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-white p-2 rounded-lg">
+                                                    <AlertCircle size={20} className="text-blue-950" />
+                                                </div>
+                                                <span className="font-semibold text-white">Help</span>
+                                            </div>
+                                            <ChevronRight size={20} className="text-gray-300" />
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                setShowProfileModal(false);
+                                                setShowTransactionHistory(true);
+                                            }}
+                                            className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-white p-2 rounded-lg">
+                                                    <TrendingUp size={20} className="text-blue-950" />
+                                                </div>
+                                                <span className="font-semibold text-white">History</span>
+                                            </div>
+                                            <ChevronRight size={20} className="text-gray-300" />
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                setShowProfileModal(false);
+                                                setResetPinView('forgot');
+                                                setResetPinError('');
+                                                setResetPinSuccess(false);
+                                                setResetOtpInput('');
+                                                setResetNewPin('');
+                                                setShowResetPinModal(true);
+                                            }}
+                                            className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-white p-2 rounded-lg">
+                                                    <Settings size={20} className="text-blue-950" />
+                                                </div>
+                                                <span className="font-semibold text-white">Reset Transfer PIN</span>
+                                            </div>
+                                            <ChevronRight size={20} className="text-gray-300" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
+                        )}
 
-                            <div className="mt-6 flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        setShowBankModal(false);
-                                        setBankFormData({
-                                            accountName: "",
-                                            accountNumber: "",
-                                            bankName: "",
-                                            bankCode: ""
-                                        });
-                                    }}
-                                    className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleSaveBank}
-                                    disabled={savingBank}
-                                    className="flex-1 bg-blue-950 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {savingBank ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                            Saving...
-                                        </>
+                        {/* Transaction History Modal */}
+                        {showTransactionHistory && (
+                            <div className="fixed inset-0 bg-white z-50 flex flex-col">
+                                <div className="bg-blue-950 p-4 flex items-center gap-4 text-white">
+                                    <button onClick={() => setShowTransactionHistory(false)}>
+                                        <X size={24} />
+                                    </button>
+                                    <h2 className="text-xl font-bold">Transaction History</h2>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto p-4 bg-gray-100">
+                                    {transactions.length === 0 ? (
+                                        <div className="text-center py-12">
+                                            <ShoppingBag size={48} className="mx-auto text-gray-400 mb-4" />
+                                            <p className="text-gray-600">No transactions yet</p>
+                                        </div>
                                     ) : (
-                                        <>
-                                            <Save size={18} />
-                                            Save Bank Details
-                                        </>
+                                        <div className="space-y-3">
+                                            {transactions.map((txn) => (
+                                                <div key={txn.id} className="bg-white rounded-xl p-4 shadow-sm">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`p-2 rounded-lg ${txn.type === 'transfer_out' ? 'bg-red-100' :
+                                                                txn.type === 'transfer_in' ? 'bg-green-100' :
+                                                                    'bg-blue-100'
+                                                                }`}>
+                                                                {txn.type === 'transfer_out'
+                                                                    ? <ArrowUpRight size={18} className="text-red-500" />
+                                                                    : txn.type === 'transfer_in'
+                                                                        ? <ArrowDownLeft size={18} className="text-green-600" />
+                                                                        : <ShoppingBag size={18} className="text-blue-950" />}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-semibold text-blue-950">{txn.bookTitle}</p>
+                                                                <p className="text-xs text-gray-500">
+                                                                    {txn.createdAtDate?.toLocaleDateString()} at {txn.createdAtDate?.toLocaleTimeString()}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-green-600 font-bold">
+                                                                +₦{(txn.sellerAmount || (txn.amount * 0.85)).toLocaleString()}
+                                                            </p>
+                                                            <p className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">Success</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-600">Buyer:</span>
+                                                            <span className="text-blue-950 font-medium">{txn.buyerName}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-600">Price:</span>
+                                                            <span className="text-blue-950 font-medium">₦{txn.amount?.toLocaleString()}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-600">Platform Fee (20%):</span>
+                                                            <span className="text-red-600 font-medium">-₦{((txn.amount || 0) * 0.20).toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     )}
-                                </button>
-                            </div>
 
-                            <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
-                                <p className="text-xs text-yellow-700">
-                                    <strong>Note:</strong> Ensure your bank details are correct. All withdrawals will be sent to this account.
-                                </p>
+                                    {withdrawals.length > 0 && (
+                                        <div className="mt-6">
+                                            <h3 className="font-bold text-lg mb-3 text-blue-950">Withdrawal History</h3>
+                                            <div className="space-y-3">
+                                                {withdrawals.map((w) => (
+                                                    <div key={w.id} className="bg-white rounded-xl p-4 shadow-sm">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`p-2 rounded-lg ${w.status === 'pending' ? 'bg-yellow-100' :
+                                                                    w.status === 'completed' ? 'bg-red-100' :
+                                                                        w.status === 'rejected' ? 'bg-red-100' :
+                                                                            'bg-gray-100'
+                                                                    }`}>
+                                                                    <Download size={18} className={
+                                                                        w.status === 'pending' ? 'text-yellow-600' :
+                                                                            w.status === 'completed' ? 'text-red-600' :
+                                                                                w.status === 'rejected' ? 'text-red-600' :
+                                                                                    'text-gray-600'
+                                                                    } />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="font-semibold text-blue-950">Withdrawal Request</p>
+                                                                    <p className="text-xs text-gray-500">
+                                                                        {w.requestedAtDate?.toLocaleDateString()} at {w.requestedAtDate?.toLocaleTimeString()}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-red-600 font-bold">₦{w.amount?.toLocaleString()}</p>
+                                                                <p className={`text-xs px-2 py-1 rounded ${w.status === 'pending' ? 'text-yellow-600 bg-yellow-50' :
+                                                                    w.status === 'completed' ? 'text-green-600 bg-green-50' :
+                                                                        w.status === 'rejected' ? 'text-red-600 bg-red-50' :
+                                                                            'text-gray-600 bg-gray-50'
+                                                                    }`}>
+                                                                    {w.status === 'pending' ? '⏳ Pending Approval' :
+                                                                        w.status === 'completed' ? '✅ Completed' :
+                                                                            w.status === 'rejected' ? '❌ Rejected' : w.status}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        {w.reference && (
+                                                            <p className="text-xs text-gray-500 mt-2 bg-gray-50 p-2 rounded">
+                                                                Ref: {w.reference}
+                                                            </p>
+                                                        )}
+                                                        {w.adminNote && (
+                                                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mt-2">
+                                                                <p className="text-xs font-semibold text-blue-900 mb-1">Admin Note:</p>
+                                                                <p className="text-xs text-blue-700">{w.adminNote}</p>
+                                                            </div>
+                                                        )}
+                                                        {w.status === 'pending' && (
+                                                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mt-2">
+                                                                <p className="text-xs text-yellow-700">
+                                                                    Your withdrawal request is being reviewed by our team. You'll receive an email notification once it's processed.
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+                        )}
+
+                        {/* Withdraw Modal */}
+                        {showWithdrawModal && (
+                            <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+                                <div className="bg-white w-full h-full md:h-auto md:max-w-2xl overflow-y-auto">
+                                    <div className="sticky top-0 bg-blue-950 px-6 py-4 flex justify-between items-center text-white">
+                                        <h2 className="text-2xl font-bold">Withdraw Funds</h2>
+                                        <button onClick={() => {
+                                            setShowWithdrawModal(false);
+                                            setWithdrawalError("");
+                                            setWithdrawAmount("");
+                                        }}>
+                                            <X size={24} />
+                                        </button>
+                                    </div>
+
+                                    <div className="p-6 border-b border-gray-200">
+                                        <div className="flex items-center gap-2 text-yellow-600 mb-2">
+                                            <AlertCircle size={18} />
+                                            <p className="text-sm font-semibold">LAN Approval Required</p>
+                                        </div>
+                                        <p className="text-xs text-gray-600 mt-2">
+                                            Your withdrawal request will be reviewed and processed within 24-48 hours. You'll receive an email notification once approved.
+                                        </p>
+                                    </div>
+                                    {user?.bankDetails ? (
+                                        <div className="p-6 border-b border-gray-200 bg-blue-50">
+                                            <p className="text-sm font-semibold text-gray-700 mb-2">Withdrawal will be sent to:</p>
+                                            <div className="space-y-1 text-sm text-gray-600">
+                                                <p><strong>Account Name:</strong> {user.bankDetails.accountName}</p>
+                                                <p><strong>Account Number:</strong> {user.bankDetails.accountNumber}</p>
+                                                <p><strong>Bank:</strong> {user.bankDetails.bankName}</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="p-6 border-b border-gray-200 bg-yellow-50">
+                                            <div className="flex items-start gap-2">
+                                                <AlertCircle size={18} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+                                                <p className="text-sm text-yellow-600">Please add bank details to your profile first</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="p-6">
+                                        <div className="bg-blue-950 p-4 rounded-xl mb-4">
+                                            <p className="text-sm text-gray-300">Available Balance</p>
+                                            <p className="text-3xl font-bold text-white">₦{accountBalance.toLocaleString()}</p>
+                                        </div>
+
+                                        {withdrawalError && (
+                                            <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+                                                <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                                                <p className="text-sm text-red-600">{withdrawalError}</p>
+                                            </div>
+                                        )}
+
+                                        <label className="font-semibold block mb-2 text-gray-700">Amount</label>
+                                        <input
+                                            type="number"
+                                            value={withdrawAmount}
+                                            onChange={(e) => {
+                                                setWithdrawAmount(e.target.value);
+                                                setWithdrawalError("");
+                                            }}
+                                            placeholder="Enter amount"
+                                            className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl mb-2 focus:border-blue-950 focus:outline-none"
+                                            min="1000"
+                                            max={accountBalance}
+                                        />
+                                        <p className="text-sm text-gray-600 mb-4">Minimum: ₦1,000</p>
+
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={() => {
+                                                    setShowWithdrawModal(false);
+                                                    setWithdrawalError("");
+                                                    setWithdrawAmount("");
+                                                }}
+                                                className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={handleWithdraw}
+                                                disabled={withdrawing || !user?.bankDetails}
+                                                className="flex-1 bg-blue-950 text-white px-6 py-3 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:bg-blue-900 transition-colors"
+                                            >
+                                                {withdrawing ? (
+                                                    <>
+                                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                                        Processing...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Download size={18} />
+                                                        Withdraw Now
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Edit Profile Modal */}
+                        {isEditing && (
+                            <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+                                <div className="bg-white w-full h-full md:h-auto md:max-w-2xl overflow-y-auto">
+                                    <div className="sticky top-0 bg-blue-950 px-6 py-4 flex justify-between items-center text-white">
+                                        <h2 className="text-2xl font-bold">Edit Profile</h2>
+                                        <button onClick={() => setIsEditing(false)}><X size={24} /></button>
+                                    </div>
+                                    <div className="p-6">
+                                        <div className="flex justify-center mb-6">
+                                            <div className="relative">
+                                                <img src={user?.photoBase64 || "/api/placeholder/128/128"} className="w-32 h-32 rounded-full border-4 border-blue-950 object-cover" alt="profile" />
+                                                <label className="absolute bottom-0 right-0 bg-blue-950 p-3 rounded-full cursor-pointer hover:bg-blue-900">
+                                                    <Camera size={18} className="text-white" />
+                                                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div className="grid sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="font-semibold block mb-2 text-gray-700">First Name</label>
+                                                <input value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="font-semibold block mb-2 text-gray-700">Surname</label>
+                                                <input value={formData.surname} onChange={(e) => setFormData({ ...formData, surname: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="font-semibold block mb-2 text-gray-700">Phone</label>
+                                                <input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="font-semibold block mb-2 text-gray-700">Date of Birth</label>
+                                                <input type="date" value={formData.dateOfBirth} onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
+                                            </div>
+                                            <div className="sm:col-span-2">
+                                                <label className="font-semibold block mb-2 text-gray-700">Address</label>
+                                                <input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none" />
+                                            </div>
+                                            <div className="sm:col-span-2">
+                                                <label className="font-semibold block mb-2 text-gray-700">Country</label>
+                                                <input
+                                                    value={formData.country}
+                                                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                                                    placeholder="e.g. Nigeria"
+                                                    className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="mt-6 flex gap-3">
+                                            <button onClick={() => setIsEditing(false)} className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-300">Cancel</button>
+                                            <button onClick={handleSave} className="flex-1 bg-blue-950 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-900">
+                                                <Save size={18} />Save
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Bank Details Modal */}
+                        {showBankModal && (
+                            <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+                                <div className="bg-white w-full h-full md:h-auto md:max-w-2xl md:rounded-2xl overflow-y-auto">
+                                    <div className="sticky top-0 bg-blue-950 px-6 py-4 flex justify-between items-center md:rounded-t-2xl text-white">
+                                        <h2 className="text-2xl font-bold">Bank Details</h2>
+                                        <button
+                                            onClick={() => {
+                                                setShowBankModal(false);
+                                                setBankFormData({
+                                                    accountName: "",
+                                                    accountNumber: "",
+                                                    bankName: "",
+                                                    bankCode: ""
+                                                });
+                                            }}
+                                        >
+                                            <X size={24} />
+                                        </button>
+                                    </div>
+
+                                    <div className="p-6">
+                                        {user?.bankDetails && (
+                                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                                                <p className="text-sm font-semibold text-blue-900 mb-3">Current Bank Details:</p>
+                                                <div className="space-y-2 text-sm">
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-600">Account Name:</span>
+                                                        <span className="font-semibold text-blue-950">{user.bankDetails.accountName}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-600">Account Number:</span>
+                                                        <span className="font-semibold text-blue-950">{user.bankDetails.accountNumber}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-600">Bank:</span>
+                                                        <span className="font-semibold text-blue-950">{user.bankDetails.bankName}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="font-semibold block mb-2 text-gray-700">
+                                                    Account Name <span className="text-red-500">*</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={bankFormData.accountName}
+                                                    onChange={(e) => setBankFormData({ ...bankFormData, accountName: e.target.value })}
+                                                    placeholder="Enter account holder name"
+                                                    className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="font-semibold block mb-2 text-gray-700">
+                                                    Account Number <span className="text-red-500">*</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={bankFormData.accountNumber}
+                                                    onChange={(e) => setBankFormData({ ...bankFormData, accountNumber: e.target.value })}
+                                                    placeholder="Enter account number"
+                                                    className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none"
+                                                    maxLength="10"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="font-semibold block mb-2 text-gray-700">
+                                                    Bank Name <span className="text-red-500">*</span>
+                                                </label>
+                                                <select
+                                                    value={bankFormData.bankName}
+                                                    onChange={(e) => {
+                                                        const selectedBank = nigerianBanks.find(bank => bank.name === e.target.value);
+                                                        setBankFormData({
+                                                            ...bankFormData,
+                                                            bankName: e.target.value,
+                                                            bankCode: selectedBank ? selectedBank.code : ""
+                                                        });
+                                                    }}
+                                                    className="w-full bg-white text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl focus:border-blue-950 focus:outline-none overflow-visible"
+                                                >
+                                                    <option value="">Select your bank</option>
+                                                    {nigerianBanks.map((bank) => (
+                                                        <option
+                                                            key={bank.code}
+                                                            value={bank.name}
+                                                            className="py-2"
+                                                        >
+                                                            {bank.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="font-semibold block mb-2 text-gray-700">
+                                                    Bank Code
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={bankFormData.bankCode}
+                                                    readOnly
+                                                    placeholder="Auto-filled when you select bank"
+                                                    className="w-full bg-gray-100 text-blue-950 border-2 border-gray-300 px-4 py-3 rounded-xl cursor-not-allowed"
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">✓ Bank code is automatically filled when you select a bank</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-6 flex gap-3">
+                                            <button
+                                                onClick={() => {
+                                                    setShowBankModal(false);
+                                                    setBankFormData({
+                                                        accountName: "",
+                                                        accountNumber: "",
+                                                        bankName: "",
+                                                        bankCode: ""
+                                                    });
+                                                }}
+                                                className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={handleSaveBank}
+                                                disabled={savingBank}
+                                                className="flex-1 bg-blue-950 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {savingBank ? (
+                                                    <>
+                                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                                        Saving...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Save size={18} />
+                                                        Save Bank Details
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+
+                                        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+                                            <p className="text-xs text-yellow-700">
+                                                <strong>Note:</strong> Ensure your bank details are correct. All withdrawals will be sent to this account.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* PIN Modal */}
                         {showPinModal && (
@@ -1623,49 +1685,176 @@ export default function SellerAccountClient() {
                                 onClose={() => setSuccessData(null)}
                             />
                         )}
-            {/* Bottom Navigation - Mobile Only */}
-            <div className="fixed -bottom-7  left-0 right-0 bg-blue-950 border-t border-blue-800 lg:hidden">
-                <div className="flex justify-around items-center py-3 px-2">
-                    <Link href="/home">
-                        <button className="flex flex-col items-center gap-1">
-                            <DollarSign size={24} className="text-gray-300" />
-                            <span className="text-xs text-gray-300 font-medium">Home</span>
-                        </button>
-                    </Link>
-                    <Link href="/my-account/seller-account/my-books">
-                        <button className="flex flex-col items-center gap-1" title="Check the books you bought on LAN">
-                            <Book size={24} className="text-gray-300" />
-                            <span className="text-xs text-gray-300">My Books</span>
-                        </button>
-                    </Link>
-                    <Link href="/documents" title="Browse the latest book posted by other sellers">
-                        <button className="flex flex-col items-center gap-1">
-                            <Globe size={24} className="text-gray-300" />
-                            <span className="text-xs text-gray-300">Browse</span>
-                        </button>
-                    </Link>
-                    <Link href="/advertise">
-                        <button className="flex flex-col items-center gap-1" title="Upload your books and make more sales">
-                            <TrendingUp size={24} className="text-gray-300" />
-                            <span className="text-xs text-gray-300">Upload</span>
-                        </button>
-                    </Link>
-                    <button
-                        onClick={() => setShowProfileModal(true)}
-                        className="flex flex-col items-center gap-1"
-                        title="My profile"
-                    >
-                        <User size={24} className="text-gray-300" />
-                        <span className="text-xs text-gray-300">Me</span>
-                    </button>
-                </div>
-            </div>
+                        {/* Bottom Navigation - Mobile Only */}
+                        <div className="fixed -bottom-7  left-0 right-0 bg-blue-950 border-t border-blue-800 lg:hidden">
+                            <div className="flex justify-around items-center py-3 px-2">
+                                <Link href="/home">
+                                    <button className="flex flex-col items-center gap-1">
+                                        <DollarSign size={24} className="text-gray-300" />
+                                        <span className="text-xs text-gray-300 font-medium">Home</span>
+                                    </button>
+                                </Link>
+                                <Link href="/my-account/seller-account/my-books">
+                                    <button className="flex flex-col items-center gap-1" title="Check the books you bought on LAN">
+                                        <Book size={24} className="text-gray-300" />
+                                        <span className="text-xs text-gray-300">My Books</span>
+                                    </button>
+                                </Link>
+                                <Link href="/documents" title="Browse the latest book posted by other sellers">
+                                    <button className="flex flex-col items-center gap-1">
+                                        <Globe size={24} className="text-gray-300" />
+                                        <span className="text-xs text-gray-300">Browse</span>
+                                    </button>
+                                </Link>
+                                <Link href="/advertise">
+                                    <button className="flex flex-col items-center gap-1" title="Upload your books and make more sales">
+                                        <TrendingUp size={24} className="text-gray-300" />
+                                        <span className="text-xs text-gray-300">Upload</span>
+                                    </button>
+                                </Link>
+                                <button
+                                    onClick={() => setShowProfileModal(true)}
+                                    className="flex flex-col items-center gap-1"
+                                    title="My profile"
+                                >
+                                    <User size={24} className="text-gray-300" />
+                                    <span className="text-xs text-gray-300">Me</span>
+                                </button>
+                            </div>
+                        </div>
 
-            {/* Bottom Padding for Mobile Nav */}
-            <div className="h-20 lg:hidden"></div>
+                        {/* Bottom Padding for Mobile Nav */}
+                        <div className="h-20 lg:hidden"></div>
                     </div>
                 </div>
             </div>
+            {showResetPinModal && (
+                <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl">
+
+                        <div className="bg-blue-950 px-6 py-5 flex items-center justify-between">
+                            <div>
+                                <p className="text-blue-300 text-xs mb-1">Security</p>
+                                <p className="text-white text-lg font-semibold">Reset Transfer PIN</p>
+                            </div>
+                            <button
+                                onClick={() => setShowResetPinModal(false)}
+                                className="w-9 h-9 rounded-full border border-white/20 flex items-center justify-center text-blue-300 hover:text-white hover:border-white/40 transition-colors"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            {resetPinError && (
+                                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+                                    <AlertCircle size={16} className="text-red-500 flex-shrink-0" />
+                                    <p className="text-sm text-red-600">{resetPinError}</p>
+                                </div>
+                            )}
+
+                            {/* Success state */}
+                            {resetPinSuccess && (
+                                <div className="text-center py-4">
+                                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                    <p className="font-semibold text-blue-950 mb-1">PIN Reset Successful!</p>
+                                    <p className="text-sm text-gray-500 mb-6">Your transfer PIN has been updated.</p>
+                                    <button
+                                        onClick={() => setShowResetPinModal(false)}
+                                        className="w-full bg-blue-950 text-white py-3.5 rounded-xl font-semibold hover:bg-blue-900 transition-all"
+                                    >
+                                        Done
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Step 1 — Send OTP */}
+                            {!resetPinSuccess && resetPinView === 'forgot' && (
+                                <>
+                                    <p className="text-sm text-gray-500 text-center mb-6">
+                                        We'll send a 6-digit reset code to verify your identity.
+                                    </p>
+                                    <button
+                                        onClick={async () => {
+                                            setResetPinError('');
+                                            const result = await requestPinReset();
+                                            if (result.success) {
+                                                setResetPinView('otp');
+                                            } else {
+                                                setResetPinError('Failed to send code. Try again.');
+                                            }
+                                        }}
+                                        disabled={Processing}
+                                        className="w-full bg-blue-950 text-white py-3.5 rounded-xl font-semibold hover:bg-blue-900 transition-all disabled:opacity-50 mb-3"
+                                    >
+                                        {Processing ? 'Sending...' : 'Send Reset Code'}
+                                    </button>
+                                    <button
+                                        onClick={() => setShowResetPinModal(false)}
+                                        className="w-full text-sm text-gray-400 hover:text-gray-600 py-2"
+                                    >
+                                        Cancel
+                                    </button>
+                                </>
+                            )}
+
+                            {/* Step 2 — OTP + new PIN */}
+                            {!resetPinSuccess && resetPinView === 'otp' && (
+                                <>
+                                    <p className="text-sm text-gray-500 text-center mb-5">
+                                        Enter the 6-digit code sent to you and choose a new PIN.
+                                    </p>
+                                    <input
+                                        type="text"
+                                        value={resetOtpInput}
+                                        onChange={(e) => setResetOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                        className="w-full p-3 border-2 text-blue-950 border-gray-200 rounded-xl text-center text-xl tracking-widest focus:border-blue-950 focus:outline-none mb-3"
+                                        placeholder="6-digit code"
+                                        maxLength={6}
+                                        inputMode="numeric"
+                                    />
+                                    <input
+                                        type="password"
+                                        value={resetNewPin}
+                                        onChange={(e) => setResetNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                        className="w-full p-3 border-2 text-blue-950 border-gray-200 rounded-xl text-center text-2xl tracking-widest focus:border-blue-950 focus:outline-none mb-5"
+                                        placeholder="New 4-digit PIN"
+                                        maxLength={4}
+                                        inputMode="numeric"
+                                    />
+                                    <button
+                                        onClick={async () => {
+                                            setResetPinError('');
+                                            if (resetOtpInput.length < 6) { setResetPinError('Enter the 6-digit code.'); return; }
+                                            if (resetNewPin.length < 4) { setResetPinError('New PIN must be 4 digits.'); return; }
+                                            try {
+                                                await verifyOtpAndSetPin(resetOtpInput, resetNewPin);
+                                                setResetPinSuccess(true);
+                                            } catch (err) {
+                                                setResetPinError(err.message);
+                                            }
+                                        }}
+                                        disabled={Processing || resetOtpInput.length < 6 || resetNewPin.length < 4}
+                                        className="w-full bg-blue-950 text-white py-3.5 rounded-xl font-semibold hover:bg-blue-900 transition-all disabled:opacity-40 disabled:cursor-not-allowed mb-3"
+                                    >
+                                        {Processing ? 'Verifying...' : 'Reset PIN & Save'}
+                                    </button>
+                                    <button
+                                        onClick={() => { setResetPinView('forgot'); setResetPinError(''); }}
+                                        className="w-full text-sm text-gray-400 hover:text-gray-600 py-2"
+                                    >
+                                        Back
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

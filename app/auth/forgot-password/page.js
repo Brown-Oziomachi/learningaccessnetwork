@@ -73,6 +73,17 @@ export default function ForgotPasswordPage() {
         return (
             <AuthLayout showBack={false}>
                 <div className="flex-1 flex flex-col items-center justify-center px-4">
+                        <div className="flex items-center gap-2 text-blue-950 px-10 py-3 rounded-xl mb-10">
+                            <h1
+                                className="text-4xl max-md:text-3xl lg:text-6xl font-bold text-blue-950"
+                                style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
+                            >
+                                [LAN Library]
+                                <p className="text-xs sm:text-base font-light" style={{ fontFamily: "'Lato', sans-serif" }}>
+                                    The Global Student Library 📚
+                                </p>
+                            </h1>
+                        </div>
                     <div className="text-center max-w-lg">
                         {/* Success Icon */}
                         <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -95,31 +106,7 @@ export default function ForgotPasswordPage() {
                             </p>
                         </div>
 
-                        {/* Instructions */}
-                        <div className="bg-white border-2 border-gray-200 rounded-xl p-6 mb-6 text-left">
-                            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <Shield className="w-5 h-5 text-blue-950" />
-                                Next Steps:
-                            </h3>
-                            <ol className="space-y-3 text-sm text-gray-700">
-                                <li className="flex gap-3">
-                                    <span className="flex-shrink-0 w-6 h-6 bg-blue-950 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
-                                    <span>Check your email inbox for a message from LAN Library</span>
-                                </li>
-                                <li className="flex gap-3">
-                                    <span className="flex-shrink-0 w-6 h-6 bg-blue-950 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
-                                    <span>Click the <strong>"Reset Password"</strong> link in the email</span>
-                                </li>
-                                <li className="flex gap-3">
-                                    <span className="flex-shrink-0 w-6 h-6 bg-blue-950 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
-                                    <span>Enter your new password on the secure page</span>
-                                </li>
-                                <li className="flex gap-3">
-                                    <span className="flex-shrink-0 w-6 h-6 bg-blue-950 text-white rounded-full flex items-center justify-center text-xs font-bold">4</span>
-                                    <span>Return here to sign in with your new password</span>
-                                </li>
-                            </ol>
-                        </div>
+                       
 
                         {/* Important Notes */}
                         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">

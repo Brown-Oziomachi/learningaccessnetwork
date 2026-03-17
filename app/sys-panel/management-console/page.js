@@ -177,6 +177,9 @@ export default function ComprehensiveAdminPanel() {
   const [showAdminPinModal, setShowAdminPinModal] = useState(false);
   const [pendingWithdrawal, setPendingWithdrawal] = useState(null);
   const [adminPinValue, setAdminPinValue] = useState('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [skipConfirm, setSkipConfirm] = useState(false);
+  const [confirmedWithdrawal, setConfirmedWithdrawal] = useState(null);
   const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
 
   useEffect(() => {
@@ -463,25 +466,67 @@ const updateSchoolDocumentStatus = async (docId, status) => {
 };
 
   const updateAdvertisementStatus = async (id, status, ad) => {
-  if (status === 'approved') {
-    // Check for duplicates
-    const isDuplicate = await checkPdfDuplicate(ad.pdfUrl || ad.pdfLink);
-    if (isDuplicate) {
-      alert('⚠️ This file already exists in the database. Cannot approve duplicate.');
-      return;
+    if (status === 'approved') {
+      // Check for duplicates
+      const isDuplicate = await checkPdfDuplicate(ad.pdfUrl || ad.pdfLink);
+      if (isDuplicate) {
+        alert('⚠️ This file already exists in the database. Cannot approve duplicate.');
+        return;
+      }
     }
-  }
-  
-  await updateDoc(doc(db, 'advertMyBook', id), { 
-    status, 
-    reviewedAt: serverTimestamp(),
-    reviewedBy: user.email // Add this for tracking
-  });
-  
-  setAdvertisements(advertisements.map(a => a.id === id ? { ...a, status } : a));
-  alert(`✅ Book ${status} successfully`);
-  setShowModal(false);
-};
+
+    try {
+      // 1. Update the book document status
+      await updateDoc(doc(db, 'advertMyBook', id), {
+        status,
+        reviewedAt: serverTimestamp(),
+        reviewedBy: user.email
+      });
+
+      // 2. If approved, notify all followers
+      if (status === 'approved') {
+        const lecturerId = ad.sellerId;
+        const lecturerName = ad.sellerName || "A lecturer you follow";
+        const bookTitle = ad.bookTitle || ad.title || "new material";
+
+        // Query the 'follows' collection for this lecturer
+        const followersQuery = query(
+          collection(db, "follows"),
+          where("lecturerId", "==", lecturerId)
+        );
+
+        const followersSnap = await getDocs(followersQuery);
+
+        if (!followersSnap.empty) {
+          // Create notification documents for each follower
+          const notificationPromises = followersSnap.docs.map(followerDoc => {
+            const followerData = followerDoc.data();
+            return addDoc(collection(db, "notifications"), {
+              userId: followerData.followerId, // The student/follower UID
+              type: 'new_upload',
+              title: 'New Material Uploaded! 📚',
+              message: `${lecturerName} just uploaded: "${bookTitle}"`,
+              link: `/lecturer-profile?sellerId=${lecturerId}`, // Redirect student to profile
+              createdAt: serverTimestamp(),
+              read: false
+            });
+          });
+
+          await Promise.all(notificationPromises);
+          console.log(`Successfully notified ${followersSnap.size} followers.`);
+        }
+      }
+
+      // Update local state and UI
+      setAdvertisements(advertisements.map(a => a.id === id ? { ...a, status } : a));
+      alert(`✅ Book ${status} successfully ${status === 'approved' ? 'and followers notified' : ''}`);
+      setShowModal(false);
+
+    } catch (error) {
+      console.error("Error in updateAdvertisementStatus:", error);
+      alert("An error occurred while updating status. Check console for details.");
+    }
+  };
 
   const updateTicketStatus = async (id, status) => {
     await updateDoc(doc(db, 'supportTickets', id), { status, resolvedAt: serverTimestamp() });
@@ -552,92 +597,51 @@ const updateSchoolDocumentStatus = async (docId, status) => {
     }
   };
 
-  //  APPROVE WITHDRAWAL FUNCTION
   const approveWithdrawal = async (withdrawal) => {
-    // ✅ VALIDATION: Check if bank details exist
+    // If skipConfirm is false, show the confirm modal and stop here
+    if (!skipConfirm) {
+      setConfirmedWithdrawal(withdrawal);
+      setShowConfirmModal(true);
+      return; // ← STOP. Don't run anything else.
+    }
+
+    // PIN was verified, skip confirmed — reset and proceed
+    setSkipConfirm(false);
+
+    // Validations
     if (!withdrawal.bankDetails) {
-      alert('❌ Error: This withdrawal request is missing bank details.\n\nThis usually happens for old requests created before bank details were added.\n\nPlease ask the seller to submit a new withdrawal request.');
+      alert('❌ Error: This withdrawal request is missing bank details.');
       return;
     }
-
-    // ✅ VALIDATION: Check if bank code exists
     if (!withdrawal.bankDetails.bankCode) {
-      alert('❌ Error: Bank code is missing!\n\nThis withdrawal was created before bank codes were added to the system.\n\nSolution:\n1. Ask the seller to cancel this request\n2. Have them submit a new withdrawal request\n3. The new request will include the bank code');
+      alert('❌ Error: Bank code is missing!');
       return;
     }
-
-    // ✅ VALIDATION: Check required fields
     if (!withdrawal.bankDetails.accountNumber || !withdrawal.bankDetails.accountName) {
-      alert('❌ Error: Incomplete bank details. Account number or name is missing.');
-      return;
-    }
-
-    // Show confirmation with all details
-    const confirmMessage = `
-⚠️ CONFIRM WITHDRAWAL APPROVAL
-
-Amount: ₦${withdrawal.amount.toLocaleString()}
-Seller: ${withdrawal.sellerName}
-
-Bank Details:
-• Bank: ${withdrawal.bankDetails.bankName}
-• Bank Code: ${withdrawal.bankDetails.bankCode}
-• Account: ${withdrawal.bankDetails.accountNumber}
-• Account Name: ${withdrawal.bankDetails.accountName}
-
-This will process the payment via Flutterwave.
-
-Click OK to approve or Cancel to go back.
-  `.trim();
-
-    if (!confirm(confirmMessage)) {
+      alert('❌ Error: Incomplete bank details.');
       return;
     }
 
     try {
-      setProcessingWithdrawalId(withdrawal.id);  // in approveWithdrawal
+      setProcessingWithdrawalId(withdrawal.id);
 
-      console.log('🔄 Starting withdrawal approval process...');
-      console.log('📋 Withdrawal details:', {
-        id: withdrawal.id,
-        amount: withdrawal.amount,
-        seller: withdrawal.sellerName,
-        bankCode: withdrawal.bankDetails.bankCode,
-        accountNumber: withdrawal.bankDetails.accountNumber
-      });
-
-      // Step 1: Process Flutterwave transfer
       const transferResult = await processFlutterwaveTransfer(withdrawal);
 
-      console.log('📡 Transfer result:', transferResult);
-
       if (!transferResult.success) {
-        console.error('❌ Transfer failed:', transferResult);
-
-        // Enhanced error messages
         let errorMessage = transferResult.error || 'Unknown error occurred';
         let helpText = '';
-
-        // Specific error guidance
         if (errorMessage.toLowerCase().includes('insufficient')) {
-          helpText = '\n\n💡 Solution:\n1. Go to dashboard.flutterwave.com\n2. Click "Transfers" in the sidebar\n3. Fund your wallet with at least ₦' + withdrawal.amount.toLocaleString();
-        } else if (errorMessage.toLowerCase().includes('invalid') && errorMessage.toLowerCase().includes('key')) {
-          helpText = '\n\n💡 Solution:\n1. Check your .env.local file\n2. Make sure FLUTTERWAVE_SECRET_KEY starts with FLWSECK-\n3. Copy the SECRET KEY from Flutterwave dashboard\n4. Restart your dev server';
+          helpText = '\n\n💡 Fund your Flutterwave wallet with at least ₦' + withdrawal.amount.toLocaleString();
         } else if (errorMessage.toLowerCase().includes('bank code')) {
-          helpText = '\n\n💡 Solution:\n1. Verify bank code: ' + withdrawal.bankDetails.bankCode + '\n2. Check if this is the correct code for ' + withdrawal.bankDetails.bankName + '\n3. You can find correct codes at https://developer.flutterwave.com/docs/resources/banks';
-        } else if (errorMessage.toLowerCase().includes('account')) {
-          helpText = '\n\n💡 Solution:\n1. Verify account number: ' + withdrawal.bankDetails.accountNumber + '\n2. Confirm it matches ' + withdrawal.bankDetails.bankName + '\n3. Check account name: ' + withdrawal.bankDetails.accountName;
+          helpText = '\n\n💡 Verify bank code: ' + withdrawal.bankDetails.bankCode;
         } else if (errorMessage.includes('HTML') || errorMessage.includes('JSON')) {
-          helpText = '\n\n💡 Solution:\n1. Your API key is invalid or wrong\n2. Go to https://dashboard.flutterwave.com/settings/apis\n3. Copy your SECRET KEY (starts with FLWSECK-)\n4. Update .env.local\n5. Restart server: npm run dev';
+          helpText = '\n\n💡 Your API key may be invalid. Check .env.local and restart the server.';
         }
-
         alert(`❌ Transfer Failed\n\n${errorMessage}${helpText}`);
         return;
       }
 
-      console.log('✅ Transfer successful!');
-
-      // Step 2: Update withdrawal status in Firestore
+      // Update withdrawal status
       await updateDoc(doc(db, 'withdrawals', withdrawal.id), {
         status: 'completed',
         processedAt: serverTimestamp(),
@@ -647,63 +651,40 @@ Click OK to approve or Cancel to go back.
         processedBy: user.email
       });
 
-      console.log('✅ Withdrawal status updated in Firestore');
-
-      // Step 3: Update seller statistics (DO NOT subtract balance again!)
-      // Logic: The balance was already deducted on the seller's dashboard at request time.
-      // We only update the 'totalWithdrawn' stat to reflect a successful payout.
+      // Update seller stats
       const sellerDocRef = doc(db, 'sellers', withdrawal.sellerId);
       const sellerDoc = await getDoc(sellerDocRef);
-
       if (sellerDoc.exists()) {
-        const currentTotalWithdrawn = sellerDoc.data().totalWithdrawn || 0;
-
         await updateDoc(sellerDocRef, {
-          // Record the success by adding the amount to their lifetime withdrawals
-          totalWithdrawn: currentTotalWithdrawn + withdrawal.amount,
+          totalWithdrawn: (sellerDoc.data().totalWithdrawn || 0) + withdrawal.amount,
           lastWithdrawalDate: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
-
-        console.log('✅ Seller stats updated. (Balance was already deducted at the time of request)');
       }
 
-      // Step 4: Send notification
+      // Notify seller
       await addDoc(collection(db, 'notifications'), {
         userId: withdrawal.sellerId,
         type: 'withdrawal_approved',
         title: 'Withdrawal Approved ✅',
-        message: `Your withdrawal of ₦${withdrawal.amount.toLocaleString()} has been approved and processed. The funds should arrive in your bank account within 24 hours.\n\nBank: ${withdrawal.bankDetails.bankName}\nAccount: ${withdrawal.bankDetails.accountNumber}\n\nFlutterwave Reference: ${transferResult.reference}`,
+        message: `Your withdrawal of ₦${withdrawal.amount.toLocaleString()} has been processed.\n\nBank: ${withdrawal.bankDetails.bankName}\nAccount: ${withdrawal.bankDetails.accountNumber}\n\nReference: ${transferResult.reference}`,
         reference: withdrawal.reference,
         createdAt: serverTimestamp(),
         read: false
       });
 
-      console.log('✅ Notification sent to seller');
+      alert(`✅ Withdrawal Approved!\n\nAmount: ₦${withdrawal.amount.toLocaleString()}\nSeller: ${withdrawal.sellerName}\nFlutterwave ID: ${transferResult.transferId}\nReference: ${transferResult.reference}`);
 
-      // Success message
-      alert(`✅ Withdrawal Approved Successfully!
-
-        Amount: ₦${withdrawal.amount.toLocaleString()}
-        Seller: ${withdrawal.sellerName}
-        Bank: ${withdrawal.bankDetails.bankName}
-        Account: ${withdrawal.bankDetails.accountNumber}
-
-        Flutterwave Transfer ID: ${transferResult.transferId}
-        Reference: ${transferResult.reference}
-
-        The seller has been notified via email and in-app notification.`);
-
-      // Refresh withdrawal list
       await fetchWithdrawals();
 
     } catch (error) {
       console.error('❌ Unexpected error:', error);
-      alert(`❌ Failed to approve withdrawal\n\nError: ${error.message}\n\nPlease check the console for more details.`);
+      alert(`❌ Failed: ${error.message}`);
     } finally {
       setProcessingWithdrawalId(null);
     }
-  };
+  };    
+
 
   const fetchFeedbacks = async () => {
   try {
@@ -1730,7 +1711,10 @@ const deleteFeedback = async (feedbackId) => {
                     {withdrawal.status === 'pending' && (
                       <div className="space-y-2">
                         <button
-                          onClick={() => { setPendingWithdrawal(withdrawal); setShowAdminPinModal(true); }}                          disabled={processingWithdrawalId === withdrawal.id}
+                          onClick={() => {
+                            setConfirmedWithdrawal(withdrawal);
+                            setShowConfirmModal(true);
+                          }}
                           className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold transition-colors"
                         >
                           {processingWithdrawalId === withdrawal.id ? (
@@ -1869,11 +1853,12 @@ const deleteFeedback = async (feedbackId) => {
                   if (!ADMIN_PIN) { alert('Admin PIN not configured'); return; }
                   if (entered !== ADMIN_PIN) {
                     alert('❌ Incorrect PIN');
-                    document.getElementById('adminPinInput').value = '';
                     return;
                   }
+                  
                   setShowAdminPinModal(false);
                   setAdminPinValue('');
+                  setSkipConfirm(true);        // ← ADD THIS
                   approveWithdrawal(pendingWithdrawal);
                   setPendingWithdrawal(null);
                 }}
@@ -1891,6 +1876,99 @@ const deleteFeedback = async (feedbackId) => {
         </div>
       )}
      
+      {showConfirmModal && confirmedWithdrawal && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+
+            {/* Header */}
+            <div className="bg-blue-950 px-6 py-6">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-10 h-10 bg-yellow-400 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-yellow-900" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Confirm Withdrawal</h3>
+                  <p className="text-blue-300 text-xs">Review details before approving</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+
+              {/* Amount */}
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
+                <p className="text-xs text-gray-500 mb-1">Withdrawal Amount</p>
+                <p className="text-4xl font-bold text-green-600">
+                  ₦{confirmedWithdrawal.amount?.toLocaleString()}
+                </p>
+              </div>
+
+              {/* Seller */}
+              <div className="bg-gray-50 rounded-2xl p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Seller</span>
+                  <span className="font-semibold text-gray-900">{confirmedWithdrawal.sellerName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Email</span>
+                  <span className="text-gray-700 text-xs">{confirmedWithdrawal.sellerEmail}</span>
+                </div>
+              </div>
+
+              {/* Bank Details */}
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 space-y-2 text-sm">
+                <p className="text-xs font-bold text-blue-900 uppercase tracking-wide mb-2">Bank Details</p>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Bank</span>
+                  <span className="font-semibold text-gray-900">{confirmedWithdrawal.bankDetails?.bankName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Bank Code</span>
+                  <span className="font-mono text-gray-700">{confirmedWithdrawal.bankDetails?.bankCode}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Account No.</span>
+                  <span className="font-mono font-semibold text-gray-900">{confirmedWithdrawal.bankDetails?.accountNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Account Name</span>
+                  <span className="font-semibold text-gray-900">{confirmedWithdrawal.bankDetails?.accountName}</span>
+                </div>
+              </div>
+
+              {/* Warning */}
+              <div className="flex items-start gap-2 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+                <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-yellow-700">
+                  This will process an irreversible payment via Flutterwave. Double-check all details above.
+                </p>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => { setShowConfirmModal(false); setConfirmedWithdrawal(null); }}
+                  className="flex-1 py-3.5 rounded-2xl border-2 border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowConfirmModal(false);
+                    setPendingWithdrawal(confirmedWithdrawal);
+                    setShowAdminPinModal(true);
+                    setConfirmedWithdrawal(null);
+                  }}
+                  className="flex-2 flex-1 py-3.5 rounded-2xl bg-green-600 text-white font-bold hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Check className="w-5 h-5" />
+                  Proceed to PIN
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
