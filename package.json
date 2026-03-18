@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "crypto-js": "^4.2.0",
     "firebase": "^12.6.0",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.561.0",

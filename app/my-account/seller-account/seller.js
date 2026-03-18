@@ -169,8 +169,8 @@ function SuccessModal({ amount, reference, onClose }) {
                         <span className="text-gray-500">Status</span>
                         <span className="bg-yellow-50 text-yellow-600 text-xs px-2 py-1 rounded-full font-semibold">⏳ Pending</span>
                     </div>
-                    <p className="text-xs text-gray-400 text-center pt-2">
-                        You'll receive an email once your request is processed (24–48 hrs)
+                    <p className="text-xs text-blue-950 text-center pt-2">
+                        You'll receive a notification via your dashboard and an email once your request is processed (24–48 hrs)
                     </p>
                     <button
                         onClick={onClose}

@@ -13,6 +13,7 @@ import { auth, db } from '@/lib/firebaseConfig';
 import TransferReceipt, { TransferReceiptModal } from '@/components/Transferreceipt';
 import Link from 'next/link';
 import { Smartphone } from 'lucide-react';
+import SHA256 from 'crypto-js/sha256';
 
 export const generateAccountNumber = () => {
     const digits = Math.floor(1000000 + Math.random() * 9000000);
@@ -384,9 +385,12 @@ export default function TransferClient() {
         setHasPin(true);
     };
 
-    // ── Verify PIN ──
+    // ── Verify PIN (Updated for Hashing) ──
     const handleVerifyPin = (enteredPin) => {
-        if (enteredPin === seller?.transferPin) {
+        // Hash the entered pin to compare it with the stored hash
+        const enteredHash = SHA256(enteredPin).toString();
+
+        if (enteredHash === seller?.transferPin) {
             setShowPinModal(false);
             if (pinAction) {
                 pinAction();
@@ -396,7 +400,6 @@ export default function TransferClient() {
         }
         return false;
     };
-
     // ── Request PIN then run action ──
     const requirePin = (action) => {
         setPinAction(() => action);
