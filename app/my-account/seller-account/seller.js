@@ -347,37 +347,7 @@ export default function SellerAccountClient() {
             });
             allTransactions = [...txnsFromCollection];
 
-            // 2. Fetch from purchasedBooks in users collection
-            const usersSnapshot = await getDocs(collection(db, "users"));
-            usersSnapshot.docs.forEach(userDoc => {
-                const userData = userDoc.data();
-                const purchasedBooks = userData.purchasedBooks || {};
-
-                Object.values(purchasedBooks).forEach(purchase => {
-                    if (purchase.sellerId === uid) {
-                        const existingTxn = allTransactions.find(
-                            t => t.id === purchase.transactionId ||
-                                (t.bookTitle === purchase.title && t.buyerEmail === userData.email)
-                        );
-                        if (!existingTxn) {
-                            allTransactions.push({
-                                id: purchase.transactionId || `purchase-${purchase.bookId}-${userDoc.id}`,
-                                bookTitle: purchase.title,
-                                buyerName: userData.displayName || `${userData.firstName || ''} ${userData.surname || ''}`.trim() || 'Unknown Buyer',
-                                buyerEmail: userData.email,
-                                amount: purchase.amount,
-                                sellerAmount: purchase.amount * 0.80,
-                                sellerId: purchase.sellerId,
-                                sellerName: purchase.sellerName,
-                                createdAtDate: purchase.purchaseDate ? new Date(purchase.purchaseDate) : new Date(),
-                                source: 'purchasedBooks'
-                            });
-                        }
-                    }
-                });
-            });
-
-            // 3. Fetch withdrawals
+            // 2. Fetch withdrawals
             const withdrawalsQuery = query(
                 collection(db, "withdrawals"),
                 where("sellerId", "==", uid)
@@ -394,7 +364,7 @@ export default function SellerAccountClient() {
             withdrawalsList.sort((a, b) => b.requestedAtDate - a.requestedAtDate);
             setWithdrawals(withdrawalsList);
 
-            // 4. Fetch outgoing transfers
+            // 3. Fetch outgoing transfers
             const transfersQuery = query(
                 collection(db, 'transfers'),
                 where('senderId', '==', uid)
@@ -414,7 +384,7 @@ export default function SellerAccountClient() {
                 };
             });
 
-            // 4b. Fetch incoming transfers
+            // 4. Fetch incoming transfers
             const incomingTransfersQuery = query(
                 collection(db, 'transfers'),
                 where('recipientId', '==', uid)
@@ -434,14 +404,11 @@ export default function SellerAccountClient() {
                 };
             });
 
-            // 5. Merge all into allTransactions BEFORE sorting and setting state
+            // 5. Merge, sort and set
             allTransactions = [...allTransactions, ...transfersList, ...incomingList];
             allTransactions.sort((a, b) => b.createdAtDate - a.createdAtDate);
-
-            // 6. Set transactions (includes transfers both ways)
             setTransactions(allTransactions);
 
-            // 7. Calculate earnings — exclude transfers from earnings calculation
         } catch (error) {
             console.error("Error fetching seller transactions:", error);
         }
@@ -606,18 +573,29 @@ export default function SellerAccountClient() {
             await addDoc(collection(db, "withdrawals"), withdrawalData);
 
             // 2. IMMEDIATELY deduct the balance so they can't request it again
-            // We use increment(-amount) for atomicity
             await updateDoc(doc(db, "sellers", user.uid), {
                 accountBalance: increment(-amountToDeduct),
                 lastWithdrawalRequestDate: serverTimestamp(),
                 updatedAt: serverTimestamp(),
             });
 
+            // Update balance locally immediately
+            setAccountBalance((prev) => prev - amountToDeduct);
+
+            // Add new withdrawal to local list immediately
+            const newWithdrawal = {
+                id: `temp-${Date.now()}`,
+                sellerId: user.uid,
+                amount: amountToDeduct,
+                status: "pending",
+                reference: withdrawalRef,
+                bankDetails: user.bankDetails,
+                requestedAtDate: new Date(),
+            };
+            setWithdrawals((prev) => [newWithdrawal, ...prev]);
+
             setWithdrawAmount("");
             setSuccessData({ amount: amountToDeduct, reference: withdrawalRef });
-
-            // 3. Refresh the UI balance
-            await refreshBalanceOnly(user.uid);
 
         } catch (error) {
             console.error("Withdrawal error:", error);

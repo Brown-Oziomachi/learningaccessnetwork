@@ -693,7 +693,7 @@ useEffect(() => {
                                         {/* Section Heading & Tabs */}
                                         <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-6 py-20">
                                             <div>
-                                                <h2 className="text-3xl font-bold text-gray-900">Explore Library</h2>
+                                                <h3 className="text-3xl font-bold text-gray-900">Explore Library</h3>
                                                 <p className="text-gray-600 mt-2">Find materials by Departments or resources</p>
                                             </div>
 

@@ -8,7 +8,8 @@ import {
     ArrowLeft,
     Loader2,
     GraduationCap,
-    Info
+    Info,
+    X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
@@ -39,6 +40,13 @@ export default function BecomeSellerClient() {
     });
 
     const [errors, setErrors] = useState({});
+    const [toast, setToast] = useState({ show: false, message: "", type: "error" });
+
+    // Helper to show the toast and auto-hide it
+    const showToast = (message, type = "error") => {
+        setToast({ show: true, message, type });
+        setTimeout(() => setToast({ show: false, message: "", type }), 5000); // Auto-hide after 5s
+    };
 
     const nigerianBanks = [
         { name: "Access Bank", code: "044" },
@@ -131,9 +139,9 @@ export default function BecomeSellerClient() {
                     email: auth.currentUser.email
                 }));
 
-                alert("Could not load user data from database. You can still proceed with the form.");
+                showToast("Could not load user data. You can still proceed with the form.", "error");
             } else {
-                alert("Connection error. Please check your internet and try again.");
+                showToast("Connection error. Please check your internet and try again.", "error");
                 router.push('/my-account');
             }
         } finally {
@@ -210,8 +218,9 @@ const handleSubmit = async () => {
         });
 
         // Prepare Seller Document Creation
+        // ... inside handleSubmit
         batch.set(sellerRef, {
-            accountBalance: 0, 
+            accountBalance: 0,
             totalEarnings: 0,
             booksSold: 0,
             bankDetails: {
@@ -219,33 +228,47 @@ const handleSubmit = async () => {
                 bankCode: formData.bankCode,
                 accountNumber: formData.accountNumber,
                 accountName: formData.accountName,
-                flutterwaveSubaccountId: flutterwaveSubaccountId,
+                // Ensure this matches the object structure your rules expect
             },
             businessInfo: {
                 businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
                 businessDescription: formData.businessDescription
             },
-            title: formData.title || "",
             sellerName: `${formData.firstName} ${formData.surname}`.trim(),
+            title: formData.title || "",
             createdAt: serverTimestamp(),
-            status: "active"
+            status: "active",
+            flutterwaveSubaccountId: flutterwaveSubaccountId // Move to top level if rules struggle with nested objects
         });
 
         // 3. Commit the Batch
         await batch.commit();
 
-        alert("Seller account created successfully! 🎉");
+        // Replace alert with showToast
+        showToast("Seller account created successfully! 🎉", "success");
+
+        // Delay the redirect slightly so the user can actually see the success message
+        setTimeout(() => {
+            router.push('/my-account/seller-account');
+        }, 5000);
         router.push('/my-account/seller-account');
 
     } catch (error) {
         console.error("Onboarding Error:", error);
-        
-        // Friendly error messages for the UI
-        if (error.message.includes("timeout")) {
-            alert("Request timed out. Please check your connection.");
+
+        let userFriendlyMessage = "An unexpected error occurred.";
+
+        if (error.message.includes("permission")) {
+            userFriendlyMessage = "Setup failed: Permissions denied. Please contact support.";
+        } else if (error.message.includes("account")) {
+            userFriendlyMessage = "Setup failed: Sorry, we couldn't verify your account number. Kindly pass a valid account number.";
+        } else if (error.message.includes("timeout")) {
+            userFriendlyMessage = "Request timed out. Please check your internet connection.";
         } else {
-            alert(`Setup failed: ${error.message}`);
+            userFriendlyMessage = `Setup failed: ${error.message}`;
         }
+
+        showToast(userFriendlyMessage, "error");
     } finally {
         setSubmitting(false);
     }
@@ -687,6 +710,38 @@ const handleSubmit = async () => {
                     </div>
                 )}
             </main>
+            {/* Sided Pop-out Toast */}
+            {toast.show && (
+                <div className="fixed top-20 right-4 z-50 transition-all duration-500 ease-in-out transform translate-x-0 animate-in slide-in-from-right-full">
+                    <div className={`flex items-center gap-3 p-4 rounded-xl shadow-2xl border-l-4 min-w-[320px] max-w-md ${toast.type === "error"
+                            ? "bg-white border-red-500 text-gray-800"
+                            : "bg-white border-green-500 text-gray-800"
+                        }`}>
+                        {/* Status Icon */}
+                        <div className={`shrink-0 ${toast.type === "error" ? "text-red-500" : "text-green-500"}`}>
+                            {toast.type === "error" ? <Info size={22} /> : <CheckCircle size={22} />}
+                        </div>
+
+                        {/* Message Content */}
+                        <div className="flex-1">
+                            <p className="text-sm font-semibold leading-tight">
+                                {toast.type === "error" ? "Action Failed" : "Success!"}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                                {toast.message}
+                            </p>
+                        </div>
+
+                        {/* Manual Close Button */}
+                        <button
+                            onClick={() => setToast({ ...toast, show: false })}
+                            className="p-1.5 hover:bg-gray-100 rounded-full transition-colors text-gray-400"
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

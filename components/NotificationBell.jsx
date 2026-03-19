@@ -9,6 +9,7 @@ import {
   DollarSign,
   AlertCircle,
   BookOpen,
+  Trash2,
 } from "lucide-react";
 import {
   collection,
@@ -18,6 +19,7 @@ import {
   onSnapshot,
   updateDoc,
   doc,
+  deleteDoc,
   writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
@@ -27,6 +29,7 @@ import { db } from "@/lib/firebaseConfig";
 const getNotificationIcon = (type) => {
   switch (type) {
     case "withdrawal_approved":
+    case "referral_bonus":
       return (
         <CheckCircle
           size={18}
@@ -64,6 +67,7 @@ const getNotificationBg = (type, read) => {
     case "withdrawal_rejected":
       return "bg-red-50 border-l-4 border-red-400";
     case "referral_reward":
+    case "referral_bonus":
       return "bg-purple-50 border-l-4 border-purple-400";
     case "new_upload":
       return "bg-blue-50 border-l-4 border-blue-600";
@@ -129,6 +133,20 @@ export default function NotificationBell({ userId }) {
     }
   };
 
+  const clearAllNotifications = async () => {
+    if (!window.confirm("Are you sure you want to delete all notifications?"))
+      return;
+    try {
+      const batch = writeBatch(db);
+      notifications.forEach((n) => {
+        batch.delete(doc(db, "notifications", n.id));
+      });
+      await batch.commit();
+    } catch (err) {
+      console.error("Error clearing notifications:", err);
+    }
+  };
+
   const markAllAsRead = async () => {
     try {
       const batch = writeBatch(db);
@@ -140,6 +158,15 @@ export default function NotificationBell({ userId }) {
       await batch.commit();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const deleteNotification = async (e, id) => {
+    e.stopPropagation();
+    try {
+      await deleteDoc(doc(db, "notifications", id));
+    } catch (err) {
+      console.error("Error deleting notification:", err);
     }
   };
 
@@ -219,15 +246,21 @@ export default function NotificationBell({ userId }) {
                         >
                           {n.title}
                         </p>
-                        <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
-                          {formatTime(n.createdAt)}
-                        </span>
+
+                        {/* --- DELETE BUTTON --- */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-xs text-gray-400 whitespace-nowrap">
+                            {formatTime(n.createdAt)}
+                          </span>
+                          <button
+                            onClick={(e) => deleteNotification(e, n.id)}
+                            className="p-1 text-gray-300 hover:text-red-500 transition-colors rounded-md hover:bg-red-50"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
-                      <p
-                        className={`text-xs mt-1 leading-relaxed ${n.read ? "text-gray-400" : "text-gray-600"}`}
-                      >
-                        {n.message}
-                      </p>
                     </div>
                   </div>
                 </div>

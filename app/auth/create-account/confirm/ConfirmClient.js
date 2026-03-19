@@ -68,63 +68,20 @@ export default function ConfirmClient() {
                 referredBy: referredBy || null,
             };
 
+            // 1. All logic (Auth, Unique Account No, Firestore, Referrals) happens here
             const result = await createUserAccount(accountData);
 
             if (result.success) {
-                const newUserUid = result.uid;
-
-                // Handle Referral Logic
-                if (referredBy && referredBy !== newUserUid) {
-                    const q = query(
-                        collection(db, 'users'),
-                        where('referralCode', '==', referredBy)
-                    );
-                    const snap = await getDocs(q);
-
-                    if (!snap.empty) {
-                        const referrerDoc = snap.docs[0];
-                        const referrerId = referrerDoc.id;
-
-                        // 1. Log the referral record
-                        await addDoc(collection(db, 'referrals'), {
-                            referrerId,
-                            referredUserId: newUserUid,
-                            referredEmail: formData.email,
-                            referredName: `${formData.firstName} ${formData.surname}`,
-                            status: 'completed',
-                            reward: 500,
-                            claimed: true,
-                            createdAt: serverTimestamp(),
-                        });
-
-                        // 2. Credit the Referrer (targeting the 'users' collection for the wallet)
-                        await updateDoc(doc(db, 'users', referrerId), {
-                            accountBalance: increment(500),
-                            updatedAt: serverTimestamp(),
-                        });
-
-                        // 3. Send notification
-                        await addDoc(collection(db, 'notifications'), {
-                            userId: referrerId,
-                            type: 'referral_reward',
-                            title: 'Referral Bonus! 🎉',
-                            message: `${formData.firstName} joined via your link. ₦500 added to your wallet!`,
-                            createdAt: serverTimestamp(),
-                            read: false,
-                        });
-                    }
-                }
-
-                // Cleanup session
+                // 2. Cleanup session storage
                 sessionStorage.removeItem('userRole');
                 sessionStorage.removeItem('referredBy');
 
-                // Show feedback and redirect
+                // 3. Show success UI and redirect
                 setShowToast(true);
                 setTimeout(() => {
                     setShowToast(false);
                     handleRedirect(userRole, accountType);
-                }, 3000); // UI feels more responsive at 3s vs 20s
+                }, 3000);
 
             } else {
                 handleAuthError(result.error);

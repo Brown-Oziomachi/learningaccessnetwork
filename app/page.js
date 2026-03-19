@@ -36,7 +36,7 @@ export default function LearningAccessNetwork() {
   const studentActivityImages = [
     // 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&q=80', // Students studying together with laptops
     // 'https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=1200&q=80', // Student reading on tablet
-    'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&q=80', // Student with laptop and books
+    '/student.jpg', // Student with laptop and books
     // 'https://images.unsplash.com/photo-1516321497487-e288fb19713f?w=1200&q=80', // Happy student with digital device
     // 'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=1200&q=80', // Student browsing online
   ];

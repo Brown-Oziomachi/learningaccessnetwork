@@ -43,68 +43,45 @@ export default function SignInClient() {
 
         setLoading(true);
         setError(null);
-        setSuccessMessage(null);
 
         try {
-            const { collection, query, where, getDocs } = await import('firebase/firestore');
-            const { db } = await import('@/lib/firebaseConfig');
-
-            const usersRef = collection(db, 'users');
-            const q = query(usersRef, where('email', '==', loginData.email.toLowerCase().trim()));
-            const snap = await getDocs(q);
-
-            if (!snap.empty) {
-                const userData = snap.docs[0].data();
-                const accountStatus = userData.accountStatus || 'active';
-
-                if (accountStatus === 'suspended') {
-                    setError('suspended');
-                    setLoading(false);
-                    return;
-                }
-
-                if (accountStatus === 'pending') {
-                    setError('pending');
-                    setLoading(false);
-                    return;
-                }
-            }
-
             const result = await handleEmailPasswordSignIn(
                 loginData.email.toLowerCase().trim(),
                 loginData.password
             );
 
             if (result.success) {
-                // auth hook handles redirect
+                // Success! The useAuth hook or a router.push('/home') can go here
+                router.push('/home');
             } else {
-                const errorCode = result.error?.code || result.error?.errorCode || '';
-                switch (errorCode) {
-                    case 'auth/invalid-credential':
-                    case 'auth/wrong-password':
-                    case 'auth/user-not-found':
-                        setError('Incorrect email or password. Please try again.');
-                        break;
-                    case 'auth/invalid-email':
-                        setError('Invalid email address format.');
-                        break;
-                    case 'auth/too-many-requests':
-                        setError('Too many failed login attempts. Please try again later or reset your password.');
-                        break;
-                    case 'auth/user-disabled':
-                        setError('This account has been disabled. Please contact support.');
-                        break;
-                    default:
-                        setError(result.error?.message || 'Failed to sign in. Please try again later.');
+                const errorCode = result.error?.code || '';
+
+                // Handle your specific status codes
+                if (errorCode === 'auth/account-suspended') {
+                    setError('suspended');
+                } else if (errorCode === 'auth/account-pending') {
+                    setError('pending');
+                } else {
+                    // Fallback for standard Firebase auth errors
+                    switch (errorCode) {
+                        case 'auth/invalid-credential':
+                            setError('Incorrect email or password.');
+                            break;
+                        case 'auth/too-many-requests':
+                            setError('Too many attempts. Try again later.');
+                            break;
+                        default:
+                            setError(result.error?.message || 'Login failed.');
+                    }
                 }
-                setLoading(false);
             }
         } catch (err) {
-            console.error('Login error:', err);
             setError('Something went wrong. Please try again.');
+        } finally {
             setLoading(false);
         }
     };
+
 
     if (authLoading) {
         return (
@@ -198,17 +175,20 @@ export default function SignInClient() {
                 </div>
 
                 {/* ── Form Section ── */}
-                <div className="flex-1 flex items-start justify-center px-8 pt-8 pb-8">
+                <div className="flex-1 flex items-start justify-center px-8 pt-8 pb-8 lg:mt-35">
                     <div className="w-full max-w-md">
 
-                        {/* Desktop Globe (hidden on mobile) */}
-                        <div className="hidden lg:flex justify-center mb-10">
-                            <div className="w-24 h-24 border-4 border-blue-950 rounded-full flex items-center justify-center">
-                                <Globe className="w-12 h-12 text-blue-950" />
-                            </div>
-                        </div>
+                                                <div className="hidden lg:flex justify-center mb-10">
+                                                    <div className="w-24 h-24 border-4 border-blue-950 rounded-full flex items-center justify-center overflow-hidden">
+                                                        <img 
+                                                            src="/lanlog.png" 
+                                                            alt="LAN Library Logo"
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </div>
+                                                </div>
 
-                        {/* Success Message */}
+                                                {/* Success Message */}
                         {successMessage && (
                             <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
                                 <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
@@ -264,19 +244,16 @@ export default function SignInClient() {
                             </div>
                         )}
 
-                        {/* Google Sign In */}
-                        <div className="mb-8">
-                            <GoogleSignInButton />
-                        </div>
 
-                        {/* OR Divider */}
+
+
                         <div className="mb-8">
                             <div className="relative">
                                 <div className="absolute inset-0 flex items-center">
                                     <div className="w-full border-t border-gray-300"></div>
                                 </div>
                                 <div className="relative flex justify-center text-sm">
-                                    <span className="px-4 bg-white text-gray-500">OR</span>
+                                    <span className="px-4 bg-white text-gray-500">Continue with Email</span>
                                 </div>
                             </div>
                         </div>

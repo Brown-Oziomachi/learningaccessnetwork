@@ -179,6 +179,7 @@ export default function ComprehensiveAdminPanel() {
   const [adminPinValue, setAdminPinValue] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [skipConfirm, setSkipConfirm] = useState(false);
+  const [withdrawalSuccessData, setWithdrawalSuccessData] = useState(null);
   const [confirmedWithdrawal, setConfirmedWithdrawal] = useState(null);
   const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
 
@@ -673,7 +674,14 @@ const updateSchoolDocumentStatus = async (docId, status) => {
         read: false
       });
 
-      alert(`✅ Withdrawal Approved!\n\nAmount: ₦${withdrawal.amount.toLocaleString()}\nSeller: ${withdrawal.sellerName}\nFlutterwave ID: ${transferResult.transferId}\nReference: ${transferResult.reference}`);
+      setWithdrawalSuccessData({
+        amount: withdrawal.amount,
+        sellerName: withdrawal.sellerName,
+        bankName: withdrawal.bankDetails.bankName,
+        accountNumber: withdrawal.bankDetails.accountNumber,
+        transferId: transferResult.transferId,
+        reference: transferResult.reference,
+      });
 
       await fetchWithdrawals();
 
@@ -1965,6 +1973,64 @@ const deleteFeedback = async (feedbackId) => {
                   Proceed to PIN
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {withdrawalSuccessData && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+
+            {/* Header */}
+            <div className="bg-blue-950 px-6 py-8 flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-white text-xl font-bold mb-1">Withdrawal Approved!</h3>
+              <p className="text-blue-300 text-sm">Payment processed via Flutterwave</p>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Amount</span>
+                <span className="font-bold text-green-600">₦{Number(withdrawalSuccessData.amount).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Seller</span>
+                <span className="font-semibold text-gray-900">{withdrawalSuccessData.sellerName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Bank</span>
+                <span className="font-semibold text-gray-900">{withdrawalSuccessData.bankName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Account</span>
+                <span className="font-mono text-gray-900">{withdrawalSuccessData.accountNumber}</span>
+              </div>
+              <div className="border-t border-gray-100 pt-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Flutterwave ID</span>
+                  <span className="font-mono text-xs text-blue-950">{withdrawalSuccessData.transferId}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Reference</span>
+                  <span className="font-mono text-xs text-blue-950 break-all text-right max-w-[180px]">{withdrawalSuccessData.reference}</span>
+                </div>
+              </div>
+              <div className="flex justify-between text-sm pt-1">
+                <span className="text-gray-500">Status</span>
+                <span className="bg-green-50 text-green-700 text-xs px-2 py-1 rounded-full font-semibold">✅ Completed</span>
+              </div>
+
+              <button
+                onClick={() => setWithdrawalSuccessData(null)}
+                className="w-full mt-2 bg-blue-950 text-white py-3 rounded-2xl font-bold hover:bg-blue-900 transition-colors"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>
