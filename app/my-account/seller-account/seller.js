@@ -3,8 +3,7 @@ import React, { useState, useEffect } from "react";
 import { DollarSign, TrendingUp, ShoppingBag, Download, Book, Globe, Settings, X, Camera, Save, AlertCircle, ChevronRight, User, Building, Users, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, increment, setDoc } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, increment, setDoc } from "firebase/firestore"; import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
 import { backfillFlutterwaveSubaccount } from "@/lib/auth/backfillSubaccount";
@@ -312,6 +311,81 @@ function VTUQuickAccess() {
   );
 }
 
+function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
+    return (
+        <>
+            <div
+                className={`fixed inset-0 bg-black/50 z-[80] transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                onClick={onClose}
+            />
+            <div className={`fixed bottom-0 left-0 right-0 z-[90] transition-transform duration-300 ease-out ${isOpen ? "translate-y-0" : "translate-y-full"}`}>
+                <div className="bg-white rounded-t-3xl shadow-2xl max-w-lg mx-auto">
+                    <div className="flex justify-center pt-3 pb-1">
+                        <div className="w-10 h-1 rounded-full bg-gray-300" />
+                    </div>
+                    <div className="px-6 pt-3 pb-4 border-b border-gray-100">
+                        <p className="text-lg font-bold text-blue-950 antialiased tracking-tight">Switch Account</p>
+                        <p className="text-xs text-gray-500 mt-0.5 antialiased">Choose which account to view</p>
+                    </div>
+                    <div className="p-4 space-y-3 pb-10">
+
+                        {/* Student Account */}
+                        <div className={!isStudent ? "opacity-40" : ""}>
+                            <button
+                                onClick={() => { if (isStudent) { router.push("/student/dashboard"); onClose(); } }}
+                                disabled={!isStudent}
+                                className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all ${!isStudent ? "cursor-not-allowed" : "active:scale-[0.98]"}`}
+                            >
+                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white flex-shrink-0">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-6 h-6">
+                                        <path d="M12 3L2 9l10 6 10-6-10-6z" strokeLinecap="round" strokeLinejoin="round" />
+                                        <path d="M6 11.5V16c0 1.5 2.686 3 6 3s6-1.5 6-3v-4.5" strokeLinecap="round" />
+                                    </svg>
+                                </div>
+                                <div className="flex-1 text-left">
+                                    <div className="flex items-center gap-2">
+                                        <p className="font-bold text-blue-950 text-sm">Student Account</p>
+                                        {!isStudent && <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold">Not enrolled</span>}
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-0.5">Access courses, assignments & library</p>
+                                </div>
+                                {!isStudent
+                                    ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-gray-300"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" strokeLinecap="round" /></svg>
+                                    : <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-gray-300"><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                }
+                            </button>
+                            {!isStudent && <p className="text-xs text-center text-gray-400 mt-1">Enroll as a student to access this</p>}
+                        </div>
+
+                        {/* Seller Account */}
+                        <button
+                            onClick={onClose}
+                            className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-blue-200 bg-blue-50 transition-all active:scale-[0.98]"
+                        >
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-800 to-blue-950 flex items-center justify-center text-white flex-shrink-0">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-6 h-6">
+                                    <path d="M3 3h2l.4 2M7 13h10l4-8H5.4" strokeLinecap="round" strokeLinejoin="round" />
+                                    <circle cx="7" cy="20" r="1" fill="currentColor" />
+                                    <circle cx="17" cy="20" r="1" fill="currentColor" />
+                                </svg>
+                            </div>
+                            <div className="flex-1 text-left">
+                                <div className="flex items-center gap-2">
+                                    <p className="font-bold text-blue-950 text-sm">Seller Account</p>
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-semibold">Active</span>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-0.5">Manage earnings, documents & withdrawals</p>
+                            </div>
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-blue-800"><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </button>
+
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+}
+
 export default function SellerAccountClient() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -340,6 +414,7 @@ export default function SellerAccountClient() {
     const [resetPinError, setResetPinError] = useState('');
     const [Processing, setProcessing] = useState(false);
     const [resetPinSuccess, setResetPinSuccess] = useState(false);
+    const [showSwitchModal, setShowSwitchModal] = useState(false);
     const router = useRouter();
     const [showBankModal, setShowBankModal] = useState(false);
     const [bankFormData, setBankFormData] = useState({
@@ -453,6 +528,31 @@ export default function SellerAccountClient() {
         }
     };
 
+    function getCountryFlag(country) {
+    const flags = {
+        "Nigeria": "🇳🇬",
+        "Ghana": "🇬🇭",
+        "Kenya": "🇰🇪",
+        "South Africa": "🇿🇦",
+        "United States": "🇺🇸",
+        "United Kingdom": "🇬🇧",
+        "Canada": "🇨🇦",
+        "Australia": "🇦🇺",
+        "India": "🇮🇳",
+        "Germany": "🇩🇪",
+        "France": "🇫🇷",
+        "Brazil": "🇧🇷",
+        "Uganda": "🇺🇬",
+        "Tanzania": "🇹🇿",
+        "Rwanda": "🇷🇼",
+        "Cameroon": "🇨🇲",
+        "Ethiopia": "🇪🇹",
+        "Egypt": "🇪🇬",
+        "Senegal": "🇸🇳",
+        "Ivory Coast": "🇨🇮",
+    };
+    return flags[country] || "🌍";
+}
 
     const fetchSellerTransactions = async (uid) => {
         try {
@@ -464,15 +564,33 @@ export default function SellerAccountClient() {
                 where("sellerId", "==", uid)
             );
             const transactionsSnapshot = await getDocs(transactionsQuery);
-            const txnsFromCollection = transactionsSnapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data,
-                    bookTitle: data.bookTitle || data.title,
-                    createdAtDate: data.createdAt?.toDate?.() || (data.purchaseDate ? new Date(data.purchaseDate) : new Date())
-                };
-            });
+            const txnsFromCollection = await Promise.all(
+                transactionsSnapshot.docs.map(async (docSnap) => {
+                    const data = docSnap.data();
+
+                    let buyerCountry = null;
+                    const buyerId = data.buyerId || data.userId || data.buyerUid || data.uid || null;
+
+                    if (buyerId) {
+                        try {
+                            const buyerDoc = await getDoc(doc(db, "users", buyerId));
+                            if (buyerDoc.exists()) {
+                                buyerCountry = buyerDoc.data().country || null;
+                            }
+                        } catch (e) {
+                            console.error("Error fetching buyer country:", e);
+                        }
+                    }
+
+                    return {
+                        id: docSnap.id,
+                        ...data,
+                        bookTitle: data.bookTitle || data.title,
+                        buyerCountry,
+                        createdAtDate: data.createdAt?.toDate?.() || (data.purchaseDate ? new Date(data.purchaseDate) : new Date())
+                    };
+                })
+            );
             allTransactions = [...txnsFromCollection];
 
             // 2. Fetch withdrawals
@@ -518,19 +636,37 @@ export default function SellerAccountClient() {
                 where('recipientId', '==', uid)
             );
             const incomingSnap = await getDocs(incomingTransfersQuery);
-            const incomingList = incomingSnap.docs.map(d => {
-                const data = d.data();
-                return {
-                    id: `incoming-${d.id}`,
-                    ...data,
-                    bookTitle: `Transfer from ${data.senderName || 'Unknown'}`,
-                    buyerName: data.senderName || 'Unknown',
-                    amount: data.amount,
-                    sellerAmount: data.amount,
-                    createdAtDate: data.createdAt?.toDate?.() || new Date(),
-                    type: 'transfer_in',
-                };
-            });
+            const incomingList = await Promise.all(
+                incomingSnap.docs.map(async (d) => {
+                    const data = d.data();
+
+                    let buyerCountry = null;
+                    const senderId = data.senderId || null;
+
+                    if (senderId) {
+                        try {
+                            const senderDoc = await getDoc(doc(db, "users", senderId));
+                            if (senderDoc.exists()) {
+                                buyerCountry = senderDoc.data().country || null;
+                            }
+                        } catch (e) {
+                            console.error("Error fetching sender country:", e);
+                        }
+                    }
+
+                    return {
+                        id: `incoming-${d.id}`,
+                        ...data,
+                        bookTitle: `Transfer from ${data.senderName || 'Unknown'}`,
+                        buyerName: data.senderName || 'Unknown',
+                        amount: data.amount,
+                        sellerAmount: data.amount,
+                        buyerCountry,
+                        createdAtDate: data.createdAt?.toDate?.() || new Date(),
+                        type: 'transfer_in',
+                    };
+                })
+            );
 
             // 5. Merge, sort and set
             allTransactions = [...allTransactions, ...transfersList, ...incomingList];
@@ -924,6 +1060,15 @@ export default function SellerAccountClient() {
                                     <p className="text-xs text-green-500">Verified Seller</p>
                                 </div>
                             </button>
+                            <button
+                                onClick={() => setShowSwitchModal(true)}
+                                className="flex flex-col gap-[5px] sm:hidden justify-center items-center w-9 h-9 rounded-lg hover:bg-gray-100 transition-colors ml-10"
+                                title="Switch account"
+                            >
+                                <span className="w-5 h-[2px] bg-blue-950 rounded-full" />
+                                <span className="w-5 h-[2px] bg-blue-950 rounded-full" />
+                                <span className="w-5 h-[2px] bg-blue-950 rounded-full" />
+                            </button>
                         </div>
                         <div className="flex items-center gap-3">
                             <NotificationBell userId={user?.uid} />
@@ -933,13 +1078,16 @@ export default function SellerAccountClient() {
                             >
                                 GET HELP
                             </button>
-                            {user?.role === "student" && (
-                                <Link href="/student/dashboard">
-                                    <button className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-full transition-colors whitespace-nowrap shadow-sm">
-                                        Student Dashboard
-                                    </button>
-                                </Link>
-                            )}
+                            <button
+                                onClick={() => setShowSwitchModal(true)}
+                                className="flex flex-col gap-[5px] max-md:hidden justify-center items-center w-9 h-9 rounded-lg hover:bg-gray-100 transition-colors ml-10"
+                                title="Switch account"
+                            >
+                                <span className="w-5 h-[2px] bg-blue-950 rounded-full" />
+                                <span className="w-5 h-[2px] bg-blue-950 rounded-full" />
+                                <span className="w-5 h-[2px] bg-blue-950 rounded-full" />
+                            </button>
+                           
                         </div>
                     </div>
                 </div>
@@ -1369,9 +1517,21 @@ export default function SellerAccountClient() {
                                                             <span className="text-blue-950 font-medium">₦{txn.amount?.toLocaleString()}</span>
                                                         </div>
                                                         <div className="flex justify-between">
+                                                            <span className="text-gray-600">Country:</span>
+                                                            <span className="text-blue-950 font-medium flex items-center gap-1">
+                                                                {txn.buyerCountry ? (
+                                                                    <>
+                                                                        <span>{getCountryFlag(txn.buyerCountry)}</span>
+                                                                        <span>{txn.buyerCountry}</span>
+                                                                    </>
+                                                                ) : "—"}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between">
                                                             <span className="text-gray-600">Platform Fee (20%):</span>
                                                             <span className="text-red-600 font-medium">-₦{((txn.amount || 0) * 0.20).toLocaleString()}</span>
                                                         </div>
+
                                                     </div>
                                                 </div>
                                             ))}
@@ -1962,6 +2122,12 @@ export default function SellerAccountClient() {
                     </div>
                 </div>
             )}
+            <AccountSwitchSheet
+                isOpen={showSwitchModal}
+                onClose={() => setShowSwitchModal(false)}
+                isStudent={user?.role === "student"}
+                router={router}
+            />
         </div>
     );
 }

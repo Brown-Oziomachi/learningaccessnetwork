@@ -385,6 +385,8 @@ export default function RechargeClient() {
   const [dataPlans, setDataPlans] = useState([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [plansError, setPlansError] = useState("");
+  const [verifiedName, setVerifiedName] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
   const [selectedElecBiller, setSelectedElecBiller] = useState(null);
   const [elecPlans, setElecPlans] = useState([]);
@@ -457,6 +459,33 @@ export default function RechargeClient() {
       .finally(() => setLoadingPlans(false));
   }, [selectedNetwork, tab]);
 
+  useEffect(() => {
+  const customerId = tab === "electricity" ? meterNumber : smartcardNumber;
+  const selectedPlanObj = tab === "electricity" ? selectedElecPlan : selectedTvPlan;
+  
+  // Only verify if we have a full ID (usually 10-11 digits) and a selected plan/biller
+  if (customerId.length >= 10 && selectedPlanObj) {
+    setVerifying(true);
+    setVerifiedName("");
+    
+    const timeoutId = setTimeout(() => {
+      fetch(`/api/recharge?type=verify&customer=${customerId}&item_code=${selectedPlanObj.item_code}&biller_code=${selectedPlanObj.biller_code}`)
+        .then(r => r.json())
+        .then(res => {
+          if (res.name) setVerifiedName(res.name);
+          else setVerifiedName("Verification failed");
+        })
+        .catch(() => setVerifiedName("Error verifying name"))
+        .finally(() => setVerifying(false));
+    }, 1000); // Debounce for 1 second to avoid hitting API on every keystroke
+
+    return () => clearTimeout(timeoutId);
+  } else {
+    setVerifiedName("");
+  }
+}, [meterNumber, smartcardNumber, selectedElecPlan, selectedTvPlan, tab]);
+
+  
   // ── Auth ──
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -1131,11 +1160,29 @@ export default function RechargeClient() {
                     {/* Data Plans */}
                     {tab === "data" && (
                       <div>
+                        {/* 1. Add the Maintenance Alert at the top */}
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 flex gap-3 items-start">
+                          <div className="bg-amber-100 p-1.5 rounded-full">
+                            <AlertCircle size={16} className="text-amber-600" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-amber-800">
+                              System Activation in Progress
+                            </p>
+                            <p className="text-[11px] text-amber-700 leading-tight">
+                              Data bundle services are currently being enabled
+                              for your account. Please check back in 24-48
+                              hours.
+                            </p>
+                          </div>
+                        </div>
+
                         <label className="block text-sm font-bold text-gray-700 mb-3">
                           {selectedNetwork
                             ? `${NETWORKS.find((n) => n.id === selectedNetwork)?.name} Data Plans`
                             : "Select a network first"}
                         </label>
+
                         {!selectedNetwork ? (
                           <div className="bg-gray-50 rounded-xl p-6 text-center text-gray-400 text-sm border border-dashed border-gray-200">
                             Please select a network above to see data plans
@@ -1147,16 +1194,19 @@ export default function RechargeClient() {
                           </div>
                         ) : plansError ? (
                           <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600 text-center">
-                            {plansError}
+                            {plansError.includes("Invalid Biller")
+                              ? "Maintenance: Data plans are currently being synchronized for this network. Please use Airtime for now."
+                              : plansError}
                           </div>
                         ) : (
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto pr-1">
                             {dataPlans.map((plan) => (
                               <button
                                 key={plan.id}
+                                disabled={true} // Optional: Disable buttons while waiting for FLW
                                 onClick={() => setSelectedPlan(plan)}
                                 className={`py-3 rounded-xl font-bold text-sm transition-all text-left p-3
-                                  ${selectedPlan?.id === plan.id ? "bg-blue-950 text-white shadow-sm" : "bg-gray-50 text-gray-700 border border-gray-200 hover:border-blue-300"}`}
+              ${selectedPlan?.id === plan.id ? "bg-blue-950 text-white shadow-sm" : "bg-gray-50 text-gray-700 border border-gray-200 hover:border-blue-300 opacity-60 cursor-not-allowed"}`}
                               >
                                 <p className="font-extrabold text-sm leading-tight">
                                   {plan.size}
@@ -1173,7 +1223,6 @@ export default function RechargeClient() {
                         )}
                       </div>
                     )}
-
                     {/* Electricity */}
                     {tab === "electricity" && (
                       <div className="space-y-4">
@@ -1231,17 +1280,53 @@ export default function RechargeClient() {
                             )}
                           </div>
                         )}
+                        {/* Electricity Meter Input Section */}
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-2">
                             Meter Number
                           </label>
-                          <input
-                            type="text"
-                            placeholder="Enter meter number"
-                            value={meterNumber}
-                            onChange={(e) => setMeterNumber(e.target.value)}
-                            className="w-full border text-black border-gray-200 rounded-xl px-4 py-3 font-mono text-base focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
-                          />
+                          <div className="relative">
+                            <input
+                              type="text"
+                              placeholder="Enter meter number"
+                              value={meterNumber}
+                              onChange={(e) =>
+                                setMeterNumber(
+                                  e.target.value.replace(/\D/g, ""),
+                                )
+                              }
+                              className="w-full border text-black border-gray-200 rounded-xl px-4 py-3 font-mono text-base focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
+                            />
+                            {verifying && (
+                              <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                <Loader2
+                                  size={18}
+                                  className="animate-spin text-blue-950"
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Verified Name Display */}
+                          {verifiedName && (
+                            <div
+                              className={`mt-2 p-3 rounded-xl flex items-center gap-2 border ${
+                                verifiedName.includes("failed") ||
+                                verifiedName.includes("not found")
+                                  ? "bg-red-50 border-red-100 text-red-600"
+                                  : "bg-green-50 border-green-100 text-green-700"
+                              }`}
+                            >
+                              {verifiedName.includes("failed") ? (
+                                <AlertCircle size={14} />
+                              ) : (
+                                <CheckCircle2 size={14} />
+                              )}
+                              <span className="text-xs font-bold uppercase tracking-wider">
+                                {verifiedName}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-2">
@@ -1286,22 +1371,56 @@ export default function RechargeClient() {
                             ))}
                           </div>
                         </div>
+                        {/* TV Smartcard Input Section */}
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-2">
                             Smartcard / IUC Number
                           </label>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="Enter smartcard number"
-                            value={smartcardNumber}
-                            onChange={(e) =>
-                              setSmartcardNumber(
-                                e.target.value.replace(/\D/g, "").slice(0, 12),
-                              )
-                            }
-                            className="w-full border text-black border-gray-200 rounded-xl px-4 py-3 font-mono text-base focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
-                          />
+                          <div className="relative">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="Enter smartcard number"
+                              value={smartcardNumber}
+                              onChange={(e) =>
+                                setSmartcardNumber(
+                                  e.target.value
+                                    .replace(/\D/g, "")
+                                    .slice(0, 12),
+                                )
+                              }
+                              className="w-full border text-black border-gray-200 rounded-xl px-4 py-3 font-mono text-base focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
+                            />
+                            {verifying && (
+                              <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                <Loader2
+                                  size={18}
+                                  className="animate-spin text-blue-950"
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Verified Name Display */}
+                          {verifiedName && (
+                            <div
+                              className={`mt-2 p-3 rounded-xl flex items-center gap-2 border ${
+                                verifiedName.includes("failed") ||
+                                verifiedName.includes("not found")
+                                  ? "bg-red-50 border-red-100 text-red-600"
+                                  : "bg-green-50 border-green-100 text-green-700"
+                              }`}
+                            >
+                              {verifiedName.includes("failed") ? (
+                                <AlertCircle size={14} />
+                              ) : (
+                                <CheckCircle2 size={14} />
+                              )}
+                              <span className="text-xs font-bold uppercase tracking-wider">
+                                {verifiedName}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         {selectedTvBiller && (
                           <div>

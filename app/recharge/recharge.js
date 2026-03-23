@@ -510,7 +510,9 @@ export default function RechargeClient() {
   };
 
   // ── Derived ──
-  const finalAmount =
+  const SERVICE_FEE = 0; // Set to e.g. 50 to charge ₦50 flat, or use 0 for no fee
+
+  const baseAmount =
     tab === "airtime"
       ? airtimeAmount === "custom"
         ? Number(customAmount)
@@ -522,6 +524,8 @@ export default function RechargeClient() {
           : tab === "tv"
             ? selectedTvPlan?.price || 0
             : 0;
+
+  const finalAmount = baseAmount + SERVICE_FEE;
 
   const walletBalance = seller?.accountBalance || 0;
   const hasEnoughBalance = walletBalance >= finalAmount && finalAmount > 0;

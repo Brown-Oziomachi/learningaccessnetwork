@@ -140,6 +140,20 @@ export async function GET(request) {
         return fetchBillCategories(biller.code);
     }
 
+    if (billType === 'debug-mtn') {
+        const key = getV3SecretKey();
+        const { status, data } = await flwRequest('GET', '/v3/bill-categories?biller_code=BIL108', key);
+
+        if (status === 200) {
+            console.log("--- LIVE MTN DATA PLANS ---");
+            data.data.forEach(plan => {
+                console.log(`Name: ${plan.name} | Item Code: ${plan.item_code} | Amount: ${plan.amount}`);
+            });
+            return NextResponse.json({ message: "Check your server terminal for the list", plans: data.data });
+        }
+        return NextResponse.json({ error: "Could not fetch debug info" }, { status: 400 });
+    }
+
     if (network) {
         const billerCode = BILLER_CODES[network];
         if (!billerCode) return NextResponse.json({ error: 'Invalid network' }, { status: 400 });
@@ -188,18 +202,24 @@ export async function POST(request) {
                 type: 'AIRTIME',
                 reference: ref,
             };
+            // Locate this block in your POST function
+            // Inside export async function POST(request) { ...
+            // ... inside your POST function
         } else if (type === 'data') {
             const formattedPhone = phone.startsWith('0') ? '+234' + phone.slice(1) : phone;
+
             payload = {
-                country: 'NG',
+                country: "NG",
                 customer: formattedPhone,
-                amount: Number(amount),
-                recurrence: 'ONCE',
-                type: 'DATA_BUNDLE',
+                amount: Number(amount), // CRITICAL: Must be a Number, not a String
+                type: "MOBILEDATA",    // This is correct for Data
                 reference: ref,
-                biller_code,   // put biller_code back
-                item_code,
+                recurrence: "ONCE",
+                // Swap these to ensure they are being sent as clean strings
+                biller_code: String(biller_code),
+                item_code: String(item_code)
             };
+        
         } else if (type === 'electricity') {
             payload = {
                 country: 'NG',
