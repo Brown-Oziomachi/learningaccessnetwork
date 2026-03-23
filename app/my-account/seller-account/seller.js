@@ -184,6 +184,134 @@ function SuccessModal({ amount, reference, onClose }) {
     );
 }
 
+function VTUQuickAccess() {
+  const router = useRouter();
+
+  const services = [
+    {
+      id: "airtime",
+      label: "Airtime",
+      description: "Instant top-up",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-6 h-6">
+          <rect x="5" y="2" width="14" height="20" rx="2" />
+          <circle cx="12" cy="17" r="1" fill="currentColor" />
+        </svg>
+      ),
+      color: "from-blue-500 to-blue-700",
+      lightBg: "bg-blue-50",
+      iconColor: "text-blue-600",
+      borderColor: "border-blue-100",
+      tab: "airtime",
+    },
+    {
+      id: "data",
+      label: "Data",
+      description: "All networks",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-6 h-6">
+          <path d="M1.5 8.5C5 5 9.5 3 12 3s7 2 10.5 5.5" strokeLinecap="round" />
+          <path d="M5 12c1.9-1.9 4.3-3 7-3s5.1 1.1 7 3" strokeLinecap="round" />
+          <path d="M8.5 15.5c.9-.9 2.1-1.5 3.5-1.5s2.6.6 3.5 1.5" strokeLinecap="round" />
+          <circle cx="12" cy="19" r="1.5" fill="currentColor" />
+        </svg>
+      ),
+      color: "from-violet-500 to-violet-700",
+      lightBg: "bg-violet-50",
+      iconColor: "text-violet-600",
+      borderColor: "border-violet-100",
+      tab: "data",
+    },
+    {
+      id: "electricity",
+      label: "Electricity",
+      description: "Pay bills",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-6 h-6">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+      color: "from-amber-400 to-orange-500",
+      lightBg: "bg-amber-50",
+      iconColor: "text-amber-600",
+      borderColor: "border-amber-100",
+      tab: "electricity",
+    },
+    {
+      id: "tv",
+      label: "TV/Cable",
+      description: "DStv, GOtv & more",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-6 h-6">
+          <rect x="2" y="7" width="20" height="13" rx="2" />
+          <path d="M8 7L12 3l4 4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M9 12h6M9 15h4" strokeLinecap="round" />
+        </svg>
+      ),
+      color: "from-emerald-500 to-teal-600",
+      lightBg: "bg-emerald-50",
+      iconColor: "text-emerald-600",
+      borderColor: "border-emerald-100",
+      tab: "tv",
+    },
+  ];
+
+  const handleClick = (tab) => {
+    router.push(`/recharge?tab=${tab}`);
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-5">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="font-bold text-base text-blue-950">Quick Recharge</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Bills & top-ups from your wallet</p>
+        </div>
+        <button
+          onClick={() => router.push("/recharge")}
+          className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors"
+        >
+          View all
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} className="w-3 h-3">
+            <path d="M3 8h10M9 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
+
+      {/* 4-column grid */}
+      <div className="grid grid-cols-4 gap-3">
+        {services.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => handleClick(s.tab)}
+            className={`group flex flex-col items-center gap-2 p-3 rounded-xl border ${s.borderColor} ${s.lightBg} hover:shadow-md active:scale-95 transition-all duration-150 cursor-pointer`}
+          >
+            {/* Icon circle */}
+            <div className={`w-11 h-11 rounded-full bg-white shadow-sm flex items-center justify-center ${s.iconColor} group-hover:scale-110 transition-transform duration-150`}>
+              {s.icon}
+            </div>
+
+            {/* Labels */}
+            <div className="text-center">
+              <p className="text-xs font-bold text-blue-950 leading-tight">{s.label}</p>
+              <p className="text-[10px] text-gray-400 leading-tight mt-0.5 hidden sm:block">{s.description}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Bottom strip */}
+      <div className="mt-4 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
+        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
+        <p className="text-xs text-blue-700 font-medium">
+          Payments are instant and deducted from your LAN wallet
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function SellerAccountClient() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -797,27 +925,21 @@ export default function SellerAccountClient() {
                                 </div>
                             </button>
                         </div>
-                        <div className="bg-blue-950 rounded-xl shadow-sm px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center gap-2 w-full sm:w-auto">
-
-                            <div className="flex-shrink-0">
-                                <NotificationBell userId={user?.uid} />
-                            </div>
-
+                        <div className="flex items-center gap-3">
+                            <NotificationBell userId={user?.uid} />
                             <button
                                 onClick={handleButton}
-                                className="bg-pink-500 hover:bg-pink-600 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap w-full sm:w-auto"
+                                className="bg-pink-500 hover:bg-pink-600 text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-full transition-colors whitespace-nowrap shadow-sm"
                             >
                                 GET HELP
                             </button>
-
                             {user?.role === "student" && (
-                                <Link href="/student/dashboard" className="w-full sm:w-auto">
-                                    <button className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap w-full sm:w-auto">
+                                <Link href="/student/dashboard">
+                                    <button className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-full transition-colors whitespace-nowrap shadow-sm">
                                         Student Dashboard
                                     </button>
                                 </Link>
                             )}
-
                         </div>
                     </div>
                 </div>
@@ -870,27 +992,34 @@ export default function SellerAccountClient() {
 
                         {/* Stats Grid */}
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white rounded-xl p-6  shadow-sm">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="bg-blue-950 p-3 rounded-lg">
+                            <div className="bg-white rounded-xl p-4 shadow-sm overflow-hidden">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-blue-950 p-3 rounded-lg flex-shrink-0">
+                                        <TrendingUp size={18} className="text-white" />
                                     </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Total Earnings</p>
-                                        <p className="text-2xl font-bold text-blue-950">₦{totalEarnings.toLocaleString()}</p>
+                                    <div className="min-w-0">
+                                        <p className="text-sm text-gray-600 truncate">Total Earnings</p>
+                                        <p className="text-xl font-bold text-blue-950 truncate">
+                                            ₦{totalEarnings.toLocaleString()}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
-                            <div className="bg-white rounded-xl p-6 shadow-sm">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="bg-blue-950 p-3 rounded-lg">
+                            <div className="bg-white rounded-xl p-4 shadow-sm overflow-hidden">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-blue-950 p-3 rounded-lg flex-shrink-0">
+                                        <ShoppingBag size={18} className="text-white" />
                                     </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Documents Sold</p>
-                                        <p className="text-2xl font-bold text-blue-950">{booksSold}</p>
+                                    <div className="min-w-0">
+                                        <p className="text-sm text-gray-600 truncate">Documents Sold</p>
+                                        <p className="text-xl font-bold text-blue-950 truncate">
+                                            {booksSold}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        <VTUQuickAccess />
 
                         {/* Recent Transactions */}
                         <div className="bg-white rounded-xl shadow-sm p-6">
@@ -1754,7 +1883,7 @@ export default function SellerAccountClient() {
                             {!resetPinSuccess && resetPinView === 'forgot' && (
                                 <>
                                     <p className="text-sm text-gray-500 text-center mb-6">
-                                        We'll send a 6-digit reset code to verify your identity.
+                                        We'll send a 6-digit reset code to your email to verify your identity.
                                     </p>
                                     <button
                                         onClick={async () => {
@@ -1784,7 +1913,7 @@ export default function SellerAccountClient() {
                             {!resetPinSuccess && resetPinView === 'otp' && (
                                 <>
                                     <p className="text-sm text-gray-500 text-center mb-5">
-                                        Enter the 6-digit code sent to you and choose a new PIN.
+                                        Enter the 6-digit code sent to your email and choose a new PIN.
                                     </p>
                                     <input
                                         type="text"

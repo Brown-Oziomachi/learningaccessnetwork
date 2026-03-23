@@ -307,7 +307,7 @@ export default function AboutClient() {
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <Link
-                            href="/pdf"
+                            href="/documents"
                             className="bg-white text-blue-950 px-8 py-4 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
                         >
                             Browse Library

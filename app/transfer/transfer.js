@@ -387,10 +387,7 @@ export default function TransferClient() {
 
     // ── Verify PIN (Updated for Hashing) ──
     const handleVerifyPin = (enteredPin) => {
-        // Hash the entered pin to compare it with the stored hash
-        const enteredHash = SHA256(enteredPin).toString();
-
-        if (enteredHash === seller?.transferPin) {
+        if (enteredPin === seller?.transferPin) {
             setShowPinModal(false);
             if (pinAction) {
                 pinAction();
@@ -586,6 +583,7 @@ export default function TransferClient() {
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0 flex-1">
                                 <p className="font-bold text-white text-sm truncate">{sellerName}</p>
+                                <p className="text-blue-300 text-xs mt-0.5">LAN Wallet</p>
                                 <div className="flex items-center gap-2 mt-1">
                                     <span className="font-mono text-blue-200 text-xs tracking-wider">
                                         {formatAccountNumber(seller.accountNumber)}
@@ -610,10 +608,13 @@ export default function TransferClient() {
                     <div className="hidden lg:flex flex-col gap-6">
                         <div className="bg-blue-950 text-white rounded-2xl p-6 shadow-sm">
                             <p className="text-blue-300 text-xs font-semibold uppercase tracking-widest mb-4">Your LAN Account</p>
-                            <div className="bg-blue-900/50 rounded-xl px-4 py-3 border border-blue-700 mb-3">
+                            <div className="bg-blue-900/50 rounded-xl px-4 py-3 border border-blue-700 mb-1">
                                 <p className="text-xl font-bold text-white truncate">{sellerName}</p>
                             </div>
-                            <div className="flex items-center gap-2 bg-blue-900/50 rounded-xl px-4 py-3 border border-blue-700">
+                            <div className="bg-blue-900/50 rounded-xl px-4 py-3 border border-blue-700 mb-1">
+                                <p className="text-blue-300 text-xs mt-0.5">LAN Wallet</p>
+                            </div>
+                            <div className="flex items-center gap-2 bg-blue-900/50 rounded-xl px-4 py-3 border border-blue-700 mb-3">
                                 <span className="font-mono text-base font-bold text-white tracking-wider flex-1 truncate">
                                     {formatAccountNumber(seller.accountNumber)}
                                 </span>

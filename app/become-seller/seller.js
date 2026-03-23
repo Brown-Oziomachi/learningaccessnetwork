@@ -250,7 +250,7 @@ const handleSubmit = async () => {
         // Delay the redirect slightly so the user can actually see the success message
         setTimeout(() => {
             router.push('/my-account/seller-account');
-        }, 5000);
+        }, 10000);
         router.push('/my-account/seller-account');
 
     } catch (error) {
@@ -613,7 +613,7 @@ const handleSubmit = async () => {
                                     className="mt-1"
                                 />
                                 <label htmlFor="agreeToTerms" className="text-sm text-gray-700 cursor-pointer">
-                                    I agree to the Terms and Conditions and understand that: I will receive 80% of each sale amount, 20% commission goes to platform maintenance, minimum withdrawal amount is ₦1,000, and withdrawals are processed within 3-5 business days.
+                                    I agree to the Terms and Conditions and understand that: I will receive 80% of each sale amount, 20% commission goes to platform maintenance, minimum withdrawal amount is ₦1,000, and withdrawals are processed before 24 hours.
                                 </label>
                             </div>
                             {errors.agreeToTerms && (
@@ -651,11 +651,11 @@ const handleSubmit = async () => {
                 </div>
                 {/* Lecturer Info Popup */}
                 {showLecturerInfo && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/50 backdrop-blur-sm">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center pt-10 bg-black/50 backdrop-blur-sm overflow-y-auto">
                         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
                             {/* Header */}
                             <div className="bg-gradient-to-br from-blue-950 to-indigo-900 px-6 py-6 text-white text-center">
-                                <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-white/20">
+                                <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 mt-15 border border-white/20">
                                     <GraduationCap className="w-7 h-7 text-blue-200" />
                                 </div>
                                 <h3 className="text-xl font-bold">Why Select an Academic Title?</h3>

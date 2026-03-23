@@ -420,7 +420,7 @@ export default function LearningAccessNetwork() {
               alt="Books"
               className="w-full h-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-blue-950/95 via-blue-950/70 to-blue-950/70" />
+            <div className="absolute inset-0 bg-gradient-to-t from-blue-950/35 via-blue-950/70 to-blue-950/60" />
           </motion.div>
         </AnimatePresence>
 
@@ -431,12 +431,12 @@ export default function LearningAccessNetwork() {
           <h1 className="text-xl text-yellow-300 mb-1 font-bold">
             Share the wealth [of knowledge].
           </h1>
-          <p className="text-lg mb-4 leading-relaxed font-bold">Turn your books into income. Upload your work, reach a global audience [90M+], and earn whenever readers discover and purchase your content.
+          <p className="text-md mb-4 leading-relaxed font-bold">Turn your books into income. Upload your work, reach a global audience [90M+], and earn whenever readers discover and purchase your content.
           </p>
-          <p className="text-white text-lg mb-6 leading-relaxed">
+          <p className="text-white text-md mb-6 leading-relaxed">
             A secure marketplace where <span className="font-bold text-yellow-300">students and authors sell original works</span> and <span className="font-bold text-yellow-300">learners access course-specific knowledge</span> they need to excel.
           </p>
-          <div className="flex flex-col gap-3">
+          <div className="flex max-md:flex-col gap-3">
             <a href="/auth/signin" target="_blank"
               className="bg-white text-center text-blue-950 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
             >
@@ -444,9 +444,9 @@ export default function LearningAccessNetwork() {
             </a>
             <button
               onClick={() => setShowWhatIsLanModal(true)}
-              className="text-white font-bold underline"
+              className="cursor-pointer px-8 py-4 border-2 border-white text-white font-bold rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
             >
-              PLATFORM GUIDE →
+              Platform Guide
             </button>
           </div>
         </div>
@@ -470,7 +470,7 @@ export default function LearningAccessNetwork() {
               className="w-full h-full object-cover"
             />
             {/* Dark overlay for better text readability */}
-            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent"></div>
           </motion.div>
         </AnimatePresence>
 
@@ -573,7 +573,7 @@ export default function LearningAccessNetwork() {
                 alt="Students using LAN Library"
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-blue-950/95 via-blue-950/60 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-blue-950/95 via-blue-950/30 to-transparent" />
             </motion.div>
           </AnimatePresence>
 
@@ -599,6 +599,13 @@ export default function LearningAccessNetwork() {
                 <span><strong>Global Academic Reach:</strong> Browse thousands of verified resources from top academics worldwide.</span>
               </li>
             </ul>
+          <div className='mt-5'>
+            <a href="/auth/signin" target="_blank"
+              className=" px-8 py-4 text-blue-950 bg-white font-bold rounded-lg hover:bg-blue-900 transition-all shadow-lg"
+            >
+              Start Learning →
+            </a>
+          </div>
           </div>
         </div>
 
@@ -718,7 +725,7 @@ export default function LearningAccessNetwork() {
                 alt="Sellers earning on LAN Library"
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-green-900/95 via-green-900/60 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-green-900/95 via-green-900/30 to-transparent" />
             </motion.div>
           </AnimatePresence>
 
@@ -747,6 +754,13 @@ export default function LearningAccessNetwork() {
                 <span><strong>Seamless Selling:</strong> Upload once and reach 90M+ learners with automated payouts.</span>
               </li>
             </ul>
+            <div className='mt-5'>
+              <a href="/auth/signin" target="_blank"
+                className=" px-8 py-4 text-green-600 bg-white font-bold rounded-lg hover:bg-blue-900 transition-all shadow-lg"
+              >
+                Start Selling →
+              </a>
+            </div>
           </div>
         </div>
 
@@ -896,7 +910,7 @@ export default function LearningAccessNetwork() {
               href="/auth/signin"
               className="inline-block bg-white text-gray-900 font-bold lg:px-25 lg:text-2xl lg:py-6 px-5 py-3 rounded-full hover:bg-gray-100 transition-all shadow-lg"
             >
-              Open an account
+              Create account
             </a>
           </div>
 
@@ -1388,7 +1402,7 @@ export default function LearningAccessNetwork() {
               <div>
                 <h3 className="font-bold mb-4">Company</h3>
                 <ul className="space-y-2 text-blue-950">
-                  <li><button onClick={() => setShowWhatIsLanModal(true)} className="hover:text-white">Plateform guide</button></li>
+                  <li><button onClick={() => setShowWhatIsLanModal(true)} className="hover:text-white">Platform guide</button></li>
                   <li><Link href="/lan/privacy-policy" className="hover:text-white">Privacy Policy</Link></li>
                   <li><Link href="/lan/terms-of-service" className="hover:text-white">Terms of Service</Link></li>
                 </ul>
