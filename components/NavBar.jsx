@@ -43,12 +43,10 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import WhatIsLanModal from "./WhatIsLanModal";
 
 export default function Navbar() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [showWhatIsLanModal, setShowWhatIsLanModal] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [mobileSubmenu, setMobileSubmenu] = useState(null);
@@ -290,16 +288,7 @@ useEffect(() => {
 
   <div className="bg-gray-50 py-16">
     <div className="max-w-5xl mx-auto px-4 text-center">
-      <h2 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-6">
-        Share the wealth <span className="text-gray-700">[of knowledge]</span>.
-      </h2>
-
-      <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-12">
-        Turn your books into income. Upload your work, reach a global audience{" "}
-        <span className="font-medium text-gray-900">[90M+]</span>, and earn
-        whenever readers discover and purchase your content.
-      </p>
-
+     
       <div className="bg-white rounded-xl shadow-lg py-16 flex flex-col items-center justify-center">
         <div className="flex items-center gap-8 mb-8 text-gray-800">
           <Monitor size={64} strokeWidth={1.5} />
@@ -326,14 +315,6 @@ useEffect(() => {
             "Become a Seller"
           )}
         </button>
-
-        {/* Optional: Show seller status */}
-        {!checkingSeller && isSeller && (
-          <p className="text-sm text-green-600 mt-3 flex items-center gap-1">
-            <span className="w-2 h-2 bg-green-600 rounded-full"></span>
-            You're a verified seller
-          </p>
-        )}
       </div>
     </div>
   </div>;
@@ -528,12 +509,11 @@ useEffect(() => {
         <div className="hidden lg:block bg-gray-50 border-t border-gray-200 ">
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => setShowWhatIsLanModal(true)}
+              <a href="/docs" target="_blank"
                 className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 whitespace-nowrap"
               >
                 What is LAN Library?
-              </button>
+              </a>
 
               {/* Education Dropdown */}
               <div
@@ -992,15 +972,11 @@ useEffect(() => {
                 </Link>
 
                 <div className="border-t border-blue-950 my-4 pt-4">
-                  <button
-                    onClick={() => {
-                      setShowWhatIsLanModal(true);
-                      setShowMobileMenu(false);
-                    }}
+                  <a href="/docs" target="_blank"
                     className="text-sm font-semibold text-gray-500 mb-2 px-4"
                   >
                     What is LAN Library?
-                  </button>
+                  </a>
 
                   {Object.keys(menuCategories).map((key) => (
                     <button
@@ -1095,10 +1071,7 @@ useEffect(() => {
         }
       `}</style>
       {/* What is LAN Library Modal */}
-      <WhatIsLanModal
-        isOpen={showWhatIsLanModal}
-        onClose={() => setShowWhatIsLanModal(false)}
-      />
+     
     </>
   );
 }

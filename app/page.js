@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { auth, db } from '@/lib/firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
-import WhatIsLanModal from "@/components/WhatIsLanModal";
 
 export default function LearningAccessNetwork() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -21,7 +20,6 @@ export default function LearningAccessNetwork() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const currentYear = new Date().getFullYear();
-  const [showWhatIsLanModal, setShowWhatIsLanModal] = useState(false);
   const [featuredBooks, setFeaturedBooks] = useState([]);
   const [loadingBooks, setLoadingBooks] = useState(true);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
@@ -198,7 +196,7 @@ export default function LearningAccessNetwork() {
 
   if (loading) {
     return (
-      <div className="min-h-screen items-center justify-center flex flex-col space-y-1 bg-white">
+      <div className="min-h-screen items-center justify-center flex flex-col space-y-1 bg-white overflow-hidden">
         <h1 className="text-center justify-center items-center text-3xl lg:text-7xl md:text-5xl font-bold">
           <span className="text-white bg-blue-950 px-4 py-2 rounded">LAN</span>
           <span className="text-blue-950 ml-3">Library</span>
@@ -442,12 +440,11 @@ export default function LearningAccessNetwork() {
             >
               Browse Books
             </a>
-            <button
-              onClick={() => setShowWhatIsLanModal(true)}
+            <a href="/docs" target="_blank"
               className="cursor-pointer px-8 py-4 border-2 border-white text-white font-bold rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
             >
               Platform Guide
-            </button>
+            </a>
           </div>
         </div>
       </section>
@@ -503,12 +500,11 @@ export default function LearningAccessNetwork() {
                     Browse Books
                     <ArrowRight className="w-5 h-5" />
                   </a>
-                  <button
-                    onClick={() => setShowWhatIsLanModal(true)}
+                  <a href="/docs" target="_blank"
                     className="cursor-pointer px-8 py-4 border-2 border-white text-white font-bold rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
                   >
                     Platform Guide
-                  </button>
+                  </a>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -1003,6 +999,8 @@ export default function LearningAccessNetwork() {
               className="text-center mb-12"
             >
               <div className="inline-block mb-4">
+                <img src="lanlog.png" className='rounded-full w-30 h-30 mx-auto mb-5' />
+
                 <span className="bg-blue-950 text-white px-6 py-2 rounded-full text-sm font-bold uppercase tracking-wider">
                   Beyond Books
                 </span>
@@ -1118,20 +1116,7 @@ export default function LearningAccessNetwork() {
               transition={{ duration: 0.8, delay: 0.4 }}
               className="mt-12 text-center"
             >
-              <div className="bg-blue-950 text-white p-8 md:p-12 rounded-3xl shadow-2xl max-w-4xl mx-auto">
-                <h3 className="text-2xl md:text-4xl font-black mb-4">
-                  One Platform. Everything You Need. 🚀
-                </h3>
-                <p className="text-blue-100 text-lg md:text-xl mb-6 font-semibold">
-                  Study smarter, earn money, and manage your campus life—all from your phone
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                  <a href="/auth/signin" className="bg-white text-blue-950 px-8 py-4 rounded-full font-black text-lg hover:bg-blue-50 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105">
-                    Get Started Free
-                  </a>
-                  
-                </div>
-              </div>
+             
             </motion.div>
 
             {/* Trust Badges */}
@@ -1220,25 +1205,12 @@ export default function LearningAccessNetwork() {
               <h2 className="text-5xl md:text-6xl font-black text-gray-900 mb-6">
                 Over 10,000+ people love us. You will too.
               </h2>
-              <p className="text-2xl text-gray-600">Watch The Video And Learn More About Us.</p>
             </div>
 
             <div className="grid lg:grid-cols-3 gap-8">
               {/* Left Column */}
               <div className="space-y-8">
-                <div className="bg-white rounded-2xl p-8 shadow-lg">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Unimaginably Excellent</h3>
-                  <p className="text-gray-700 leading-relaxed mb-6">
-                    I could not imagine how great LAN Library works until I signed up with them. Honestly, this is my first time reviewing about any website but I must say that I'm happy to write how excellent this platform operates.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-yellow-500 rounded-full flex items-center justify-center text-white font-bold">
-                      K
-                    </div>
-                    <span className="font-semibold text-gray-900">Kevin</span>
-                  </div>
-                </div>
-
+               
                 <div className="bg-white rounded-2xl p-8 shadow-lg">
                   <h3 className="text-2xl font-bold text-gray-900 mb-4">Best in Class Support</h3>
                   <p className="text-gray-700 leading-relaxed mb-6">
@@ -1246,7 +1218,7 @@ export default function LearningAccessNetwork() {
                   </p>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold">
-                      T
+                      <img src="lanlog.png" className='rounded-full' />
                     </div>
                     <span className="font-semibold text-gray-900">Theresa</span>
                   </div>
@@ -1275,8 +1247,8 @@ export default function LearningAccessNetwork() {
 
                   {/* Name at Bottom */}
                   <div className="absolute bottom-8 left-8 flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-950 to-blue-950 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                      LAN
+                    <div className="w-12 h-12  rounded-full flex items-center justify-center text-white font-bold text-lg">
+                      <img src="lanlog.png"  className='rounded-full'/>
                     </div>
                     <span className="text-blue-950 font-bold text-xl">LAN Library</span>
                   </div>
@@ -1286,33 +1258,21 @@ export default function LearningAccessNetwork() {
               {/* Right Column */}
               <div className="space-y-8">
                 <div className="bg-white rounded-2xl p-8 shadow-lg">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Best exchange rates</h3>
-                  <p className="text-gray-700 leading-relaxed mb-6">
-                    The platform is intuitive, seamless and easy to use. It is also the platform with the best prices for buying books and materials.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold">
-                      B
-                    </div>
-                    <span className="font-semibold text-gray-900">Banji</span>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-2xl p-8 shadow-lg">
                   <h3 className="text-2xl font-bold text-gray-900 mb-4">Seamless for Purchases</h3>
                   <p className="text-gray-700 leading-relaxed mb-6">
                     LAN Library has been helping me since last year that I found it, I don't have to stress about finding books anymore as it comes quickly and very fast.
                   </p>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold">
-                      B
+                      <img src="lanlog.png" className='rounded-full' />
                     </div>
                     <span className="font-semibold text-gray-900">Blessing</span>
                   </div>
                 </div>
               </div>
+              <div> </div>
               <a href="/learn/make-money" target="_blank"
-                className="px-10 py-4 bg-white text-blue-950 font-black rounded-lg hover:bg-gray-100 transition-all shadow-xl text-lg mx-auto"
+                className="px-10 py-4 bg-white text-blue-950 font-black rounded-lg hover:bg-gray-100 text-center transition-all shadow-xl text-lg "
               >
                 Watch More Videos
               </a>
@@ -1362,7 +1322,6 @@ export default function LearningAccessNetwork() {
         {/* Footer */}
         <footer className="bg-white text-blue-950 py-12">
           <div className="max-w-7xl mx-auto px-4">
-            <div className="grid md:grid-cols-4 gap-8 mb-8">
               <Link href="/" className="flex items-center gap-2 flex-shrink-0">
                 <h1
                   className="text-4xl sm:text-6xl font-bold text-blue-950"
@@ -1377,7 +1336,7 @@ export default function LearningAccessNetwork() {
                   </h2>
                 </h1>
               </Link>
-
+            <div className="grid md:grid-cols-4 gap-8 mb-8 mt-10">
               <div>
                 <h3 className="font-bold mb-4">For Students</h3>
                 <ul className="space-y-2 text-blue-950">
@@ -1402,7 +1361,7 @@ export default function LearningAccessNetwork() {
               <div>
                 <h3 className="font-bold mb-4">Company</h3>
                 <ul className="space-y-2 text-blue-950">
-                  <li><button onClick={() => setShowWhatIsLanModal(true)} className="hover:text-white">Platform guide</button></li>
+                  <li><Link href="/docs" className="hover:text-white">Platform guide</Link></li>
                   <li><Link href="/lan/privacy-policy" className="hover:text-white">Privacy Policy</Link></li>
                   <li><Link href="/lan/terms-of-service" className="hover:text-white">Terms of Service</Link></li>
                 </ul>
@@ -1435,11 +1394,6 @@ export default function LearningAccessNetwork() {
             </div>
           </div>
         )}
-
-        <WhatIsLanModal
-          isOpen={showWhatIsLanModal}
-          onClose={() => setShowWhatIsLanModal(false)}
-        />
       </div>
     </div>
   );

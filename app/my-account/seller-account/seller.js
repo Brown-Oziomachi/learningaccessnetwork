@@ -1072,12 +1072,11 @@ export default function SellerAccountClient() {
                         </div>
                         <div className="flex items-center gap-3">
                             <NotificationBell userId={user?.uid} />
-                            <button
-                                onClick={handleButton}
+                            <a href="/docs"
                                 className="bg-pink-500 hover:bg-pink-600 text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-full transition-colors whitespace-nowrap shadow-sm"
                             >
                                 GET HELP
-                            </button>
+                            </a>
                             <button
                                 onClick={() => setShowSwitchModal(true)}
                                 className="flex flex-col gap-[5px] max-md:hidden justify-center items-center w-9 h-9 rounded-lg hover:bg-gray-100 transition-colors ml-10"
@@ -1219,7 +1218,7 @@ export default function SellerAccountClient() {
                                         <Book className="text-white" size={20} />
                                     </div>
                                     <div className="flex-1">
-                                        <p className="font-semibold text-blue-950">My documents</p>
+                                        <p className="font-semibold text-blue-950">My uploaded documents</p>
                                         <p className="text-xs text-gray-600">View uploaded documents</p>
                                     </div>
                                     <ChevronRight size={20} className="text-gray-400" />

@@ -266,36 +266,6 @@ export default function Footer() {
           {/* Customer Service */}
           <div>
             <h4 className="font-bold mb-4 text-lg">Customer Service</h4>
-            <ul className="space-y-3 mb-4">
-              <li>
-                <Link
-                  href="/my-account"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>My Account</span>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/my-books"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>My Books</span>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/saved-my-book"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>Saved Books</span>
-                </Link>
-              </li>
-            </ul>
-
             {/* Contact Info */}
             <div className="space-y-2 text-sm ">
               <div className="flex items-start gap-2">
@@ -313,7 +283,7 @@ export default function Footer() {
                   href="tel:+2341234567890"
                   className="hover:text-blue-950 transition-colors"
                 >
-                  +234 123 456 7890
+                  +234 8142 995 114
                 </a>
               </div>
               <div className="flex items-start gap-2">

@@ -89,11 +89,6 @@ export default function HelpArticlePage() {
       <header className="bg-blue-950 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <h1 className="text-xl md:text-2xl font-bold lg:text-3xl  ">
-                LAN <span className="text-blue-400">Library</span>
-              </h1>
-            </Link>
             <Link href="/lan/net/help-center" className="text-blue-400 hover:text-white transition-colors flex items-center gap-2">
               <ArrowLeft size={20} />
               Back to Help Center
@@ -196,14 +191,13 @@ export default function HelpArticlePage() {
             </div>
             <p className="text-sm text-gray-600 mt-4">
               Still need assistance?{' '}
-              <Link href="/contact" className="text-blue-950 hover:underline font-semibold">
+              <Link href="contact/lan/4/enqiry" className="text-blue-950 hover:underline font-semibold">
                 Contact our support team
               </Link>
             </p>
           </div>
         </article>
       </main>
-
       {/* Footer */}
       <footer className="bg-blue-950 text-white mt-16">
         <div className="max-w-7xl mx-auto px-4 py-12">

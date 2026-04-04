@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { fetchBookDetails } from "@/utils/bookUtils";
-import WhatIsLanModal from "./WhatIsLanModal";
 
 export default function BookPreviewPage() {
   const router = useRouter();
@@ -56,7 +55,6 @@ const bookId = rawBookId?.startsWith("firestore-")
   const [checkingSeller, setCheckingSeller] = useState(true);
   const [isSeller, setIsSeller] = useState(false);
   const [allBooks, setAllBooks] = useState([]);
-  const [showWhatIsLanModal, setShowWhatIsLanModal] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [bookSalesCount, setBookSalesCount] = useState({});
@@ -751,12 +749,11 @@ const submitFeedback = async () => {
 
               <div className="border-t border-blue-950 my-4"></div>
               <div className="mt-6">
-                <button
-                  onClick={() => setShowWhatIsLanModal(true)}
+                <a href="/docs" target="_blank" rel="noopener noreferrer"
                   className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 whitespace-nowrap z-50"
                 >
                   What is LAN Library?
-                </button>
+                </a>
 
                 <div className="space-y-1">
                   {categories.map((category, index) => (
@@ -1560,10 +1557,7 @@ const submitFeedback = async () => {
           animation: fadeIn 0.3s ease-out;
         }
       `}</style>
-      <WhatIsLanModal
-        isOpen={showWhatIsLanModal}
-        onClose={() => setShowWhatIsLanModal(false)}
-      />
+    
     </div>
   );
 }

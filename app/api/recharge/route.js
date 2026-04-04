@@ -3,14 +3,15 @@ import { NextResponse } from 'next/server';
 import https from 'https';
 import { getV3SecretKey } from '@/lib/flutterwaveToken';
 
-// ── Verified from your actual Flutterwave account ─────────────────────────────
-const BILLER_CODES = {
+// ── Network biller codes ──────────────────────────────────────────────────────
+const NETWORK_BILLER_CODES = {
     MTN: 'BIL108',
     AIRTEL: 'BIL110',
     GLO: 'BIL109',
     '9MOBILE': 'BIL111',
 };
 
+// ── Electricity billers ───────────────────────────────────────────────────────
 const ELECTRICITY_BILLERS = {
     IKEDC: { code: 'BIL113', name: 'Ikeja Electric' },
     EKEDC: { code: 'BIL112', name: 'Eko Electric' },
@@ -25,6 +26,7 @@ const ELECTRICITY_BILLERS = {
     YEDC: { code: 'BIL118', name: 'Yola Electric' },
 };
 
+// ── TV billers ────────────────────────────────────────────────────────────────
 const TV_BILLERS = {
     DSTV: { code: 'BIL121', name: 'DStv' },
     GOTV: { code: 'BIL122', name: 'GOtv' },
@@ -34,7 +36,9 @@ const TV_BILLERS = {
 const isTestMode = () =>
     process.env.FLUTTERWAVE_SECRET_KEY?.includes('FLWSECK_TEST') ?? false;
 
-function flwRequest(method, path, secretKey, bodyObj = null) {
+// ── Flutterwave request helper ────────────────────────────────────────────────
+function flwRequest(method, path, bodyObj = null) {
+    const secretKey = getV3SecretKey();
     return new Promise((resolve, reject) => {
         const bodyStr = bodyObj ? JSON.stringify(bodyObj) : null;
         const options = {
@@ -42,18 +46,21 @@ function flwRequest(method, path, secretKey, bodyObj = null) {
             path,
             method,
             headers: {
-                Authorization: 'Bearer ' + secretKey,
+                Authorization: `Bearer ${secretKey}`,
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
                 ...(bodyStr ? { 'Content-Length': Buffer.byteLength(bodyStr) } : {}),
             },
         };
         const req = https.request(options, (res) => {
-            let data = '';
-            res.on('data', (c) => (data += c));
+            let raw = '';
+            res.on('data', (chunk) => (raw += chunk));
             res.on('end', () => {
-                try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
-                catch { reject(new Error('Non-JSON response (' + res.statusCode + '): ' + data.slice(0, 300))); }
+                try {
+                    resolve({ status: res.statusCode, data: raw.trim() ? JSON.parse(raw) : {} });
+                } catch (err) {
+                    reject(new Error(`JSON parse failed (${res.statusCode}): ${raw.slice(0, 200)}`));
+                }
             });
         });
         req.on('error', reject);
@@ -62,28 +69,21 @@ function flwRequest(method, path, secretKey, bodyObj = null) {
     });
 }
 
-async function getFlutterwaveBalance(key) {
+// ── Get NGN wallet balance ────────────────────────────────────────────────────
+async function getFlutterwaveBalance() {
     try {
-        const { status, data } = await flwRequest('GET', '/v3/balances/NGN', key);
+        const { status, data } = await flwRequest('GET', '/v3/balances/NGN');
         if (status === 200 && data.status === 'success') return data.data?.available_balance ?? null;
         return null;
     } catch { return null; }
 }
 
-async function triggerBalanceAlert(baseUrl) {
-    try {
-        await fetch(`${baseUrl}/api/flutterwave-balance-alert`, { method: 'POST' });
-    } catch (e) {
-        console.error('[recharge] Balance alert trigger failed:', e.message);
-    }
-}
-
+// ── Fetch plans for a biller code ─────────────────────────────────────────────
 async function fetchBillCategories(billerCode) {
-    const key = getV3SecretKey();
     try {
         const path = `/v3/bill-categories?biller_code=${billerCode}`;
-        console.log('[recharge] GET', path);
-        const { status, data } = await flwRequest('GET', path, key);
+        console.log('[recharge] GET plans:', path);
+        const { status, data } = await flwRequest('GET', path);
 
         if (status !== 200 || data.status !== 'success') {
             return NextResponse.json({ error: data?.message || 'Failed to fetch plans' }, { status: 400 });
@@ -92,17 +92,16 @@ async function fetchBillCategories(billerCode) {
         const plans = (data.data || []).map((item) => ({
             id: String(item.id),
             name: item.biller_name || item.name,
-            size: item.biller_name || item.name,
-            duration: item.validity || 'Standard',
+            size: item.short_name || item.biller_name || item.name,
+            duration: 'Standard',
             price: Number(item.amount),
+            amount: Number(item.amount),
             item_code: item.item_code || String(item.id),
             biller_code: item.biller_code || billerCode,
         }));
 
-        console.log('[recharge] plans count:', plans.length, '| first:', plans[0]?.name);
         return NextResponse.json({ plans });
     } catch (err) {
-        console.error('[recharge] fetchBillCategories error:', err.message);
         return NextResponse.json({ error: err.message }, { status: 500 });
     }
 }
@@ -110,55 +109,74 @@ async function fetchBillCategories(billerCode) {
 // ── GET /api/recharge ─────────────────────────────────────────────────────────
 export async function GET(request) {
     const { searchParams } = new URL(request.url);
-    const network = searchParams.get('network')?.toUpperCase();
     const billType = searchParams.get('type');
-    const billerId = searchParams.get('biller')?.toUpperCase();
+    const billerCode = searchParams.get('biller_code');
+    const customer = searchParams.get('customer');
+    const itemCode = searchParams.get('item_code');
+    const billerParam = searchParams.get('biller')?.toUpperCase();
 
+    // 1. Fetch plans for a specific biller code (data, electricity, tv)
+    // GET /api/recharge?type=plans&biller_code=BIL108
+    if (billType === 'plans') {
+        if (!billerCode) return NextResponse.json({ error: 'Missing biller_code' }, { status: 400 });
+        if (isTestMode()) return NextResponse.json({ plans: [], mode: 'test' });
+        return fetchBillCategories(billerCode);
+    }
+
+    // 2. Electricity biller list
+    // GET /api/recharge?type=electricity
     if (billType === 'electricity') {
         return NextResponse.json({
             billers: Object.entries(ELECTRICITY_BILLERS).map(([id, v]) => ({ id, ...v })),
         });
     }
 
+    // 3. TV biller list
+    // GET /api/recharge?type=tv
     if (billType === 'tv') {
         return NextResponse.json({
             billers: Object.entries(TV_BILLERS).map(([id, v]) => ({ id, ...v })),
         });
     }
 
+    // 4. Electricity meter type plans
+    // GET /api/recharge?type=electricity-plans&biller=IKEDC
     if (billType === 'electricity-plans') {
-        if (!billerId) return NextResponse.json({ error: 'Missing biller param' }, { status: 400 });
-        const biller = ELECTRICITY_BILLERS[billerId];
-        if (!biller) return NextResponse.json({ error: 'Invalid electricity biller: ' + billerId }, { status: 400 });
+        if (!billerParam) return NextResponse.json({ error: 'Missing biller param' }, { status: 400 });
+        const biller = ELECTRICITY_BILLERS[billerParam];
+        if (!biller) return NextResponse.json({ error: 'Invalid electricity biller' }, { status: 400 });
         return fetchBillCategories(biller.code);
     }
 
+    // 5. TV subscription plans
+    // GET /api/recharge?type=tv-plans&biller=DSTV
     if (billType === 'tv-plans') {
-        if (!billerId) return NextResponse.json({ error: 'Missing biller param' }, { status: 400 });
-        const biller = TV_BILLERS[billerId];
-        if (!biller) return NextResponse.json({ error: 'Invalid TV biller: ' + billerId }, { status: 400 });
+        if (!billerParam) return NextResponse.json({ error: 'Missing biller param' }, { status: 400 });
+        const biller = TV_BILLERS[billerParam];
+        if (!biller) return NextResponse.json({ error: 'Invalid TV biller' }, { status: 400 });
         return fetchBillCategories(biller.code);
     }
 
-    if (billType === 'debug-mtn') {
-        const key = getV3SecretKey();
-        const { status, data } = await flwRequest('GET', '/v3/bill-categories?biller_code=BIL108', key);
-
-        if (status === 200) {
-            console.log("--- LIVE MTN DATA PLANS ---");
-            data.data.forEach(plan => {
-                console.log(`Name: ${plan.name} | Item Code: ${plan.item_code} | Amount: ${plan.amount}`);
-            });
-            return NextResponse.json({ message: "Check your server terminal for the list", plans: data.data });
+    // 6. Validate meter / smartcard number
+    // GET /api/recharge?type=verify&item_code=XX&biller_code=BILxxx&customer=12345
+    if (billType === 'verify') {
+        if (!customer || !billerCode || !itemCode) {
+            return NextResponse.json({ error: 'Missing required params: customer, biller_code, item_code' }, { status: 400 });
         }
-        return NextResponse.json({ error: "Could not fetch debug info" }, { status: 400 });
-    }
-
-    if (network) {
-        const billerCode = BILLER_CODES[network];
-        if (!billerCode) return NextResponse.json({ error: 'Invalid network' }, { status: 400 });
-        if (isTestMode()) return NextResponse.json({ plans: [], mode: 'test' });
-        return fetchBillCategories(billerCode);
+        try {
+            const path = `/v3/bills/validate?item_code=${itemCode}&biller_code=${billerCode}&customer=${customer}`;
+            const { status, data } = await flwRequest('GET', path);
+            if (status === 200 && data.status === 'success') {
+                return NextResponse.json({
+                    name: data.data?.name || null,
+                    address: data.data?.address || null,
+                    raw: data.data,
+                });
+            }
+            return NextResponse.json({ name: null, error: data?.message || 'Could not verify' });
+        } catch (err) {
+            return NextResponse.json({ name: null, error: err.message });
+        }
     }
 
     return NextResponse.json({ error: 'Invalid request parameters' }, { status: 400 });
@@ -170,24 +188,16 @@ export async function POST(request) {
         const body = await request.json();
         const { type, phone, amount, item_code, biller_code, meter_number, smartcard_number } = body;
 
-        const ref = 'LAN_' + type.toUpperCase() + '_' + Date.now() + '_' +
-            Math.random().toString(36).slice(2, 8).toUpperCase();
-
         if (isTestMode()) {
-            return NextResponse.json(
-                { error: 'Not supported in test mode. Switch to live keys.' },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: 'Not supported in test mode. Switch to live keys.' }, { status: 400 });
         }
 
-        const key = getV3SecretKey();
-        const flwBalance = await getFlutterwaveBalance(key);
+        const ref = `LAN_${type.toUpperCase()}_${Date.now()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
+        // Check wallet balance
+        const flwBalance = await getFlutterwaveBalance();
         if (flwBalance !== null && flwBalance < Number(amount)) {
-            return NextResponse.json(
-                { error: 'Service temporarily unavailable. Please try again shortly.' },
-                { status: 503 }
-            );
+            return NextResponse.json({ error: 'Service temporarily unavailable. Please try again shortly.' }, { status: 503 });
         }
 
         let payload;
@@ -198,36 +208,31 @@ export async function POST(request) {
                 country: 'NG',
                 customer: formattedPhone,
                 amount: Number(amount),
-                recurrence: 'ONCE',
                 type: 'AIRTIME',
                 reference: ref,
+                recurrence: 'ONCE',
+                biller_code,
             };
-            // Locate this block in your POST function
-            // Inside export async function POST(request) { ...
-            // ... inside your POST function
         } else if (type === 'data') {
             const formattedPhone = phone.startsWith('0') ? '+234' + phone.slice(1) : phone;
-
             payload = {
-                country: "NG",
+                country: 'NG',
                 customer: formattedPhone,
-                amount: Number(amount), // CRITICAL: Must be a Number, not a String
-                type: "MOBILEDATA",    // This is correct for Data
+                amount: Number(amount),
+                type: 'DATA_BUNDLE',
                 reference: ref,
-                recurrence: "ONCE",
-                // Swap these to ensure they are being sent as clean strings
-                biller_code: String(biller_code),
-                item_code: String(item_code)
+                recurrence: 'ONCE',
+                biller_code,
+                item_code,
             };
-        
         } else if (type === 'electricity') {
             payload = {
                 country: 'NG',
                 customer: meter_number,
                 amount: Number(amount),
-                recurrence: 'ONCE',
                 type: 'POWER',
                 reference: ref,
+                recurrence: 'ONCE',
                 biller_code,
                 item_code,
             };
@@ -236,9 +241,9 @@ export async function POST(request) {
                 country: 'NG',
                 customer: smartcard_number,
                 amount: Number(amount),
-                recurrence: 'ONCE',
                 type: 'CABLETV',
                 reference: ref,
+                recurrence: 'ONCE',
                 biller_code,
                 item_code,
             };
@@ -247,7 +252,7 @@ export async function POST(request) {
         }
 
         console.log('[recharge] POST payload:', JSON.stringify(payload));
-        const { status, data } = await flwRequest('POST', '/v3/bills', key, payload);
+        const { status, data } = await flwRequest('POST', '/v3/bills', payload);
         console.log('[recharge] POST response:', JSON.stringify(data).slice(0, 400));
 
         if (status !== 200 || data.status !== 'success') {
@@ -259,8 +264,8 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Delivery failed. Your wallet has not been debited.' }, { status: 400 });
         }
 
-        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://yourdomain.com';
-        triggerBalanceAlert(baseUrl);
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
+        if (baseUrl) fetch(`${baseUrl}/api/flutterwave-balance-alert`, { method: 'POST' }).catch(() => { });
 
         return NextResponse.json({ ref, data });
 

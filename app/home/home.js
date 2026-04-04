@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Monitor, Upload, ChevronLeft, ShoppingBag, Smartphone, Globe, ArrowRight, ChevronRight, BookOpen } from 'lucide-react';
 import Link from 'next/link';
-import Navbar from '@/components/NavBar';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
@@ -11,6 +10,7 @@ import HomeLoading from './loading';
 import MobileCategoriesCarousel from '@/components/MobileCategoriesCarousel';
 import InstitutionalLibraryPage from '@/components/InstitutionalLib';
 import Footer from '@/components/FooterComp';
+import Navbar from '@/components/NavBar';
 
 const documentTypes = [
     { name: 'Textbook', slug: 'textbook', image: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400', description: 'Standard educational books' },
