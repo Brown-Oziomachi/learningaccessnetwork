@@ -524,6 +524,7 @@ export default function RechargeClient() {
         amount: selectedPlan.price,
         item_code: selectedPlan.item_code,
         biller_code: selectedPlan.biller_code,
+        bundle_name: selectedPlan.name,   // ← add this line
       };
     }
     if (tab === "electricity") {

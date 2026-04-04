@@ -186,7 +186,18 @@ export async function GET(request) {
 export async function POST(request) {
     try {
         const body = await request.json();
-        const { type, phone, amount, item_code, biller_code, meter_number, smartcard_number } = body;
+
+        // ── Destructure all fields including bundle_name ──────────────────────
+        const {
+            type,
+            phone,
+            amount,
+            item_code,
+            biller_code,
+            bundle_name,        // <-- exact `name` from bill categories API
+            meter_number,
+            smartcard_number,
+        } = body;
 
         if (isTestMode()) {
             return NextResponse.json({ error: 'Not supported in test mode. Switch to live keys.' }, { status: 400 });
@@ -214,12 +225,16 @@ export async function POST(request) {
                 biller_code,
             };
         } else if (type === 'data') {
+            // ── Guard: bundle_name is required for data purchases ─────────────
+            if (!bundle_name) {
+                return NextResponse.json({ error: 'Missing bundle_name. Pass the exact plan name from the bill categories API.' }, { status: 400 });
+            }
             const formattedPhone = phone.startsWith('0') ? '+234' + phone.slice(1) : phone;
             payload = {
                 country: 'NG',
                 customer: formattedPhone,
                 amount: Number(amount),
-                type: 'DATA_BUNDLE',
+                type: bundle_name,  // exact `name` from bill categories, e.g. "MTN 1.5 GB DATA BUNDLE"
                 reference: ref,
                 recurrence: 'ONCE',
                 biller_code,

@@ -3,7 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, BookOpen, ChevronRight, Search, X, GraduationCap, BookMarked, CheckCircle2, UserPlus, UserCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { collection, getDocs, query, where, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import {
+    collection, getDocs, query, where, deleteDoc,
+    setDoc, doc, updateDoc, increment, serverTimestamp
+} from 'firebase/firestore';
 import { auth, db } from "@/lib/firebaseConfig";
 import Navbar from '@/components/NavBar';
 import Footer from '@/components/FooterComp';
@@ -37,31 +40,41 @@ export default function LecturersClient() {
         setFollowingIds(ids);
     };
 
-    const handleFollow = async (e, lecturerId) => {
-        e.preventDefault(); // Prevent navigation
+    const handleFollow = async (e, lecturerId, lecturerName) => {
+        e.preventDefault();
         if (!user) return;
+
+        // Deterministic ID = always findable for unfollow
+        const followId = `${user.uid}_${lecturerId}`;
+        const followRef = doc(db, "follows", followId);
+        const sellerRef = doc(db, "sellers", lecturerId);
 
         try {
             if (followingIds.has(lecturerId)) {
-                // Unfollow logic
-                const q = query(collection(db, "follows"),
-                    where("followerId", "==", user.uid),
-                    where("lecturerId", "==", lecturerId));
-                const snap = await getDocs(q);
-                await deleteDoc(snap.docs[0].ref);
+                // Unfollow
+                await deleteDoc(followRef);
+                try {
+                    await updateDoc(sellerRef, { followersCount: increment(-1) });
+                } catch (e) { console.log("Seller doc not found for decrement"); }
                 followingIds.delete(lecturerId);
             } else {
-                // Follow logic
-                await addDoc(collection(db, "follows"), {
+                // Follow
+                await setDoc(followRef, {
                     followerId: user.uid,
                     lecturerId: lecturerId,
+                    lecturerName: lecturerName || '',
                     createdAt: serverTimestamp()
                 });
+                try {
+                    await updateDoc(sellerRef, { followersCount: increment(1) });
+                } catch (e) {
+                    await setDoc(sellerRef, { followersCount: 1 }, { merge: true });
+                }
                 followingIds.add(lecturerId);
             }
             setFollowingIds(new Set(followingIds));
         } catch (err) {
-            console.error(err);
+            console.error("Follow error:", err);
         }
     };
 
@@ -182,7 +195,7 @@ export default function LecturersClient() {
                                         {lecturer.sellerName.charAt(0)}
                                     </div>
                                     <button
-                                        onClick={(e) => handleFollow(e, lecturer.sellerId)}
+                                        onClick={(e) => handleFollow(e, lecturer.sellerId, lecturer.sellerName)}
                                         className={`p-3 rounded-xl transition-all ${followingIds.has(lecturer.sellerId) ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600'}`}
                                     >
                                         {followingIds.has(lecturer.sellerId) ? <UserCheck size={22} /> : <UserPlus size={22} />}

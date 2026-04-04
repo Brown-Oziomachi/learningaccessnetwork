@@ -420,7 +420,7 @@ export default function LANDocsClient() {
                         <span>Search...</span>
                         <span className="ml-auto text-[10px] bg-white/[0.07] rounded px-1.5 py-0.5 font-mono">Ctrl K</span>
                     </button>
-                    <a href="#" className="text-[13px] font-medium text-white bg-white/[0.08] border border-white/[0.12] rounded-lg px-3 py-1.5 whitespace-nowrap hover:bg-white/[0.13] transition-colors no-underline">
+                    <a href="#" className="text-[13px] font-medium text-white bg-white/[0.08] border border-white/[0.12] max-md:hidden rounded-lg px-3 py-1.5 whitespace-nowrap hover:bg-white/[0.13] transition-colors no-underline">
                         LAN Platform <span className="text-[#606080]">›</span>
                     </a>
                     {/* Mobile search icon */}
