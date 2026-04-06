@@ -9,7 +9,7 @@ import {
   DollarSign, Users, BookOpen, ChevronRight, Send, RefreshCw, BarChart3,
   Settings, Flag, XCircle, AlertTriangle, UserX, Lock, ExternalLink,
   Download, Book, Phone, MapPin, CreditCard, Building,
-  Clock, ThumbsUp
+  Clock, ThumbsUp, Smartphone
 } from 'lucide-react';
 import { BookApprovalModal, ReplyModal, TransactionModal, UserModal } from '@/components/ApprovalModal';
 import FlwBalanceWidget from '@/components/admin/FlwBalanceWidget';
@@ -181,6 +181,10 @@ export default function ComprehensiveAdminPanel() {
   const [skipConfirm, setSkipConfirm] = useState(false);
   const [withdrawalSuccessData, setWithdrawalSuccessData] = useState(null);
   const [confirmedWithdrawal, setConfirmedWithdrawal] = useState(null);
+  const [articleFeedbacks, setArticleFeedbacks] = useState([]);
+  const [selectedSeller, setSelectedSeller] = useState(null);
+  const [sellerDetails, setSellerDetails] = useState(null);
+  const [loadingSellerDetails, setLoadingSellerDetails] = useState(false);
   const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
 
   useEffect(() => {
@@ -253,15 +257,53 @@ const checkAdminStatus = async (currentUser) => {
         fetchBookReports(),
         fetchTransactions(),
         fetchUsers(),
-        fetchWithdrawals(), 
-        fetchSchoolApplications(), 
+        fetchWithdrawals(),
+        fetchSchoolApplications(),
         fetchSchoolDocuments(),
         fetchFeedbacks(),
+        fetchArticleFeedbacks(), // ← ADD THIS
       ]);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSellerFullDetails = async (sellerId) => {
+    setLoadingSellerDetails(true);
+    try {
+      const [sellerDoc, salesSnap, transfersSnap, withdrawalsSnap, rechargesSnap] = await Promise.all([
+        getDoc(doc(db, 'sellers', sellerId)),
+        getDocs(query(collection(db, 'transactions'), where('sellerId', '==', sellerId), orderBy('createdAt', 'desc'))),
+        getDocs(query(collection(db, 'transfers'), where('senderId', '==', sellerId), orderBy('createdAt', 'desc'))),
+        getDocs(query(collection(db, 'withdrawals'), where('sellerId', '==', sellerId), orderBy('requestedAt', 'desc'))),
+        getDocs(query(collection(db, 'recharges'), where('sellerId', '==', sellerId), orderBy('createdAt', 'desc'))),
+      ]);
+
+      const seller = sellerDoc.exists() ? { id: sellerDoc.id, ...sellerDoc.data() } : null;
+      const sales = salesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const transfers = transfersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const sellerWithdrawals = withdrawalsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const recharges = rechargesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const totalEarned = sales.reduce((sum, s) => sum + (s.sellerEarnings || s.amount || 0), 0);
+      const totalTransferred = transfers.reduce((sum, t) => sum + (t.totalDeducted || t.amount || 0), 0);
+      const totalWithdrawn = sellerWithdrawals.filter(w => w.status === 'completed').reduce((sum, w) => sum + (w.amount || 0), 0);
+      const totalSpentOnRecharges = recharges.reduce((sum, r) => sum + (r.amount || 0), 0);
+
+      setSellerDetails({
+        seller,
+        sales,
+        transfers,
+        withdrawals: sellerWithdrawals,
+        recharges,
+        stats: { totalEarned, totalTransferred, totalWithdrawn, totalSpentOnRecharges }
+      });
+    } catch (err) {
+      console.error('Error fetching seller details:', err);
+    } finally {
+      setLoadingSellerDetails(false);
     }
   };
 
@@ -483,6 +525,28 @@ const updateSchoolDocumentStatus = async (docId, status) => {
         reviewedAt: serverTimestamp(),
         reviewedBy: user.email
       });
+
+      if (status === 'approved' && (ad.pdfUrl || ad.pdfLink)) {
+        fetch('/api/book-embed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bookId: id,
+            pdfUrl: ad.pdfUrl || ad.pdfLink,
+            sellerId: ad.userId || ad.sellerId,
+            title: ad.bookTitle || ad.title,
+          }),
+        })
+          .then(r => r.json())
+          .then(result => {
+            if (result.success) {
+              console.log(`✅ AI embedding done: ${result.chunks} chunks for "${ad.bookTitle}"`);
+            } else {
+              console.warn('⚠️ AI embedding failed (book still approved):', result.error);
+            }
+          })
+          .catch(err => console.warn('⚠️ AI embedding error (book still approved):', err.message));
+      }
 
       // 2. If approved, notify all followers
       if (status === 'approved') {
@@ -730,6 +794,20 @@ const updateSchoolDocumentStatus = async (docId, status) => {
   }
 };
 
+const fetchArticleFeedbacks = async () => {
+  try {
+    const q = query(collection(db, 'articleFeedback'), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    setArticleFeedbacks(snapshot.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      createdAt: d.data().createdAt?.toDate() || new Date()
+    })));
+  } catch (error) {
+    console.error('Error fetching article feedbacks:', error);
+  }
+  };
+  
 const deleteFeedback = async (feedbackId) => {
   if (!confirm('Are you sure you want to delete this feedback? This action cannot be undone.')) return;
   
@@ -949,7 +1027,8 @@ const deleteFeedback = async (feedbackId) => {
             { id: 'users', icon: Users, label: 'Users' },
             { id: 'schools', icon: Building, label: 'Schools', badge: stats.pendingSchools },
             { id: 'school-documents', icon: FileText, label: 'School Docs', badge: stats.pendingSchoolDocs },
-            { id: 'feedbacks', icon: ThumbsUp, label: 'Feedbacks', badge: feedbacks.length },
+            { id: 'feedbacks', icon: ThumbsUp, label: 'Book Feedback', badge: feedbacks.length },
+            { id: 'article-feedbacks', icon: MessageSquare, label: 'Help Feedback', badge: articleFeedbacks.filter(f => !f.helpful).length },
             { id: 'settings', icon: Settings, label: 'Settings' }
 
           ].map(({ id, icon: Icon, label, badge }) => (
@@ -1580,7 +1659,131 @@ const deleteFeedback = async (feedbackId) => {
           </div>
         ))}
       </div>
-    )}
+            )}
+            
+            {activeSection === 'article-feedbacks' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <h2 className="text-2xl font-bold text-white">Help Center Article Feedbacks</h2>
+                  <div className="flex gap-3">
+                    <div className="bg-green-500 text-white text-sm px-4 py-2 rounded-lg font-semibold flex items-center gap-2">
+                      <ThumbsUp className="w-4 h-4" /> {articleFeedbacks.filter(f => f.helpful).length} Helpful
+                    </div>
+                    <div className="bg-red-500 text-white text-sm px-4 py-2 rounded-lg font-semibold flex items-center gap-2">
+                      <X className="w-4 h-4" /> {articleFeedbacks.filter(f => !f.helpful).length} Not Helpful
+                    </div>
+                  </div>
+                </div>
+
+                {/* Most problematic articles */}
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-500" /> Most Unhelpful Articles
+                  </h3>
+                  <div className="space-y-3">
+                    {Object.entries(
+                      articleFeedbacks
+                        .filter(f => !f.helpful)
+                        .reduce((acc, f) => {
+                          const key = f.slug || 'unknown';
+                          if (!acc[key]) acc[key] = { title: f.title, slug: f.slug, category: f.category, count: 0, comments: [] };
+                          acc[key].count++;
+                          if (f.comment) acc[key].comments.push(f.comment);
+                          return acc;
+                        }, {})
+                    )
+                      .sort((a, b) => b[1].count - a[1].count)
+                      .slice(0, 5)
+                      .map(([slug, data]) => (
+                        <div key={slug} className="p-4 bg-red-50 border border-red-100 rounded-xl">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <p className="font-semibold text-gray-900 text-sm">{data.title || slug}</p>
+                              <p className="text-xs text-blue-600">{data.category} · /{slug}</p>
+                            </div>
+                            <span className="bg-red-100 text-red-800 text-sm font-bold px-3 py-1 rounded-full">
+                              {data.count} negative
+                            </span>
+                          </div>
+                          {data.comments.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {data.comments.slice(0, 2).map((c, i) => (
+                                <p key={i} className="text-xs text-gray-600 bg-white rounded-lg px-3 py-2 border border-red-100">
+                                  "{c}"
+                                </p>
+                              ))}
+                              {data.comments.length > 2 && (
+                                <p className="text-xs text-gray-400">+{data.comments.length - 2} more comments</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    {articleFeedbacks.filter(f => !f.helpful).length === 0 && (
+                      <p className="text-gray-400 text-sm text-center py-6">No negative feedback yet 🎉</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* All article feedbacks */}
+                {articleFeedbacks.length === 0 ? (
+                  <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                    <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">No Article Feedbacks Yet</h3>
+                    <p className="text-gray-600">Feedbacks from help center articles will appear here</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {articleFeedbacks.map((fb) => (
+                      <div key={fb.id} className={`bg-white rounded-lg shadow-sm p-5 border-l-4 ${fb.helpful ? 'border-green-500' : 'border-red-500'}`}>
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1 mr-3">
+                            <p className="font-bold text-gray-900 text-sm">{fb.title || 'Unknown Article'}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">/{fb.slug}</p>
+                            <span className="inline-block mt-1 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                              {fb.category || 'Uncategorized'}
+                            </span>
+                          </div>
+                          <span className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold ${fb.helpful ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {fb.helpful ? '👍 Helpful' : '👎 Not helpful'}
+                          </span>
+                        </div>
+
+                        {fb.comment && (
+                          <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 mb-3">
+                            <p className="text-xs text-gray-500 font-semibold mb-1">User comment:</p>
+                            <p className="text-sm text-gray-700">"{fb.comment}"</p>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-gray-400">
+                            {fb.createdAt instanceof Date
+                              ? fb.createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                              : 'Unknown date'}
+                          </p>
+                          <button
+                            onClick={async () => {
+                              if (!confirm('Delete this feedback?')) return;
+                              try {
+                                await deleteDoc(doc(db, 'articleFeedback', fb.id));
+                                setArticleFeedbacks(prev => prev.filter(f => f.id !== fb.id));
+                              } catch (err) {
+                                alert('Failed to delete: ' + err.message);
+                              }
+                            }}
+                            className="text-red-400 hover:text-red-600 transition-colors p-1"
+                            title="Delete feedback"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
   </div>
 )}
 
@@ -1715,6 +1918,16 @@ const deleteFeedback = async (feedbackId) => {
                       </div>
                     </div>
 
+                    <button
+                      onClick={() => {
+                        setSelectedSeller(withdrawal.sellerId);
+                        fetchSellerFullDetails(withdrawal.sellerId);
+                      }}
+                      className="w-full mb-3 py-2.5 border-2 border-blue-950 text-blue-950 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 text-sm"
+                    >
+                      <Eye className="w-4 h-4" /> View Full Seller Account
+                    </button>
+                    
                     {/* Action Buttons for Pending */}
                     {withdrawal.status === 'pending' && (
                       <div className="space-y-2">
@@ -2031,6 +2244,174 @@ const deleteFeedback = async (feedbackId) => {
               >
                 Done
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Seller Full Details Modal */}
+      {selectedSeller && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-blue-950 px-6 py-5 flex items-center justify-between sticky top-0 z-10">
+              <div>
+                <h3 className="text-white font-bold text-lg">Full Seller Account</h3>
+                <p className="text-blue-300 text-xs mt-0.5">Complete financial overview</p>
+              </div>
+              <button onClick={() => { setSelectedSeller(null); setSellerDetails(null); }}
+                className="p-2 hover:bg-blue-800 rounded-xl transition-colors">
+                <X className="w-5 h-5 text-blue-300" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {loadingSellerDetails ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="animate-spin h-10 w-10 border-b-2 border-blue-950 rounded-full" />
+                </div>
+              ) : sellerDetails ? (
+                <>
+                  {/* Seller Profile */}
+                  <div className="bg-gray-50 rounded-2xl p-5">
+                    <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                      <User className="w-4 h-4" /> Seller Profile
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-gray-500 text-xs">Business Name</p>
+                        <p className="font-semibold text-gray-900">{sellerDetails.seller?.businessInfo?.businessName || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs">Account Name</p>
+                        <p className="font-semibold text-gray-900">{sellerDetails.seller?.bankDetails?.accountName || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs">Current Wallet Balance</p>
+                        <p className="font-bold text-green-600 text-lg">₦{(sellerDetails.seller?.accountBalance || 0).toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs">Total Ever Withdrawn</p>
+                        <p className="font-bold text-red-500 text-lg">₦{sellerDetails.stats.totalWithdrawn.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs">Transfer PIN Set</p>
+                        <p className="font-semibold text-gray-900">{sellerDetails.seller?.transferPin ? '✅ Yes' : '❌ No'}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs">Joined</p>
+                        <p className="font-semibold text-gray-900">{formatDate(sellerDetails.seller?.createdAt)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Financial Summary */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      { label: 'Total Earned (Sales)', value: `₦${sellerDetails.stats.totalEarned.toLocaleString()}`, color: 'green' },
+                      { label: 'Total Withdrawn', value: `₦${sellerDetails.stats.totalWithdrawn.toLocaleString()}`, color: 'red' },
+                      { label: 'Sent via Transfers', value: `₦${sellerDetails.stats.totalTransferred.toLocaleString()}`, color: 'blue' },
+                      { label: 'Spent on Recharges', value: `₦${sellerDetails.stats.totalSpentOnRecharges.toLocaleString()}`, color: 'orange' },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} className={`bg-${color}-50 border border-${color}-200 rounded-xl p-3 text-center`}>
+                        <p className={`text-${color}-600 text-xs font-semibold mb-1`}>{label}</p>
+                        <p className={`text-${color}-900 font-bold text-sm`}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Recent Sales */}
+                  <div>
+                    <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-green-600" /> Sales ({sellerDetails.sales.length})
+                    </h4>
+                    {sellerDetails.sales.length === 0 ? (
+                      <p className="text-gray-400 text-sm text-center py-4 bg-gray-50 rounded-xl">No sales yet</p>
+                    ) : (
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {sellerDetails.sales.map(sale => (
+                          <div key={sale.id} className="flex justify-between items-center p-3 bg-green-50 rounded-lg text-sm">
+                            <div>
+                              <p className="font-semibold text-gray-900">{sale.bookTitle || 'Unknown'}</p>
+                              <p className="text-xs text-gray-500">{formatDate(sale.createdAt)}</p>
+                            </div>
+                            <p className="font-bold text-green-600">+₦{(sale.sellerEarnings || sale.amount || 0).toLocaleString()}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Transfers Sent */}
+                  <div>
+                    <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                      <Send className="w-4 h-4 text-blue-600" /> Transfers Sent ({sellerDetails.transfers.length})
+                    </h4>
+                    {sellerDetails.transfers.length === 0 ? (
+                      <p className="text-gray-400 text-sm text-center py-4 bg-gray-50 rounded-xl">No transfers sent</p>
+                    ) : (
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {sellerDetails.transfers.map(tx => (
+                          <div key={tx.id} className="flex justify-between items-center p-3 bg-blue-50 rounded-lg text-sm">
+                            <div>
+                              <p className="font-semibold text-gray-900">To: {tx.recipientName || 'Unknown'}</p>
+                              <p className="text-xs text-gray-500">{formatDate(tx.createdAt)}</p>
+                            </div>
+                            <p className="font-bold text-blue-600">-₦{(tx.totalDeducted || tx.amount || 0).toLocaleString()}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Withdrawal History */}
+                  <div>
+                    <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                      <Download className="w-4 h-4 text-red-600" /> Withdrawal History ({sellerDetails.withdrawals.length})
+                    </h4>
+                    {sellerDetails.withdrawals.length === 0 ? (
+                      <p className="text-gray-400 text-sm text-center py-4 bg-gray-50 rounded-xl">No withdrawals yet</p>
+                    ) : (
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {sellerDetails.withdrawals.map(w => (
+                          <div key={w.id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg text-sm">
+                            <div>
+                              <p className="font-semibold text-gray-900">₦{(w.amount || 0).toLocaleString()}</p>
+                              <p className="text-xs text-gray-500">{formatDate(w.requestedAt)}</p>
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(w.status)}`}>
+                              {w.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Recharge History */}
+                  <div>
+                    <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                      <Smartphone className="w-4 h-4 text-purple-600" /> Recharge History ({sellerDetails.recharges.length})
+                    </h4>
+                    {sellerDetails.recharges.length === 0 ? (
+                      <p className="text-gray-400 text-sm text-center py-4 bg-gray-50 rounded-xl">No recharges yet</p>
+                    ) : (
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {sellerDetails.recharges.map(r => (
+                          <div key={r.id} className="flex justify-between items-center p-3 bg-purple-50 rounded-lg text-sm">
+                            <div>
+                              <p className="font-semibold text-gray-900 capitalize">{r.type} — {r.phone || r.meterNumber || r.smartcardNumber || '—'}</p>
+                              <p className="text-xs text-gray-500">{r.network || r.plan?.name || ''} · {formatDate(r.createdAt)}</p>
+                            </div>
+                            <p className="font-bold text-purple-600">-₦{(r.amount || 0).toLocaleString()}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-center text-gray-500 py-8">Could not load seller details.</p>
+              )}
             </div>
           </div>
         </div>

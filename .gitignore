@@ -24,6 +24,8 @@ dist/
 *.mov
 *.avi
 *.mkv
+service-account.json
+fix-key.js
 *.zip
 *.tar.gz
 *.pdf

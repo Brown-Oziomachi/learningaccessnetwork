@@ -268,6 +268,32 @@ function SuccessScreen({ type, network, phone, amount, plan, txRef, paymentMetho
   );
 }
 
+// ── Detect network from phone number ──────────────────────────────────────────
+function detectNetwork(phone) {
+  const clean = phone.replace(/\D/g, '');
+  const prefix = clean.substring(0, 4);
+
+  const prefixMap = {
+    // MTN
+    '0803': 'MTN', '0806': 'MTN', '0703': 'MTN', '0706': 'MTN',
+    '0813': 'MTN', '0816': 'MTN', '0810': 'MTN', '0814': 'MTN',
+    '0903': 'MTN', '0906': 'MTN', '0913': 'MTN', '0916': 'MTN',
+    // Airtel
+    '0802': 'AIRTEL', '0808': 'AIRTEL', '0708': 'AIRTEL',
+    '0812': 'AIRTEL', '0701': 'AIRTEL', '0902': 'AIRTEL',
+    '0901': 'AIRTEL', '0904': 'AIRTEL', '0907': 'AIRTEL',
+    '0912': 'AIRTEL',
+    // Glo
+    '0805': 'GLO', '0807': 'GLO', '0705': 'GLO', '0815': 'GLO',
+    '0811': 'GLO', '0905': 'GLO', '0915': 'GLO',
+    // 9Mobile
+    '0809': '9MOBILE', '0818': '9MOBILE', '0817': '9MOBILE',
+    '0909': '9MOBILE', '0908': '9MOBILE',
+  };
+
+  return prefixMap[prefix] || null;
+}
+
 // ─── MAIN RECHARGE CLIENT ─────────────────────────────────────────────────────
 export default function RechargeClient() {
   const searchParams = useSearchParams();
@@ -429,8 +455,7 @@ export default function RechargeClient() {
     setVerifying(true);
     setVerifiedName("");
     const timeoutId = setTimeout(() => {
-      fetch(`/api/recharge?type=verify&customer=${customerId}&item_code=${selectedPlanObj.item_code}&biller_code=${selectedPlanObj.biller_code}`)
-        .then((r) => r.json())
+      fetch(`/api/recharge?type=verify&item_code=${selectedPlanObj.item_code}&biller_code=${selectedPlanObj.biller_code}&customer=${customerId}`)        .then((r) => r.json())
         .then((res) => { setVerifiedName(res.name || "Verification failed"); })
         .catch(() => setVerifiedName("Error verifying name"))
         .finally(() => setVerifying(false));
@@ -494,9 +519,9 @@ export default function RechargeClient() {
         selectedNetwork &&
         phone &&
         phone.length >= 11 &&
-        finalAmount > 0 &&
-        airtimePlans.length > 0
+        finalAmount > 0
       );
+    
     if (tab === "data")
       return !!(selectedNetwork && phone && phone.length >= 11 && selectedPlan);
     if (tab === "electricity")
@@ -897,7 +922,20 @@ export default function RechargeClient() {
                           inputMode="numeric"
                           placeholder="08012345678"
                           value={phone}
-                          onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, "").slice(0, 11);
+                            setPhone(val);
+
+                            // Auto-detect network when 4+ digits entered
+                            if (val.length >= 4) {
+                              const detected = detectNetwork(val);
+                              if (detected && detected !== selectedNetwork) {
+                                setSelectedNetwork(detected);
+                                setSelectedPlan(null);
+                                setAirtimePlans([]);
+                              }
+                            }
+                          }}
                           className="w-full border text-black border-gray-200 rounded-xl px-4 py-3 font-mono text-base focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
                         />
                         {phone.length > 0 && phone.length < 11 && (
@@ -905,8 +943,32 @@ export default function RechargeClient() {
                             <AlertCircle size={11} /> {11 - phone.length} digit{11 - phone.length !== 1 ? "s" : ""} remaining
                           </p>
                         )}
+                        {/* Wrong network warning */}
+                        {phone.length === 11 && selectedNetwork && detectNetwork(phone) && detectNetwork(phone) !== selectedNetwork && (
+                          <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2">
+                            <AlertCircle size={14} className="text-amber-600 shrink-0" />
+                            <p className="text-xs text-amber-700">
+                              <p className="text-sm text-gray-600">
+                                This is
+                                <span className="font-bold text-blue-600">
+                                  {" "}{NETWORKS.find(n => n.id === detectNetwork(phone))?.name || "unknown"} number
+                                </span>.
+                              </p>                              <button
+                                onClick={() => {
+                                  setSelectedNetwork(detectNetwork(phone));
+                                  setSelectedPlan(null);
+                                  setAirtimePlans([]);
+                                }}
+                                className="ml-1 underline font-bold text-amber-800"
+                              >
+                                Switch now
+                              </button>
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
+
 
                     {/* Airtime Amount */}
                     {tab === "airtime" && (
@@ -1167,8 +1229,21 @@ export default function RechargeClient() {
                     )}
 
                     <button
-                      onClick={() => { setError(""); setStep(2); }}
-                      disabled={!isFormValid()}
+                      onClick={() => {
+                        setError("");
+                        // Auto-correct network if phone prefix doesn't match selected network
+                        const detected = detectNetwork(phone);
+                        if (detected && detected !== selectedNetwork) {
+                          setSelectedNetwork(detected);
+                          setSelectedPlan(null);
+                          setAirtimePlans([]);
+                        }
+                        setStep(2);
+                      }}
+                      disabled={
+                        !isFormValid() ||
+                        (phone.length === 11 && detectNetwork(phone) && detectNetwork(phone) !== selectedNetwork)
+                      }
                       className="w-full py-4 bg-blue-950 text-white rounded-xl font-bold text-base hover:bg-blue-900 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Review Order <ArrowLeft size={17} className="rotate-180" />

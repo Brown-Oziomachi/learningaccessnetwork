@@ -164,8 +164,10 @@ export async function GET(request) {
             return NextResponse.json({ error: 'Missing required params: customer, biller_code, item_code' }, { status: 400 });
         }
         try {
-            const path = `/v3/bills/validate?item_code=${itemCode}&biller_code=${billerCode}&customer=${customer}`;
+            const path = `/v3/bills/validate?item_code=${encodeURIComponent(itemCode)}&biller_code=${encodeURIComponent(billerCode)}&customer=${encodeURIComponent(customer)}`;
             const { status, data } = await flwRequest('GET', path);
+            console.log('[verify response]', JSON.stringify(data));
+
             if (status === 200 && data.status === 'success') {
                 return NextResponse.json({
                     name: data.data?.name || null,

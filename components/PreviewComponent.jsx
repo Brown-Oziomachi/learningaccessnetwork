@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { fetchBookDetails } from "@/utils/bookUtils";
+import BookAIChat from "./BookAIChat";
 
 export default function BookPreviewPage() {
   const router = useRouter();
@@ -749,7 +750,10 @@ const submitFeedback = async () => {
 
               <div className="border-t border-blue-950 my-4"></div>
               <div className="mt-6">
-                <a href="/docs" target="_blank" rel="noopener noreferrer"
+                <a
+                  href="/docs"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 whitespace-nowrap z-50"
                 >
                   What is LAN Library?
@@ -921,7 +925,7 @@ const submitFeedback = async () => {
                   className="flex items-center text-blue-50 bg-blue-950 justify-center gap-2 px-4 py-2 border  rounded-lg "
                 >
                   <ThumbsUp className="w-4 h-4 " />
-                  <span className="">Rate: {bookFeedbackCount}</span>
+                  <span className="">Reviews: {bookFeedbackCount}</span>
                 </button>
                 <button className="flex items-center text-blue-50 bg-blue-950 justify-center gap-2 px-4 py-2 border  rounded-lg">
                   <FileText size={18} />
@@ -1557,7 +1561,12 @@ const submitFeedback = async () => {
           animation: fadeIn 0.3s ease-out;
         }
       `}</style>
-    
+
+      <BookAIChat
+        bookId={book.firestoreId || cleanBookId}
+        bookTitle={book.title}
+        aiEnabled={book.aiEnabled}
+      />
     </div>
   );
 }
