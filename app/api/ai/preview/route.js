@@ -19,118 +19,77 @@ export async function POST(req) {
             type,
         } = await req.json();
 
-        // ── 1. Resolve Google Drive download URL ──
-        let finalDownloadUrl = pdfUrl;
-        if (pdfUrl && pdfUrl.includes("drive.google.com")) {
-            const fileId = pdfUrl.match(/\/d\/(.*?)\/|id=(.*?)(&|$)/);
-            if (!fileId) throw new Error("Invalid Google Drive URL.");
-            finalDownloadUrl = `https://drive.google.com/uc?export=download&id=${fileId[1] || fileId[2]}`;
-        }
-
-        // ── 2. Fetch PDF ──
-        const pdfRes = await fetch(finalDownloadUrl, {
-            headers: { "User-Agent": "Mozilla/5.0" },
-        });
-
-        if (!pdfRes.ok) {
-            throw new Error("Could not fetch PDF file.");
-        }
-
-        const arrayBuffer = await pdfRes.arrayBuffer();
-
-        // ⚠️ Size guard (important)
-        if (arrayBuffer.byteLength > 15 * 1024 * 1024) {
-            return NextResponse.json(
-                { error: "Book file too large (max 15MB)." },
-                { status: 413 }
-            );
-        }
-
-        const base64Data = Buffer.from(arrayBuffer).toString("base64");
-
-        // ── 3. Build context-aware prompt ──
-        let contextBlock = "";
-
-        if (activeSection) {
-            contextBlock += `\nCurrent section: "${activeSection}".`;
-        }
-
-        if (currentlyVisibleText) {
-            contextBlock += `\nVisible text:\n"""\n${currentlyVisibleText.slice(0, 1500)}\n"""`;
-        }
-
         const isSummary = type === "summary";
+        let aiParts = [];
 
-        const promptText = isSummary
-            ? `
-Role: Expert LAN Library Tutor.
-Book: "${bookTitle}".
+        // ── 1. SMART DATA STRATEGY ──
+        // If we have screen text and it's NOT a full book summary, skip the PDF download!
+        const canSkipDownload = currentlyVisibleText && currentlyVisibleText.length > 50 && !isSummary;
 
-Task: Provide a Smart Summary in exactly 3 points.
+        if (canSkipDownload) {
+            console.log("⚡ Optimization: Using visible text only (skipping PDF download)");
+            aiParts.push({
+                text: `CONTEXT FROM BOOK PAGE:\n"""\n${currentlyVisibleText}\n"""`
+            });
+        } else {
+            // ── 2. Fallback: Download PDF only if necessary (Summary or no screen text) ──
+            let finalDownloadUrl = pdfUrl;
+            if (pdfUrl && pdfUrl.includes("drive.google.com")) {
+                const fileId = pdfUrl.match(/\/d\/(.*?)\/|id=(.*?)(&|$)/);
+                if (!fileId) throw new Error("Invalid Google Drive URL.");
+                finalDownloadUrl = `https://drive.google.com/uc?export=download&id=${fileId[1] || fileId[2]}`;
+            }
 
-Format:
-**Point 1:**
-Explanation
+            const pdfRes = await fetch(finalDownloadUrl, {
+                headers: { "User-Agent": "Mozilla/5.0" },
+            });
 
-**Point 2:**
-Explanation
+            if (!pdfRes.ok) throw new Error("MiFi connection too slow to fetch full book.");
 
-**Point 3:**
-Explanation
+            const contentType = pdfRes.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/pdf")) {
+                throw new Error("File source returned a webpage. Try a different book.");
+            }
 
-Then add a practical example block.
+            const arrayBuffer = await pdfRes.arrayBuffer();
+            if (arrayBuffer.byteLength > 12 * 1024 * 1024) {
+                return NextResponse.json({ error: "Book too large for full scan (Max 12MB)." }, { status: 413 });
+            }
 
-End with 2-3 key terms like:
-[[Term: Definition]]
-`
-            : `
-Role: Expert LAN Library Tutor.
-Book: "${bookTitle}".
-${contextBlock}
-
-Task: Answer ONLY from the PDF.
-
-Student Question:
-${userQuestion}
-
-Rules:
-- Use Markdown
-- Use **bold** for key terms
-- Add [p. X] if referencing a page
-`;
-
-        // ── 4. Gemini AI (NEW SDK — WORKING) ──
-        const result = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: [
-                {
-                    role: "user",
-                    parts: [
-                        {
-                            inlineData: {
-                                data: base64Data,
-                                mimeType: "application/pdf",
-                            },
-                        },
-                        {
-                            text: promptText,
-                        },
-                    ],
+            const base64Data = Buffer.from(arrayBuffer).toString("base64");
+            aiParts.push({
+                inlineData: {
+                    data: base64Data,
+                    mimeType: "application/pdf",
                 },
-            ],
+            });
+        }
+
+        // ── 3. Build Prompt ──
+        const promptText = isSummary
+            ? `Role: Expert LAN Library Tutor. Book: "${bookTitle}". Task: Provide a Smart Summary in exactly 3 points. Format: **Point 1: [Concept]** Explanation... Add a quote block and [[Term: Definition]].`
+            : `Role: Expert LAN Library Tutor. Book: "${bookTitle}". Section: "${activeSection || 'General'}". 
+               Task: Answer the student's question using the provided context. 
+               Student Question: ${userQuestion}`;
+
+        aiParts.push({ text: promptText });
+
+        // ── 4. Execute Gemini ──
+        const result = await ai.models.generateContent({
+            model: "gemini-1.5-flash",
+            contents: [{ role: "user", parts: aiParts }],
+            generationConfig: { maxOutputTokens: 800, temperature: 0.7 },
         });
 
         const aiReply = result.text;
 
-        // ── 5. Save to Firestore ──
+        // ── 5. Log to Firestore ──
         await adminDb.collection("student_queries").add({
             bookTitle,
             bookId: bookId || "unknown",
             studentId: userId || "anonymous",
-            question: userQuestion || (isSummary ? "Smart Summary" : ""),
+            question: userQuestion || (isSummary ? "Summary" : "Query"),
             answer: aiReply,
-            type: type || "question",
-            activeSection: activeSection || null,
             timestamp: new Date(),
         });
 
@@ -138,10 +97,10 @@ Rules:
 
     } catch (error) {
         console.error("❌ LAN AI Error:", error.message);
-
+        const isQuota = error.message.includes("429") || error.message.includes("quota");
         return NextResponse.json(
-            { error: error.message },
-            { status: 500 }
+            { error: isQuota ? "AI is cooling down (15s). Try again." : error.message },
+            { status: isQuota ? 429 : 500 }
         );
     }
 }
