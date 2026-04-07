@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebaseConfig";
@@ -30,6 +30,7 @@ import {
 import Link from "next/link";
 import { fetchBookDetails } from "@/utils/bookUtils";
 import BookAIChat from "./BookAIChat";
+import AiAskButton from "./AiAskButton";
 
 export default function BookPreviewPage() {
   const router = useRouter();
@@ -63,7 +64,17 @@ const bookId = rawBookId?.startsWith("firestore-")
   const [feedbackText, setFeedbackText] = useState("");
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [bookFeedbackCount, setBookFeedbackCount] = useState(0);
-
+const [currentChapter, setCurrentChapter] = useState("");
+const [visiblePageText, setVisiblePageText] = useState("");
+  const pdfViewerRef = useRef(null);
+  
+  
+  const jumpToPage = (pageNum) => {
+    const iframe = document.querySelector("iframe[title]");
+    if (!iframe) return;
+    const src = iframe.src.split("#")[0];
+    iframe.src = `${src}#page=${pageNum}`;
+  };
 
   // Helper function to get thumbnail from PDF
   const getThumbnailUrl = (book) => {
@@ -160,6 +171,16 @@ const bookId = rawBookId?.startsWith("firestore-")
     }
   };
 
+  useEffect(() => {
+  if (book) {
+    setCurrentChapter(book.category || "");
+    setVisiblePageText(
+      [book.description, book.introduction, book.message]
+        .filter(Boolean).join("\n\n").slice(0, 1500)
+    );
+  }
+  }, [book]);
+  
   // Auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -688,7 +709,6 @@ const submitFeedback = async () => {
           </div>
         </div>
       </header>
-
       {/* Navigation Menu Modal */}
       {showNavMenu && (
         <>
@@ -842,7 +862,6 @@ const submitFeedback = async () => {
           </div>
         </>
       )}
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -952,6 +971,13 @@ const submitFeedback = async () => {
                   <span className="text-xs">Share</span>
                 </button>
               </div>
+
+              <AiAskButton
+                bookTitle={book.title}
+                pdfUrl={book.pdfUrl || book.embedUrl}
+                bookId={bookId}
+                userId={user?.uid}
+              />
 
               <div className="border-t border-gray-200 pt-4 space-y-3">
                 <div className="flex items-center gap-3 text-sm">
@@ -1291,7 +1317,6 @@ const submitFeedback = async () => {
           </div>
         </div>
       </div>
-
       {showOverview && (
         <>
           <div
@@ -1339,7 +1364,6 @@ const submitFeedback = async () => {
           </div>
         </>
       )}
-
       {showSummary && (
         <>
           <div
@@ -1378,7 +1402,6 @@ const submitFeedback = async () => {
           </div>
         </>
       )}
-
       {/* Options Modal */}
       {showOptionsModal && (
         <>
@@ -1454,7 +1477,6 @@ const submitFeedback = async () => {
           </div>
         </>
       )}
-
       {/* Feedback Modal */}
       {showFeedbackModal && (
         <>
@@ -1516,14 +1538,12 @@ const submitFeedback = async () => {
           </div>
         </>
       )}
-
       {/* Toast */}
       {showToast && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg z-[9999] animate-fadeIn">
           {toastMessage}
         </div>
       )}
-
       <style jsx>{`
         @keyframes slideUp {
           from {
@@ -1561,12 +1581,6 @@ const submitFeedback = async () => {
           animation: fadeIn 0.3s ease-out;
         }
       `}</style>
-
-      <BookAIChat
-        bookId={book.firestoreId || cleanBookId}
-        bookTitle={book.title}
-        aiEnabled={book.aiEnabled}
-      />
     </div>
   );
 }
