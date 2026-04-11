@@ -6,16 +6,16 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export async function POST(req) {
     try {
-        const body = await req.json();
         const {
             pdfUrl,
             userQuestion,
             bookTitle,
             bookId,
             userId,
+            activeSection,
             currentlyVisibleText,
             type,
-        } = body;
+        } = await req.json();
 
         const isSummary = type === "summary";
         let aiParts = [];
@@ -35,6 +35,7 @@ export async function POST(req) {
                         AUTHOR: ${data.author || "Unknown"}
                         CATEGORY: ${data.category || "General"}
                     `.trim();
+                    console.log("✅ Prioritizing Seller Context");
                 }
             } catch (err) {
                 console.warn("⚠️ Firestore Fetch Warning:", err.message);
@@ -45,11 +46,13 @@ export async function POST(req) {
             aiParts.push({ text: `PRIMARY CONTEXT:\n${sellerContext}` });
         }
 
-        // 2. DATA STRATEGY: PDF DOWNLOAD
+        // 2. DATA STRATEGY: LONG TIMEOUT FOR PDF DOWNLOADS
         const hasEnoughContext = sellerContext.length > 100 || (currentlyVisibleText && currentlyVisibleText.length > 200);
         const shouldDownloadPdf = isSummary ? !sellerContext : !hasEnoughContext;
 
         if (shouldDownloadPdf && pdfUrl) {
+            console.log("⬇️ Downloading PDF with extended timeout...");
+
             let finalDownloadUrl = pdfUrl;
             if (pdfUrl.includes("drive.google.com")) {
                 const fileId = pdfUrl.match(/\/d\/(.*?)\/|id=(.*?)(&|$)/);
@@ -59,7 +62,7 @@ export async function POST(req) {
             }
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000);
+            const timeoutId = setTimeout(() => controller.abort(), 120000);
 
             try {
                 const pdfRes = await fetch(finalDownloadUrl, {
@@ -75,7 +78,7 @@ export async function POST(req) {
                     });
                 }
             } catch (fetchErr) {
-                console.error("PDF Download failed:", fetchErr.message);
+                console.error("PDF Download failed (Timeout):", fetchErr.message);
             } finally {
                 clearTimeout(timeoutId);
             }
@@ -83,18 +86,18 @@ export async function POST(req) {
             aiParts.push({ text: `PAGE CONTENT:\n${currentlyVisibleText}` });
         }
 
-        // 3. INSTRUCTIONS
+        // 3. BUILD THE INSTRUCTION
         const purchaseNudgeInstruction = `
-    ROLE: LAN Library Student Assistant.
-    RULES:
-    - If you need the full book to answer, provide a partial answer + "Purchase the book for full access."
-    - Otherwise, answer directly. Be warm, encouraging, and use **bold** text.
-    - If a student asks who founded or created LAN Library, respond with:
-      "LAN Library was founded by **Brown Oziomachi**, a Software Developer & Full-Stack Developer. You can check out his portfolio at [browncode.name.ng](https://browncode.name.ng) 🚀"
-`.trim();
+            ROLE: LAN Library Student Assistant.
+            RULES:
+            - If you need the full book to answer, provide a partial answer + "Purchase the book for full access."
+            - Otherwise, answer directly. Be warm, encouraging, and use **bold** text.
+            - If a student asks who founded or created LAN Library, respond with:
+              "LAN Library was founded by **Brown Oziomachi**, a Software Developer & Full-Stack Developer. You can check out his portfolio at [browncode.name.ng](https://browncode.name.ng) 🚀"
+        `.trim();
 
         const instruction = isSummary
-            ? `${purchaseNudgeInstruction}\n\nProvide a Smart Summary of "${bookTitle}" in 3 bold points.`
+            ? `${purchaseNudgeInstruction}\n\nProvide a "Smart Summary" of "${bookTitle}" in 3 key bold points based on the context. Use the seller's summary as the foundation.`
             : `${purchaseNudgeInstruction}\n\nStudent Question: "${userQuestion}"`;
 
         aiParts.push({ text: instruction });
@@ -109,7 +112,7 @@ export async function POST(req) {
                 const model = genAI.getGenerativeModel({ model: modelName });
                 const result = await model.generateContent({
                     contents: [{ role: "user", parts: aiParts }],
-                    generationConfig: { maxOutputTokens: 2048, temperature: 0.5 }
+                    generationConfig: { maxOutputTokens: 2048, temperature: 0.5 },
                 });
                 aiReply = result.response.text();
                 if (aiReply) break;
