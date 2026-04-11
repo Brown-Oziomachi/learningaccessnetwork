@@ -1,3 +1,4 @@
+"use client"
 // app/hooks/usePayment.js
 import { useState, useEffect } from 'react';
 import { db, auth } from '@/lib/firebaseConfig';

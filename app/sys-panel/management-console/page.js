@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, addDoc, serverTimestamp, increment, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { db, auth } from '@/lib/firebaseConfig';
 import {
   FileText, Trash2, Check, X, Search, Calendar, User, Shield,
   Eye, Mail, MessageSquare, AlertCircle, TrendingUp,
@@ -13,6 +12,7 @@ import {
 } from 'lucide-react';
 import { BookApprovalModal, ReplyModal, TransactionModal, UserModal } from '@/components/ApprovalModal';
 import FlwBalanceWidget from '@/components/admin/FlwBalanceWidget';
+import { db } from '@/lib/firebaseConfig';
 
 // ── Platform Fee Section Component ──────────────────────────────────────────
 function PlatformFeeSection({ user }) {

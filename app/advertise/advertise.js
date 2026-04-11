@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { auth, db, storage } from "@/lib/firebaseConfig";
-import { addDoc, collection, serverTimestamp, doc, getDoc } from "firebase/firestore";
+import { app, auth, db } from "@/lib/firebaseConfig";
+import { storage } from "@/lib/firebaseStorage"; import { addDoc, collection, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { Upload, X, AlertCircle, Building2, BookOpen, GraduationCap } from "lucide-react";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";

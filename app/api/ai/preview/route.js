@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { adminDb } from "@/lib/firebase-admin";
 
-const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export async function POST(req) {
     try {
@@ -21,86 +19,103 @@ export async function POST(req) {
 
         const isSummary = type === "summary";
         let aiParts = [];
+        let sellerContext = "";
 
-        // ── 1. SMART DATA STRATEGY ──
-        // If we have screen text and it's NOT a full book summary, skip the PDF download!
-        const canSkipDownload = currentlyVisibleText && currentlyVisibleText.length > 50 && !isSummary;
+        // 1. FETCH SELLER'S DESCRIPTION (Uses the Optimized adminDb)
+        if (bookId) {
+            try {
+                const cleanBookId = bookId.replace("firestore-", "");
+                const bookDoc = await adminDb.collection("advertMyBook").doc(cleanBookId).get();
 
-        if (canSkipDownload) {
-            console.log("⚡ Optimization: Using visible text only (skipping PDF download)");
-            aiParts.push({
-                text: `CONTEXT FROM BOOK PAGE:\n"""\n${currentlyVisibleText}\n"""`
-            });
-        } else {
-            // ── 2. Fallback: Download PDF only if necessary (Summary or no screen text) ──
-            let finalDownloadUrl = pdfUrl;
-            if (pdfUrl && pdfUrl.includes("drive.google.com")) {
-                const fileId = pdfUrl.match(/\/d\/(.*?)\/|id=(.*?)(&|$)/);
-                if (!fileId) throw new Error("Invalid Google Drive URL.");
-                finalDownloadUrl = `https://drive.google.com/uc?export=download&id=${fileId[1] || fileId[2]}`;
+                if (bookDoc.exists) {
+                    const data = bookDoc.data();
+                    sellerContext = `
+                        SELLER'S DESCRIPTION: ${data.description || "N/A"}
+                        SELLER'S MESSAGE/SUMMARY: ${data.message || "N/A"}
+                        AUTHOR: ${data.author || "Unknown"}
+                        CATEGORY: ${data.category || "General"}
+                    `.trim();
+                    console.log("✅ Prioritizing Seller Context");
+                }
+            } catch (err) {
+                console.warn("⚠️ Firestore Fetch Warning:", err.message);
             }
-
-            const pdfRes = await fetch(finalDownloadUrl, {
-                headers: { "User-Agent": "Mozilla/5.0" },
-            });
-
-            if (!pdfRes.ok) throw new Error("MiFi connection too slow to fetch full book.");
-
-            const contentType = pdfRes.headers.get("content-type");
-            if (!contentType || !contentType.includes("application/pdf")) {
-                throw new Error("File source returned a webpage. Try a different book.");
-            }
-
-            const arrayBuffer = await pdfRes.arrayBuffer();
-            if (arrayBuffer.byteLength > 12 * 1024 * 1024) {
-                return NextResponse.json({ error: "Book too large for full scan (Max 12MB)." }, { status: 413 });
-            }
-
-            const base64Data = Buffer.from(arrayBuffer).toString("base64");
-            aiParts.push({
-                inlineData: {
-                    data: base64Data,
-                    mimeType: "application/pdf",
-                },
-            });
         }
 
-        // ── 3. Build Prompt ──
-        const promptText = isSummary
-            ? `Role: Expert LAN Library Tutor. Book: "${bookTitle}". Task: Provide a Smart Summary in exactly 3 points. Format: **Point 1: [Concept]** Explanation... Add a quote block and [[Term: Definition]].`
-            : `Role: Expert LAN Library Tutor. Book: "${bookTitle}". Section: "${activeSection || 'General'}". 
-               Task: Answer the student's question using the provided context. 
-               Student Question: ${userQuestion}`;
+        if (sellerContext) {
+            aiParts.push({ text: `PRIMARY CONTEXT:\n${sellerContext}` });
+        }
 
-        aiParts.push({ text: promptText });
+        // 2. DATA STRATEGY: LONG TIMEOUT FOR PDF DOWNLOADS
+        const hasEnoughContext = sellerContext.length > 100 || (currentlyVisibleText && currentlyVisibleText.length > 200);
+        const shouldDownloadPdf = isSummary ? !sellerContext : !hasEnoughContext;
 
-        // ── 4. Execute Gemini ──
-        const result = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
+        if (shouldDownloadPdf && pdfUrl) {
+            console.log("⬇️ Downloading PDF with extended timeout...");
+
+            let finalDownloadUrl = pdfUrl;
+            if (pdfUrl.includes("drive.google.com")) {
+                const fileId = pdfUrl.match(/\/d\/(.*?)\/|id=(.*?)(&|$)/);
+                if (fileId) {
+                    finalDownloadUrl = `https://drive.google.com/uc?export=download&id=${fileId[1] || fileId[2]}`;
+                }
+            }
+
+            // Extended timeout for MiFi connections (2 minutes)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+            try {
+                const pdfRes = await fetch(finalDownloadUrl, {
+                    headers: { "User-Agent": "Mozilla/5.0" },
+                    signal: controller.signal
+                });
+
+                if (pdfRes.ok) {
+                    const arrayBuffer = await pdfRes.arrayBuffer();
+                    const base64Data = Buffer.from(arrayBuffer).toString("base64");
+                    aiParts.push({
+                        inlineData: { data: base64Data, mimeType: "application/pdf" },
+                    });
+                }
+            } catch (fetchErr) {
+                console.error("PDF Download failed (Timeout):", fetchErr.message);
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        } else if (currentlyVisibleText) {
+            aiParts.push({ text: `PAGE CONTENT:\n${currentlyVisibleText}` });
+        }
+
+        // 3. BUILD THE INSTRUCTION
+        const instruction = isSummary
+            ? `Provide a "Smart Summary" of "${bookTitle}" in 3 key points based on the context. Use the seller's summary as the foundation. Format points in **bold**.`
+            : `Answer the student question: "${userQuestion}" using the provided context. Be helpful and encouraging.`;
+
+        aiParts.push({ text: instruction });
+
+        // 4. CALL GEMINI
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent({
             contents: [{ role: "user", parts: aiParts }],
-            generationConfig: { maxOutputTokens: 800, temperature: 0.7 },
+            generationConfig: { maxOutputTokens: 600, temperature: 0.5 },
         });
 
-        const aiReply = result.text;
+        const aiReply = result.response.text();
 
-        // ── 5. Log to Firestore ──
-        await adminDb.collection("student_queries").add({
+        // 5. LOG TO FIRESTORE (Non-blocking)
+        adminDb.collection("student_queries").add({
             bookTitle,
-            bookId: bookId || "unknown",
+            bookId,
             studentId: userId || "anonymous",
-            question: userQuestion || (isSummary ? "Summary" : "Query"),
             answer: aiReply,
             timestamp: new Date(),
-        });
+        }).catch(e => console.error("Log Error:", e));
 
         return NextResponse.json({ reply: aiReply });
 
     } catch (error) {
-        console.error("❌ LAN AI Error:", error.message);
-        const isQuota = error.message.includes("429") || error.message.includes("quota");
-        return NextResponse.json(
-            { error: isQuota ? "AI is cooling down (15s). Try again." : error.message },
-            { status: isQuota ? 429 : 500 }
-        );
+        console.error("❌ LAN AI API Error:", error.message);
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

@@ -1,3 +1,4 @@
+"use client"
 // components/admin/FlwBalanceWidget.js
 'use client';
 

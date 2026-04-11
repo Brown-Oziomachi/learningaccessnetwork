@@ -1,3 +1,4 @@
+"use client"
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -69,7 +70,7 @@ export default function LearningAccessNetwork() {
       title: "AI Tools For Writing Books",
       description: "Today's a fantastic time to be writing a book. With a plethora of digital tools and online resources, you can tackle your writing project with ease.",
       thumbnail: "/make.png",
-      videoUrl: "/tools.mp4",
+      videoUrl: "/seller tools.mp4",
       duration: "8:45",
     },
     {
@@ -441,7 +442,7 @@ export default function LearningAccessNetwork() {
               Browse Books
             </a>
             <a href="/docs" target="_blank"
-              className="cursor-pointer px-8 py-4 border-2 border-white text-white font-bold rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
+              className="cursor-pointer px-8 py-4 border-2 text-center border-white text-white font-bold rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
             >
               Platform Guide
             </a>

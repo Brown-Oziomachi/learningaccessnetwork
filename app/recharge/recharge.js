@@ -424,7 +424,10 @@ export default function RechargeClient() {
       fetch("/api/recharge?type=electricity")
         .then((r) => r.json())
         .then((res) => {
-          setElecBillers((res.billers || []).map((b) => ({ biller_code: b.id, biller_name: b.name, code: b.code })));
+          setElecBillers((res.billers || []).map((b) => ({
+            biller_code: b.code,    // ✅ CORRECT — "BIL112"
+            biller_name: b.name,
+          })));
         })
         .catch(console.error)
         .finally(() => setLoadingBillers(false));
@@ -435,7 +438,10 @@ export default function RechargeClient() {
       fetch("/api/recharge?type=tv")
         .then((r) => r.json())
         .then((res) => {
-          setTvBillers((res.billers || []).map((b) => ({ biller_code: b.id, biller_name: b.name, code: b.code })));
+          setTvBillers((res.billers || []).map((b) => ({
+            biller_code: b.code,    // ✅ was b.id
+            biller_name: b.name,
+          })));
         })
         .catch(console.error)
         .finally(() => setLoadingBillers(false));
@@ -447,7 +453,13 @@ export default function RechargeClient() {
     const customerId = tab === "electricity" ? meterNumber : smartcardNumber;
     const selectedPlanObj = tab === "electricity" ? selectedElecPlan : selectedTvPlan;
 
-    if ((tab !== "electricity" && tab !== "tv") || !customerId || customerId.length < 10 || !selectedPlanObj) {
+    // More explicit guard:
+    const isReadyToVerify =
+      selectedPlanObj &&
+      selectedPlanObj.item_code &&
+      selectedPlanObj.biller_code;
+
+    if ((tab !== "electricity" && tab !== "tv") || !customerId || customerId.length < 10 || !isReadyToVerify) {
       setVerifiedName("");
       return;
     }
@@ -456,8 +468,14 @@ export default function RechargeClient() {
     setVerifiedName("");
     const timeoutId = setTimeout(() => {
       fetch(`/api/recharge?type=verify&item_code=${selectedPlanObj.item_code}&biller_code=${selectedPlanObj.biller_code}&customer=${customerId}`)        .then((r) => r.json())
-        .then((res) => { setVerifiedName(res.name || "Verification failed"); })
-        .catch(() => setVerifiedName("Error verifying name"))
+        // Replace the .then inside the verify useEffect setTimeout:
+        .then((res) => {
+          if (res.skipped) {
+            setVerifiedName("__skipped__");  // sentinel value
+          } else {
+            setVerifiedName(res.name || "Verification failed");
+          }
+        })        .catch(() => setVerifiedName("Error verifying name"))
         .finally(() => setVerifying(false));
     }, 1000);
     return () => clearTimeout(timeoutId);
@@ -1104,10 +1122,19 @@ export default function RechargeClient() {
                               </div>
                             )}
                           </div>
-                          {verifiedName && (
-                            <div className={`mt-2 p-3 rounded-xl flex items-center gap-2 border ${verifiedName.includes("failed") || verifiedName.includes("not found") ? "bg-red-50 border-red-100 text-red-600" : "bg-green-50 border-green-100 text-green-700"}`}>
+                          {verifiedName && verifiedName !== "__skipped__" && (
+                            <div className={`mt-2 p-3 rounded-xl flex items-center gap-2 border ${verifiedName.includes("failed") || verifiedName.includes("not found")
+                                ? "bg-red-50 border-red-100 text-red-600"
+                                : "bg-green-50 border-green-100 text-green-700"
+                              }`}>
                               {verifiedName.includes("failed") ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
                               <span className="text-xs font-bold uppercase tracking-wider">{verifiedName}</span>
+                            </div>
+                          )}
+                          {verifiedName === "__skipped__" && (
+                            <div className="mt-2 p-3 rounded-xl flex items-center gap-2 border bg-blue-50 border-blue-100 text-blue-700">
+                              <AlertCircle size={14} />
+                              <span className="text-xs font-medium">Verification not available for this provider — your meter will be confirmed at payment.</span>
                             </div>
                           )}
                         </div>

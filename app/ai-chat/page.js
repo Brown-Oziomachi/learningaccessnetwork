@@ -352,8 +352,8 @@ function AiChatContent() {
                         }
                     </button>
                 </form>
-                <p className="text-center text-[9px] text-slate-300 uppercase tracking-wider mt-2">
-                    Airtel MiFi Optimized · Secured by Firestore
+                <p className="text-center text-[9px] text-slate-700 uppercase tracking-wider mt-2">
+                    LAN Library AI is here to help you understand your books better. Ask questions, get summaries, and explore key concepts with ease!
                 </p>
             </footer>
 

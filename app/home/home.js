@@ -4,13 +4,13 @@ import { FileText, Monitor, Upload, ChevronLeft, ShoppingBag, Smartphone, Globe,
 import Link from 'next/link';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc, collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
 import HomeLoading from './loading';
 import MobileCategoriesCarousel from '@/components/MobileCategoriesCarousel';
 import InstitutionalLibraryPage from '@/components/InstitutionalLib';
 import Footer from '@/components/FooterComp';
 import Navbar from '@/components/NavBar';
+import { auth, db } from '@/lib/firebaseConfig';
 
 const documentTypes = [
     { name: 'Textbook', slug: 'textbook', image: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400', description: 'Standard educational books' },

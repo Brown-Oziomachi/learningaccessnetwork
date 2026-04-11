@@ -6,7 +6,6 @@ import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, increment, setDoc } from "firebase/firestore"; import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
-import { backfillFlutterwaveSubaccount } from "@/lib/auth/backfillSubaccount";
 import NotificationBell from "@/components/NotificationBell";
 import { usePayment } from "@/app/hooks/usePayment";
 
@@ -437,12 +436,6 @@ export default function SellerAccountClient() {
         requestPinReset,
         verifyOtpAndSetPin
     } = usePayment(null, formData, null);
-
-    useEffect(() => {
-        if (user?.uid) {
-            backfillFlutterwaveSubaccount(user.uid); // silent, non-blocking
-        }
-    }, [user?.uid]);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {

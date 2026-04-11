@@ -1,3 +1,4 @@
+// components/AiAskButton.jsx
 "use client";
 import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
