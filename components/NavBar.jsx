@@ -336,7 +336,7 @@ useEffect(() => {
         <Link href="/latest/documentations" className="no-underline">
           <div className="bg-white flex items-center justify-center gap-2 text-blue-950">
             <h1 className=" font-bold text-lg mt-3">Recently Published...</h1>
-            <ChevronRight size={16} className="mt-3"/>
+            <ChevronRight size={16} className="mt-3" />
           </div>
         </Link>
         <div className="max-w-4xl mx-auto px-4 py-3 sm:py-4">
@@ -509,7 +509,9 @@ useEffect(() => {
         <div className="hidden lg:block bg-gray-50 border-t border-gray-200 ">
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-center gap-1">
-              <a href="/docs" target="_blank"
+              <a
+                href="/docs"
+                target="_blank"
                 className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 whitespace-nowrap"
               >
                 What is LAN Library?
@@ -928,7 +930,7 @@ useEffect(() => {
                   <span>My Account</span>
                 </button>
                 <Link
-                href="/lecturers"
+                  href="/lecturers"
                   className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
                 >
                   <Crown size={16} />
@@ -972,7 +974,9 @@ useEffect(() => {
                 </Link>
 
                 <div className="border-t border-blue-950 my-4 pt-4">
-                  <a href="/docs" target="_blank"
+                  <a
+                    href="/docs"
+                    target="_blank"
                     className="text-sm font-semibold text-gray-500 mb-2 px-4"
                   >
                     What is LAN Library?
@@ -1069,9 +1073,42 @@ useEffect(() => {
         .animate-slideDown {
           animation: slideDown 0.2s ease-out;
         }
+
+        @keyframes fabPop {
+          0% {
+            transform: scale(0.8);
+            opacity: 0;
+          }
+          70% {
+            transform: scale(1.08);
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+        .fab-ai {
+          animation: fabPop 0.4s ease-out forwards;
+        }
+        .fab-ai:hover {
+          transform: scale(1.06);
+          box-shadow: 0 8px 25px rgba(14, 165, 233, 0.45);
+        }
+        .fab-ai:active {
+          transform: scale(0.97);
+        }
       `}</style>
-      {/* What is LAN Library Modal */}
-     
+
+      {/* ── FLOATING AI BUTTON ── */}
+      <Link
+        href="/ai-chat"
+        className="fab-ai fixed bottom-30 right-5 z-[9999] flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white font-semibold px-4 py-3 rounded-full shadow-lg transition-all duration-200"
+        style={{ boxShadow: "0 4px 18px rgba(14, 165, 233, 0.35)" }}
+      >
+        <Sparkles size={18} />
+        <span className="text-sm">Ask AI</span>
+      </Link>
+      {/* ── END FLOATING AI BUTTON ── */}
     </>
   );
 }
