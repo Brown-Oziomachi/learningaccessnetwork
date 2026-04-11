@@ -21,7 +21,7 @@ export async function POST(req) {
         let aiParts = [];
         let sellerContext = "";
 
-        // 1. FETCH SELLER'S DESCRIPTION (Uses the Optimized adminDb)
+        // 1. FETCH SELLER'S DESCRIPTION
         if (bookId) {
             try {
                 const cleanBookId = bookId.replace("firestore-", "");
@@ -61,7 +61,6 @@ export async function POST(req) {
                 }
             }
 
-            // Extended timeout for MiFi connections (2 minutes)
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 120000);
 
@@ -94,11 +93,17 @@ export async function POST(req) {
 
         aiParts.push({ text: instruction });
 
-        // 4. CALL GEMINI
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // 4. CALL GEMINI (Updated Model Reference)
+        // We use gemini-3-flash-preview for better logic and PDF understanding
+        const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+        // app/api/ai/preview/route.js
         const result = await model.generateContent({
             contents: [{ role: "user", parts: aiParts }],
-            generationConfig: { maxOutputTokens: 600, temperature: 0.5 },
+            generationConfig: {
+                maxOutputTokens: 2048,  // was 600 — way too low
+                temperature: 0.5
+            },
         });
 
         const aiReply = result.response.text();
