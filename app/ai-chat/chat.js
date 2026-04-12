@@ -10,8 +10,11 @@ import {
 import {
     collection, addDoc, serverTimestamp, query,
     where, orderBy, getDocs, doc, updateDoc, deleteDoc,
+    getDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
+import { auth } from "@/lib/firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
 import { booksData } from "@/lib/booksData";
 
 /* ══════════════════════════════════════
@@ -32,7 +35,6 @@ function CopyButton({ text }) {
 
 /* ══════════════════════════════════════
    PURCHASE SUGGESTION CARD
-   Shown when AI suggests buying the book
 ══════════════════════════════════════ */
 function PurchaseSuggestionCard({ bookTitle, bookId, price, onPurchase }) {
     return (
@@ -45,9 +47,7 @@ function PurchaseSuggestionCard({ bookTitle, bookId, price, onPurchase }) {
                     <p className="text-[12px] text-sky-400 font-semibold uppercase tracking-wider mb-0.5">
                         📚 Unlock Full Access
                     </p>
-                    <p className="text-[13px] text-slate-200 font-medium line-clamp-2 mb-1">
-                        {bookTitle}
-                    </p>
+                    <p className="text-[13px] text-slate-200 font-medium line-clamp-2 mb-1">{bookTitle}</p>
                     <p className="text-[11px] text-slate-400 leading-relaxed">
                         Get complete answers, summaries, and AI assistance on every page.
                     </p>
@@ -163,7 +163,6 @@ function VocabBadge({ term, definition, onSave }) {
 
 /* ══════════════════════════════════════
    BOOK PICKER SCREEN
-   Shown when user lands without a bookId
 ══════════════════════════════════════ */
 function BookPickerScreen({ onSelectBook }) {
     const [allBooks, setAllBooks] = useState([]);
@@ -188,12 +187,10 @@ function BookPickerScreen({ onSelectBook }) {
         const loadBooks = async () => {
             setLoadingBooks(true);
             try {
-                // Start with static booksData
                 const staticBooks = booksData.map(b => ({ ...b, image: getThumbnailUrl(b) }));
                 setAllBooks(staticBooks);
                 setFilteredBooks(staticBooks);
 
-                // Then enrich with Firestore
                 const q = query(collection(db, "advertMyBook"), where("status", "==", "approved"));
                 const snap = await getDocs(q);
                 const fsBooks = snap.docs.map(d => {
@@ -238,7 +235,6 @@ function BookPickerScreen({ onSelectBook }) {
 
     return (
         <div className="flex flex-col h-screen bg-slate-950">
-            {/* Header */}
             <header className="flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-sky-500/20 shrink-0">
                 <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/25 flex items-center justify-center">
                     <Library size={15} className="text-sky-400" />
@@ -253,7 +249,6 @@ function BookPickerScreen({ onSelectBook }) {
                 </div>
             </header>
 
-            {/* Hero */}
             <div className="px-5 pt-8 pb-5 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center mx-auto mb-4">
                     <BookMarked size={30} className="text-sky-400" />
@@ -264,7 +259,6 @@ function BookPickerScreen({ onSelectBook }) {
                 </p>
             </div>
 
-            {/* Search */}
             <div className="px-4 pb-4">
                 <div className="flex items-center gap-2.5 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 focus-within:border-sky-500/50 transition-colors max-w-lg mx-auto">
                     <Search size={15} className="text-slate-500 shrink-0" />
@@ -283,7 +277,6 @@ function BookPickerScreen({ onSelectBook }) {
                 </div>
             </div>
 
-            {/* Books Grid */}
             <div className="flex-1 overflow-y-auto px-4 pb-6">
                 {loadingBooks ? (
                     <div className="flex items-center justify-center py-16">
@@ -311,7 +304,6 @@ function BookPickerScreen({ onSelectBook }) {
                                         onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=200"; }}
                                         loading="lazy"
                                     />
-                                    {/* Hover overlay */}
                                     <div className="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/10 transition-colors flex items-center justify-center">
                                         <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-sky-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-lg">
                                             Ask AI ✦
@@ -348,22 +340,15 @@ const QUICK_ACTIONS = [
 function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelectSession, onNewChat, onDeleteSession, bookTitle }) {
     return (
         <>
-            {/* Overlay */}
             {isOpen && (
-                <div
-                    className="fixed inset-0 bg-black/60 z-40 lg:hidden"
-                    onClick={onClose}
-                />
+                <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={onClose} />
             )}
-
-            {/* Sidebar */}
             <div className={`
-        fixed top-0 left-0 h-full w-72 bg-slate-900 border-r border-slate-700/50 z-50
-        flex flex-col transition-transform duration-300 ease-in-out
-        ${isOpen ? "translate-x-0" : "-translate-x-full"}
-        lg:relative lg:translate-x-0 lg:z-auto lg:shrink-0
-      `}>
-                {/* Sidebar Header */}
+                fixed top-0 left-0 h-full w-72 bg-slate-900 border-r border-slate-700/50 z-50
+                flex flex-col transition-transform duration-300 ease-in-out
+                ${isOpen ? "translate-x-0" : "-translate-x-full"}
+                lg:relative lg:translate-x-0 lg:z-auto lg:shrink-0
+            `}>
                 <div className="flex items-center justify-between px-4 py-4 border-b border-slate-700/50">
                     <div className="flex items-center gap-2">
                         <BookMarked size={16} className="text-sky-400" />
@@ -377,7 +362,6 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
                     </button>
                 </div>
 
-                {/* New Chat Button */}
                 <div className="p-3">
                     <button
                         onClick={onNewChat}
@@ -388,7 +372,6 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
                     </button>
                 </div>
 
-                {/* Book context badge */}
                 <div className="px-3 pb-2">
                     <div className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700/50">
                         <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Current Book</p>
@@ -396,7 +379,6 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
                     </div>
                 </div>
 
-                {/* Chat History List */}
                 <div className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
                     {chatSessions.length === 0 ? (
                         <div className="px-3 py-6 text-center">
@@ -418,6 +400,9 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
                                     <p className={`text-[12px] font-medium truncate ${session.id === currentSessionId ? "text-sky-300" : "text-slate-300"}`}>
                                         {session.title || "New conversation"}
                                     </p>
+                                    <p className="text-[10px] text-sky-600/70 truncate font-medium">
+                                        {session.bookTitle || ""}
+                                    </p>
                                     <p className="text-[10px] text-slate-500 truncate">
                                         {session.updatedAt?.toDate?.()?.toLocaleDateString?.() || ""}
                                     </p>
@@ -433,7 +418,6 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
                     )}
                 </div>
 
-                {/* Footer */}
                 <div className="p-3 border-t border-slate-700/50">
                     <p className="text-[9px] text-slate-600 text-center uppercase tracking-wider">
                         Powered by LAN Library
@@ -454,40 +438,52 @@ export default function AiChatContentClient() {
     const paramBookId = searchParams.get("bookId") || "";
     const paramBookTitle = searchParams.get("bookTitle") || "";
     const paramPdfUrl = searchParams.get("pdfUrl") || "";
-    const userId = searchParams.get("userId") || "anonymous";
+    const paramUserId = searchParams.get("userId") || "";
     const paramPrice = searchParams.get("price") || "";
 
-    // If user lands without a book, they pick one here
+    // ── FIX 1: Get real userId from Firebase Auth, not just URL params ──
+    // URL params may be missing (e.g. when coming from FAB /ai-chat with no params)
+    const [firebaseUserId, setFirebaseUserId] = useState(paramUserId || "");
+    const [authReady, setAuthReady] = useState(!!paramUserId); // true immediately if userId came from URL
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setFirebaseUserId(user.uid);
+            }
+            setAuthReady(true); // Auth has resolved — either logged in or not
+        });
+        return () => unsubscribe();
+    }, []);
+
+    // Use Firebase Auth uid first, fall back to URL param, then "anonymous"
+    const userId = firebaseUserId || paramUserId || "anonymous";
+
     const [selectedBook, setSelectedBook] = useState(
         paramBookId ? { id: paramBookId, title: paramBookTitle, pdfUrl: paramPdfUrl, price: paramPrice } : null
     );
 
-    // Derived values — always use selectedBook if set, else fall back to URL params
     const bookId = selectedBook?.id || paramBookId;
     const bookTitle = selectedBook?.title || paramBookTitle || "this book";
     const pdfUrl = selectedBook?.pdfUrl || paramPdfUrl;
     const bookPrice = selectedBook?.price || paramPrice;
 
-    // ── All hooks declared here — NO early returns before this point ──
+    // ── All hooks must be above any conditional return ──
     const [loading, setLoading] = useState(false);
     const [input, setInput] = useState("");
     const [messages, setMessages] = useState([]);
     const [showWelcome, setShowWelcome] = useState(true);
     const [sidebarOpen, setSidebarOpen] = useState(false);
-
-    // Chat session management
     const [chatSessions, setChatSessions] = useState([]);
     const [currentSessionId, setCurrentSessionId] = useState(null);
 
     const bottomRef = useRef(null);
     const textareaRef = useRef(null);
 
-    /* ── Scroll to bottom on new messages ── */
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, loading]);
 
-    /* ── Auto-resize textarea ── */
     useEffect(() => {
         if (textareaRef.current) {
             textareaRef.current.style.height = "auto";
@@ -495,30 +491,38 @@ export default function AiChatContentClient() {
         }
     }, [input]);
 
-    /* ── Load chat sessions from Firebase ── */
+    /* ── Load ALL sessions for this user across all books ──
+       Single where clause = no composite index needed.
+       Runs as soon as userId resolves from Firebase Auth.        */
     useEffect(() => {
+        // Wait for Firebase Auth to resolve before querying — prevents false "anonymous" state
+        if (!authReady) return;
         if (!userId || userId === "anonymous") return;
 
         const loadSessions = async () => {
             try {
                 const q = query(
                     collection(db, "ai_chat_sessions"),
-                    where("userId", "==", userId),
-                    where("bookId", "==", bookId),
-                    orderBy("updatedAt", "desc")
+                    where("userId", "==", userId)
                 );
                 const snapshot = await getDocs(q);
-                const sessions = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                const sessions = snapshot.docs
+                    .map(d => ({ id: d.id, ...d.data() }))
+                    .sort((a, b) => {
+                        const aTime = a.updatedAt?.toDate?.()?.getTime() || 0;
+                        const bTime = b.updatedAt?.toDate?.()?.getTime() || 0;
+                        return bTime - aTime;
+                    });
                 setChatSessions(sessions);
+                console.log(`✅ Loaded ${sessions.length} chat sessions for user`);
             } catch (err) {
                 console.warn("Could not load chat sessions:", err.message);
             }
         };
 
         loadSessions();
-    }, [userId, bookId]);
+    }, [userId, authReady]);
 
-    /* ── Save vocab ── */
     const handleSaveVocab = useCallback(async ({ term, definition }) => {
         try {
             await addDoc(collection(db, "student_vocabulary"), {
@@ -531,33 +535,45 @@ export default function AiChatContentClient() {
         } catch (err) { console.error("Vocab save error:", err); }
     }, [bookId, bookTitle, userId]);
 
-    /* ── Create or update Firebase session ── */
+    /* ── FIX 3: Save sessions with explicit userId check ── */
     const saveSessionToFirebase = useCallback(async (sessionId, updatedMessages, firstUserMessage) => {
-        if (!userId || userId === "anonymous") return sessionId;
+        if (!userId || userId === "anonymous") {
+            console.warn("⚠️ Not saving session — user not authenticated");
+            return sessionId;
+        }
+        if (!bookId) return sessionId;
 
         try {
             const sessionData = {
                 userId,
                 bookId,
                 bookTitle,
-                messages: updatedMessages,
+                // Strip showPurchaseCta from stored messages (not needed in DB)
+                messages: updatedMessages.map(({ showPurchaseCta, ...rest }) => rest),
                 title: firstUserMessage?.slice(0, 60) || "New conversation",
                 updatedAt: serverTimestamp(),
             };
 
             if (sessionId) {
-                // Update existing session
                 await updateDoc(doc(db, "ai_chat_sessions", sessionId), sessionData);
+                // Update local list title/time
+                setChatSessions(prev => prev.map(s =>
+                    s.id === sessionId
+                        ? { ...s, ...sessionData, updatedAt: { toDate: () => new Date() } }
+                        : s
+                ));
                 return sessionId;
             } else {
-                // Create new session
                 const docRef = await addDoc(collection(db, "ai_chat_sessions"), {
                     ...sessionData,
                     createdAt: serverTimestamp(),
                 });
                 setCurrentSessionId(docRef.id);
-                // Add to local sessions list
-                setChatSessions(prev => [{ id: docRef.id, ...sessionData, updatedAt: { toDate: () => new Date() } }, ...prev]);
+                setChatSessions(prev => [
+                    { id: docRef.id, ...sessionData, updatedAt: { toDate: () => new Date() } },
+                    ...prev,
+                ]);
+                console.log("✅ New chat session saved:", docRef.id);
                 return docRef.id;
             }
         } catch (err) {
@@ -566,14 +582,21 @@ export default function AiChatContentClient() {
         }
     }, [userId, bookId, bookTitle]);
 
-    /* ── Load a previous session ── */
     const handleSelectSession = useCallback((session) => {
         setCurrentSessionId(session.id);
         setMessages(session.messages || []);
         setShowWelcome(false);
+        // Restore the book context for this session
+        if (session.bookId && session.bookTitle) {
+            setSelectedBook({
+                id: session.bookId,
+                title: session.bookTitle,
+                pdfUrl: session.pdfUrl || "",
+                price: session.price || "",
+            });
+        }
     }, []);
 
-    /* ── Start a new chat ── */
     const handleNewChat = useCallback(() => {
         setCurrentSessionId(null);
         setMessages([]);
@@ -581,26 +604,21 @@ export default function AiChatContentClient() {
         setInput("");
     }, []);
 
-    /* ── Delete a session ── */
     const handleDeleteSession = useCallback(async (sessionId) => {
         try {
             await deleteDoc(doc(db, "ai_chat_sessions", sessionId));
             setChatSessions(prev => prev.filter(s => s.id !== sessionId));
-            if (currentSessionId === sessionId) {
-                handleNewChat();
-            }
+            if (currentSessionId === sessionId) handleNewChat();
         } catch (err) {
             console.warn("Could not delete session:", err.message);
         }
     }, [currentSessionId, handleNewChat]);
 
-    /* ── Handle purchase redirect ── */
     const handlePurchaseRedirect = useCallback(() => {
         const cleanId = bookId?.replace("firestore-", "") || bookId;
         router.push(`/payment?bookId=${cleanId}`);
     }, [bookId, router]);
 
-    /* ── Send message ── */
     const sendMessage = useCallback(async (text, type = "question") => {
         const trimmed = text?.trim();
         if (!trimmed || loading) return;
@@ -626,25 +644,19 @@ export default function AiChatContentClient() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Connection Error");
 
-            // Detect if AI is hinting at purchasing (keywords)
             const purchaseKeywords = [
                 "purchase", "buy", "unlock", "full access", "full content",
-                "complete book", "acquire", "get the book", "read more",
-                "limited preview", "only available", "full version",
+                "complete book", "acquire", "get the book", "limited preview",
+                "only available", "full version",
             ];
             const replyLower = data.reply.toLowerCase();
             const shouldSuggestPurchase = purchaseKeywords.some(kw => replyLower.includes(kw));
 
-            const aiMsg = {
-                role: "ai",
-                text: data.reply,
-                showPurchaseCta: shouldSuggestPurchase,
-            };
-
+            const aiMsg = { role: "ai", text: data.reply, showPurchaseCta: shouldSuggestPurchase };
             const finalMessages = [...updatedWithUser, aiMsg];
             setMessages(finalMessages);
 
-            // Save to Firebase
+            // Save session — use first user message as title
             const firstUserText = messages.find(m => m.role === "user")?.text || trimmed;
             const newSessionId = await saveSessionToFirebase(currentSessionId, finalMessages, firstUserText);
             if (newSessionId && !currentSessionId) setCurrentSessionId(newSessionId);
@@ -652,14 +664,10 @@ export default function AiChatContentClient() {
         } catch (err) {
             const isNetwork = !navigator.onLine || err.message?.includes("fetch") || err.message?.includes("network");
             const friendlyError = isNetwork
-                ? "⚠️ No internet connection. Please check your network and try again."
+                ? "No internet connection. Please check your network and try again."
                 : err.message || "Something went wrong. Please try again.";
 
-            const errMessages = [...updatedWithUser, {
-                role: "ai",
-                text: `**${friendlyError}**`,
-            }];
-            setMessages(errMessages);
+            setMessages([...updatedWithUser, { role: "ai", text: `**${friendlyError}**` }]);
         } finally {
             setLoading(false);
         }
@@ -670,19 +678,14 @@ export default function AiChatContentClient() {
         if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
     };
 
-    // ── Book picker shown conditionally inside return — hooks always run ──
+    // ── Conditional return AFTER all hooks ──
     if (!selectedBook && !paramBookId) {
-        return (
-            <BookPickerScreen
-                onSelectBook={(book) => setSelectedBook(book)}
-            />
-        );
+        return <BookPickerScreen onSelectBook={(book) => setSelectedBook(book)} />;
     }
 
     return (
         <div className="flex h-screen bg-slate-950 overflow-hidden">
 
-            {/* ── Sidebar ── */}
             <ChatSidebar
                 isOpen={sidebarOpen}
                 onClose={() => setSidebarOpen(false)}
@@ -694,28 +697,22 @@ export default function AiChatContentClient() {
                 bookTitle={bookTitle}
             />
 
-            {/* ── Main Chat Area ── */}
             <div className="flex flex-col flex-1 min-w-0 h-full">
 
-                {/* ── Header ── */}
                 <header className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-sky-500/20 shrink-0">
                     <div className="flex items-center gap-3">
-                        {/* Sidebar toggle */}
                         <button
                             onClick={() => setSidebarOpen(v => !v)}
                             className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
                         >
                             <Menu size={16} />
                         </button>
-
-                        {/* Back button */}
                         <button
                             onClick={() => router.back()}
                             className="flex items-center justify-center w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/25 text-sky-400 hover:bg-sky-500/20 transition-colors"
                         >
                             <ArrowLeft size={16} />
                         </button>
-
                         <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/25 flex items-center justify-center">
                                 <BookMarked size={15} className="text-sky-400" />
@@ -735,7 +732,6 @@ export default function AiChatContentClient() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {/* New chat button (header shortcut) */}
                         <button
                             onClick={handleNewChat}
                             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-sky-500/40 transition-colors text-[11px] font-medium"
@@ -748,10 +744,8 @@ export default function AiChatContentClient() {
                     </div>
                 </header>
 
-                {/* ── Messages area ── */}
                 <main className="flex-1 overflow-y-auto bg-slate-950 px-4 py-5 space-y-4">
 
-                    {/* Welcome screen */}
                     {showWelcome && messages.length === 0 && (
                         <div className="flex flex-col items-center pt-8 pb-4 px-2 gap-3">
                             <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center mb-1">
@@ -761,15 +755,13 @@ export default function AiChatContentClient() {
                             <p className="text-[13px] text-slate-400 text-center">
                                 Ask anything about <span className="text-sky-400 font-medium">{bookTitle}</span>
                             </p>
-
-                            {/* Quick actions */}
                             <div className="w-full max-w-md flex flex-col gap-2 mt-3">
                                 {QUICK_ACTIONS.map(({ label, type }, i) => (
                                     <button
                                         key={label}
                                         onClick={() => sendMessage(label, type)}
                                         className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-[13.5px] border transition-all
-                      ${i === 0
+                                            ${i === 0
                                                 ? "border-sky-500/30 text-sky-300 bg-sky-500/10 hover:bg-sky-500/15 font-medium"
                                                 : "border-slate-700 text-slate-300 bg-slate-800/50 hover:bg-slate-800 hover:border-slate-600"
                                             }`}
@@ -779,7 +771,6 @@ export default function AiChatContentClient() {
                                     </button>
                                 ))}
                             </div>
-
                             <div className="flex items-center gap-2 mt-2">
                                 <span className="text-[11px] bg-slate-800 border border-slate-700 text-slate-400 rounded-md px-2 py-0.5 font-semibold">Highlight</span>
                                 <span className="text-[12px] text-slate-500">any text on the book page, then ask here</span>
@@ -787,18 +778,15 @@ export default function AiChatContentClient() {
                         </div>
                     )}
 
-                    {/* Chat messages */}
                     {messages.map((msg, i) => (
                         <div key={i} className={`flex items-end gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-
                             {msg.role === "ai" && (
                                 <div className="w-7 h-7 rounded-full bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0 mb-0.5">
                                     <BookMarked size={12} className="text-sky-500" />
                                 </div>
                             )}
-
                             <div className={`max-w-[82%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-[13.5px] leading-relaxed
-                ${msg.role === "ai"
+                                ${msg.role === "ai"
                                     ? "bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-sm"
                                     : "bg-sky-600 border border-sky-500/30 text-white rounded-br-sm"
                                 }`}
@@ -806,7 +794,6 @@ export default function AiChatContentClient() {
                                 {msg.role === "ai" ? (
                                     <>
                                         <RenderMessage text={msg.text} onSaveVocab={handleSaveVocab} />
-                                        {/* Purchase CTA — shown when AI hints at purchasing */}
                                         {msg.showPurchaseCta && (
                                             <PurchaseSuggestionCard
                                                 bookTitle={bookTitle}
@@ -820,7 +807,6 @@ export default function AiChatContentClient() {
                                     <p className="text-white">{msg.text}</p>
                                 )}
                             </div>
-
                             {msg.role === "user" && (
                                 <div className="w-7 h-7 rounded-full bg-sky-500 flex items-center justify-center shrink-0 mb-0.5">
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="white">
@@ -832,7 +818,6 @@ export default function AiChatContentClient() {
                         </div>
                     ))}
 
-                    {/* Typing indicator */}
                     {loading && (
                         <div className="flex items-end gap-2 justify-start">
                             <div className="w-7 h-7 rounded-full bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0">
@@ -850,7 +835,6 @@ export default function AiChatContentClient() {
                     <div ref={bottomRef} />
                 </main>
 
-                {/* ── Input bar ── */}
                 <footer className="shrink-0 bg-slate-900 border-t border-slate-700/50 px-4 pt-3 pb-5 sm:pb-4">
                     <form
                         onSubmit={handleSubmit}
@@ -870,10 +854,7 @@ export default function AiChatContentClient() {
                             disabled={loading || !input.trim()}
                             className="w-9 h-9 shrink-0 bg-sky-600 rounded-xl flex items-center justify-center text-white hover:bg-sky-500 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none transition-all"
                         >
-                            {loading
-                                ? <Loader2 size={15} className="animate-spin" />
-                                : <Send size={14} />
-                            }
+                            {loading ? <Loader2 size={15} className="animate-spin" /> : <Send size={14} />}
                         </button>
                     </form>
                     <p className="text-center text-[9px] text-slate-300 uppercase tracking-wider mt-2">
