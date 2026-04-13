@@ -8,147 +8,376 @@ import {
   DollarSign, Users, BookOpen, ChevronRight, Send, RefreshCw, BarChart3,
   Settings, Flag, XCircle, AlertTriangle, UserX, Lock, ExternalLink,
   Download, Book, Phone, MapPin, CreditCard, Building,
-  Clock, ThumbsUp, Smartphone
+  Clock, ThumbsUp, Smartphone, Bell, ChevronDown, Menu, Home,
+  LayoutDashboard, Activity, PieChart, Layers, Star, ArrowUp, ArrowDown,
+  MoreHorizontal, Filter, Plus, Minus, CheckCircle, Info
 } from 'lucide-react';
 import { BookApprovalModal, ReplyModal, TransactionModal, UserModal } from '@/components/ApprovalModal';
 import FlwBalanceWidget from '@/components/admin/FlwBalanceWidget';
-import { db } from '@/lib/firebaseConfig';
+import { db, auth } from '@/lib/firebaseConfig';
 
-// ── Platform Fee Section Component ──────────────────────────────────────────
+/* ── CSS Variables & Global Styles ─────────────────────────────────────── */
+const globalStyles = `
+  :root {
+    --nav-bg: #0d1b2e;
+    --nav-border: rgba(255,255,255,0.07);
+    --sidebar-bg: #111c2e;
+    --sidebar-width: 220px;
+    --card-bg: #162033;
+    --card-border: rgba(255,255,255,0.07);
+    --surface: #1a2740;
+    --surface2: #1f2f47;
+    --accent: #3b82f6;
+    --accent-light: #60a5fa;
+    --accent-glow: rgba(59,130,246,0.15);
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --transition: 0.2s ease;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0b1628; color: var(--text-primary); font-family: 'Inter', system-ui, sans-serif; }
+
+  .admin-shell { display: flex; min-height: 100vh; background: #0b1628; }
+
+  /* Sidebar */
+  .sidebar {
+    width: var(--sidebar-width);
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--nav-border);
+    display: flex; flex-direction: column;
+    position: fixed; top: 0; left: 0; height: 100vh; z-index: 100;
+    overflow-y: auto;
+  }
+  .sidebar-logo {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--nav-border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--accent); display: flex; align-items: center; justify-content: center;
+  }
+  .logo-text { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+  .logo-sub  { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+
+  .sidebar-section-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-muted); text-transform: uppercase;
+    padding: 16px 20px 6px;
+  }
+  .sidebar-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 20px; cursor: pointer;
+    border-radius: 0; font-size: 13px; font-weight: 500;
+    color: var(--text-secondary); transition: var(--transition);
+    position: relative; border: none; background: none; width: 100%; text-align: left;
+  }
+  .sidebar-item:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
+  .sidebar-item.active {
+    background: var(--accent-glow); color: var(--accent-light);
+    border-left: 2px solid var(--accent);
+  }
+  .sidebar-item.active svg { color: var(--accent); }
+  .sidebar-badge {
+    margin-left: auto; background: var(--accent); color: #fff;
+    font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 10px;
+    min-width: 18px; text-align: center;
+  }
+  .sidebar-badge.warn { background: var(--warning); color: #000; }
+  .sidebar-badge.danger { background: var(--danger); }
+
+  /* Top bar */
+  .topbar {
+    background: var(--nav-bg); border-bottom: 1px solid var(--nav-border);
+    padding: 0 24px; height: 60px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 99;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 16px; }
+  .topbar-search {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm); padding: 6px 12px; min-width: 240px;
+  }
+  .topbar-search input {
+    background: none; border: none; outline: none; color: var(--text-primary);
+    font-size: 13px; width: 100%;
+  }
+  .topbar-search input::placeholder { color: var(--text-muted); }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: var(--radius-sm);
+    background: var(--surface); border: 1px solid var(--card-border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text-secondary); transition: var(--transition);
+  }
+  .icon-btn:hover { background: var(--surface2); color: var(--text-primary); }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff; cursor: pointer;
+  }
+
+  /* Main content */
+  .main-content {
+    margin-left: var(--sidebar-width);
+    display: flex; flex-direction: column; flex: 1; min-height: 100vh;
+  }
+  .page-content { padding: 24px; flex: 1; }
+
+  /* Cards */
+  .card {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .card-sm { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 16px; }
+
+  /* Stat cards */
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: var(--radius); padding: 18px 20px;
+    display: flex; align-items: center; gap: 14px;
+    transition: var(--transition); cursor: default;
+  }
+  .stat-card:hover { border-color: rgba(59,130,246,0.3); background: var(--surface); }
+  .stat-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .stat-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 22px; font-weight: 700; color: var(--text-primary); line-height: 1.2; margin-top: 2px; }
+  .stat-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; display: flex; align-items: center; gap: 3px; }
+  .stat-up { color: var(--success); }
+  .stat-down { color: var(--danger); }
+
+  /* Table */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table thead tr { border-bottom: 1px solid var(--card-border); }
+  .data-table th {
+    padding: 10px 16px; text-align: left; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);
+  }
+  .data-table td { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text-secondary); vertical-align: middle; }
+  .data-table tbody tr:hover td { background: rgba(255,255,255,0.02); }
+  .data-table tbody tr:last-child td { border-bottom: none; }
+
+  /* Status pills */
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .pill-success { background: rgba(16,185,129,0.12); color: #34d399; }
+  .pill-success .pill-dot { background: #34d399; }
+  .pill-warn    { background: rgba(245,158,11,0.12); color: #fbbf24; }
+  .pill-warn .pill-dot { background: #fbbf24; }
+  .pill-danger  { background: rgba(239,68,68,0.12); color: #f87171; }
+  .pill-danger .pill-dot { background: #f87171; }
+  .pill-info    { background: rgba(59,130,246,0.12); color: #60a5fa; }
+  .pill-info .pill-dot { background: #60a5fa; }
+  .pill-gray    { background: rgba(148,163,184,0.1); color: #94a3b8; }
+  .pill-gray .pill-dot { background: #94a3b8; }
+
+  /* Section header */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .section-title { font-size: 16px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+  .section-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Action buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: var(--radius-sm);
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: var(--transition); border: none;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-success { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.25); }
+  .btn-success:hover { background: rgba(16,185,129,0.25); }
+  .btn-danger  { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+  .btn-danger:hover { background: rgba(239,68,68,0.22); }
+  .btn-ghost   { background: var(--surface); color: var(--text-secondary); border: 1px solid var(--card-border); }
+  .btn-ghost:hover { background: var(--surface2); color: var(--text-primary); }
+
+  /* Book card */
+  .book-card {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: var(--radius); padding: 18px;
+    transition: var(--transition);
+  }
+  .book-card:hover { border-color: rgba(59,130,246,0.3); transform: translateY(-1px); }
+
+  /* Withdrawal card */
+  .withdrawal-card {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: var(--radius); padding: 20px;
+    border-left: 3px solid var(--warning);
+  }
+
+  /* Mini chart bars */
+  .mini-bars { display: flex; align-items: flex-end; gap: 3px; height: 40px; }
+  .mini-bar { flex: 1; background: var(--accent); border-radius: 2px 2px 0 0; opacity: 0.7; transition: var(--transition); min-width: 6px; }
+  .mini-bar:hover { opacity: 1; }
+
+  /* Quick actions row */
+  .quick-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 4px; }
+
+  /* Input */
+  .input-dark {
+    width: 100%; background: var(--surface); border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm); padding: 9px 14px; color: var(--text-primary);
+    font-size: 13px; outline: none; transition: var(--transition);
+  }
+  .input-dark:focus { border-color: rgba(59,130,246,0.5); }
+  .input-dark::placeholder { color: var(--text-muted); }
+
+  /* Activity feed */
+  .activity-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-dot {
+    width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0;
+  }
+
+  /* Progress bar */
+  .progress-bar { height: 4px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+
+  /* Responsive */
+  @media (max-width: 1200px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); }
+    .main-content { margin-left: 0; }
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+  }
+`;
+
+/* ── Platform Fee Section ───────────────────────────────────────────────── */
 function PlatformFeeSection({ user }) {
   const [pendingFees, setPendingFees] = useState([]);
   const [loadingFees, setLoadingFees] = useState(true);
   const [payingOut, setPayingOut] = useState(false);
   const [lastPayout, setLastPayout] = useState(null);
 
-  useEffect(() => {
-    loadPendingFees();
-    loadLastPayout();
-  }, []);
+  useEffect(() => { loadPendingFees(); loadLastPayout(); }, []);
 
   const loadPendingFees = async () => {
     try {
       setLoadingFees(true);
       const { collection, query, where, getDocs } = await import('firebase/firestore');
-      const q = query(
-        collection(db, 'platformFees'),
-        where('disbursedToFlutterwave', '==', false)
-      );
+      const q = query(collection(db, 'platformFees'), where('disbursedToFlutterwave', '==', false));
       const snap = await getDocs(q);
       setPendingFees(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (err) {
-      console.error('Error loading fees:', err);
-    } finally {
-      setLoadingFees(false);
-    }
+    } catch (err) { console.error(err); } finally { setLoadingFees(false); }
   };
 
   const loadLastPayout = async () => {
     try {
       const { collection, query, orderBy, limit, getDocs } = await import('firebase/firestore');
-      const q = query(
-        collection(db, 'payoutLogs'),
-        orderBy('createdAt', 'desc'),
-        limit(1)
-      );
+      const q = query(collection(db, 'payoutLogs'), orderBy('createdAt', 'desc'), limit(1));
       const snap = await getDocs(q);
-      if (!snap.empty) {
-        setLastPayout({ id: snap.docs[0].id, ...snap.docs[0].data() });
-      }
-    } catch (err) {
-      console.error('Error loading last payout:', err);
-    }
+      if (!snap.empty) setLastPayout({ id: snap.docs[0].id, ...snap.docs[0].data() });
+    } catch (err) { console.error(err); }
   };
 
   const totalPending = pendingFees.reduce((sum, f) => sum + (f.fee || 0), 0);
 
   const triggerPayout = async () => {
-    if (totalPending < 100) {
-      alert(`Not enough fees to disburse. Current pending: ₦${totalPending}. Minimum is ₦100.`);
-      return;
-    }
-
-    if (!confirm(`Disburse ₦${totalPending.toLocaleString()} from ${pendingFees.length} fees to your Flutterwave account?`)) return;
-
+    if (totalPending < 100) { alert(`Min ₦100 required. Current: ₦${totalPending}`); return; }
+    if (!confirm(`Disburse ₦${totalPending.toLocaleString()} from ${pendingFees.length} fees?`)) return;
     setPayingOut(true);
     try {
       const { doc, updateDoc } = await import('firebase/firestore');
-      await Promise.all(
-        pendingFees.map(fee =>
-          updateDoc(doc(db, 'platformFees', fee.id), {
-            disbursedToFlutterwave: true,
-            disbursedAt: new Date()
-          })
-        )
-      );
-      alert(`✅ Marked ₦${totalPending.toLocaleString()} as disbursed.\n\nWithdraw from your Flutterwave dashboard directly.`);
+      await Promise.all(pendingFees.map(fee => updateDoc(doc(db, 'platformFees', fee.id), { disbursedToFlutterwave: true, disbursedAt: new Date() })));
+      alert(`✅ ₦${totalPending.toLocaleString()} marked as disbursed.`);
       await loadPendingFees();
-    } catch (err) {
-      console.error('Payout error:', err);
-      alert(`❌ Failed: ${err.message}`);
-    } finally {
-      setPayingOut(false);
-    }
+    } catch (err) { alert(`❌ ${err.message}`); } finally { setPayingOut(false); }
   };
 
   return (
-    <div className="space-y-4">
-      {/* Live fee stats */}
-      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-        {loadingFees ? (
-          <div className="flex items-center gap-2 text-gray-500">
-            <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full" />
-            Loading pending fees...
-          </div>
-        ) : (
-          <div className="flex items-center justify-between">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '12px 16px', border: '1px solid var(--card-border)', fontSize: 13 }}>
+        {loadingFees ? <span style={{ color: 'var(--text-muted)' }}>Loading fees…</span> : (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <p className="text-sm text-gray-600">
-                <span className="font-bold text-gray-900">{pendingFees.length}</span> pending fees
-                totalling <span className="font-bold text-green-600">₦{totalPending.toLocaleString()}</span>
-              </p>
-              {lastPayout && (
-                <p className="text-xs text-gray-400 mt-1">
-                  Last payout: ₦{lastPayout.totalAmount?.toLocaleString()} on{' '}
-                  {lastPayout.createdAt?.toDate?.().toLocaleDateString('en-NG', {
-                    day: '2-digit', month: 'short', year: 'numeric'
-                  })}
-                </p>
-              )}
+              <span style={{ color: 'var(--text-secondary)' }}><strong style={{ color: 'var(--text-primary)' }}>{pendingFees.length}</strong> pending fees — </span>
+              <strong style={{ color: 'var(--success)' }}>₦{totalPending.toLocaleString()}</strong>
+              {lastPayout && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>Last: ₦{lastPayout.totalAmount?.toLocaleString()} on {lastPayout.createdAt?.toDate?.().toLocaleDateString('en-NG')}</div>}
             </div>
-            <button
-              onClick={loadPendingFees}
-              className="text-blue-600 hover:text-blue-800 p-1"
-              title="Refresh"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
+            <button onClick={loadPendingFees} className="icon-btn"><RefreshCw size={14} /></button>
           </div>
         )}
       </div>
-
-      {/* Payout button */}
-      <button
-      
-        disabled={payingOut || loadingFees || totalPending < 100}
-        className="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-base hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {payingOut ? (
-          <><div className="animate-spin h-5 w-5 border-2 border-white/30 border-t-white rounded-full" /> Processing Payout...</>
-        ) : (
-          <><DollarSign className="w-5 h-5" /> Withdraw ₦{totalPending.toLocaleString()} Platform Fees to Flutterwave</>
-        )}
+      <button onClick={triggerPayout} disabled={payingOut || loadingFees || totalPending < 100}
+        className="btn btn-success" style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: 13 }}>
+        {payingOut ? <><div style={{ width: 16, height: 16, border: '2px solid rgba(52,211,153,0.3)', borderTopColor: '#34d399', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Processing…</> : <><DollarSign size={16} />Withdraw ₦{totalPending.toLocaleString()} to Flutterwave</>}
       </button>
-
-      {totalPending < 100 && !loadingFees && (
-        <p className="text-xs text-center text-gray-400">
-          Minimum ₦100 required to disburse. Keep collecting fees!
-        </p>
-      )}
+      {totalPending < 100 && !loadingFees && <p style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>Min ₦100 required.</p>}
     </div>
   );
 }
 
+/* ── Sidebar Nav Items ──────────────────────────────────────────────────── */
+const NAV_SECTIONS = [
+  {
+    label: 'Dashboard',
+    items: [
+      { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
+    ]
+  },
+  {
+    label: 'Content',
+    items: [
+      { id: 'advertisements', icon: BookOpen, label: 'Books', badgeKey: 'pendingAds' },
+      { id: 'schools', icon: Building, label: 'Schools', badgeKey: 'pendingSchools' },
+      { id: 'school-documents', icon: FileText, label: 'School Docs', badgeKey: 'pendingSchoolDocs' },
+    ]
+  },
+  {
+    label: 'Finance',
+    items: [
+      { id: 'withdrawals', icon: Download, label: 'Withdrawals', badgeKey: 'pendingWithdrawals', badgeType: 'warn' },
+      { id: 'transactions', icon: DollarSign, label: 'Transactions' },
+      { id: 'settings', icon: Settings, label: 'Fee Settings' },
+    ]
+  },
+  {
+    label: 'Users & Support',
+    items: [
+      { id: 'users', icon: Users, label: 'All Users' },
+      { id: 'support', icon: MessageSquare, label: 'Support', badgeKey: 'openTickets', badgeType: 'danger' },
+      { id: 'reports', icon: Flag, label: 'Reports', badgeKey: 'pendingReports', badgeType: 'danger' },
+    ]
+  },
+  {
+    label: 'Feedback',
+    items: [
+      { id: 'feedbacks', icon: ThumbsUp, label: 'Book Feedback' },
+      { id: 'article-feedbacks', icon: Star, label: 'Help Feedback' },
+    ]
+  }
+];
+
+/* ── Main Component ─────────────────────────────────────────────────────── */
 export default function ComprehensiveAdminPanel() {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -170,7 +399,6 @@ export default function ComprehensiveAdminPanel() {
   const [sending, setSending] = useState(false);
   const [pdfUrl, setPdfUrl] = useState('');
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
-  const [pdfViewMode, setPdfViewMode] = useState('embed'); // 'embed' or 'fullscreen'
   const [schoolApplications, setSchoolApplications] = useState([]);
   const [schoolDocuments, setSchoolDocuments] = useState([]);
   const [feedbacks, setFeedbacks] = useState([]);
@@ -185,89 +413,43 @@ export default function ComprehensiveAdminPanel() {
   const [selectedSeller, setSelectedSeller] = useState(null);
   const [sellerDetails, setSellerDetails] = useState(null);
   const [loadingSellerDetails, setLoadingSellerDetails] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        await checkAdminStatus(currentUser);
-      } else {
-        setUser(null);
-        setIsAdmin(false);
-        setCheckingAdmin(false);
-      }
+      if (currentUser) { setUser(currentUser); await checkAdminStatus(currentUser); }
+      else { setUser(null); setIsAdmin(false); setCheckingAdmin(false); }
     });
     return () => unsubscribe();
   }, []);
 
-
-const checkAdminStatus = async (currentUser) => {
-  try {
-    setCheckingAdmin(true);
-    
-    // Primary check: Firestore admin flag
-    const userDocRef = doc(db, 'users', currentUser.uid);
-    const userDoc = await getDoc(userDocRef);
-    
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      
-      // Check Firestore first
-      if (userData.role === 'admin' || userData.isAdmin === true) {
-        setIsAdmin(true);
-        await fetchAllData();
-        return;
+  const checkAdminStatus = async (currentUser) => {
+    try {
+      setCheckingAdmin(true);
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        if (userData.role === 'admin' || userData.isAdmin === true) { setIsAdmin(true); await fetchAllData(); return; }
       }
-    }
-    
-    // Fallback check: Environment variable (for emergency access)
-    if (ADMIN_EMAILS.includes(currentUser.email)) {
-      // Log this access for security monitoring
-      
-      // Optionally, automatically set isAdmin in Firestore
-      await updateDoc(userDocRef, {
-        isAdmin: true,
-        role: 'admin',
-        adminAccessGranted: serverTimestamp()
-      });
-      
-      setIsAdmin(true);
-      await fetchAllData();
-      return;
-    }
-    
-    // No admin access
-    setIsAdmin(false);
-    
-  } catch (error) {
-    console.error('Error checking admin status:', error);
-    setIsAdmin(false);
-  } finally {
-    setCheckingAdmin(false);
-  }
-};
+      if (ADMIN_EMAILS.includes(currentUser.email)) {
+        await updateDoc(doc(db, 'users', currentUser.uid), { isAdmin: true, role: 'admin', adminAccessGranted: serverTimestamp() });
+        setIsAdmin(true); await fetchAllData(); return;
+      }
+      setIsAdmin(false);
+    } catch (error) { console.error(error); setIsAdmin(false); } finally { setCheckingAdmin(false); }
+  };
 
   const fetchAllData = async () => {
     setLoading(true);
     try {
       await Promise.all([
-        fetchAdvertisements(),
-        fetchSupportTickets(),
-        fetchBookReports(),
-        fetchTransactions(),
-        fetchUsers(),
-        fetchWithdrawals(),
-        fetchSchoolApplications(),
-        fetchSchoolDocuments(),
-        fetchFeedbacks(),
-        fetchArticleFeedbacks(), // ← ADD THIS
+        fetchAdvertisements(), fetchSupportTickets(), fetchBookReports(),
+        fetchTransactions(), fetchUsers(), fetchWithdrawals(),
+        fetchSchoolApplications(), fetchSchoolDocuments(), fetchFeedbacks(), fetchArticleFeedbacks(),
       ]);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
   const fetchSellerFullDetails = async (sellerId) => {
@@ -280,663 +462,164 @@ const checkAdminStatus = async (currentUser) => {
         getDocs(query(collection(db, 'withdrawals'), where('sellerId', '==', sellerId), orderBy('requestedAt', 'desc'))),
         getDocs(query(collection(db, 'recharges'), where('sellerId', '==', sellerId), orderBy('createdAt', 'desc'))),
       ]);
-
       const seller = sellerDoc.exists() ? { id: sellerDoc.id, ...sellerDoc.data() } : null;
       const sales = salesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const transfers = transfersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const sellerWithdrawals = withdrawalsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const recharges = rechargesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
       const totalEarned = sales.reduce((sum, s) => sum + (s.sellerEarnings || s.amount || 0), 0);
       const totalTransferred = transfers.reduce((sum, t) => sum + (t.totalDeducted || t.amount || 0), 0);
       const totalWithdrawn = sellerWithdrawals.filter(w => w.status === 'completed').reduce((sum, w) => sum + (w.amount || 0), 0);
       const totalSpentOnRecharges = recharges.reduce((sum, r) => sum + (r.amount || 0), 0);
-
-      setSellerDetails({
-        seller,
-        sales,
-        transfers,
-        withdrawals: sellerWithdrawals,
-        recharges,
-        stats: { totalEarned, totalTransferred, totalWithdrawn, totalSpentOnRecharges }
-      });
-    } catch (err) {
-      console.error('Error fetching seller details:', err);
-    } finally {
-      setLoadingSellerDetails(false);
-    }
+      setSellerDetails({ seller, sales, transfers, withdrawals: sellerWithdrawals, recharges, stats: { totalEarned, totalTransferred, totalWithdrawn, totalSpentOnRecharges } });
+    } catch (err) { console.error(err); } finally { setLoadingSellerDetails(false); }
   };
 
   const fetchSchoolApplications = async () => {
-    try {
-      const q = query(collection(db, 'schoolApplications'), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      setSchoolApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    } catch (error) {
-      console.error('Error fetching school applications:', error);
-    }
+    try { const q = query(collection(db, 'schoolApplications'), orderBy('createdAt', 'desc')); const s = await getDocs(q); setSchoolApplications(s.docs.map(d => ({ id: d.id, ...d.data() }))); } catch (e) { console.error(e); }
   };
-
   const fetchSchoolDocuments = async () => {
-    try {
-      const q = query(collection(db, 'schoolDocuments'), orderBy('uploadDate', 'desc'));
-      const snapshot = await getDocs(q);
-      setSchoolDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    } catch (error) {
-      console.error('Error fetching school documents:', error);
-    }
+    try { const q = query(collection(db, 'schoolDocuments'), orderBy('uploadDate', 'desc')); const s = await getDocs(q); setSchoolDocuments(s.docs.map(d => ({ id: d.id, ...d.data() }))); } catch (e) { console.error(e); }
   };
-
-  const updateSchoolApplicationStatus = async (schoolId, status) => {
-  if (!confirm(`Are you sure you want to ${status} this school application?`)) return;
-  
-  try {
-    await updateDoc(doc(db, 'schoolApplications', schoolId), {
-      status: status,
-      verifiedSchool: status === 'approved',
-      reviewedAt: serverTimestamp(),
-      reviewedBy: user.email
-    });
-    
-    // Send notification to school
-    const school = schoolApplications.find(s => s.id === schoolId);
-    if (school) {
-      await addDoc(collection(db, 'notifications'), {
-        userId: school.userId || school.email,
-        type: status === 'approved' ? 'school_approved' : 'school_rejected',
-        title: status === 'approved' ? 'School Application Approved ✅' : 'School Application Rejected ❌',
-        message: status === 'approved' 
-          ? `Congratulations! ${school.schoolName} has been approved. You can now access your school dashboard and start uploading documents.`
-          : `Your school application for ${school.schoolName} has been rejected. Please contact support for more information.`,
-        createdAt: serverTimestamp(),
-        read: false
-      });
-    }
-    
-    alert(`School ${status} successfully!`);
-    await fetchSchoolApplications();
-  } catch (error) {
-    console.error('Error updating school application:', error);
-    alert('Failed to update school application');
-  }
-};
-
-const updateSchoolDocumentStatus = async (docId, status) => {
-  if (!confirm(`Are you sure you want to ${status} this document?`)) return;
-  
-  try {
-    await updateDoc(doc(db, 'schoolDocuments', docId), {
-      status: status,
-      verified: status === 'approved',
-      approvedDate: status === 'approved' ? serverTimestamp() : null,
-      approvedBy: user.email
-    });
-    
-    // Update school's total document count if approved
-    const document = schoolDocuments.find(d => d.id === docId);
-    if (document && status === 'approved') {
-      const schoolQuery = query(
-        collection(db, 'schoolApplications'),
-        where('schoolId', '==', document.schoolId)
-      );
-      const schoolSnap = await getDocs(schoolQuery);
-      
-      if (!schoolSnap.empty) {
-        const schoolDocRef = doc(db, 'schoolApplications', schoolSnap.docs[0].id);
-        const currentTotal = schoolSnap.docs[0].data().totalDocuments || 0;
-        await updateDoc(schoolDocRef, {
-          totalDocuments: currentTotal + 1
-        });
-      }
-    }
-    
-    alert(`Document ${status} successfully!`);
-    await fetchSchoolDocuments();
-  } catch (error) {
-    console.error('Error updating document:', error);
-    alert('Failed to update document');
-  }
-  };
-  
-  const fetchAdvertisements = async () => {
-    const q = query(collection(db, 'advertMyBook'), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    setAdvertisements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  };
-
-  const fetchSupportTickets = async () => {
-    const q = query(collection(db, 'supportTickets'), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    setSupportTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  };
-
-  const fetchBookReports = async () => {
-    const q = query(collection(db, 'bookReports'), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    setBookReports(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  };
-
+  const fetchAdvertisements = async () => { const q = query(collection(db, 'advertMyBook'), orderBy('createdAt', 'desc')); const s = await getDocs(q); setAdvertisements(s.docs.map(d => ({ id: d.id, ...d.data() }))); };
+  const fetchSupportTickets = async () => { const q = query(collection(db, 'supportTickets'), orderBy('createdAt', 'desc')); const s = await getDocs(q); setSupportTickets(s.docs.map(d => ({ id: d.id, ...d.data() }))); };
+  const fetchBookReports = async () => { const q = query(collection(db, 'bookReports'), orderBy('createdAt', 'desc')); const s = await getDocs(q); setBookReports(s.docs.map(d => ({ id: d.id, ...d.data() }))); };
   const fetchTransactions = async () => {
-    const [txnSnap, transferSnap] = await Promise.all([
-      getDocs(query(collection(db, 'transactions'), orderBy('createdAt', 'desc'))),
-      getDocs(query(collection(db, 'transfers'), orderBy('createdAt', 'desc')))
-    ]);
+    const [txnSnap, transferSnap] = await Promise.all([getDocs(query(collection(db, 'transactions'), orderBy('createdAt', 'desc'))), getDocs(query(collection(db, 'transfers'), orderBy('createdAt', 'desc')))]);
     const txns = txnSnap.docs.map(d => ({ id: d.id, ...d.data(), source: 'sale' }));
-    const transfers = transferSnap.docs.map(d => ({
-      id: d.id, ...d.data(),
-      source: 'transfer',
-      bookTitle: `Transfer → ${d.data().recipientName || 'Unknown'}`,
-      buyerEmail: d.data().senderName || d.data().senderId,
-      sellerName: d.data().recipientName,
-      amount: d.data().totalDeducted || d.data().amount,
-    }));
-    const all = [...txns, ...transfers].sort((a, b) => {
-      const aDate = a.createdAt?.toDate?.() || new Date(0);
-      const bDate = b.createdAt?.toDate?.() || new Date(0);
-      return bDate - aDate;
-    });
+    const transfers = transferSnap.docs.map(d => ({ id: d.id, ...d.data(), source: 'transfer', bookTitle: `Transfer → ${d.data().recipientName || 'Unknown'}`, buyerEmail: d.data().senderName || d.data().senderId, sellerName: d.data().recipientName, amount: d.data().totalDeducted || d.data().amount }));
+    const all = [...txns, ...transfers].sort((a, b) => (b.createdAt?.toDate?.() || new Date(0)) - (a.createdAt?.toDate?.() || new Date(0)));
     setTransactions(all);
   };
-
-  const fetchUsers = async () => {
-    const snapshot = await getDocs(collection(db, 'users'));
-    setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  };
-
+  const fetchUsers = async () => { const s = await getDocs(collection(db, 'users')); setUsers(s.docs.map(d => ({ id: d.id, ...d.data() }))); };
   const fetchWithdrawals = async () => {
+    try { const q = query(collection(db, 'withdrawals'), orderBy('requestedAt', 'desc')); const s = await getDocs(q); setWithdrawals(s.docs.map(d => ({ id: d.id, ...d.data(), requestedAtDate: d.data().requestedAt?.toDate() || new Date() }))); } catch (e) { console.error(e); }
+  };
+  const fetchFeedbacks = async () => {
     try {
-      const q = query(collection(db, 'withdrawals'), orderBy('requestedAt', 'desc'));
-      const snapshot = await getDocs(q);
-      setWithdrawals(snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        requestedAtDate: doc.data().requestedAt?.toDate() || new Date()
-      })));
-    } catch (error) {
-      console.error('Error fetching withdrawals:', error);
-    }
+      const q = query(collection(db, 'bookFeedbacks'), orderBy('createdAt', 'desc')); const s = await getDocs(q);
+      const list = await Promise.all(s.docs.map(async (feedbackDoc) => {
+        const fb = feedbackDoc.data();
+        if (!fb.bookTitle && fb.bookId) { try { const bd = await getDoc(doc(db, 'advertMyBook', fb.bookId.replace('firestore-', ''))); if (bd.exists()) fb.bookTitle = bd.data().bookTitle || bd.data().title; } catch (e) { } }
+        return { id: feedbackDoc.id, ...fb, createdAt: fb.createdAt?.toDate() || new Date() };
+      }));
+      setFeedbacks(list);
+    } catch (e) { console.error(e); }
+  };
+  const fetchArticleFeedbacks = async () => {
+    try { const q = query(collection(db, 'articleFeedback'), orderBy('createdAt', 'desc')); const s = await getDocs(q); setArticleFeedbacks(s.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() || new Date() }))); } catch (e) { console.error(e); }
   };
 
   const checkPdfDuplicate = async (pdfUrl) => {
-  if (!pdfUrl) return false;
-  setCheckingDuplicate(true);
-  try {
-    // Check exact URL match
-    const q = query(
-      collection(db, 'advertMyBook'), 
-      where('pdfUrl', '==', pdfUrl), 
-      where('status', '==', 'approved')
-    );
-    const snapshot = await getDocs(q);
-    
-    // If it's a Firebase Storage URL, it's a direct upload - less strict duplicate check
-    if (pdfUrl.includes('firebasestorage.googleapis.com')) {
-      // For direct uploads, only flag if exact same file URL exists
-      return !snapshot.empty;
-    }
-    
-    // For Google Drive, check more strictly
-    if (pdfUrl.includes('drive.google.com')) {
-      // Extract Drive file ID and check if any approved book has same file ID
-      const match = pdfUrl.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})|id=([\w-]{25,})/);
-      if (match) {
-        const fileId = match[1] || match[2] || match[3];
-        // Check all approved books for this file ID
-        const allApprovedQuery = query(
-          collection(db, 'advertMyBook'),
-          where('status', '==', 'approved')
-        );
-        const allApproved = await getDocs(allApprovedQuery);
-        
-        for (const doc of allApproved.docs) {
-          const data = doc.data();
-          if (data.driveFileId === fileId || 
-              data.pdfUrl?.includes(fileId) || 
-              data.pdfLink?.includes(fileId)) {
-            return true; // Duplicate found
-          }
+    if (!pdfUrl) return false; setCheckingDuplicate(true);
+    try {
+      const q = query(collection(db, 'advertMyBook'), where('pdfUrl', '==', pdfUrl), where('status', '==', 'approved'));
+      const s = await getDocs(q);
+      if (pdfUrl.includes('drive.google.com')) {
+        const match = pdfUrl.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})|id=([\w-]{25,})/);
+        if (match) {
+          const fileId = match[1] || match[2] || match[3];
+          const all = await getDocs(query(collection(db, 'advertMyBook'), where('status', '==', 'approved')));
+          for (const d of all.docs) { const data = d.data(); if (data.driveFileId === fileId || data.pdfUrl?.includes(fileId) || data.pdfLink?.includes(fileId)) { return true; } }
         }
       }
-    }
-    
-    return !snapshot.empty;
-  } catch (error) {
-    console.error('Error checking duplicate:', error);
-    return false;
-  } finally {
-    setCheckingDuplicate(false);
-  }
-};
+      return !s.empty;
+    } catch (e) { return false; } finally { setCheckingDuplicate(false); }
+  };
 
   const updateAdvertisementStatus = async (id, status, ad) => {
-    if (status === 'approved') {
-      // Check for duplicates
-      const isDuplicate = await checkPdfDuplicate(ad.pdfUrl || ad.pdfLink);
-      if (isDuplicate) {
-        alert('⚠️ This file already exists in the database. Cannot approve duplicate.');
-        return;
-      }
-    }
-
+    if (status === 'approved') { const isDup = await checkPdfDuplicate(ad.pdfUrl || ad.pdfLink); if (isDup) { alert('⚠️ Duplicate file. Cannot approve.'); return; } }
     try {
-      // 1. Update the book document status
-      await updateDoc(doc(db, 'advertMyBook', id), {
-        status,
-        reviewedAt: serverTimestamp(),
-        reviewedBy: user.email
-      });
-
-      if (status === 'approved' && (ad.pdfUrl || ad.pdfLink)) {
-        fetch('/api/book-embed', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            bookId: id,
-            pdfUrl: ad.pdfUrl || ad.pdfLink,
-            sellerId: ad.userId || ad.sellerId,
-            title: ad.bookTitle || ad.title,
-          }),
-        })
-          .then(r => r.json())
-          .then(result => {
-            if (result.success) {
-              console.log(`✅ AI embedding done: ${result.chunks} chunks for "${ad.bookTitle}"`);
-            } else {
-              console.warn('⚠️ AI embedding failed (book still approved):', result.error);
-            }
-          })
-          .catch(err => console.warn('⚠️ AI embedding error (book still approved):', err.message));
-      }
-
-      // 2. If approved, notify all followers
+      await updateDoc(doc(db, 'advertMyBook', id), { status, reviewedAt: serverTimestamp(), reviewedBy: user.email });
+      if (status === 'approved' && (ad.pdfUrl || ad.pdfLink)) { fetch('/api/book-embed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bookId: id, pdfUrl: ad.pdfUrl || ad.pdfLink, sellerId: ad.userId || ad.sellerId, title: ad.bookTitle || ad.title }) }).catch(() => { }); }
       if (status === 'approved') {
-        const lecturerId = ad.sellerId;
-        const lecturerName = ad.sellerName || "A lecturer you follow";
-        const bookTitle = ad.bookTitle || ad.title || "new material";
-
-        // Query the 'follows' collection for this lecturer
-        const followersQuery = query(
-          collection(db, "follows"),
-          where("lecturerId", "==", lecturerId)
-        );
-
-        const followersSnap = await getDocs(followersQuery);
-
-        if (!followersSnap.empty) {
-          // Create notification documents for each follower
-          const notificationPromises = followersSnap.docs.map(followerDoc => {
-            const followerData = followerDoc.data();
-            return addDoc(collection(db, "notifications"), {
-              userId: followerData.followerId, // The student/follower UID
-              type: 'new_upload',
-              title: 'New Material Uploaded! 📚',
-              message: `${lecturerName} just uploaded: "${bookTitle}"`,
-              link: `/lecturer-profile?sellerId=${lecturerId}`, // Redirect student to profile
-              createdAt: serverTimestamp(),
-              read: false
-            });
-          });
-
-          await Promise.all(notificationPromises);
-          console.log(`Successfully notified ${followersSnap.size} followers.`);
-        }
+        const lecturerId = ad.sellerId; const lecturerName = ad.sellerName || "A lecturer"; const bookTitle = ad.bookTitle || "new material";
+        const followersSnap = await getDocs(query(collection(db, "follows"), where("lecturerId", "==", lecturerId)));
+        if (!followersSnap.empty) { await Promise.all(followersSnap.docs.map(fd => addDoc(collection(db, "notifications"), { userId: fd.data().followerId, type: 'new_upload', title: '📚 New Material Uploaded!', message: `${lecturerName} just uploaded: "${bookTitle}"`, link: `/lecturer-profile?sellerId=${lecturerId}`, createdAt: serverTimestamp(), read: false }))); }
       }
-
-      // Update local state and UI
       setAdvertisements(advertisements.map(a => a.id === id ? { ...a, status } : a));
-      alert(`✅ Book ${status} successfully ${status === 'approved' ? 'and followers notified' : ''}`);
-      setShowModal(false);
-
-    } catch (error) {
-      console.error("Error in updateAdvertisementStatus:", error);
-      alert("An error occurred while updating status. Check console for details.");
-    }
+      alert(`✅ Book ${status}`); setShowModal(false);
+    } catch (error) { console.error(error); alert("Error updating status."); }
   };
 
-  const updateTicketStatus = async (id, status) => {
-    await updateDoc(doc(db, 'supportTickets', id), { status, resolvedAt: serverTimestamp() });
-    setSupportTickets(supportTickets.map(t => t.id === id ? { ...t, status } : t));
-    alert(`Ticket ${status}`);
-  };
+  const updateTicketStatus = async (id, status) => { await updateDoc(doc(db, 'supportTickets', id), { status, resolvedAt: serverTimestamp() }); setSupportTickets(supportTickets.map(t => t.id === id ? { ...t, status } : t)); };
+  const updateReportStatus = async (id, status) => { await updateDoc(doc(db, 'bookReports', id), { status, resolvedAt: serverTimestamp() }); setBookReports(bookReports.map(r => r.id === id ? { ...r, status } : r)); };
+  const updateUserStatus = async (userId, status) => { if (!confirm(`Set user to ${status}?`)) return; await updateDoc(doc(db, 'users', userId), { accountStatus: status, updatedAt: serverTimestamp() }); fetchUsers(); };
+  const deleteUserAccount = async (userId) => { if (!confirm('DELETE this user? Cannot undo!')) return; try { await deleteDoc(doc(db, 'users', userId)); fetchUsers(); setShowModal(false); } catch (e) { alert('Failed: ' + e.message); } };
+  const deleteFeedback = async (feedbackId) => { if (!confirm('Delete this feedback?')) return; try { await deleteDoc(doc(db, 'bookFeedbacks', feedbackId)); setFeedbacks(feedbacks.filter(f => f.id !== feedbackId)); } catch (e) { alert('Failed: ' + e.message); } };
 
-  const updateReportStatus = async (id, status) => {
-    await updateDoc(doc(db, 'bookReports', id), { status, resolvedAt: serverTimestamp() });
-    setBookReports(bookReports.map(r => r.id === id ? { ...r, status } : r));
-    alert(`Report ${status}`);
-  };
-
-  const updateUserStatus = async (userId, status) => {
-    if (!confirm(`Are you sure you want to set this user to ${status}?`)) return;
-    await updateDoc(doc(db, 'users', userId), { accountStatus: status, updatedAt: serverTimestamp() });
-    fetchUsers();
-    alert(`User account set to ${status}`);
-  };
-
-  const deleteUserAccount = async (userId) => {
-    if (!confirm('Are you sure you want to DELETE this user account? This action cannot be undone!')) return;
-    try {
-      await deleteDoc(doc(db, 'users', userId));
-      fetchUsers();
-      alert('User account deleted successfully');
-      setShowModal(false);
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      alert('Failed to delete user account');
-    }
-  };
-
-  //  FLUTTERWAVE TRANSFER FUNCTION
   const processFlutterwaveTransfer = async (withdrawal) => {
     try {
-      console.log(' Initiating transfer via API route...');
-
-      const response = await fetch('/api/flutterwave-transfer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ withdrawal })
-      });
-
+      const response = await fetch('/api/flutterwave-transfer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ withdrawal }) });
       const result = await response.json();
-
-      console.log(' API response:', result);
-
-      if (result.success) {
-        return {
-          success: true,
-          transferId: result.transferId,
-          reference: result.reference,
-          status: result.status
-        };
-      } else {
-        throw new Error(result.error || 'Transfer failed');
-      }
-
-    } catch (error) {
-      console.error(' Transfer error:', error);
-      return {
-        success: false,
-        error: error.message || 'Failed to process transfer'
-      };
-    }
+      if (result.success) return { success: true, transferId: result.transferId, reference: result.reference, status: result.status };
+      throw new Error(result.error || 'Transfer failed');
+    } catch (error) { return { success: false, error: error.message || 'Failed to process transfer' }; }
   };
 
   const approveWithdrawal = async (withdrawal) => {
-    // If skipConfirm is false, show the confirm modal and stop here
-    if (!skipConfirm) {
-      setConfirmedWithdrawal(withdrawal);
-      setShowConfirmModal(true);
-      return; // ← STOP. Don't run anything else.
-    }
-
-    // PIN was verified, skip confirmed — reset and proceed
+    if (!skipConfirm) { setConfirmedWithdrawal(withdrawal); setShowConfirmModal(true); return; }
     setSkipConfirm(false);
-
-    // Validations
-    if (!withdrawal.bankDetails) {
-      alert('❌ Error: This withdrawal request is missing bank details.');
-      return;
-    }
-    if (!withdrawal.bankDetails.bankCode) {
-      alert('❌ Error: Bank code is missing!');
-      return;
-    }
-    if (!withdrawal.bankDetails.accountNumber || !withdrawal.bankDetails.accountName) {
-      alert('❌ Error: Incomplete bank details.');
-      return;
-    }
-
+    if (!withdrawal.bankDetails?.bankCode || !withdrawal.bankDetails?.accountNumber || !withdrawal.bankDetails?.accountName) { alert('❌ Incomplete bank details.'); return; }
     try {
       setProcessingWithdrawalId(withdrawal.id);
-
       const transferResult = await processFlutterwaveTransfer(withdrawal);
-
-      if (!transferResult.success) {
-        let errorMessage = transferResult.error || 'Unknown error occurred';
-        let helpText = '';
-        if (errorMessage.toLowerCase().includes('insufficient')) {
-          helpText = '\n\n💡 Fund your Flutterwave wallet with at least ₦' + withdrawal.amount.toLocaleString();
-        } else if (errorMessage.toLowerCase().includes('bank code')) {
-          helpText = '\n\n💡 Verify bank code: ' + withdrawal.bankDetails.bankCode;
-        } else if (errorMessage.includes('HTML') || errorMessage.includes('JSON')) {
-          helpText = '\n\n💡 Your API key may be invalid. Check .env.local and restart the server.';
-        }
-        alert(`❌ Transfer Failed\n\n${errorMessage}${helpText}`);
-        return;
-      }
-
-      // Update withdrawal status
-      await updateDoc(doc(db, 'withdrawals', withdrawal.id), {
-        status: 'completed',
-        processedAt: serverTimestamp(),
-        flutterwaveTransferId: transferResult.transferId,
-        flutterwaveReference: transferResult.reference,
-        adminNote: 'Approved and processed via Flutterwave',
-        processedBy: user.email
-      });
-
-      // Update seller stats
+      if (!transferResult.success) { alert(`❌ Transfer Failed\n\n${transferResult.error}`); return; }
+      await updateDoc(doc(db, 'withdrawals', withdrawal.id), { status: 'completed', processedAt: serverTimestamp(), flutterwaveTransferId: transferResult.transferId, flutterwaveReference: transferResult.reference, adminNote: 'Approved via Flutterwave', processedBy: user.email });
       const sellerDocRef = doc(db, 'sellers', withdrawal.sellerId);
       const sellerDoc = await getDoc(sellerDocRef);
-      if (sellerDoc.exists()) {
-        await updateDoc(sellerDocRef, {
-          totalWithdrawn: (sellerDoc.data().totalWithdrawn || 0) + withdrawal.amount,
-          lastWithdrawalDate: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-      }
-
-      // Notify seller
-      await addDoc(collection(db, 'notifications'), {
-        userId: withdrawal.sellerId,
-        type: 'withdrawal_approved',
-        title: 'Withdrawal Approved ✅',
-        message: `Your withdrawal of ₦${withdrawal.amount.toLocaleString()} has been processed.\n\nBank: ${withdrawal.bankDetails.bankName}\nAccount: ${withdrawal.bankDetails.accountNumber}\n\nReference: ${transferResult.reference}`,
-        reference: withdrawal.reference,
-        createdAt: serverTimestamp(),
-        read: false
-      });
-
-      setWithdrawalSuccessData({
-        amount: withdrawal.amount,
-        sellerName: withdrawal.sellerName,
-        bankName: withdrawal.bankDetails.bankName,
-        accountNumber: withdrawal.bankDetails.accountNumber,
-        transferId: transferResult.transferId,
-        reference: transferResult.reference,
-      });
-
+      if (sellerDoc.exists()) await updateDoc(sellerDocRef, { totalWithdrawn: (sellerDoc.data().totalWithdrawn || 0) + withdrawal.amount, lastWithdrawalDate: serverTimestamp(), updatedAt: serverTimestamp() });
+      await addDoc(collection(db, 'notifications'), { userId: withdrawal.sellerId, type: 'withdrawal_approved', title: 'Withdrawal Approved ✅', message: `Your withdrawal of ₦${withdrawal.amount.toLocaleString()} has been processed. Ref: ${transferResult.reference}`, createdAt: serverTimestamp(), read: false });
+      setWithdrawalSuccessData({ amount: withdrawal.amount, sellerName: withdrawal.sellerName, bankName: withdrawal.bankDetails.bankName, accountNumber: withdrawal.bankDetails.accountNumber, transferId: transferResult.transferId, reference: transferResult.reference });
       await fetchWithdrawals();
-
-    } catch (error) {
-      console.error('❌ Unexpected error:', error);
-      alert(`❌ Failed: ${error.message}`);
-    } finally {
-      setProcessingWithdrawalId(null);
-    }
-  };    
-
-
-  const fetchFeedbacks = async () => {
-  try {
-    const q = query(collection(db, 'bookFeedbacks'), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    
-    const feedbackList = await Promise.all(
-      snapshot.docs.map(async (feedbackDoc) => {
-        const fbData = feedbackDoc.data();
-        
-        // If bookTitle is missing, fetch it
-        if (!fbData.bookTitle && fbData.bookId) {
-          try {
-            const bookId = fbData.bookId.replace('firestore-', '');
-            const bookDoc = await getDoc(doc(db, 'advertMyBook', bookId));
-            if (bookDoc.exists()) {
-              fbData.bookTitle = bookDoc.data().bookTitle || bookDoc.data().title;
-            }
-          } catch (error) {
-            console.error('Error fetching book title:', error);
-          }
-        }
-        
-        return {
-          id: feedbackDoc.id,
-          ...fbData,
-          createdAt: fbData.createdAt?.toDate() || new Date()
-        };
-      })
-    );
-    
-    setFeedbacks(feedbackList);
-  } catch (error) {
-    console.error('Error fetching feedbacks:', error);
-  }
-};
-
-const fetchArticleFeedbacks = async () => {
-  try {
-    const q = query(collection(db, 'articleFeedback'), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    setArticleFeedbacks(snapshot.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      createdAt: d.data().createdAt?.toDate() || new Date()
-    })));
-  } catch (error) {
-    console.error('Error fetching article feedbacks:', error);
-  }
+    } catch (error) { alert(`❌ Failed: ${error.message}`); } finally { setProcessingWithdrawalId(null); }
   };
-  
-const deleteFeedback = async (feedbackId) => {
-  if (!confirm('Are you sure you want to delete this feedback? This action cannot be undone.')) return;
-  
-  try {
-    await deleteDoc(doc(db, 'bookFeedbacks', feedbackId));
-    alert('✅ Feedback deleted successfully');
-    await fetchFeedbacks();
-  } catch (error) {
-    console.error('Error deleting feedback:', error);
-    alert('❌ Failed to delete feedback');
-  }
-};
 
-  //  REJECT WITHDRAWAL FUNCTION
-  // 🟢 UPDATED REJECT WITHDRAWAL FUNCTION (With Refund Logic)
   const rejectWithdrawal = async (withdrawalId, sellerId, amount) => {
-    const reason = prompt('Enter rejection reason (will be shown to seller):');
-
-    if (!reason || reason.trim() === '') {
-      alert('Please provide a rejection reason');
-      return;
-    }
-
-    if (!confirm(`Reject withdrawal of ₦${amount.toLocaleString()}?`)) return;
-
+    const reason = prompt('Rejection reason:');
+    if (!reason?.trim()) { alert('Please provide a reason'); return; }
+    if (!confirm(`Reject ₦${amount.toLocaleString()}?`)) return;
     try {
       setProcessingWithdrawalId(withdrawalId);
+      await updateDoc(doc(db, 'withdrawals', withdrawalId), { status: 'rejected', processedAt: serverTimestamp(), adminNote: reason, processedBy: user.email });
+      await updateDoc(doc(db, 'sellers', sellerId), { accountBalance: increment(amount), updatedAt: serverTimestamp() });
+      await addDoc(collection(db, 'notifications'), { userId: sellerId, type: 'withdrawal_rejected', title: 'Withdrawal Rejected ❌', message: `Your withdrawal of ₦${amount.toLocaleString()} was rejected. Funds returned. Reason: ${reason}`, createdAt: serverTimestamp(), read: false });
+      alert('✅ Rejected and funds refunded.'); await fetchWithdrawals();
+    } catch (error) { alert(`Failed: ${error.message}`); } finally { setProcessingWithdrawalId(null); }
+  };
 
-      // 1. Update the withdrawal document status
-      await updateDoc(doc(db, 'withdrawals', withdrawalId), {
-        status: 'rejected',
-        processedAt: serverTimestamp(),
-        adminNote: reason,
-        processedBy: user.email
-      });
+  const updateSchoolApplicationStatus = async (schoolId, status) => {
+    if (!confirm(`${status} this school?`)) return;
+    try {
+      await updateDoc(doc(db, 'schoolApplications', schoolId), { status, verifiedSchool: status === 'approved', reviewedAt: serverTimestamp(), reviewedBy: user.email });
+      const school = schoolApplications.find(s => s.id === schoolId);
+      if (school) await addDoc(collection(db, 'notifications'), { userId: school.userId || school.email, type: `school_${status}`, title: status === 'approved' ? 'School Approved ✅' : 'School Rejected ❌', message: status === 'approved' ? `${school.schoolName} has been approved.` : `Your application for ${school.schoolName} was rejected.`, createdAt: serverTimestamp(), read: false });
+      await fetchSchoolApplications();
+    } catch (error) { alert('Failed: ' + error.message); }
+  };
 
-      // 2. REFUND THE SELLER (Since money was deducted on request)
-      const { increment } = await import('firebase/firestore'); // Ensure increment is available
-      const sellerDocRef = doc(db, 'sellers', sellerId);
-
-      await updateDoc(sellerDocRef, {
-        accountBalance: increment(amount), // Add the money back
-        updatedAt: serverTimestamp()
-      });
-
-      // 3. Send notification to seller
-      await addDoc(collection(db, 'notifications'), {
-        userId: sellerId,
-        type: 'withdrawal_rejected',
-        title: 'Withdrawal Request Rejected ❌',
-        message: `Your withdrawal request for ₦${amount.toLocaleString()} was rejected and the funds have been returned to your wallet.\n\nReason: ${reason}`,
-        createdAt: serverTimestamp(),
-        read: false
-      });
-
-      alert('✅ Withdrawal rejected and funds refunded to seller.');
-      await fetchWithdrawals();
-
-    } catch (error) {
-      console.error('Error rejecting withdrawal:', error);
-      alert(` Failed to reject withdrawal: ${error.message}`);
-    } finally {
-      setProcessingWithdrawalId(null);
-    }
+  const updateSchoolDocumentStatus = async (docId, status) => {
+    if (!confirm(`${status} this document?`)) return;
+    try {
+      await updateDoc(doc(db, 'schoolDocuments', docId), { status, verified: status === 'approved', approvedDate: status === 'approved' ? serverTimestamp() : null, approvedBy: user.email });
+      await fetchSchoolDocuments();
+    } catch (error) { alert('Failed: ' + error.message); }
   };
 
   const sendEmailReply = async () => {
-    if (!replyMessage.trim() || !selectedItem) {
-      alert('Please write a message');
-      return;
-    }
-
+    if (!replyMessage.trim() || !selectedItem) { alert('Please write a message'); return; }
     setSending(true);
-
     try {
-      const replyData = {
-        to: selectedItem.email || selectedItem.reporterEmail,
-        subject: `Re: ${selectedItem.subject || selectedItem.reason || 'Your inquiry'}`,
-        message: replyMessage,
-        from: user.email,
-        sentAt: serverTimestamp(),
-        originalTicketId: selectedItem.id,
-        type: activeSection
-      };
-
-      await addDoc(collection(db, 'adminReplies'), replyData);
-
+      await addDoc(collection(db, 'adminReplies'), { to: selectedItem.email || selectedItem.reporterEmail, subject: `Re: ${selectedItem.subject || selectedItem.reason || 'Your inquiry'}`, message: replyMessage, from: user.email, sentAt: serverTimestamp(), originalTicketId: selectedItem.id, type: activeSection });
       const collectionName = activeSection === 'support' ? 'supportTickets' : 'bookReports';
-
-      await updateDoc(doc(db, collectionName, selectedItem.id), {
-        adminResponse: replyMessage,
-        status: 'resolved',
-        resolvedAt: serverTimestamp()
-      });
-
-      alert('Reply sent successfully!');
-      setShowModal(false);
-      setReplyMessage('');
-      setSelectedItem(null);
-
-      if (activeSection === 'support') {
-        await fetchSupportTickets();
-      } else {
-        await fetchBookReports();
-      }
-
-    } catch (error) {
-      console.error('Error sending reply:', error);
-      alert(`Failed to send reply: ${error.message}`);
-    } finally {
-      setSending(false);
-    }
+      await updateDoc(doc(db, collectionName, selectedItem.id), { adminResponse: replyMessage, status: 'resolved', resolvedAt: serverTimestamp() });
+      setShowModal(false); setReplyMessage(''); setSelectedItem(null);
+      if (activeSection === 'support') await fetchSupportTickets(); else await fetchBookReports();
+    } catch (error) { alert(`Failed: ${error.message}`); } finally { setSending(false); }
   };
 
-  const openModal = (type, item) => {
-    setModalType(type);
-    setSelectedItem(item);
-    setShowModal(true);
-    setPdfViewMode('embed');
-  };
-
-  const closeModal = () => {
-    setShowModal(false);
-    setModalType('');
-    setSelectedItem(null);
-    setReplyMessage('');
-    setPdfUrl('');
-    setPdfViewMode('embed');
-  };
+  const openModal = (type, item) => { setModalType(type); setSelectedItem(item); setShowModal(true); };
+  const closeModal = () => { setShowModal(false); setModalType(''); setSelectedItem(null); setReplyMessage(''); setPdfUrl(''); };
 
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
@@ -944,1474 +627,681 @@ const deleteFeedback = async (feedbackId) => {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'pending':
-      case 'open':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'approved':
-      case 'resolved':
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'rejected':
-      case 'suspended':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const getStatusPill = (status) => {
+    const map = { pending: 'pill-warn', open: 'pill-warn', approved: 'pill-success', resolved: 'pill-success', active: 'pill-success', rejected: 'pill-danger', suspended: 'pill-danger', completed: 'pill-success' };
+    return map[status] || 'pill-gray';
   };
+
   const stats = {
     totalRevenue: transactions?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0,
     totalTransactions: transactions?.length || 0,
-    totalTransfers: transactions?.filter(t => t.source === 'transfer').length || 0,
     totalUsers: users?.length || 0,
-    totalFeedbacks: feedbacks?.length || 0,
     totalBooks: advertisements?.length || 0,
     pendingAds: advertisements?.filter(a => a.status === 'pending').length || 0,
     openTickets: supportTickets?.filter(t => t.status === 'open').length || 0,
     pendingReports: bookReports?.filter(r => r.status === 'pending').length || 0,
     pendingSchools: schoolApplications?.filter(s => s.status === 'pending').length || 0,
-    pendingSchoolDocs: schoolDocuments?.filter(d => d.status === 'pending').length || 0
+    pendingSchoolDocs: schoolDocuments?.filter(d => d.status === 'pending').length || 0,
+    pendingWithdrawals: withdrawals?.filter(w => w.status === 'pending').length || 0,
   };
 
-  if (checkingAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-blue-950">
-        <div className="text-center">
-          <div className="animate-spin h-12 w-12 border-b-2 border-white rounded-full mx-auto"></div>
-          <p className="mt-4 text-white">Verifying admin access...</p>
-        </div>
+  if (checkingAdmin) return (
+    <div style={{ minHeight: '100vh', background: '#0b1628', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <style>{globalStyles}</style>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 48, height: 48, border: '2px solid rgba(59,130,246,0.3)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <p style={{ color: '#94a3b8', fontSize: 14 }}>Verifying admin access…</p>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (!user || !isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-blue-950">
-        <div className="text-center bg-white p-8 rounded-lg shadow-lg max-w-md">
-          <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Unauthorized Access</h2>
-          <p className="text-gray-600 mb-4">You don't have permission to access this page.</p>
-          <a href="/home" className="inline-block bg-blue-950 text-white px-6 py-2 rounded-lg hover:bg-blue-900">
-            Go to Home
-          </a>
-        </div>
+  if (!user || !isAdmin) return (
+    <div style={{ minHeight: '100vh', background: '#0b1628', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <style>{globalStyles}</style>
+      <div style={{ background: '#162033', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: 40, maxWidth: 400, textAlign: 'center' }}>
+        <Shield size={48} color="#ef4444" style={{ margin: '0 auto 16px' }} />
+        <h2 style={{ color: '#e2e8f0', marginBottom: 8 }}>Unauthorized</h2>
+        <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 20 }}>You don't have admin access.</p>
+        <a href="/home" style={{ background: '#3b82f6', color: '#fff', padding: '10px 24px', borderRadius: 8, textDecoration: 'none', fontSize: 14 }}>Go Home</a>
       </div>
-    );
-  }
+    </div>
+  );
 
+  /* ── Render ─────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-blue-950">
-      <header className="bg-blue-950 text-white p-4 sticky top-0 z-50 shadow-lg border-b border-blue-900">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">LAN Library Admin Panel</h1>
-            <p className="text-sm text-blue-300">{user.email}</p>
+    <div className="admin-shell">
+      <style>{globalStyles}
+        {`@keyframes spin { to { transform: rotate(360deg); } }
+         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+         .page-content > * { animation: fadeIn 0.25s ease; }`}
+      </style>
+
+      {/* ── Sidebar ────────────────────────────────────────────────────── */}
+      <nav className="sidebar">
+        <div className="sidebar-logo">
+          <div className="logo-icon"><BookOpen size={16} color="#fff" /></div>
+          <div><div className="logo-text">LAN Library</div><div className="logo-sub">Admin Panel</div></div>
+        </div>
+        {NAV_SECTIONS.map(section => (
+          <div key={section.label}>
+            <div className="sidebar-section-label">{section.label}</div>
+            {section.items.map(({ id, icon: Icon, label, badgeKey, badgeType }) => {
+              const badgeCount = badgeKey ? stats[badgeKey] : 0;
+              return (
+                <button key={id} className={`sidebar-item${activeSection === id ? ' active' : ''}`}
+                  onClick={() => { setActiveSection(id); setSearchTerm(''); }}>
+                  <Icon size={15} />
+                  {label}
+                  {badgeCount > 0 && <span className={`sidebar-badge${badgeType === 'warn' ? ' warn' : badgeType === 'danger' ? ' danger' : ''}`}>{badgeCount}</span>}
+                </button>
+              );
+            })}
           </div>
-          <button onClick={fetchAllData} className="flex items-center gap-2 bg-white text-blue-950 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
+        ))}
+        <div style={{ padding: '16px 20px', marginTop: 'auto', borderTop: '1px solid var(--nav-border)' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{user.email}</div>
         </div>
-      </header>
+      </nav>
 
-      <div className="max-w-7xl mx-auto p-4 md:p-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-8">
-          {[
-            { id: 'overview', icon: BarChart3, label: 'Overview' },
-            { id: 'advertisements', icon: BookOpen, label: 'Books', badge: stats.pendingAds },
-            { id: 'withdrawals', icon: Download, label: 'Withdrawals', badge: withdrawals.filter(w => w.status === 'pending').length }, // ✅ ADDED
-            { id: 'support', icon: MessageSquare, label: 'Support', badge: stats.openTickets },
-            { id: 'reports', icon: Flag, label: 'Reports', badge: stats.pendingReports },
-            { id: 'transactions', icon: DollarSign, label: 'Sales' },
-            { id: 'users', icon: Users, label: 'Users' },
-            { id: 'schools', icon: Building, label: 'Schools', badge: stats.pendingSchools },
-            { id: 'school-documents', icon: FileText, label: 'School Docs', badge: stats.pendingSchoolDocs },
-            { id: 'feedbacks', icon: ThumbsUp, label: 'Book Feedback', badge: feedbacks.length },
-            { id: 'article-feedbacks', icon: MessageSquare, label: 'Help Feedback', badge: articleFeedbacks.filter(f => !f.helpful).length },
-            { id: 'settings', icon: Settings, label: 'Settings' }
+      {/* ── Main Content ─────────────────────────────────────────────── */}
+      <div className="main-content">
+        {/* Topbar */}
+        <header className="topbar">
+          <div className="topbar-left">
+            <div className="topbar-search">
+              <Search size={14} color="var(--text-muted)" />
+              <input placeholder="Search…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            </div>
+          </div>
+          <div className="topbar-right">
+            <button onClick={fetchAllData} className="icon-btn" title="Refresh"><RefreshCw size={15} /></button>
+            <div className="icon-btn"><Bell size={15} /></div>
+            <div className="avatar">{user.email?.[0]?.toUpperCase() || 'A'}</div>
+          </div>
+        </header>
 
-          ].map(({ id, icon: Icon, label, badge }) => (
-            <button key={id} onClick={() => { setActiveSection(id); setSearchTerm(''); }}
-              className={`p-4 rounded-lg transition-all ${activeSection === id ? 'bg-white text-blue-950 shadow-lg' : 'bg-blue-900 text-white hover:bg-blue-800'}`}>
-              <Icon className="w-6 h-6 mx-auto mb-2" />
-              <span className="text-sm font-semibold">{label}</span>
-              {badge > 0 && <span className="block text-xs mt-1 bg-yellow-400 text-yellow-900 rounded-full px-2 py-0.5">{badge}</span>}
-            </button>
-          ))}
-        </div>
+        {/* Page Content */}
+        <div className="page-content">
 
-        {activeSection === 'overview' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">Dashboard Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[
-                { label: 'Total Revenue', value: `₦${stats.totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'green' },
-                { label: 'Total Users', value: stats.totalUsers, icon: Users, color: 'blue' },
-                { label: 'Total Books', value: stats.totalBooks, icon: BookOpen, color: 'purple' },
-                { label: 'Transactions', value: `${stats.totalTransactions} total`, icon: TrendingUp, color: 'orange' }              ].map(({ label, value, icon: Icon, color }) => (
-                <div key={label} className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="flex items-center justify-between">
+          {/* ── OVERVIEW ──────────────────────────────────────────────── */}
+          {activeSection === 'overview' && (
+            <div>
+              <div className="section-header">
+                <div>
+                  <div className="section-title"><LayoutDashboard size={18} />Dashboard Overview</div>
+                  <div className="section-sub">Welcome back, {user.email?.split('@')[0]}</div>
+                </div>
+                <button onClick={fetchAllData} className="btn btn-ghost"><RefreshCw size={13} />Refresh</button>
+              </div>
+
+              {/* Stat cards */}
+              <div className="stat-grid">
+                {[
+                  { label: 'Total Revenue', value: `₦${stats.totalRevenue.toLocaleString()}`, sub: `${stats.totalTransactions} transactions`, icon: DollarSign, color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+                  { label: 'Total Users', value: stats.totalUsers.toLocaleString(), sub: 'Registered accounts', icon: Users, color: '#3b82f6', bg: 'rgba(59,130,246,0.12)' },
+                  { label: 'Total Books', value: stats.totalBooks.toLocaleString(), sub: `${stats.pendingAds} pending review`, icon: BookOpen, color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
+                  { label: 'Pending Actions', value: (stats.pendingAds + stats.openTickets + stats.pendingWithdrawals).toString(), sub: 'Needs attention', icon: AlertCircle, color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+                ].map(({ label, value, sub, icon: Icon, color, bg }) => (
+                  <div key={label} className="stat-card">
+                    <div className="stat-icon" style={{ background: bg }}><Icon size={20} color={color} /></div>
                     <div>
-                      <p className="text-gray-600 text-sm">{label}</p>
-                      <p className={`text-3xl font-bold text-${color}-600`}>{value}</p>
+                      <div className="stat-label">{label}</div>
+                      <div className="stat-value">{value}</div>
+                      <div className="stat-sub">{sub}</div>
                     </div>
-                    <Icon className={`w-12 h-12 text-${color}-600 opacity-20`} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Flutterwave widget */}
+              <div style={{ marginBottom: 20 }}><FlwBalanceWidget /></div>
+
+              {/* Grid: Alerts + Activity */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                {/* Pending alerts */}
+                <div className="card">
+                  <div className="section-title" style={{ marginBottom: 16 }}><AlertCircle size={16} color="#f59e0b" />Pending Actions</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {[
+                      { label: 'Book Approvals', count: stats.pendingAds, color: '#f59e0b', section: 'advertisements' },
+                      { label: 'Support Tickets', count: stats.openTickets, color: '#ef4444', section: 'support' },
+                      { label: 'Withdrawals', count: stats.pendingWithdrawals, color: '#3b82f6', section: 'withdrawals' },
+                      { label: 'School Apps', count: stats.pendingSchools, color: '#8b5cf6', section: 'schools' },
+                      { label: 'Book Reports', count: stats.pendingReports, color: '#ef4444', section: 'reports' },
+                    ].map(({ label, count, color, section }) => (
+                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+                        onClick={() => { setActiveSection(section); setSearchTerm(''); }}>
+                        <div style={{ width: 3, height: 28, borderRadius: 2, background: color, flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, color: 'var(--text-secondary)', flex: 1 }}>{label}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: count > 0 ? color : 'var(--text-muted)' }}>{count}</span>
+                        <div className="progress-bar" style={{ width: 80, flexShrink: 0 }}>
+                          <div className="progress-fill" style={{ background: color, width: `${Math.min(100, count * 10)}%` }} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
-            <FlwBalanceWidget />
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[
-                { title: 'Pending Book Approvals', count: stats.pendingAds, section: 'advertisements', color: 'yellow', bg: 'yellow-50', border: 'yellow-200' },
-                { title: 'Open Support Tickets', count: stats.openTickets, section: 'support', color: 'red', bg: 'red-50', border: 'red-200' },
-                { title: 'Pending Reports', count: stats.pendingReports, section: 'reports', color: 'orange', bg: 'orange-50', border: 'orange-200' },
-                { title: 'Pending School Applications', count: stats.pendingSchools, section: 'schools', color: 'purple', bg: 'purple-50', border: 'purple-200' },
-                { title: 'Pending School Documents', count: stats.pendingSchoolDocs, section: 'school-documents', color: 'indigo', bg: 'indigo-50', border: 'indigo-200' },
-              ].map(({ title, count, section, color, bg, border }) => (
-                <div key={section} className={`bg-${bg} border border-${border} rounded-lg p-6`}>
-                  <h3 className={`font-bold text-${color}-900 mb-2`}>{title}</h3>
-                  <p className={`text-3xl font-bold text-${color}-600 mb-4`}>{count}</p>
-                  <button onClick={() => { setActiveSection(section); setSearchTerm(''); }}
-                    className={`text-${color}-800 hover:underline text-sm flex items-center gap-1`}>
-                    View All <ChevronRight className="w-4 h-4" />
-                  </button>
+
+                {/* Recent transactions */}
+                <div className="card">
+                  <div className="section-title" style={{ marginBottom: 16 }}><Activity size={16} color="#3b82f6" />Recent Transactions</div>
+                  <div>
+                    {transactions.slice(0, 5).map((txn) => (
+                      <div key={txn.id} className="activity-item" style={{ cursor: 'pointer' }} onClick={() => openModal('transaction', txn)}>
+                        <div className="activity-dot" style={{ background: '#10b981' }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{txn.bookTitle?.slice(0, 32)}{txn.bookTitle?.length > 32 ? '…' : ''}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{txn.buyerEmail?.slice(0, 28)}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#10b981' }}>₦{txn.amount?.toLocaleString()}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{formatDate(txn.createdAt)?.split(',')[0]}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              </div>
             </div>
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Recent Transactions</h3>
-              <div className="space-y-3">
-                {transactions.slice(0, 5).map((txn) => (
-                  <div key={txn.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer" onClick={() => openModal('transaction', txn)}>
-                    <div>
-                      <p className="font-semibold text-gray-900">{txn.bookTitle}</p>
-                      <p className="text-sm text-gray-600">{txn.buyerEmail}</p>
+          )}
+
+          {/* ── BOOKS ─────────────────────────────────────────────────── */}
+          {activeSection === 'advertisements' && (
+            <div>
+              <div className="section-header">
+                <div className="section-title"><BookOpen size={18} />Books <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 14 }}>({advertisements.length})</span></div>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <input className="input-dark" placeholder="Search books by title…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+                {advertisements.filter(ad => ad.bookTitle?.toLowerCase().includes(searchTerm.toLowerCase())).map((ad) => (
+                  <div key={ad.id} className="book-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2, lineHeight: 1.3 }}>{ad.bookTitle}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>by {ad.author}</div>
+                      </div>
+                      <span className={`pill ${getStatusPill(ad.status)}`}><span className="pill-dot" />{ad.status}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-green-600">₦{txn.amount?.toLocaleString()}</p>
-                      <p className="text-xs text-gray-500">{formatDate(txn.createdAt)}</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14, background: 'var(--surface)', borderRadius: 8, padding: '10px 12px' }}>
+                      {[
+                        { icon: Mail, text: ad.sellerEmail, color: '#60a5fa' },
+                        { icon: DollarSign, text: `₦${ad.price?.toLocaleString()}`, color: '#34d399' },
+                        { icon: Book, text: ad.category, color: 'var(--text-muted)' },
+                        { icon: User, text: ad.sellerName, color: 'var(--text-secondary)' },
+                        { icon: Calendar, text: formatDate(ad.createdAt)?.split(',')[0], color: 'var(--text-muted)' },
+                      ].map(({ icon: Icon, text, color }) => text ? (
+                        <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color }}>
+                          <Icon size={12} />{text}
+                        </div>
+                      ) : null)}
+                    </div>
+                    <button onClick={() => openModal('advertisement', ad)} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '9px' }}>
+                      <Eye size={13} />Review & Approve
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── TRANSACTIONS ──────────────────────────────────────────── */}
+          {activeSection === 'transactions' && (
+            <div>
+              <div className="section-header">
+                <div className="section-title"><DollarSign size={18} />Transactions</div>
+              </div>
+              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <table className="data-table">
+                  <thead><tr>
+                    {['Book', 'Buyer', 'Seller', 'Amount', 'Date', 'Status', ''].map(h => <th key={h}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {transactions.map((txn) => (
+                      <tr key={txn.id}>
+                        <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{txn.bookTitle?.slice(0, 30)}</td>
+                        <td>{txn.buyerEmail?.slice(0, 22)}</td>
+                        <td>{txn.sellerName || txn.sellerEmail || 'N/A'}</td>
+                        <td style={{ color: '#34d399', fontWeight: 700 }}>₦{txn.amount?.toLocaleString()}</td>
+                        <td style={{ fontSize: 11 }}>{formatDate(txn.createdAt)}</td>
+                        <td><span className={`pill ${getStatusPill(txn.status || 'completed')}`}><span className="pill-dot" />{txn.status || 'completed'}</span></td>
+                        <td><button onClick={() => openModal('transaction', txn)} className="icon-btn" style={{ width: 28, height: 28 }}><Eye size={13} /></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ── USERS ─────────────────────────────────────────────────── */}
+          {activeSection === 'users' && (
+            <div>
+              <div className="section-header">
+                <div className="section-title"><Users size={18} />Users <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 14 }}>({users.length})</span></div>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <input className="input-dark" placeholder="Search by name, email or role…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              </div>
+              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <table className="data-table">
+                  <thead><tr>{['Name', 'Email', 'Role', 'Status', 'Joined', ''].map(h => <th key={h}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {users.filter(u => u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || u.role?.toLowerCase().includes(searchTerm.toLowerCase())).map(u => (
+                      <tr key={u.id}>
+                        <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{u.displayName || 'N/A'}</td>
+                        <td>{u.email}</td>
+                        <td><span className={`pill ${u.role === 'admin' ? 'pill-info' : 'pill-gray'}`}>{u.role || 'user'}</span></td>
+                        <td><span className={`pill ${getStatusPill(u.accountStatus || 'active')}`}><span className="pill-dot" />{u.accountStatus || 'active'}</span></td>
+                        <td style={{ fontSize: 11 }}>{formatDate(u.createdAt)?.split(',')[0]}</td>
+                        <td><button onClick={() => openModal('user', u)} className="icon-btn" style={{ width: 28, height: 28 }}><Eye size={13} /></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ── SUPPORT ───────────────────────────────────────────────── */}
+          {activeSection === 'support' && (
+            <div>
+              <div className="section-header">
+                <div className="section-title"><MessageSquare size={18} />Support Tickets</div>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <input className="input-dark" placeholder="Search tickets…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+                {supportTickets.filter(t => t.subject?.toLowerCase().includes(searchTerm.toLowerCase()) || t.email?.toLowerCase().includes(searchTerm.toLowerCase())).map(ticket => (
+                  <div key={ticket.id} className="card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                      <div><div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{ticket.subject || 'No Subject'}</div><div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{ticket.name} · {ticket.email}</div></div>
+                      <span className={`pill ${getStatusPill(ticket.status)}`}><span className="pill-dot" />{ticket.status}</span>
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>{ticket.message}</p>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>{formatDate(ticket.createdAt)}</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => openModal('reply', ticket)} className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }}><Mail size={12} />Reply</button>
+                      <button onClick={() => updateTicketStatus(ticket.id, 'resolved')} className="btn btn-success" style={{ flex: 1, justifyContent: 'center' }}><Check size={12} />Resolve</button>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeSection === 'advertisements' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">Book Advertisements</h2>
-            <div className="bg-white rounded-lg shadow-sm p-4 text-blue-950">
-              <input type="text" placeholder="Search books..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {advertisements.filter(ad => ad.bookTitle?.toLowerCase().includes(searchTerm.toLowerCase())).map((ad) => (
-                <div key={ad.id} className="bg-white rounded-lg shadow-sm p-6 hover:shadow-lg transition-shadow">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      <h3 className="font-bold text-gray-900 text-lg mb-1">{ad.bookTitle}</h3>
-                      <p className="text-sm text-gray-600">by {ad.author}</p>
+          {/* ── REPORTS ───────────────────────────────────────────────── */}
+          {activeSection === 'reports' && (
+            <div>
+              <div className="section-header"><div className="section-title"><Flag size={18} />Book Reports</div></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+                {bookReports.map(report => (
+                  <div key={report.id} className="card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <div><div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{report.bookTitle}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{report.reporterEmail}</div></div>
+                      <span className={`pill ${getStatusPill(report.status)}`}><span className="pill-dot" />{report.status}</span>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(ad.status)}`}>{ad.status}</span>
+                    <div style={{ fontSize: 12, color: '#f87171', marginBottom: 6, fontWeight: 600 }}>{report.reason}</div>
+                    <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>{report.details}</p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => openModal('reply', report)} className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }}><Mail size={12} />Reply</button>
+                      <button onClick={() => updateReportStatus(report.id, 'resolved')} className="btn btn-success" style={{ flex: 1, justifyContent: 'center' }}><Check size={12} />Resolve</button>
+                    </div>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-                  <div className="space-y-2 mb-4 text-sm bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-gray-500" />
-                      <span className="text-gray-600 truncate">{ad.sellerEmail}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-gray-500" />
-                      <span className="font-semibold text-green-600">₦{ad.price?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Book className="w-4 h-4 text-gray-500" />
-                      <span className="text-gray-700 capitalize">{ad.category}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-gray-500" />
-                      <span className="text-gray-500 text-xs">{formatDate(ad.createdAt)}</span>
-                    </div>
-                    {ad.pages && (
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-gray-500" />
-                        <span className="text-gray-700">{ad.pages} pages</span>
+          {/* ── WITHDRAWALS ───────────────────────────────────────────── */}
+          {activeSection === 'withdrawals' && (
+            <div>
+              <div className="section-header">
+                <div className="section-title"><Download size={18} />Withdrawals</div>
+              </div>
+              {/* Stats row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+                {[
+                  { label: 'Pending', count: withdrawals.filter(w => w.status === 'pending').length, color: '#f59e0b' },
+                  { label: 'Completed', count: withdrawals.filter(w => w.status === 'completed').length, color: '#10b981' },
+                  { label: 'Rejected', count: withdrawals.filter(w => w.status === 'rejected').length, color: '#ef4444' },
+                  { label: 'Pending Amount', count: `₦${withdrawals.filter(w => w.status === 'pending').reduce((s, w) => s + (w.amount || 0), 0).toLocaleString()}`, color: '#3b82f6' },
+                ].map(({ label, count, color }) => (
+                  <div key={label} className="card-sm">
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color }}>{count}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <input className="input-dark" placeholder="Search by seller name, email or reference…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>
+                {withdrawals.length === 0 ? (
+                  <div className="card" style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48 }}>
+                    <Download size={32} color="var(--text-muted)" style={{ margin: '0 auto 12px' }} />
+                    <div style={{ color: 'var(--text-muted)' }}>No withdrawal requests</div>
+                  </div>
+                ) : withdrawals.filter(w => w.sellerName?.toLowerCase().includes(searchTerm.toLowerCase()) || w.sellerEmail?.toLowerCase().includes(searchTerm.toLowerCase()) || w.reference?.toLowerCase().includes(searchTerm.toLowerCase())).map(withdrawal => (
+                  <div key={withdrawal.id} className="withdrawal-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{withdrawal.sellerName}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{withdrawal.sellerEmail}</div>
                       </div>
-                    )}
-                    <span className="text-gray-700 capitalize text-xl">{ad.sellerName}</span>
-
-                  </div>
-
-                  <button onClick={() => openModal('advertisement', ad)} className="w-full bg-blue-950 text-white py-3 rounded-lg hover:bg-blue-900 flex items-center justify-center gap-2 font-semibold transition-colors">
-                    <Eye className="w-5 h-5" />
-                    Review & Approve
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeSection === 'transactions' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">All Transactions</h2>
-            <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-blue-950 text-white border-b">
-                  <tr>
-                    {['Book', 'Buyer', 'Seller', 'Amount', 'Date', 'Status', 'Actions'].map(h => (
-                      <th key={h} className="px-6 py-3 text-left text-xs font-medium uppercase">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {transactions.map((txn) => (
-                    <tr key={txn.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm text-gray-900">{txn.bookTitle}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{txn.buyerEmail}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{txn.sellerName || txn.sellerEmail || 'N/A'}</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-green-600">₦{txn.amount?.toLocaleString()}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{formatDate(txn.createdAt)}</td>
-                      <td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(txn.status || 'completed')}`}>{txn.status || 'completed'}</span></td>
-                      <td className="px-6 py-4">
-                        <button onClick={() => openModal('transaction', txn)} className="text-blue-950 hover:text-blue-700">
-                          <Eye className="w-5 h-5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeSection === 'users' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">All Users <span className="text-blue-300 text-lg">({users.length})</span></h2>
-            </div>
-            <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
-              <div className="bg-white rounded-lg shadow-sm p-4">
-                <input type="text" placeholder="Search users by name, email or role..."
-                  value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-blue-950" />
-              </div>
-              <table className="w-full">
-                <thead className="bg-blue-950 text-white border-b">
-                  <tr>
-                    {['Name', 'Email', 'Role', 'Status', 'Joined', 'Actions'].map(h => (
-                      <th key={h} className="px-6 py-3 text-left text-xs font-medium uppercase">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {users.filter(u =>
-                    u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    u.role?.toLowerCase().includes(searchTerm.toLowerCase())
-                  ).map((u) => (
-                    <tr key={u.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm text-gray-900">{u.displayName || 'N/A'}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{u.email}</td>
-                      <td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs ${u.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}`}>{u.role || 'user'}</span></td>
-                      <td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(u.accountStatus || 'active')}`}>{u.accountStatus || 'active'}</span></td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{formatDate(u.createdAt)}</td>
-                      <td className="px-6 py-4">
-                        <button onClick={() => openModal('user', u)} className="text-blue-950 hover:text-blue-700">
-                          <Eye className="w-5 h-5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeSection === 'support' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">Support Tickets</h2>
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <input type="text" placeholder="Search tickets..."
-                value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-blue-950" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {supportTickets.filter(t =>
-                t.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                t.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                t.name?.toLowerCase().includes(searchTerm.toLowerCase())
-              ).map((ticket) => (                <div key={ticket.id} className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="font-bold text-gray-900">{ticket.subject || 'No Subject'}</h3>
-                      <p className="text-sm text-gray-600">{ticket.name}</p>
-                      <p className="text-xs text-gray-500">{ticket.email}</p>
+                      <span className={`pill ${getStatusPill(withdrawal.status)}`}><span className="pill-dot" />{withdrawal.status}</span>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(ticket.status)}`}>{ticket.status}</span>
-                  </div>
-                  <p className="text-xs font-semibold text-blue-950 mb-2">Category: {ticket.category}</p>
-                  <p className="text-sm text-gray-700 mb-4">{ticket.message}</p>
-                  <p className="text-xs text-gray-500 mb-4">{formatDate(ticket.createdAt)}</p>
-                  <div className="flex gap-2">
-                    <button onClick={() => openModal('reply', ticket)} className="flex-1 bg-blue-950 text-white py-2 rounded-lg hover:bg-blue-900 flex items-center justify-center gap-1">
-                      <Mail className="w-4 h-4" />Reply
-                    </button>
-                    <button onClick={() => updateTicketStatus(ticket.id, 'resolved')} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-1">
-                      <Check className="w-4 h-4" />Resolve
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeSection === 'reports' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">Book Reports</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {bookReports.map((report) => (
-                <div key={report.id} className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="font-bold text-gray-900">{report.bookTitle}</h3>
-                      <p className="text-sm text-gray-600">by {report.bookAuthor}</p>
-                      <p className="text-xs text-gray-500">{report.reporterEmail}</p>
+                    <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Amount</span>
+                      <span style={{ fontSize: 22, fontWeight: 700, color: '#34d399' }}>₦{withdrawal.amount?.toLocaleString()}</span>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(report.status)}`}>{report.status}</span>
-                  </div>
-                  <p className="text-sm font-semibold text-red-600 mb-2">{report.reason}</p>
-                  <p className="text-sm text-gray-700 mb-4">{report.details}</p>
-                  <p className="text-xs text-gray-500 mb-4">{formatDate(report.createdAt)}</p>
-                  <div className="flex gap-2">
-                    <button onClick={() => openModal('reply', report)} className="flex-1 bg-blue-950 text-white py-2 rounded-lg hover:bg-blue-900 flex items-center justify-center gap-1">
-                      <Mail className="w-4 h-4" />Reply
-                    </button>
-                    <button onClick={() => updateReportStatus(report.id, 'resolved')} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-1">
-                      <Check className="w-4 h-4" />Resolve
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeSection === 'schools' && (
-  <div className="space-y-6">
-    <h2 className="text-2xl font-bold text-white">School Applications</h2>
-
-    {/* Stats */}
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-        <p className="text-yellow-600 font-semibold mb-2">Pending</p>
-        <p className="text-3xl font-bold text-yellow-900">
-          {schoolApplications.filter(s => s.status === 'pending').length}
-        </p>
-      </div>
-      <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-        <p className="text-green-600 font-semibold mb-2">Approved</p>
-        <p className="text-3xl font-bold text-green-900">
-          {schoolApplications.filter(s => s.status === 'approved').length}
-        </p>
-      </div>
-      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-        <p className="text-red-600 font-semibold mb-2">Rejected</p>
-        <p className="text-3xl font-bold text-red-900">
-          {schoolApplications.filter(s => s.status === 'rejected').length}
-        </p>
-      </div>
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <p className="text-blue-600 font-semibold mb-2">Total Schools</p>
-        <p className="text-3xl font-bold text-blue-900">
-          {schoolApplications.length}
-        </p>
-      </div>
-    </div>
-
-    {/* Applications List */}
-    {schoolApplications.length === 0 ? (
-      <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-        <Building className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-xl font-bold text-gray-900 mb-2">No School Applications</h3>
-        <p className="text-gray-600">School registration applications will appear here</p>
-      </div>
-    ) : (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {schoolApplications.map((school) => (
-          <div key={school.id} className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="font-bold text-gray-900 text-lg">{school.schoolName}</h3>
-                <p className="text-sm text-gray-600">{school.schoolType}</p>
-              </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(school.status)}`}>
-                {school.status}
-              </span>
-            </div>
-
-            <div className="space-y-2 text-sm mb-4 text-blue-950">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-gray-500" />
-                <span>{school.state}, {school.country}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-gray-500" />
-                <span className="text-blue-600">{school.email}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-gray-500" />
-                <span>{school.phone}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-gray-500" />
-                <span>{school.principalName}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-gray-500" />
-                <span>Approval #: {school.approvalNumber}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-gray-500" />
-                <span>{formatDate(school.createdAt)}</span>
-              </div>
-              {school.address && (
-                <div className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 text-gray-500 mt-1" />
-                  <span className="text-gray-700">{school.address}</span>
-                </div>
-              )}
-              {school.userId && (
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-gray-500" />
-                  <span className="text-xs text-gray-500">User ID: {school.userId}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Proof Document */}
-            {school.proofDocumentUrl && (
-              <div className="mb-4">
-                <a
-                  href={school.proofDocumentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  View Proof Document
-                </a>
-              </div>
-            )}
-
-            {/* Actions */}
-            {school.status === 'pending' && (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => updateSchoolApplicationStatus(school.id, 'approved')}
-                  className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-1"
-                >
-                  <Check className="w-4 h-4" />
-                  Approve
-                </button>
-                <button
-                  onClick={() => updateSchoolApplicationStatus(school.id, 'rejected')}
-                  className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 flex items-center justify-center gap-1"
-                >
-                  <X className="w-4 h-4" />
-                  Reject
-                </button>
-              </div>
-            )}
-
-            {school.status === 'approved' && (
-              <div className="space-y-2">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                  <p className="text-green-800 text-sm flex items-center gap-2">
-                    <Check className="w-4 h-4" />
-                    School approved and verified
-                  </p>
-                  {school.reviewedAt && (
-                    <p className="text-xs text-gray-600 mt-1">
-                      Approved on {formatDate(school.reviewedAt)} by {school.reviewedBy}
-                    </p>
-                  )}
-                </div>
-                <a
-                  href={`/schools/${school.schoolId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-center bg-blue-950 text-white py-2 rounded-lg hover:bg-blue-900"
-                >
-                  View School Profile
-                </a>
-              </div>
-            )}
-
-            {school.status === 'rejected' && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-red-800 text-sm flex items-center gap-2">
-                  <X className="w-4 h-4" />
-                  Application rejected
-                </p>
-                {school.reviewedAt && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    Rejected on {formatDate(school.reviewedAt)} by {school.reviewedBy}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
-)}
-
-{activeSection === 'school-documents' && (
-  <div className="space-y-6">
-    <h2 className="text-2xl font-bold text-white">School Documents</h2>
-
-    {schoolDocuments.length === 0 ? (
-      <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-        <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-xl font-bold text-gray-900 mb-2">No School Documents</h3>
-        <p className="text-gray-600">Documents uploaded by schools will appear here</p>
-      </div>
-    ) : (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {schoolDocuments.map((doc) => (
-          <div key={doc.id} className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-900">{doc.title}</h3>
-                <p className="text-sm text-gray-600">{doc.schoolName}</p>
-              </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(doc.status)}`}>
-                {doc.status}
-              </span>
-            </div>
-
-            <div className="space-y-2 text-sm mb-4">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-gray-500" />
-                <span>{doc.type}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Building className="w-4 h-4 text-gray-500" />
-                <span>{doc.department}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-gray-500" />
-                <span>{doc.level}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-gray-500" />
-                <span>{doc.year}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-gray-500" />
-                <span>{doc.fileSize}</span>
-              </div>
-              <div className="text-xs text-gray-500">
-                Uploaded: {formatDate(doc.uploadDate)}
-              </div>
-            </div>
-
-            {doc.fileUrl && (
-              <div className="mb-4">
-                <a
-                  href={doc.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  View Document
-                </a>
-              </div>
-            )}
-
-            {doc.status === 'pending' && (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => updateSchoolDocumentStatus(doc.id, 'approved')}
-                  className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-1"
-                >
-                  <Check className="w-4 h-4" />
-                  Approve
-                </button>
-                <button
-                  onClick={() => updateSchoolDocumentStatus(doc.id, 'rejected')}
-                  className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 flex items-center justify-center gap-1"
-                >
-                  <X className="w-4 h-4" />
-                  Reject
-                </button>
-              </div>
-            )}
-
-            {doc.status === 'approved' && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <p className="text-green-800 text-sm flex items-center gap-2">
-                  <Check className="w-4 h-4" />
-                  Document approved and published
-                </p>
-                {doc.approvedDate && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    Approved on {formatDate(doc.approvedDate)} by {doc.approvedBy}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
-)}
-
-{activeSection === 'settings' && (
-  <div className="space-y-6">
-    <h2 className="text-2xl font-bold text-white">Settings</h2>
-
-    {/* Platform Fees Payout */}
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <div className="flex items-center gap-3 mb-2">
-        <DollarSign className="w-6 h-6 text-green-600" />
-        <h3 className="text-xl font-bold text-gray-900">Platform Fee Payouts</h3>
-      </div>
-      <p className="text-gray-500 text-sm mb-6">
-        Collect all accumulated ₦50 transfer fees and send them to your Flutterwave account.
-      </p>
-
-      {/* Fee Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <p className="text-green-600 text-xs font-semibold uppercase mb-1">Pending Fees</p>
-          <p className="text-2xl font-bold text-green-900" id="pendingFeesCount">—</p>
-          <p className="text-xs text-gray-500 mt-1">Not yet disbursed</p>
-        </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-blue-600 text-xs font-semibold uppercase mb-1">Total Amount </p>
-          <p className="text-2xl font-bold text-blue-900" id="pendingFeesAmount">—</p>
-          <p className="text-xs text-gray-500 mt-1">Ready to withdraw</p>
-        </div>
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <p className="text-gray-600 text-xs font-semibold uppercase mb-1">Fee Per Transfer</p>
-          <p className="text-2xl font-bold text-gray-900">₦50</p>
-          <p className="text-xs text-gray-500 mt-1">Fixed platform fee</p>
-        </div>
-      </div>
-
-      <PlatformFeeSection user={user} />
-    </div>
-  </div>
-        )}
-        
-{activeSection === 'feedbacks' && (
-  <div className="space-y-6">
-    <h2 className="text-2xl font-bold text-white">User Feedbacks</h2>
-
-    {feedbacks.length === 0 ? (
-      <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-        <ThumbsUp className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-xl font-bold text-gray-900 mb-2">No Feedbacks Yet</h3>
-        <p className="text-gray-600">User feedbacks on books will appear here</p>
-      </div>
-    ) : (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {feedbacks.map((fb) => (
-          <div key={fb.id} className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-900">Book Name: {fb.bookTitle || 'Unknown Book'}</h3>
-                <p className="text-sm text-gray-600 font-bold">FeedBack Name: {fb.userName || 'Anonymous'}</p>
-                <p className="text-sm text-gray-600 font-bold">Book Author: {fb.bookAuthor || 'Anonymous'}</p>
-                <p className="text-xs text-gray-500 font-bold">FeedBack Email: {fb.userEmail || 'No email'}</p>
-              </div>
-              <span className="text-xs text-gray-400">{formatDate(fb.createdAt)}</span>
-            </div>
-
-            <div className="mb-4">
-              <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
-                {fb.feedback || '(No feedback text provided)'}
-              </p>
-            </div>
-
-            <div className="text-xs text-gray-500 mb-4">
-              <p>Book ID: {fb.bookId}</p>
-              {fb.userId && <p>User ID: {fb.userId}</p>}
-            </div>
-
-            <button
-              onClick={() => deleteFeedback(fb.id)}
-              className="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete Feedback
-            </button>
-          </div>
-        ))}
-      </div>
-            )}
-            
-            {activeSection === 'article-feedbacks' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <h2 className="text-2xl font-bold text-white">Help Center Article Feedbacks</h2>
-                  <div className="flex gap-3">
-                    <div className="bg-green-500 text-white text-sm px-4 py-2 rounded-lg font-semibold flex items-center gap-2">
-                      <ThumbsUp className="w-4 h-4" /> {articleFeedbacks.filter(f => f.helpful).length} Helpful
-                    </div>
-                    <div className="bg-red-500 text-white text-sm px-4 py-2 rounded-lg font-semibold flex items-center gap-2">
-                      <X className="w-4 h-4" /> {articleFeedbacks.filter(f => !f.helpful).length} Not Helpful
-                    </div>
-                  </div>
-                </div>
-
-                {/* Most problematic articles */}
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-red-500" /> Most Unhelpful Articles
-                  </h3>
-                  <div className="space-y-3">
-                    {Object.entries(
-                      articleFeedbacks
-                        .filter(f => !f.helpful)
-                        .reduce((acc, f) => {
-                          const key = f.slug || 'unknown';
-                          if (!acc[key]) acc[key] = { title: f.title, slug: f.slug, category: f.category, count: 0, comments: [] };
-                          acc[key].count++;
-                          if (f.comment) acc[key].comments.push(f.comment);
-                          return acc;
-                        }, {})
-                    )
-                      .sort((a, b) => b[1].count - a[1].count)
-                      .slice(0, 5)
-                      .map(([slug, data]) => (
-                        <div key={slug} className="p-4 bg-red-50 border border-red-100 rounded-xl">
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <p className="font-semibold text-gray-900 text-sm">{data.title || slug}</p>
-                              <p className="text-xs text-blue-600">{data.category} · /{slug}</p>
-                            </div>
-                            <span className="bg-red-100 text-red-800 text-sm font-bold px-3 py-1 rounded-full">
-                              {data.count} negative
-                            </span>
-                          </div>
-                          {data.comments.length > 0 && (
-                            <div className="mt-2 space-y-1">
-                              {data.comments.slice(0, 2).map((c, i) => (
-                                <p key={i} className="text-xs text-gray-600 bg-white rounded-lg px-3 py-2 border border-red-100">
-                                  "{c}"
-                                </p>
-                              ))}
-                              {data.comments.length > 2 && (
-                                <p className="text-xs text-gray-400">+{data.comments.length - 2} more comments</p>
-                              )}
-                            </div>
-                          )}
+                    <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Bank Details</div>
+                      {[
+                        { label: 'Account Name', value: withdrawal.bankDetails?.accountName },
+                        { label: 'Account No.', value: withdrawal.bankDetails?.accountNumber },
+                        { label: 'Bank', value: withdrawal.bankDetails?.bankName },
+                        { label: 'Code', value: withdrawal.bankDetails?.bankCode },
+                      ].filter(r => r.value).map(({ label, value }) => (
+                        <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                          <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontFamily: 'monospace' }}>{value}</span>
                         </div>
                       ))}
-                    {articleFeedbacks.filter(f => !f.helpful).length === 0 && (
-                      <p className="text-gray-400 text-sm text-center py-6">No negative feedback yet 🎉</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* All article feedbacks */}
-                {articleFeedbacks.length === 0 ? (
-                  <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-                    <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">No Article Feedbacks Yet</h3>
-                    <p className="text-gray-600">Feedbacks from help center articles will appear here</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {articleFeedbacks.map((fb) => (
-                      <div key={fb.id} className={`bg-white rounded-lg shadow-sm p-5 border-l-4 ${fb.helpful ? 'border-green-500' : 'border-red-500'}`}>
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="flex-1 mr-3">
-                            <p className="font-bold text-gray-900 text-sm">{fb.title || 'Unknown Article'}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">/{fb.slug}</p>
-                            <span className="inline-block mt-1 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                              {fb.category || 'Uncategorized'}
-                            </span>
-                          </div>
-                          <span className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold ${fb.helpful ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {fb.helpful ? '👍 Helpful' : '👎 Not helpful'}
-                          </span>
-                        </div>
-
-                        {fb.comment && (
-                          <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 mb-3">
-                            <p className="text-xs text-gray-500 font-semibold mb-1">User comment:</p>
-                            <p className="text-sm text-gray-700">"{fb.comment}"</p>
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-gray-400">
-                            {fb.createdAt instanceof Date
-                              ? fb.createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                              : 'Unknown date'}
-                          </p>
-                          <button
-                            onClick={async () => {
-                              if (!confirm('Delete this feedback?')) return;
-                              try {
-                                await deleteDoc(doc(db, 'articleFeedback', fb.id));
-                                setArticleFeedbacks(prev => prev.filter(f => f.id !== fb.id));
-                              } catch (err) {
-                                alert('Failed to delete: ' + err.message);
-                              }
-                            }}
-                            className="text-red-400 hover:text-red-600 transition-colors p-1"
-                            title="Delete feedback"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-  </div>
-)}
-
-        {activeSection === 'withdrawals' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">Withdrawal Requests</h2>
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <input type="text" placeholder="Search by seller name, email or reference..."
-                value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-blue-950" />
-            </div>
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <Clock className="w-6 h-6 text-yellow-600" />
-                  <p className="text-yellow-600 font-semibold">Pending</p>
-                </div>
-                <p className="text-3xl font-bold text-yellow-900">
-                  {withdrawals.filter(w => w.status === 'pending').length}
-                </p>
-              </div>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <Check className="w-6 h-6 text-green-600" />
-                  <p className="text-green-600 font-semibold">Completed</p>
-                </div>
-                <p className="text-3xl font-bold text-green-900">
-                  {withdrawals.filter(w => w.status === 'completed').length}
-                </p>
-              </div>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <X className="w-6 h-6 text-red-600" />
-                  <p className="text-red-600 font-semibold">Rejected</p>
-                </div>
-                <p className="text-3xl font-bold text-red-900">
-                  {withdrawals.filter(w => w.status === 'rejected').length}
-                </p>
-              </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <DollarSign className="w-6 h-6 text-blue-600" />
-                  <p className="text-blue-600 font-semibold">Total Amount</p>
-                </div>
-                <p className="text-3xl font-bold text-blue-900">
-                  ₦{withdrawals.filter(w => w.status === 'pending').reduce((sum, w) => sum + (w.amount || 0), 0).toLocaleString()}
-                </p>
-              </div>
-            </div> 
-             
-          
-
-            {/* Withdrawal List */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {withdrawals.length === 0 ? (
-                <div className="col-span-2 bg-white rounded-lg shadow-sm p-12 text-center">
-                  <Download className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">No Withdrawal Requests</h3>
-                  <p className="text-gray-600">Withdrawal requests from sellers will appear here</p>
-                </div>
-              ) : (
-                withdrawals.filter(w =>
-                  w.sellerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  w.sellerEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  w.reference?.toLowerCase().includes(searchTerm.toLowerCase())
-                ).map((withdrawal) => (
-                      <div key={withdrawal.id} className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-yellow-500">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="font-bold text-gray-900 text-lg">{withdrawal.sellerName}</h3>
-                        <p className="text-sm text-gray-600">{withdrawal.sellerEmail}</p>
-                        {withdrawal.sellerPhone && (
-                          <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                            <Phone className="w-3 h-3" />
-                            {withdrawal.sellerPhone}
-                          </p>
-                        )}
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(withdrawal.status)}`}>
-                        {withdrawal.status === 'pending' && '⏳ '}
-                        {withdrawal.status === 'completed' && '✅ '}
-                        {withdrawal.status === 'rejected' && '❌ '}
-                        {withdrawal.status}
-                      </span>
                     </div>
-
-                    {/* Amount Display */}
-                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 mb-4 border border-green-200">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600 text-sm font-medium">Withdrawal Amount</span>
-                        <span className="text-3xl font-bold text-green-600">
-                          ₦{withdrawal.amount?.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-2 space-y-1">
-                        <p className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          Requested: {formatDate(withdrawal.requestedAt)}
-                        </p>
-                        <p className="font-mono">Ref: {withdrawal.reference}</p>
-                      </div>
-                    </div>
-
-
-                    
-                    {/* Bank Details */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Building className="w-4 h-4 text-blue-900" />
-                        <p className="text-xs font-semibold text-blue-900">Bank Details</p>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Account Name:</span>
-                          <span className="font-semibold text-gray-900">{withdrawal.bankDetails?.accountName}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Account Number:</span>
-                          <span className="font-mono font-semibold text-gray-900">{withdrawal.bankDetails?.accountNumber}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Bank:</span>
-                          <span className="font-semibold text-gray-900">{withdrawal.bankDetails?.bankName}</span>
-                        </div>
-                        {withdrawal.bankDetails?.bankCode && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Bank Code:</span>
-                            <span className="font-mono text-xs text-gray-700">{withdrawal.bankDetails?.bankCode}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        setSelectedSeller(withdrawal.sellerId);
-                        fetchSellerFullDetails(withdrawal.sellerId);
-                      }}
-                      className="w-full mb-3 py-2.5 border-2 border-blue-950 text-blue-950 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 text-sm"
-                    >
-                      <Eye className="w-4 h-4" /> View Full Seller Account
-                    </button>
-                    
-                    {/* Action Buttons for Pending */}
+                    <button onClick={() => { setSelectedSeller(withdrawal.sellerId); fetchSellerFullDetails(withdrawal.sellerId); }}
+                      className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}><Eye size={12} />View Seller Account</button>
                     {withdrawal.status === 'pending' && (
-                      <div className="space-y-2">
-                        <button
-                          onClick={() => {
-                            setConfirmedWithdrawal(withdrawal);
-                            setShowConfirmModal(true);
-                          }}
-                          className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold transition-colors"
-                        >
-                          {processingWithdrawalId === withdrawal.id ? (
-                            <>
-                              <div className="animate-spin h-5 w-5 border-b-2 border-white rounded-full"></div>
-                              Processing...
-                            </>
-                          ) : (
-                            <>
-                              <Check className="w-5 h-5" />
-                              Approve & Transfer via Flutterwave
-                            </>
-                          )}
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => { setConfirmedWithdrawal(withdrawal); setShowConfirmModal(true); }}
+                          disabled={processingWithdrawalId === withdrawal.id} className="btn btn-success" style={{ flex: 1, justifyContent: 'center' }}>
+                          {processingWithdrawalId === withdrawal.id ? '…' : <><Check size={12} />Approve</>}
                         </button>
-                        <button
-                          onClick={() => rejectWithdrawal(withdrawal.id, withdrawal.sellerId, withdrawal.amount)}
-                          disabled={processingWithdrawalId === withdrawal.id}
-                          className="w-full bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold transition-colors"
-                        >
-                          <X className="w-5 h-5" />
-                          Reject Request
+                        <button onClick={() => rejectWithdrawal(withdrawal.id, withdrawal.sellerId, withdrawal.amount)}
+                          disabled={processingWithdrawalId === withdrawal.id} className="btn btn-danger" style={{ flex: 1, justifyContent: 'center' }}>
+                          <X size={12} />Reject
                         </button>
                       </div>
                     )}
-
-                    {/* Completed Status */}
                     {withdrawal.status === 'completed' && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <div className="flex items-start gap-3">
-                          <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-green-900 font-semibold text-sm mb-2">
-                              ✅ Payment Processed Successfully
-                            </p>
-                            {withdrawal.flutterwaveTransferId && (
-                              <div className="text-xs text-gray-700 space-y-1">
-                                <p>Transfer ID: <span className="font-mono">{withdrawal.flutterwaveTransferId}</span></p>
-                                <p>Processed: {formatDate(withdrawal.processedAt)}</p>
-                                <p>By: {withdrawal.processedBy}</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                      <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#34d399' }}>
+                        ✅ Processed · Ref: {withdrawal.flutterwaveReference}
                       </div>
                     )}
-
-                    {/* Rejected Status */}
                     {withdrawal.status === 'rejected' && withdrawal.adminNote && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div className="flex items-start gap-3">
-                          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-red-900 font-semibold text-sm mb-1">Rejection Reason:</p>
-                            <p className="text-red-700 text-xs">{withdrawal.adminNote}</p>
-                            <p className="text-xs text-gray-500 mt-2">Rejected: {formatDate(withdrawal.processedAt)} by {withdrawal.processedBy}
-                            </p>
-                          </div>
-                        </div>
+                      <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#f87171' }}>
+                        ❌ {withdrawal.adminNote}
                       </div>
                     )}
                   </div>
-                ))
-              )}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* ── SCHOOLS ───────────────────────────────────────────────── */}
+          {activeSection === 'schools' && (
+            <div>
+              <div className="section-header"><div className="section-title"><Building size={18} />School Applications</div></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+                {[{ label: 'Pending', count: schoolApplications.filter(s => s.status === 'pending').length, color: '#f59e0b' }, { label: 'Approved', count: schoolApplications.filter(s => s.status === 'approved').length, color: '#10b981' }, { label: 'Rejected', count: schoolApplications.filter(s => s.status === 'rejected').length, color: '#ef4444' }, { label: 'Total', count: schoolApplications.length, color: '#3b82f6' }].map(({ label, count, color }) => (
+                  <div key={label} className="card-sm"><div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div><div style={{ fontSize: 22, fontWeight: 700, color }}>{count}</div></div>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+                {schoolApplications.map(school => (
+                  <div key={school.id} className="card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                      <div><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{school.schoolName}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{school.schoolType}</div></div>
+                      <span className={`pill ${getStatusPill(school.status)}`}><span className="pill-dot" />{school.status}</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 12 }}>
+                      {[{ icon: MapPin, text: `${school.state}, ${school.country}` }, { icon: Mail, text: school.email }, { icon: Phone, text: school.phone }, { icon: User, text: school.principalName }].filter(r => r.text).map(({ icon: Icon, text }) => (
+                        <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--text-secondary)' }}><Icon size={11} />{text}</div>
+                      ))}
+                    </div>
+                    {school.status === 'pending' && (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => updateSchoolApplicationStatus(school.id, 'approved')} className="btn btn-success" style={{ flex: 1, justifyContent: 'center' }}><Check size={12} />Approve</button>
+                        <button onClick={() => updateSchoolApplicationStatus(school.id, 'rejected')} className="btn btn-danger" style={{ flex: 1, justifyContent: 'center' }}><X size={12} />Reject</button>
+                      </div>
+                    )}
+                    {school.status !== 'pending' && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Reviewed {formatDate(school.reviewedAt)?.split(',')[0]} by {school.reviewedBy}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── SCHOOL DOCS ───────────────────────────────────────────── */}
+          {activeSection === 'school-documents' && (
+            <div>
+              <div className="section-header"><div className="section-title"><FileText size={18} />School Documents</div></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+                {schoolDocuments.length === 0 ? <div className="card" style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>No documents yet</div> :
+                  schoolDocuments.map(d => (
+                    <div key={d.id} className="card">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <div><div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{d.title}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{d.schoolName}</div></div>
+                        <span className={`pill ${getStatusPill(d.status)}`}><span className="pill-dot" />{d.status}</span>
+                      </div>
+                      {d.fileUrl && <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent-light)', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}><ExternalLink size={11} />View Document</a>}
+                      {d.status === 'pending' && (
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => updateSchoolDocumentStatus(d.id, 'approved')} className="btn btn-success" style={{ flex: 1, justifyContent: 'center' }}><Check size={12} />Approve</button>
+                          <button onClick={() => updateSchoolDocumentStatus(d.id, 'rejected')} className="btn btn-danger" style={{ flex: 1, justifyContent: 'center' }}><X size={12} />Reject</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── FEEDBACKS ─────────────────────────────────────────────── */}
+          {activeSection === 'feedbacks' && (
+            <div>
+              <div className="section-header"><div className="section-title"><ThumbsUp size={18} />Book Feedbacks</div></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+                {feedbacks.length === 0 ? <div className="card" style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>No feedbacks yet</div> :
+                  feedbacks.map(fb => (
+                    <div key={fb.id} className="card">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{fb.bookTitle || 'Unknown Book'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{fb.userName || 'Anonymous'} · {fb.userEmail}</div>
+                        </div>
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{fb.createdAt instanceof Date ? fb.createdAt.toLocaleDateString() : ''}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'var(--surface)', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+                        {fb.feedback || '(No text)'}
+                      </div>
+                      <button onClick={() => deleteFeedback(fb.id)} className="btn btn-danger" style={{ width: '100%', justifyContent: 'center' }}><Trash2 size={12} />Delete</button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── ARTICLE FEEDBACKS ─────────────────────────────────────── */}
+          {activeSection === 'article-feedbacks' && (
+            <div>
+              <div className="section-header">
+                <div className="section-title"><Star size={18} />Help Center Feedback</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <span className="pill pill-success"><span className="pill-dot" />{articleFeedbacks.filter(f => f.helpful).length} helpful</span>
+                  <span className="pill pill-danger"><span className="pill-dot" />{articleFeedbacks.filter(f => !f.helpful).length} not helpful</span>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+                {articleFeedbacks.map(fb => (
+                  <div key={fb.id} className="card" style={{ borderLeft: `3px solid ${fb.helpful ? '#10b981' : '#ef4444'}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{fb.title || 'Unknown Article'}</div>
+                        <div style={{ fontSize: 11, color: '#60a5fa', marginTop: 2 }}>/{fb.slug}</div>
+                      </div>
+                      <span className={`pill ${fb.helpful ? 'pill-success' : 'pill-danger'}`}>{fb.helpful ? '👍' : '👎'}</span>
+                    </div>
+                    {fb.comment && <div style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'var(--surface)', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>"{fb.comment}"</div>}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{fb.createdAt instanceof Date ? fb.createdAt.toLocaleDateString() : ''}</span>
+                      <button onClick={async () => { if (!confirm('Delete?')) return; try { await deleteDoc(doc(db, 'articleFeedback', fb.id)); setArticleFeedbacks(prev => prev.filter(f => f.id !== fb.id)); } catch (e) { alert(e.message); } }} className="icon-btn" style={{ width: 28, height: 28 }}><Trash2 size={12} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── SETTINGS ──────────────────────────────────────────────── */}
+          {activeSection === 'settings' && (
+            <div>
+              <div className="section-header"><div className="section-title"><Settings size={18} />Fee Settings</div></div>
+              <div className="card" style={{ maxWidth: 560 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                  <div style={{ width: 36, height: 36, background: 'rgba(16,185,129,0.12)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DollarSign size={16} color="#34d399" /></div>
+                  <div><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Platform Fee Payouts</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Collect ₦50 transfer fees and send to Flutterwave</div></div>
+                </div>
+                <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: 16, marginTop: 12 }}>
+                  <PlatformFeeSection user={user} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-     {/* ==================== ALL MODALS ==================== */}
+      {/* ══════════ MODALS ══════════ */}
+      <BookApprovalModal isOpen={showModal && modalType === 'advertisement'} onClose={closeModal} item={selectedItem} onApprove={(item) => updateAdvertisementStatus(item.id, 'approved', item)} onReject={(item, reason) => updateAdvertisementStatus(item.id, 'rejected', item)} checkPdfDuplicate={checkPdfDuplicate} formatDate={formatDate} getStatusColor={getStatusPill} />
+      <ReplyModal isOpen={showModal && modalType === 'reply'} onClose={closeModal} item={selectedItem} replyMessage={replyMessage} setReplyMessage={setReplyMessage} onSend={sendEmailReply} sending={sending} />
+      <TransactionModal isOpen={showModal && modalType === 'transaction'} onClose={closeModal} item={selectedItem} formatDate={formatDate} getStatusColor={getStatusPill} />
+      <UserModal isOpen={showModal && modalType === 'user'} onClose={closeModal} item={selectedItem} formatDate={formatDate} getStatusColor={getStatusPill} onUpdateStatus={updateUserStatus} onDelete={deleteUserAccount} />
 
-<BookApprovalModal
-  isOpen={showModal && modalType === 'advertisement'}
-  onClose={closeModal}
-  item={selectedItem}
-  onApprove={(item) => updateAdvertisementStatus(item.id, 'approved', item)}
-  onReject={(item, reason) => updateAdvertisementStatus(item.id, 'rejected', item)}
-  checkPdfDuplicate={checkPdfDuplicate}
-  formatDate={formatDate}
-  getStatusColor={getStatusColor}
-/>
-
-<ReplyModal
-  isOpen={showModal && modalType === 'reply'}
-  onClose={closeModal}
-  item={selectedItem}
-  replyMessage={replyMessage}
-  setReplyMessage={setReplyMessage}
-  onSend={sendEmailReply}
-  sending={sending}
-/>
-
-<TransactionModal
-  isOpen={showModal && modalType === 'transaction'}
-  onClose={closeModal}
-  item={selectedItem}
-  formatDate={formatDate}
-  getStatusColor={getStatusColor}
-/>
-
-<UserModal
-  isOpen={showModal && modalType === 'user'}
-  onClose={closeModal}
-  item={selectedItem}
-  formatDate={formatDate}
-  getStatusColor={getStatusColor}
-  onUpdateStatus={updateUserStatus}
-  onDelete={deleteUserAccount}
-      />
-      
+      {/* Admin PIN Modal */}
       {showAdminPinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
-            <div className="bg-blue-950 px-6 py-6 text-center">
-              <div className="w-12 h-12 bg-blue-800 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-blue-700">
-                <Lock className="w-6 h-6 text-blue-200" />
-              </div>
-              <h3 className="text-white font-bold text-lg">Admin Authorization</h3>
-              <p className="text-blue-300 text-xs mt-1">Enter PIN to approve ₦{pendingWithdrawal?.amount?.toLocaleString()}</p>
-              <p className="text-blue-200 text-xs mt-1">To: {pendingWithdrawal?.sellerName}</p>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 16, width: '100%', maxWidth: 360, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--surface)', padding: '20px 24px', textAlign: 'center' }}>
+              <div style={{ width: 44, height: 44, background: 'rgba(59,130,246,0.15)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}><Lock size={20} color="#60a5fa" /></div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>Admin Authorization</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Enter PIN to approve ₦{pendingWithdrawal?.amount?.toLocaleString()}</div>
             </div>
-            <div className="p-6">
-              <input
-                type="password"
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="Enter Admin PIN"
-                autoFocus
-                value={adminPinValue}
-                onChange={(e) => setAdminPinValue(e.target.value)}
-                className="w-full text-center text-2xl font-bold tracking-widest border-2 border-gray-200 rounded-2xl px-4 py-4 focus:border-blue-950 focus:outline-none text-blue-950"
-              />
-              <button
-                onClick={() => {
-                  const entered = adminPinValue;
-                  const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PIN;
-                  if (!ADMIN_PIN) { alert('Admin PIN not configured'); return; }
-                  if (entered !== ADMIN_PIN) {
-                    alert('❌ Incorrect PIN');
-                    return;
-                  }
-                  
-                  setShowAdminPinModal(false);
-                  setAdminPinValue('');
-                  setSkipConfirm(true);        // ← ADD THIS
-                  approveWithdrawal(pendingWithdrawal);
-                  setPendingWithdrawal(null);
-                }}
-                className="w-full mt-4 py-4 bg-green-600 text-white rounded-2xl font-bold text-base hover:bg-green-700 transition-all"
-              >
-                Confirm Approval
-              </button>
-              <button
-                onClick={() => { setShowAdminPinModal(false); setPendingWithdrawal(null); setAdminPinValue(''); }}                className="w-full mt-3 py-3 text-gray-400 text-sm hover:text-gray-600 transition-colors"
-              >
-                Cancel
-              </button>
+            <div style={{ padding: 20 }}>
+              <input type="password" inputMode="numeric" maxLength={6} placeholder="Enter PIN" autoFocus value={adminPinValue} onChange={e => setAdminPinValue(e.target.value)} className="input-dark" style={{ textAlign: 'center', fontSize: 20, fontWeight: 700, letterSpacing: 8, marginBottom: 12 }} />
+              <button onClick={() => { const entered = adminPinValue; const PIN = process.env.NEXT_PUBLIC_ADMIN_PIN; if (!PIN) { alert('PIN not configured'); return; } if (entered !== PIN) { alert('❌ Incorrect PIN'); return; } setShowAdminPinModal(false); setAdminPinValue(''); setSkipConfirm(true); approveWithdrawal(pendingWithdrawal); setPendingWithdrawal(null); }} className="btn btn-success" style={{ width: '100%', justifyContent: 'center', padding: 12 }}>Confirm Approval</button>
+              <button onClick={() => { setShowAdminPinModal(false); setPendingWithdrawal(null); setAdminPinValue(''); }} style={{ width: '100%', marginTop: 8, background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', padding: '8px 0' }}>Cancel</button>
             </div>
           </div>
         </div>
       )}
-     
+
+      {/* Confirm Modal */}
       {showConfirmModal && confirmedWithdrawal && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-
-            {/* Header */}
-            <div className="bg-blue-950 px-6 py-6">
-              <div className="flex items-center gap-3 mb-1">
-                <div className="w-10 h-10 bg-yellow-400 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <AlertTriangle className="w-5 h-5 text-yellow-900" />
-                </div>
-                <div>
-                  <h3 className="text-white font-bold text-lg">Confirm Withdrawal</h3>
-                  <p className="text-blue-300 text-xs">Review details before approving</p>
-                </div>
-              </div>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', padding: 16 }}>
+          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 16, width: '100%', maxWidth: 420 }}>
+            <div style={{ background: 'var(--surface)', padding: '18px 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 36, height: 36, background: 'rgba(245,158,11,0.15)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertTriangle size={18} color="#fbbf24" /></div>
+              <div><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Confirm Withdrawal</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Review before approving</div></div>
             </div>
-
-            <div className="p-6 space-y-4">
-
-              {/* Amount */}
-              <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
-                <p className="text-xs text-gray-500 mb-1">Withdrawal Amount</p>
-                <p className="text-4xl font-bold text-green-600">
-                  ₦{confirmedWithdrawal.amount?.toLocaleString()}
-                </p>
+            <div style={{ padding: 20 }}>
+              <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 10, padding: '14px', textAlign: 'center', marginBottom: 14 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Amount</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: '#34d399' }}>₦{confirmedWithdrawal.amount?.toLocaleString()}</div>
               </div>
-
-              {/* Seller */}
-              <div className="bg-gray-50 rounded-2xl p-4 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Seller</span>
-                  <span className="font-semibold text-gray-900">{confirmedWithdrawal.sellerName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Email</span>
-                  <span className="text-gray-700 text-xs">{confirmedWithdrawal.sellerEmail}</span>
-                </div>
-              </div>
-
-              {/* Bank Details */}
-              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 space-y-2 text-sm">
-                <p className="text-xs font-bold text-blue-900 uppercase tracking-wide mb-2">Bank Details</p>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Bank</span>
-                  <span className="font-semibold text-gray-900">{confirmedWithdrawal.bankDetails?.bankName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Bank Code</span>
-                  <span className="font-mono text-gray-700">{confirmedWithdrawal.bankDetails?.bankCode}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Account No.</span>
-                  <span className="font-mono font-semibold text-gray-900">{confirmedWithdrawal.bankDetails?.accountNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Account Name</span>
-                  <span className="font-semibold text-gray-900">{confirmedWithdrawal.bankDetails?.accountName}</span>
-                </div>
-              </div>
-
-              {/* Warning */}
-              <div className="flex items-start gap-2 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
-                <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-yellow-700">
-                  This will process an irreversible payment via Flutterwave. Double-check all details above.
-                </p>
-              </div>
-
-              {/* Buttons */}
-              <div className="flex gap-3 pt-1">
-                <button
-                  onClick={() => { setShowConfirmModal(false); setConfirmedWithdrawal(null); }}
-                  className="flex-1 py-3.5 rounded-2xl border-2 border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    setShowConfirmModal(false);
-                    setPendingWithdrawal(confirmedWithdrawal);
-                    setShowAdminPinModal(true);
-                    setConfirmedWithdrawal(null);
-                  }}
-                  className="flex-2 flex-1 py-3.5 rounded-2xl bg-green-600 text-white font-bold hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Check className="w-5 h-5" />
-                  Proceed to PIN
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {withdrawalSuccessData && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
-
-            {/* Header */}
-            <div className="bg-blue-950 px-6 py-8 flex flex-col items-center text-center">
-              <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="text-white text-xl font-bold mb-1">Withdrawal Approved!</h3>
-              <p className="text-blue-300 text-sm">Payment processed via Flutterwave</p>
-            </div>
-
-            {/* Body */}
-            <div className="p-6 space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Amount</span>
-                <span className="font-bold text-green-600">₦{Number(withdrawalSuccessData.amount).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Seller</span>
-                <span className="font-semibold text-gray-900">{withdrawalSuccessData.sellerName}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Bank</span>
-                <span className="font-semibold text-gray-900">{withdrawalSuccessData.bankName}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Account</span>
-                <span className="font-mono text-gray-900">{withdrawalSuccessData.accountNumber}</span>
-              </div>
-              <div className="border-t border-gray-100 pt-3 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Flutterwave ID</span>
-                  <span className="font-mono text-xs text-blue-950">{withdrawalSuccessData.transferId}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Reference</span>
-                  <span className="font-mono text-xs text-blue-950 break-all text-right max-w-[180px]">{withdrawalSuccessData.reference}</span>
-                </div>
-              </div>
-              <div className="flex justify-between text-sm pt-1">
-                <span className="text-gray-500">Status</span>
-                <span className="bg-green-50 text-green-700 text-xs px-2 py-1 rounded-full font-semibold">✅ Completed</span>
-              </div>
-
-              <button
-                onClick={() => setWithdrawalSuccessData(null)}
-                className="w-full mt-2 bg-blue-950 text-white py-3 rounded-2xl font-bold hover:bg-blue-900 transition-colors"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Seller Full Details Modal */}
-      {selectedSeller && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="bg-blue-950 px-6 py-5 flex items-center justify-between sticky top-0 z-10">
-              <div>
-                <h3 className="text-white font-bold text-lg">Full Seller Account</h3>
-                <p className="text-blue-300 text-xs mt-0.5">Complete financial overview</p>
-              </div>
-              <button onClick={() => { setSelectedSeller(null); setSellerDetails(null); }}
-                className="p-2 hover:bg-blue-800 rounded-xl transition-colors">
-                <X className="w-5 h-5 text-blue-300" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {loadingSellerDetails ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="animate-spin h-10 w-10 border-b-2 border-blue-950 rounded-full" />
-                </div>
-              ) : sellerDetails ? (
-                <>
-                  {/* Seller Profile */}
-                  <div className="bg-gray-50 rounded-2xl p-5">
-                    <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                      <User className="w-4 h-4" /> Seller Profile
-                    </h4>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <p className="text-gray-500 text-xs">Business Name</p>
-                        <p className="font-semibold text-gray-900">{sellerDetails.seller?.businessInfo?.businessName || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-xs">Account Name</p>
-                        <p className="font-semibold text-gray-900">{sellerDetails.seller?.bankDetails?.accountName || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-xs">Current Wallet Balance</p>
-                        <p className="font-bold text-green-600 text-lg">₦{(sellerDetails.seller?.accountBalance || 0).toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-xs">Total Ever Withdrawn</p>
-                        <p className="font-bold text-red-500 text-lg">₦{sellerDetails.stats.totalWithdrawn.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-xs">Transfer PIN Set</p>
-                        <p className="font-semibold text-gray-900">{sellerDetails.seller?.transferPin ? '✅ Yes' : '❌ No'}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-xs">Joined</p>
-                        <p className="font-semibold text-gray-900">{formatDate(sellerDetails.seller?.createdAt)}</p>
-                      </div>
-                    </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, background: 'var(--surface)', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+                {[{ label: 'Seller', value: confirmedWithdrawal.sellerName }, { label: 'Bank', value: confirmedWithdrawal.bankDetails?.bankName }, { label: 'Account', value: confirmedWithdrawal.bankDetails?.accountNumber }, { label: 'Name', value: confirmedWithdrawal.bankDetails?.accountName }].map(({ label, value }) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{value}</span>
                   </div>
+                ))}
+              </div>
+              <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#fbbf24', marginBottom: 14, display: 'flex', gap: 8 }}>
+                <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />Irreversible — double-check all details above.
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => { setShowConfirmModal(false); setConfirmedWithdrawal(null); }} className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }}>Cancel</button>
+                <button onClick={() => { setShowConfirmModal(false); setPendingWithdrawal(confirmedWithdrawal); setShowAdminPinModal(true); setConfirmedWithdrawal(null); }} className="btn btn-success" style={{ flex: 1, justifyContent: 'center' }}><Check size={13} />Proceed to PIN</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-                  {/* Financial Summary */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Success Modal */}
+      {withdrawalSuccessData && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', padding: 16 }}>
+          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 16, width: '100%', maxWidth: 360 }}>
+            <div style={{ background: 'var(--surface)', padding: '24px', textAlign: 'center' }}>
+              <div style={{ width: 52, height: 52, background: 'rgba(16,185,129,0.15)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}><Check size={24} color="#34d399" /></div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Payment Sent!</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Processed via Flutterwave</div>
+            </div>
+            <div style={{ padding: 20 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, marginBottom: 16 }}>
+                {[{ label: 'Amount', value: `₦${Number(withdrawalSuccessData.amount).toLocaleString()}`, color: '#34d399' }, { label: 'Seller', value: withdrawalSuccessData.sellerName }, { label: 'Bank', value: withdrawalSuccessData.bankName }, { label: 'Account', value: withdrawalSuccessData.accountNumber }, { label: 'Ref', value: withdrawalSuccessData.reference }].map(({ label, value, color }) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--card-border)', paddingBottom: 6 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+                    <span style={{ color: color || 'var(--text-primary)', fontWeight: 600, fontFamily: label === 'Account' || label === 'Ref' ? 'monospace' : 'inherit', fontSize: label === 'Ref' ? 11 : 13 }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setWithdrawalSuccessData(null)} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: 12 }}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Seller Details Modal */}
+      {selectedSeller && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', padding: 16 }}>
+          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 16, width: '100%', maxWidth: 600, maxHeight: '88vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: 'var(--surface)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Seller Account</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Full financial overview</div></div>
+              <button onClick={() => { setSelectedSeller(null); setSellerDetails(null); }} className="icon-btn"><X size={15} /></button>
+            </div>
+            <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
+              {loadingSellerDetails ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}><div style={{ width: 32, height: 32, border: '2px solid rgba(59,130,246,0.3)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /></div>
+              ) : sellerDetails ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                     {[
-                      { label: 'Total Earned (Sales)', value: `₦${sellerDetails.stats.totalEarned.toLocaleString()}`, color: 'green' },
-                      { label: 'Total Withdrawn', value: `₦${sellerDetails.stats.totalWithdrawn.toLocaleString()}`, color: 'red' },
-                      { label: 'Sent via Transfers', value: `₦${sellerDetails.stats.totalTransferred.toLocaleString()}`, color: 'blue' },
-                      { label: 'Spent on Recharges', value: `₦${sellerDetails.stats.totalSpentOnRecharges.toLocaleString()}`, color: 'orange' },
+                      { label: 'Balance', value: `₦${(sellerDetails.seller?.accountBalance || 0).toLocaleString()}`, color: '#34d399' },
+                      { label: 'Withdrawn', value: `₦${sellerDetails.stats.totalWithdrawn.toLocaleString()}`, color: '#f87171' },
+                      { label: 'Total Earned', value: `₦${sellerDetails.stats.totalEarned.toLocaleString()}`, color: '#60a5fa' },
+                      { label: 'Transferred', value: `₦${sellerDetails.stats.totalTransferred.toLocaleString()}`, color: '#fbbf24' },
                     ].map(({ label, value, color }) => (
-                      <div key={label} className={`bg-${color}-50 border border-${color}-200 rounded-xl p-3 text-center`}>
-                        <p className={`text-${color}-600 text-xs font-semibold mb-1`}>{label}</p>
-                        <p className={`text-${color}-900 font-bold text-sm`}>{value}</p>
-                      </div>
+                      <div key={label} className="card-sm"><div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{label}</div><div style={{ fontSize: 18, fontWeight: 700, color }}>{value}</div></div>
                     ))}
                   </div>
-
-                  {/* Recent Sales */}
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-green-600" /> Sales ({sellerDetails.sales.length})
-                    </h4>
-                    {sellerDetails.sales.length === 0 ? (
-                      <p className="text-gray-400 text-sm text-center py-4 bg-gray-50 rounded-xl">No sales yet</p>
-                    ) : (
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {sellerDetails.sales.map(sale => (
-                          <div key={sale.id} className="flex justify-between items-center p-3 bg-green-50 rounded-lg text-sm">
-                            <div>
-                              <p className="font-semibold text-gray-900">{sale.bookTitle || 'Unknown'}</p>
-                              <p className="text-xs text-gray-500">{formatDate(sale.createdAt)}</p>
-                            </div>
-                            <p className="font-bold text-green-600">+₦{(sale.sellerEarnings || sale.amount || 0).toLocaleString()}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Transfers Sent */}
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                      <Send className="w-4 h-4 text-blue-600" /> Transfers Sent ({sellerDetails.transfers.length})
-                    </h4>
-                    {sellerDetails.transfers.length === 0 ? (
-                      <p className="text-gray-400 text-sm text-center py-4 bg-gray-50 rounded-xl">No transfers sent</p>
-                    ) : (
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {sellerDetails.transfers.map(tx => (
-                          <div key={tx.id} className="flex justify-between items-center p-3 bg-blue-50 rounded-lg text-sm">
-                            <div>
-                              <p className="font-semibold text-gray-900">To: {tx.recipientName || 'Unknown'}</p>
-                              <p className="text-xs text-gray-500">{formatDate(tx.createdAt)}</p>
-                            </div>
-                            <p className="font-bold text-blue-600">-₦{(tx.totalDeducted || tx.amount || 0).toLocaleString()}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Withdrawal History */}
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                      <Download className="w-4 h-4 text-red-600" /> Withdrawal History ({sellerDetails.withdrawals.length})
-                    </h4>
-                    {sellerDetails.withdrawals.length === 0 ? (
-                      <p className="text-gray-400 text-sm text-center py-4 bg-gray-50 rounded-xl">No withdrawals yet</p>
-                    ) : (
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {sellerDetails.withdrawals.map(w => (
-                          <div key={w.id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg text-sm">
-                            <div>
-                              <p className="font-semibold text-gray-900">₦{(w.amount || 0).toLocaleString()}</p>
-                              <p className="text-xs text-gray-500">{formatDate(w.requestedAt)}</p>
-                            </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(w.status)}`}>
-                              {w.status}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Recharge History */}
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                      <Smartphone className="w-4 h-4 text-purple-600" /> Recharge History ({sellerDetails.recharges.length})
-                    </h4>
-                    {sellerDetails.recharges.length === 0 ? (
-                      <p className="text-gray-400 text-sm text-center py-4 bg-gray-50 rounded-xl">No recharges yet</p>
-                    ) : (
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {sellerDetails.recharges.map(r => (
-                          <div key={r.id} className="flex justify-between items-center p-3 bg-purple-50 rounded-lg text-sm">
-                            <div>
-                              <p className="font-semibold text-gray-900 capitalize">{r.type} — {r.phone || r.meterNumber || r.smartcardNumber || '—'}</p>
-                              <p className="text-xs text-gray-500">{r.network || r.plan?.name || ''} · {formatDate(r.createdAt)}</p>
-                            </div>
-                            <p className="font-bold text-purple-600">-₦{(r.amount || 0).toLocaleString()}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <p className="text-center text-gray-500 py-8">Could not load seller details.</p>
-              )}
+                  {[
+                    { title: 'Sales', icon: DollarSign, color: '#34d399', items: sellerDetails.sales, render: s => ({ left: s.bookTitle || 'Unknown', right: `+₦${(s.sellerEarnings || s.amount || 0).toLocaleString()}`, sub: formatDate(s.createdAt) }) },
+                    { title: 'Transfers', icon: Send, color: '#60a5fa', items: sellerDetails.transfers, render: t => ({ left: `To: ${t.recipientName || 'Unknown'}`, right: `-₦${(t.totalDeducted || t.amount || 0).toLocaleString()}`, sub: formatDate(t.createdAt) }) },
+                    { title: 'Withdrawals', icon: Download, color: '#f87171', items: sellerDetails.withdrawals, render: w => ({ left: `₦${(w.amount || 0).toLocaleString()}`, right: w.status, sub: formatDate(w.requestedAt) }) },
+                  ].map(({ title, icon: Icon, color, items, render }) => (
+                    <div key={title}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}><Icon size={14} color={color} />{title} ({items.length})</div>
+                      {items.length === 0 ? <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>None yet</div> : (
+                        <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {items.map((item, i) => {
+                            const { left, right, sub } = render(item); return (
+                              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface)', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
+                                <div><div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{left}</div><div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{sub}</div></div>
+                                <span style={{ color, fontWeight: 700 }}>{right}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>Could not load details.</div>}
             </div>
           </div>
         </div>

@@ -5,7 +5,7 @@ import {
     Sparkles, Loader2, X, Send, ChevronRight,
     BookMarked, Star, ArrowLeft, Copy, Check,
     PlusCircle, MessageSquare, Menu, ShoppingCart,
-    ChevronLeft, Trash2, Search, Library,
+    ChevronLeft, Trash2, Search, Library, ChevronDown,
 } from "lucide-react";
 import {
     collection, addDoc, serverTimestamp, query,
@@ -296,12 +296,12 @@ function BookPickerScreen({ onSelectBook }) {
                                 onClick={() => onSelectBook(book)}
                                 className="group text-left flex flex-col gap-2 focus:outline-none"
                             >
-                                <div className="relative overflow-hidden border border-slate-700/60 group-hover:border-sky-500/50 transition-all group-hover:shadow-lg group-hover:shadow-sky-500/10">
+                                <div className="relative overflow-hidden object-cover border border-slate-700/60 group-hover:border-sky-500/50 transition-all group-hover:shadow-lg group-hover:shadow-sky-500/10">
                                     <img
                                         src={book.image}
                                         alt={book.title}
-                                        className="w-full h-[160px] sm:h-[190px] group-hover:scale-105 transition-transform duration-300"
-                                        onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=200"; }}
+                                        className="w-full h-[160px] sm:h-[190px] object-cover group-hover:scale-105 transition-transform duration-300"
+                                        onError={e => { e.target.src = "/lanlog.png"; }}
                                         loading="lazy"
                                     />
                                     <div className="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/10 transition-colors flex items-center justify-center">
@@ -327,17 +327,105 @@ function BookPickerScreen({ onSelectBook }) {
 
 /* ══════════════════════════════════════
    QUICK ACTIONS
+   sessionType: unique key used to find/reuse an existing session
 ══════════════════════════════════════ */
 const QUICK_ACTIONS = [
-    { label: "Summarize this book", type: "summary" },
-    { label: "What are the key concepts?", type: "question" },
-    { label: "Explain the main argument", type: "question" },
+    { label: "Summarize this book", type: "summary", sessionType: "summary" },
+    { label: "What are the key concepts?", type: "question", sessionType: "key_concepts" },
+    { label: "Explain the main argument", type: "question", sessionType: "main_argument" },
 ];
+
+/* ══════════════════════════════════════
+   BOOK GROUP (collapsible section in sidebar)
+══════════════════════════════════════ */
+function BookSessionGroup({ bookTitle, sessions, currentSessionId, onSelectSession, onDeleteSession, defaultOpen }) {
+    const [open, setOpen] = useState(defaultOpen);
+
+    return (
+        <div className="mb-1">
+            {/* Book title header — clickable to collapse/expand */}
+            <button
+                onClick={() => setOpen(v => !v)}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors group"
+            >
+                <div className="w-5 h-5 rounded bg-sky-500/15 border border-sky-500/25 flex items-center justify-center shrink-0">
+                    <BookMarked size={10} className="text-sky-400" />
+                </div>
+                <span className="flex-1 text-left text-[11px] font-semibold text-slate-300 group-hover:text-sky-300 truncate transition-colors leading-tight">
+                    {bookTitle}
+                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[9px] text-slate-500 bg-slate-800 rounded-full px-1.5 py-0.5 font-medium">
+                        {sessions.length}
+                    </span>
+                    <ChevronDown
+                        size={11}
+                        className={`text-slate-500 transition-transform duration-200 ${open ? "rotate-0" : "-rotate-90"}`}
+                    />
+                </div>
+            </button>
+
+            {/* Sessions list — shown when expanded */}
+            {open && (
+                <div className="ml-3 pl-2 border-l border-slate-700/60 space-y-0.5 mt-0.5">
+                    {sessions.map((session) => (
+                        <div
+                            key={session.id}
+                            className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-colors ${session.id === currentSessionId
+                                    ? "bg-sky-500/15 border border-sky-500/20"
+                                    : "hover:bg-slate-800 border border-transparent"
+                                }`}
+                            onClick={() => onSelectSession(session)}
+                        >
+                            <MessageSquare
+                                size={11}
+                                className={session.id === currentSessionId ? "text-sky-400 shrink-0" : "text-slate-600 shrink-0"}
+                            />
+                            <div className="flex-1 min-w-0">
+                                <p className={`text-[11.5px] font-medium truncate leading-tight ${session.id === currentSessionId ? "text-sky-300" : "text-slate-400"
+                                    }`}>
+                                    {session.title || "New conversation"}
+                                </p>
+                                <p className="text-[9.5px] text-slate-600 truncate mt-0.5">
+                                    {session.updatedAt?.toDate?.()?.toLocaleDateString?.() || ""}
+                                </p>
+                            </div>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onDeleteSession(session.id); }}
+                                className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center text-slate-500 hover:text-red-400 transition-all shrink-0"
+                            >
+                                <Trash2 size={10} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
 
 /* ══════════════════════════════════════
    SIDEBAR COMPONENT
 ══════════════════════════════════════ */
 function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelectSession, onNewChat, onDeleteSession, bookTitle }) {
+
+    // Group sessions by bookTitle
+    const groupedSessions = chatSessions.reduce((acc, session) => {
+        const title = session.bookTitle || "Unknown Book";
+        if (!acc[title]) acc[title] = [];
+        acc[title].push(session);
+        return acc;
+    }, {});
+
+    // Sort groups: current book first, then by most recent session
+    const sortedGroupKeys = Object.keys(groupedSessions).sort((a, b) => {
+        if (a === bookTitle) return -1;
+        if (b === bookTitle) return 1;
+        const aLatest = groupedSessions[a][0]?.updatedAt?.toDate?.()?.getTime() || 0;
+        const bLatest = groupedSessions[b][0]?.updatedAt?.toDate?.()?.getTime() || 0;
+        return bLatest - aLatest;
+    });
+
     return (
         <>
             {isOpen && (
@@ -349,6 +437,7 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
                 ${isOpen ? "translate-x-0" : "-translate-x-full"}
                 lg:relative lg:translate-x-0 lg:z-auto lg:shrink-0
             `}>
+                {/* Header */}
                 <div className="flex items-center justify-between px-4 py-4 border-b border-slate-700/50">
                     <div className="flex items-center gap-2">
                         <BookMarked size={16} className="text-sky-400" />
@@ -362,6 +451,7 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
                     </button>
                 </div>
 
+                {/* New chat button */}
                 <div className="p-3">
                     <button
                         onClick={onNewChat}
@@ -372,49 +462,29 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
                     </button>
                 </div>
 
-                <div className="px-3 pb-2">
-                    <div className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700/50">
-                        <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Current Book</p>
-                        <p className="text-[11px] text-slate-300 font-medium line-clamp-2">{bookTitle}</p>
-                    </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
+                {/* Sessions grouped by book */}
+                <div className="flex-1 overflow-y-auto px-2 py-1">
                     {chatSessions.length === 0 ? (
-                        <div className="px-3 py-6 text-center">
+                        <div className="px-3 py-8 text-center">
                             <MessageSquare size={24} className="text-slate-600 mx-auto mb-2" />
                             <p className="text-[11px] text-slate-500">No previous chats yet</p>
+                            <p className="text-[10px] text-slate-600 mt-1">Start a conversation to see it here</p>
                         </div>
                     ) : (
-                        chatSessions.map((session) => (
-                            <div
-                                key={session.id}
-                                className={`group flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${session.id === currentSessionId
-                                        ? "bg-sky-500/15 border border-sky-500/20"
-                                        : "hover:bg-slate-800 border border-transparent"
-                                    }`}
-                                onClick={() => { onSelectSession(session); onClose(); }}
-                            >
-                                <MessageSquare size={13} className={session.id === currentSessionId ? "text-sky-400 shrink-0" : "text-slate-500 shrink-0"} />
-                                <div className="flex-1 min-w-0">
-                                    <p className={`text-[12px] font-medium truncate ${session.id === currentSessionId ? "text-sky-300" : "text-slate-300"}`}>
-                                        {session.title || "New conversation"}
-                                    </p>
-                                    <p className="text-[10px] text-sky-600/70 truncate font-medium">
-                                        {session.bookTitle || ""}
-                                    </p>
-                                    <p className="text-[10px] text-slate-500 truncate">
-                                        {session.updatedAt?.toDate?.()?.toLocaleDateString?.() || ""}
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onDeleteSession(session.id); }}
-                                    className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center text-slate-500 hover:text-red-400 transition-all shrink-0"
-                                >
-                                    <Trash2 size={11} />
-                                </button>
-                            </div>
-                        ))
+                        <div className="space-y-1 py-1">
+                            {sortedGroupKeys.map((groupBookTitle) => (
+                                <BookSessionGroup
+                                    key={groupBookTitle}
+                                    bookTitle={groupBookTitle}
+                                    sessions={groupedSessions[groupBookTitle]}
+                                    currentSessionId={currentSessionId}
+                                    onSelectSession={(session) => { onSelectSession(session); onClose(); }}
+                                    onDeleteSession={onDeleteSession}
+                                    // Auto-expand current book's group
+                                    defaultOpen={groupBookTitle === bookTitle}
+                                />
+                            ))}
+                        </div>
                     )}
                 </div>
 
@@ -441,22 +511,19 @@ export default function AiChatContentClient() {
     const paramUserId = searchParams.get("userId") || "";
     const paramPrice = searchParams.get("price") || "";
 
-    // ── FIX 1: Get real userId from Firebase Auth, not just URL params ──
-    // URL params may be missing (e.g. when coming from FAB /ai-chat with no params)
     const [firebaseUserId, setFirebaseUserId] = useState(paramUserId || "");
-    const [authReady, setAuthReady] = useState(!!paramUserId); // true immediately if userId came from URL
+    const [authReady, setAuthReady] = useState(!!paramUserId);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             if (user) {
                 setFirebaseUserId(user.uid);
             }
-            setAuthReady(true); // Auth has resolved — either logged in or not
+            setAuthReady(true);
         });
         return () => unsubscribe();
     }, []);
 
-    // Use Firebase Auth uid first, fall back to URL param, then "anonymous"
     const userId = firebaseUserId || paramUserId || "anonymous";
 
     const [selectedBook, setSelectedBook] = useState(
@@ -468,7 +535,6 @@ export default function AiChatContentClient() {
     const pdfUrl = selectedBook?.pdfUrl || paramPdfUrl;
     const bookPrice = selectedBook?.price || paramPrice;
 
-    // ── All hooks must be above any conditional return ──
     const [loading, setLoading] = useState(false);
     const [input, setInput] = useState("");
     const [messages, setMessages] = useState([]);
@@ -491,11 +557,7 @@ export default function AiChatContentClient() {
         }
     }, [input]);
 
-    /* ── Load ALL sessions for this user across all books ──
-       Single where clause = no composite index needed.
-       Runs as soon as userId resolves from Firebase Auth.        */
     useEffect(() => {
-        // Wait for Firebase Auth to resolve before querying — prevents false "anonymous" state
         if (!authReady) return;
         if (!userId || userId === "anonymous") return;
 
@@ -514,7 +576,6 @@ export default function AiChatContentClient() {
                         return bTime - aTime;
                     });
                 setChatSessions(sessions);
-                console.log(`✅ Loaded ${sessions.length} chat sessions for user`);
             } catch (err) {
                 console.warn("Could not load chat sessions:", err.message);
             }
@@ -535,12 +596,8 @@ export default function AiChatContentClient() {
         } catch (err) { console.error("Vocab save error:", err); }
     }, [bookId, bookTitle, userId]);
 
-    /* ── FIX 3: Save sessions with explicit userId check ── */
-    const saveSessionToFirebase = useCallback(async (sessionId, updatedMessages, firstUserMessage) => {
-        if (!userId || userId === "anonymous") {
-            console.warn("⚠️ Not saving session — user not authenticated");
-            return sessionId;
-        }
+    const saveSessionToFirebase = useCallback(async (sessionId, updatedMessages, firstUserMessage, sessionType = null) => {
+        if (!userId || userId === "anonymous") return sessionId;
         if (!bookId) return sessionId;
 
         try {
@@ -548,15 +605,14 @@ export default function AiChatContentClient() {
                 userId,
                 bookId,
                 bookTitle,
-                // Strip showPurchaseCta from stored messages (not needed in DB)
                 messages: updatedMessages.map(({ showPurchaseCta, ...rest }) => rest),
                 title: firstUserMessage?.slice(0, 60) || "New conversation",
                 updatedAt: serverTimestamp(),
+                ...(sessionType ? { sessionType } : {}),
             };
 
             if (sessionId) {
                 await updateDoc(doc(db, "ai_chat_sessions", sessionId), sessionData);
-                // Update local list title/time
                 setChatSessions(prev => prev.map(s =>
                     s.id === sessionId
                         ? { ...s, ...sessionData, updatedAt: { toDate: () => new Date() } }
@@ -573,7 +629,6 @@ export default function AiChatContentClient() {
                     { id: docRef.id, ...sessionData, updatedAt: { toDate: () => new Date() } },
                     ...prev,
                 ]);
-                console.log("✅ New chat session saved:", docRef.id);
                 return docRef.id;
             }
         } catch (err) {
@@ -586,7 +641,6 @@ export default function AiChatContentClient() {
         setCurrentSessionId(session.id);
         setMessages(session.messages || []);
         setShowWelcome(false);
-        // Restore the book context for this session
         if (session.bookId && session.bookTitle) {
             setSelectedBook({
                 id: session.bookId,
@@ -619,13 +673,17 @@ export default function AiChatContentClient() {
         router.push(`/payment?bookId=${cleanId}`);
     }, [bookId, router]);
 
-    const sendMessage = useCallback(async (text, type = "question") => {
+    const sendMessage = useCallback(async (text, type = "question", sessionType = null, overrideSessionId, overrideMessages) => {
         const trimmed = text?.trim();
         if (!trimmed || loading) return;
 
+        // Use overrides when resuming an existing session (from handleQuickAction)
+        const activeSessionId = overrideSessionId !== undefined ? overrideSessionId : currentSessionId;
+        const baseMessages = overrideMessages !== undefined ? overrideMessages : messages;
+
         setShowWelcome(false);
         const userMsg = { role: "user", text: trimmed };
-        const updatedWithUser = [...messages, userMsg];
+        const updatedWithUser = [...baseMessages, userMsg];
         setMessages(updatedWithUser);
         setInput("");
         setLoading(true);
@@ -656,10 +714,11 @@ export default function AiChatContentClient() {
             const finalMessages = [...updatedWithUser, aiMsg];
             setMessages(finalMessages);
 
-            // Save session — use first user message as title
-            const firstUserText = messages.find(m => m.role === "user")?.text || trimmed;
-            const newSessionId = await saveSessionToFirebase(currentSessionId, finalMessages, firstUserText);
-            if (newSessionId && !currentSessionId) setCurrentSessionId(newSessionId);
+            const firstUserText = baseMessages.find(m => m.role === "user")?.text || trimmed;
+            const newSessionId = await saveSessionToFirebase(activeSessionId, finalMessages, firstUserText, sessionType);
+            if (newSessionId && !activeSessionId) {
+                setCurrentSessionId(newSessionId);
+            }
 
         } catch (err) {
             const isNetwork = !navigator.onLine || err.message?.includes("fetch") || err.message?.includes("network");
@@ -667,7 +726,8 @@ export default function AiChatContentClient() {
                 ? "No internet connection. Please check your network and try again."
                 : err.message || "Something went wrong. Please try again.";
 
-            setMessages([...updatedWithUser, { role: "ai", text: `**${friendlyError}**` }]);
+            console.error("AI Error:", err.message);
+            setMessages(prev => [...prev, { role: "ai", text: `**${friendlyError}**` }]);
         } finally {
             setLoading(false);
         }
@@ -678,7 +738,23 @@ export default function AiChatContentClient() {
         if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
     };
 
-    // ── Conditional return AFTER all hooks ──
+    /* ── Smart quick action: reuse existing session for this book+sessionType ── */
+    const handleQuickAction = useCallback((label, type, sessionType) => {
+        const existing = chatSessions.find(
+            s => s.bookId === bookId && s.sessionType === sessionType
+        );
+        if (existing) {
+            // Resume the existing session and append the new message into it
+            setCurrentSessionId(existing.id);
+            setMessages(existing.messages || []);
+            setShowWelcome(false);
+            sendMessage(label, type, sessionType, existing.id, existing.messages || []);
+        } else {
+            // No existing session — create a new one tagged with sessionType
+            sendMessage(label, type, sessionType, null, []);
+        }
+    }, [chatSessions, bookId, sendMessage]);
+
     if (!selectedBook && !paramBookId) {
         return <BookPickerScreen onSelectBook={(book) => setSelectedBook(book)} />;
     }
@@ -725,7 +801,6 @@ export default function AiChatContentClient() {
                                     title="Change book"
                                 >
                                     <span className="truncate">{bookTitle}</span>
-                                    <span className="text-slate-600 shrink-0">· change</span>
                                 </button>
                             </div>
                         </div>
@@ -740,7 +815,6 @@ export default function AiChatContentClient() {
                             <span className="hidden sm:inline">New chat</span>
                         </button>
                         <Sparkles size={14} className="text-sky-400" />
-                        <span className="text-[10px] text-slate-500 hidden sm:block">Gemini Flash</span>
                     </div>
                 </header>
 
@@ -756,10 +830,10 @@ export default function AiChatContentClient() {
                                 Ask anything about <span className="text-sky-400 font-medium">{bookTitle}</span>
                             </p>
                             <div className="w-full max-w-md flex flex-col gap-2 mt-3">
-                                {QUICK_ACTIONS.map(({ label, type }, i) => (
+                                {QUICK_ACTIONS.map(({ label, type, sessionType }, i) => (
                                     <button
                                         key={label}
-                                        onClick={() => sendMessage(label, type)}
+                                        onClick={() => handleQuickAction(label, type, sessionType)}
                                         className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-[13.5px] border transition-all
                                             ${i === 0
                                                 ? "border-sky-500/30 text-sky-300 bg-sky-500/10 hover:bg-sky-500/15 font-medium"
@@ -787,8 +861,8 @@ export default function AiChatContentClient() {
                             )}
                             <div className={`max-w-[82%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-[13.5px] leading-relaxed
                                 ${msg.role === "ai"
-                                    ? "bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-sm"
-                                    : "bg-sky-600 border border-sky-500/30 text-white rounded-br-sm"
+                                    ? "  text-slate-200 rounded-bl-sm"
+                                    : "bg-black text-white rounded-br-sm"
                                 }`}
                             >
                                 {msg.role === "ai" ? (

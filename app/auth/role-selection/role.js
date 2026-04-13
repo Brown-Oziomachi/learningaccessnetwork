@@ -23,7 +23,7 @@ export default function RoleSelectionClient() {
     const [submitted, setSubmitted] = useState(false);
 
     const handleRoleClick = (role) => {
-        if (role === 'student' || role === 'university') {
+        if (role === 'university') { // Only University stays on waitlist
             setSelectedRole(role);
             setShowWaitlist(true);
         } else {
@@ -55,9 +55,9 @@ export default function RoleSelectionClient() {
     };
 
     const handleContinue = () => {
-        if (!selectedRole || selectedRole !== 'seller') return;
+        // Allow both seller and student to proceed
+        if (!selectedRole || (selectedRole !== 'seller' && selectedRole !== 'student')) return;
 
-        // ✅ Save role AND ref to sessionStorage so it survives multi-step flow
         sessionStorage.setItem('userRole', selectedRole);
         if (refParam) {
             sessionStorage.setItem('referredBy', refParam);
@@ -116,6 +116,14 @@ export default function RoleSelectionClient() {
                                         : 'hover:bg-white hover:shadow-xl hover:scale-[1.02]'
                                     }`}
                             >
+                                {/* LIVE Badge */}
+                                <div className="absolute top-4 right-4">
+                                    <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 animate-pulse-slow">
+                                        <span className="w-2 h-2 bg-white rounded-full animate-ping"></span>
+                                        LIVE
+                                    </div>
+                                </div>
+
                                 <div className="mb-6 flex justify-center">
                                     <div className={`p-5 md:p-6 rounded-2xl transition-all duration-300 ${selectedRole === 'student' ? 'bg-blue-950 shadow-lg' : 'bg-blue-100 group-hover:bg-blue-950 shadow-md'
                                         }`}>
@@ -123,12 +131,15 @@ export default function RoleSelectionClient() {
                                             }`} />
                                     </div>
                                 </div>
+
                                 <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-3">Student Account</h3>
                                 <p className="text-gray-600 text-sm md:text-base leading-relaxed mb-4">
                                     Access premium academic materials and resources for your studies
                                 </p>
-                                <div className="inline-block bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full text-xs md:text-sm font-semibold">
-                                    Coming Soon
+
+                                {/* Updated Status Label */}
+                                <div className="inline-block bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-xs md:text-sm font-bold">
+                                    ✓ Live Now
                                 </div>
                             </button>
 
@@ -187,7 +198,8 @@ export default function RoleSelectionClient() {
                             </button>
                         </div>
 
-                        {selectedRole === 'seller' && (
+                        {/* Change the condition to include 'student' */}
+                        {(selectedRole === 'seller' || selectedRole === 'student') && (
                             <div className="text-center pb-8">
                                 <button
                                     onClick={handleContinue}

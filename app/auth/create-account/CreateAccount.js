@@ -20,8 +20,8 @@ export default function CreateAccountNameClient() {
         surname: ''
     });
     const [errors, setErrors] = useState({});
-    const [selectedRole, setSelectedRole] = useState('seller');
-
+    const [selectedRole, setSelectedRole] = useState('');
+    
     useEffect(() => {
         const role = sessionStorage.getItem('userRole');
         if (role) setSelectedRole(role);
