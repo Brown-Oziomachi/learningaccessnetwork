@@ -40,7 +40,6 @@ const TIERS = {
 };
 
 // ── 3. FIRESTORE-BACKED RATE LIMITER ──
-// Persists across server restarts. Stored in ai_rate_limits/{userId}
 async function checkRateLimit(userId, tier) {
     if (!userId || userId === "anonymous") return { allowed: true, queriesLeft: 3 };
 
@@ -200,14 +199,9 @@ export async function POST(req) {
         const { tier, credits, isPremium } = userPlan;
         const tierConfig = TIERS[tier] || TIERS.free;
 
-        // ── SUMMARY GATE — Pro Only ──
-        if (isSummary && !isPremium) {
-            return NextResponse.json({
-                error: "Smart Summaries are a Pro feature. Upgrade to LAN AI Pro for full summaries, unlimited questions, and advanced AI models.",
-                upgradePrompt: true,
-                upgradeType: "summary",
-            }, { status: 403 });
-        }
+        // ── SUMMARY TIER FLAG ──
+        // No hard gate — free users get a teaser, Pro users get the full summary.
+        const isFullSummary = isSummary && isPremium;
 
         // ── RATE LIMIT ──
         const { allowed, hoursLeft } = await checkRateLimit(userId, tier);
@@ -216,7 +210,7 @@ export async function POST(req) {
             if (credits > 0) {
                 console.log(`💳 ${userId} over daily limit — using credit (${credits} left)`);
                 await deductCredit(userId);
-                // Falls through
+                // Falls through to AI call
             } else {
                 return NextResponse.json({
                     error: `You've used all ${tierConfig.dailyLimit} free questions for today. Reset in ${hoursLeft} hour(s).`,
@@ -334,7 +328,9 @@ export async function POST(req) {
         }
 
         // ── PDF ──
-        const needsPdf = isSummary ? !sellerContext : (!sellerContext && !currentlyVisibleText);
+        // For full Pro summaries, load PDF even if sellerContext exists.
+        // For free teaser summaries and regular questions, only load if no other context.
+        const needsPdf = isFullSummary ? true : (!sellerContext && !currentlyVisibleText);
         if (pdfUrl && needsPdf) {
             let finalUrl = pdfUrl;
             if (pdfUrl.includes("drive.google.com")) {
@@ -384,9 +380,15 @@ RULES:
 6. If asked about a path or link from the knowledge base, mention it so the user knows where to go.
 7. When recommending books from the AVAILABLE BOOKS list, mention the title, author, and link naturally in your response.`;
 
-        const instruction = isSummary
+        // ── BUILD INSTRUCTION ──
+        // isFullSummary  → Pro user tapped Summarize: give comprehensive Smart Summary
+        // isSummary      → Free user tapped Summarize: give short teaser + upgrade nudge
+        // else           → Regular question
+        const instruction = isFullSummary
             ? `${systemPrompt}\n\nProvide a comprehensive Smart Summary of "${bookTitle}" with:\n- 5 key concepts in **bold**\n- 3 likely exam questions\n- 1 key takeaway paragraph.\nBe thorough — this is a Pro feature.`
-            : `${systemPrompt}\n\nStudent Question: "${userQuestion}"`;
+            : isSummary
+                ? `${systemPrompt}\n\nThe student tapped "Summarize this book". Give them a short teaser: a 2-3 sentence overview of "${bookTitle}" and 2 bold key concepts. Then end with: "✨ Upgrade to **LAN AI Pro** to unlock the full Smart Summary — with exam questions, deep concept breakdowns, and unlimited questions. You can upgrade right from this chat."`
+                : `${systemPrompt}\n\nStudent Question: "${userQuestion}"`;
 
         parts.push({ text: instruction });
 
