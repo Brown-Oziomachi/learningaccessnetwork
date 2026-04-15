@@ -310,6 +310,8 @@ function VTUQuickAccess() {
   );
 }
 
+
+
 function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
     return (
         <>
@@ -407,6 +409,10 @@ export default function SellerAccountClient() {
     const [pinValue, setPinValue] = useState("");
     const [pinError, setPinError] = useState("");
     const [showResetPinModal, setShowResetPinModal] = useState(false);
+    const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+    const [deactivateConfirmText, setDeactivateConfirmText] = useState("");
+    const [deactivating, setDeactivating] = useState(false);
+    const [deactivateError, setDeactivateError] = useState("");
     const [resetPinView, setResetPinView] = useState('forgot'); // 'forgot' | 'otp'
     const [resetOtpInput, setResetOtpInput] = useState('');
     const [resetNewPin, setResetNewPin] = useState('');
@@ -913,6 +919,29 @@ export default function SellerAccountClient() {
     };
 
     const sellerName = user?.bankDetails?.accountName || user?.businessInfo?.businessName || 'Unknown Seller';
+
+
+      const handleDeactivateAccount = async () => {
+          if (deactivateConfirmText !== "DELETE") return;
+          try {
+              setDeactivating(true);
+              setDeactivateError("");
+              await updateDoc(doc(db, "users", user.uid), {
+                  isDeactivated: true,
+                  deactivatedAt: serverTimestamp(),
+              });
+              await updateDoc(doc(db, "sellers", user.uid), {
+                  isDeactivated: true,
+                  deactivatedAt: serverTimestamp(),
+              });
+              await auth.signOut();
+              router.push("/auth/signin");
+          } catch (err) {
+              console.error("Deactivation error:", err);
+              setDeactivateError("Failed to deactivate account. Please try again.");
+              setDeactivating(false);
+          }
+      };
 
     if (loading) {
         return (
@@ -1447,6 +1476,24 @@ export default function SellerAccountClient() {
                                                 <span className="font-semibold text-white">Reset Transfer PIN</span>
                                             </div>
                                             <ChevronRight size={20} className="text-gray-300" />
+                                        </button>
+                                        {/* Deactivate Account */}
+                                        <button
+                                            onClick={() => {
+                                                setShowProfileModal(false);
+                                                setDeactivateConfirmText("");
+                                                setDeactivateError("");
+                                                setShowDeactivateModal(true);
+                                            }}
+                                            className="w-full bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between hover:bg-red-100 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-red-100 p-2 rounded-lg">
+                                                    <AlertCircle size={20} className="text-red-600" />
+                                                </div>
+                                                <span className="font-semibold text-red-700">Deactivate Account</span>
+                                            </div>
+                                            <ChevronRight size={20} className="text-red-400" />
                                         </button>
                                     </div>
                                 </div>
@@ -2120,6 +2167,131 @@ export default function SellerAccountClient() {
                 isStudent={user?.role === "student"}
                 router={router}
             />
+            {showDeactivateModal && (
+    <div className="fixed inset-0 bg-black/70 z-[80] flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
+        <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl">
+ 
+            {/* Red header */}
+            <div className="bg-gradient-to-br from-red-600 to-red-800 px-6 pt-8 pb-6 text-center relative">
+                <button
+                    onClick={() => setShowDeactivateModal(false)}
+                    className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-colors"
+                >
+                    <X size={14} />
+                </button>
+ 
+                {/* Warning icon with pulse ring */}
+                <div className="relative w-20 h-20 mx-auto mb-4">
+                    <div className="absolute inset-0 bg-red-400/30 rounded-full animate-ping" />
+                    <div className="relative w-20 h-20 bg-white/15 border-2 border-white/25 rounded-full flex items-center justify-center">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-9 h-9 text-white">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                        </svg>
+                    </div>
+                </div>
+ 
+                <h2 className="text-[20px] font-bold text-white mb-1">Deactivate Account?</h2>
+                <p className="text-red-200 text-[13px]">This action is permanent and cannot be undone</p>
+            </div>
+ 
+            {/* Body */}
+            <div className="p-6">
+ 
+                {/* Warning list */}
+                <div className="bg-red-50 border border-red-100 rounded-2xl p-4 mb-5 space-y-2.5">
+                    {[
+                        "You will be immediately signed out",
+                        "All your uploaded documents will be hidden",
+                        "Your wallet balance will be frozen",
+                        "You will lose access to all earnings",
+                        "This cannot be reversed without contacting support",
+                    ].map((warning, i) => (
+                        <div key={i} className="flex items-start gap-2.5">
+                            <div className="w-4 h-4 rounded-full bg-red-200 flex items-center justify-center shrink-0 mt-0.5">
+                                <svg viewBox="0 0 12 12" fill="none" className="w-2.5 h-2.5">
+                                    <path d="M2 2l8 8M10 2l-8 8" stroke="#dc2626" strokeWidth={2} strokeLinecap="round" />
+                                </svg>
+                            </div>
+                            <p className="text-[12.5px] text-red-700 leading-snug">{warning}</p>
+                        </div>
+                    ))}
+                </div>
+ 
+                {/* Confirm input */}
+                <div className="mb-5">
+                    <label className="block text-[12px] font-bold text-gray-500 uppercase tracking-wider mb-2">
+                        Type <span className="text-red-600 font-black">DELETE</span> to confirm
+                    </label>
+                    <input
+                        type="text"
+                        value={deactivateConfirmText}
+                        onChange={(e) => setDeactivateConfirmText(e.target.value.toUpperCase())}
+                        placeholder="Type DELETE here"
+                        className={`w-full border-2 rounded-xl px-4 py-3 text-[14px] font-mono tracking-widest text-center outline-none transition-all
+                            ${deactivateConfirmText === "DELETE"
+                                ? "border-red-500 bg-red-50 text-red-700 focus:border-red-600"
+                                : "border-gray-200 bg-gray-50 text-gray-700 focus:border-gray-400"
+                            }`}
+                        maxLength={6}
+                    />
+                    {deactivateConfirmText.length > 0 && deactivateConfirmText !== "DELETE" && (
+                        <p className="text-[11px] text-gray-400 text-center mt-1.5">
+                            {6 - deactivateConfirmText.length} character{6 - deactivateConfirmText.length !== 1 ? "s" : ""} remaining
+                        </p>
+                    )}
+                </div>
+ 
+                {/* Error */}
+                {deactivateError && (
+                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+                        <AlertCircle size={15} className="text-red-500 shrink-0" />
+                        <p className="text-[12px] text-red-600">{deactivateError}</p>
+                    </div>
+                )}
+ 
+                {/* Buttons */}
+                <div className="space-y-2.5">
+                    <button
+                        onClick={handleDeactivateAccount}
+                        disabled={deactivateConfirmText !== "DELETE" || deactivating}
+                        className={`w-full py-3.5 rounded-xl font-bold text-[14px] flex items-center justify-center gap-2 transition-all
+                            ${deactivateConfirmText === "DELETE" && !deactivating
+                                ? "bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white shadow-lg shadow-red-200"
+                                : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            }`}
+                    >
+                        {deactivating ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                Deactivating...
+                            </>
+                        ) : (
+                            <>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Yes, Deactivate My Account
+                            </>
+                        )}
+                    </button>
+ 
+                    <button
+                        onClick={() => {
+                            setShowDeactivateModal(false);
+                            setDeactivateConfirmText("");
+                            setDeactivateError("");
+                        }}
+                        disabled={deactivating}
+                        className="w-full py-3 rounded-xl font-semibold text-[13px] text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                        Cancel, keep my account
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+)
+}
         </div>
     );
 }

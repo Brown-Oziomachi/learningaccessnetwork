@@ -16,6 +16,7 @@ import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from '
 import { onAuthStateChanged } from 'firebase/auth';
 import Link from 'next/link';
 import Navbar from '@/components/NavBar';
+import CampusPulse from '@/components/Campus';
 
 /* ─── helpers ─── */
 const getThumbnailUrl = (book) => {
@@ -579,30 +580,10 @@ export default function StudentDashboardClient() {
                 </div>
             </section>
 
-            {/* ── Campus Pulse + Seller ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
-                    <h3 className="text-sm font-black text-slate-800 flex items-center gap-2 mb-5">
-                        <TrendingUp size={15} className="text-orange-500" /> Campus Pulse
-                        <span className="ml-auto text-[9px] font-bold text-slate-400 uppercase tracking-widest">Trending</span>
-                    </h3>
-                    <div className="space-y-3">
-                        {trending.map((b, i) => (
-                            <div key={b.id} className="group flex items-center gap-3 p-3 rounded-xl hover:bg-orange-50 transition-colors cursor-pointer">
-                                <span className="text-xl font-black text-slate-100 group-hover:text-orange-200 transition-colors w-7 shrink-0">
-                                    {String(i + 1).padStart(2, '0')}
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-slate-800 line-clamp-1">{b.title}</p>
-                                    <p className="text-[10px] text-slate-400">{b.downloads} peers reading · {b.category}</p>
-                                </div>
-                                <span className="text-[10px] font-black text-indigo-600 shrink-0">₦{b.price?.toLocaleString()}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+          <CampusPulse />
 
-                {user?.isSeller ? (
+            {/* ── Seller/Author Card ── */}
+            {user?.isSeller ? (
                     <div className="bg-[#0d2b1e] rounded-3xl p-6 text-white shadow-xl flex flex-col justify-between">
                         <div>
                             <div className="flex justify-between items-start mb-4">
@@ -646,7 +627,6 @@ export default function StudentDashboardClient() {
                         </Link>
                     </div>
                 )}
-            </div>
 
             {/* ── Top Contributors ── */}
             <section className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
