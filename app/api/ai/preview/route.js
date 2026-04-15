@@ -24,16 +24,17 @@ const MODEL_CHAIN_PRO = [
 ];
 
 // ── 2. FREEMIUM TIER CONFIG ──
+// FREE users get 15 questions per 2-hour window before seeing the upgrade prompt.
 const TIERS = {
     free: {
-        dailyLimit: 5,
-        window: 24 * 60 * 60 * 1000,
+        dailyLimit: 15,              // ← was 5, now 15
+        window: 2 * 60 * 60 * 1000, // ← was 24h, now 2 hours
         models: MODEL_CHAIN_FREE,
         canSummarize: false,
     },
     pro: {
         dailyLimit: Infinity,
-        window: 24 * 60 * 60 * 1000,
+        window: 2 * 60 * 60 * 1000,
         models: MODEL_CHAIN_PRO,
         canSummarize: true,
     },
@@ -41,7 +42,7 @@ const TIERS = {
 
 // ── 3. FIRESTORE-BACKED RATE LIMITER ──
 async function checkRateLimit(userId, tier) {
-    if (!userId || userId === "anonymous") return { allowed: true, queriesLeft: 3 };
+    if (!userId || userId === "anonymous") return { allowed: true, queriesLeft: 15 };
 
     const config = TIERS[tier] || TIERS.free;
     if (config.dailyLimit === Infinity) return { allowed: true, queriesLeft: Infinity };
@@ -53,14 +54,17 @@ async function checkRateLimit(userId, tier) {
         const snap = await ref.get();
         const data = snap.exists ? snap.data() : null;
 
+        // No record yet OR window has expired → fresh start
         if (!data || now > data.resetAt) {
             await ref.set({ count: 1, resetAt: now + config.window });
             return { allowed: true, queriesLeft: config.dailyLimit - 1 };
         }
+
         if (data.count >= config.dailyLimit) {
-            const hoursLeft = Math.ceil((data.resetAt - now) / 3600000);
-            return { allowed: false, hoursLeft, upgradePrompt: true };
+            const minutesLeft = Math.ceil((data.resetAt - now) / 60000); // minutes, not hours
+            return { allowed: false, minutesLeft, upgradePrompt: true };
         }
+
         await ref.update({ count: FieldValue.increment(1) });
         return { allowed: true, queriesLeft: config.dailyLimit - data.count - 1 };
     } catch (err) {
@@ -82,6 +86,7 @@ async function getUserPlan(userId) {
             tier: isPremium ? "pro" : "free",
             credits: aiCredits,
             isPremium,
+            userName: data.userName || data.displayName || null, // ← load stored name
         };
     } catch (err) {
         console.warn("getUserPlan failed:", err.message);
@@ -99,6 +104,41 @@ async function deductCredit(userId) {
     } catch (err) {
         console.warn("Credit deduction failed:", err.message);
     }
+}
+
+// ── 5b. DETECT & SAVE USER NAME FROM MESSAGE ──
+// Looks for "my name is X", "I'm X", "call me X" patterns.
+async function detectAndSaveName(userId, text) {
+    if (!userId || userId === "anonymous" || !text) return null;
+
+    const patterns = [
+        /my name is ([A-Za-z]+)/i,
+        /i(?:'m| am) ([A-Za-z]+)/i,
+        /call me ([A-Za-z]+)/i,
+        /people call me ([A-Za-z]+)/i,
+    ];
+
+    for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match && match[1]) {
+            const detectedName = match[1].trim();
+            // Skip common false positives
+            const skipWords = ["a", "an", "the", "not", "just", "here", "back", "good", "fine", "ok", "okay"];
+            if (skipWords.includes(detectedName.toLowerCase())) continue;
+
+            try {
+                await adminDb.collection("users").doc(userId).set(
+                    { userName: detectedName },
+                    { merge: true } // ← don't overwrite other fields
+                );
+                console.log(`👤 Saved name "${detectedName}" for user ${userId}`);
+                return detectedName;
+            } catch (err) {
+                console.warn("Name save failed:", err.message);
+            }
+        }
+    }
+    return null;
 }
 
 // ── 6. LAN DOCS KNOWLEDGE BASE ──
@@ -131,12 +171,10 @@ const LAN_DOCS = [
     { title: "Future of LAN Library", desc: "Planned features include live tutoring, AI-powered study assistants, note-taking, highlighting, bookmark syncing, video lectures, audio courses, and institutional partnerships." },
     { title: "Founder", desc: "LAN Library was founded by Brown Oziomachi, a Software Developer. Portfolio: browncode.name.ng" },
     { title: "LAN AI Pro Plan", desc: "Upgrade to LAN AI Pro for unlimited questions, advanced AI models (Gemini 2.5), full PDF analysis, and comprehensive Smart Summaries. Contact support or pay via the in-chat upgrade option to get started." },
-    { title: "AI Credits", desc: "Don't want a full subscription? Buy AI credits as a pay-as-you-go option. Use credits for extra questions beyond your free daily limit of 5. Contact support or use the in-chat credits option to purchase." },
+    { title: "AI Credits", desc: "Don't want a full subscription? Buy AI credits as a pay-as-you-go option. Use credits for extra questions beyond your free limit. Contact support or use the in-chat credits option to purchase." },
 ];
 
-const LAN_KNOWLEDGE_STRING = LAN_DOCS
-    .map(d => `• ${d.title}: ${d.desc}`)
-    .join("\n");
+const LAN_KNOWLEDGE_STRING = LAN_DOCS.map(d => `• ${d.title}: ${d.desc}`).join("\n");
 
 // ── 7. SEARCH BOOKS FROM FIRESTORE ──
 async function searchBooks(queryText) {
@@ -194,41 +232,42 @@ export async function POST(req) {
         const normalizedQuestion = (userQuestion || "")
             .toLowerCase().trim().replace(/\s+/g, " ").slice(0, 120);
 
-        // ── FETCH USER PLAN ──
+        // ── FETCH USER PLAN (includes stored userName) ──
         const userPlan = await getUserPlan(userId);
-        const { tier, credits, isPremium } = userPlan;
+        const { tier, credits, isPremium, userName: storedName } = userPlan;
         const tierConfig = TIERS[tier] || TIERS.free;
 
+        // ── DETECT & SAVE NAME (runs in background, non-blocking) ──
+        const detectedNamePromise = detectAndSaveName(userId, userQuestion);
+
         // ── SUMMARY TIER FLAG ──
-        // No hard gate — free users get a teaser, Pro users get the full summary.
         const isFullSummary = isSummary && isPremium;
 
         // ── RATE LIMIT ──
-        const { allowed, hoursLeft } = await checkRateLimit(userId, tier);
+        const { allowed, minutesLeft } = await checkRateLimit(userId, tier);
 
         if (!allowed) {
             if (credits > 0) {
-                console.log(`💳 ${userId} over daily limit — using credit (${credits} left)`);
+                console.log(`💳 ${userId} over limit — using credit (${credits} left)`);
                 await deductCredit(userId);
                 // Falls through to AI call
             } else {
                 return NextResponse.json({
-                    error: `You've used all ${tierConfig.dailyLimit} free questions for today. Reset in ${hoursLeft} hour(s).`,
+                    error: `You've used all ${tierConfig.dailyLimit} free questions for this session. Resets in ${minutesLeft} minute(s).`,
                     rateLimited: true,
                     upgradePrompt: true,
                     upgradeType: "rateLimit",
-                    hoursLeft,
+                    minutesLeft, // ← minutes, not hours
                 }, { status: 429 });
             }
         }
 
         // ── NO KEYS CHECK ──
         if (API_KEYS.length === 0) {
-            console.error("❌ No Gemini API keys configured");
             return NextResponse.json({ error: "AI service is not configured. Please contact support." }, { status: 503 });
         }
 
-        // ── CACHE CHECK — ai_cache ──
+        // ── CACHE CHECK ──
         let cacheKey = null;
         if (normalizedQuestion) {
             try {
@@ -253,7 +292,7 @@ export async function POST(req) {
             }
         }
 
-        // ── FALLBACK CACHE — student_queries ──
+        // ── FALLBACK CACHE ──
         if (cleanBookId && normalizedQuestion) {
             try {
                 const existing = await adminDb
@@ -265,7 +304,6 @@ export async function POST(req) {
 
                 if (!existing.empty) {
                     const cachedAnswer = existing.docs[0].data().answer;
-                    console.log("⚡ student_queries cache hit");
                     if (cacheKey) {
                         adminDb.collection("ai_cache").doc(cacheKey)
                             .set({ answer: cachedAnswer, cachedAt: new Date() })
@@ -278,6 +316,11 @@ export async function POST(req) {
             }
         }
 
+        // ── AWAIT NAME DETECTION (needed for system prompt personalisation) ──
+        const detectedName = await detectedNamePromise;
+        // Use detected name first, then stored name, then nothing
+        const userName = detectedName || storedName || null;
+
         // ── BUILD AI PARTS ──
         const parts = [];
 
@@ -286,7 +329,6 @@ export async function POST(req) {
         const isAskingForRecs = recommendationKeywords.some(k => normalizedQuestion.includes(k));
         let searchResultsContext = "";
         if (isAskingForRecs) {
-            console.log("🔍 Searching books for recommendations...");
             searchResultsContext = await searchBooks(normalizedQuestion);
         }
 
@@ -298,10 +340,10 @@ export async function POST(req) {
 
         // ── INJECT LAN KNOWLEDGE BASE ──
         parts.push({
-            text: `LAN PLATFORM KNOWLEDGE BASE:\n${LAN_KNOWLEDGE_STRING}\n\nUse the above knowledge base to answer any questions about LAN Library, how it works, its features, pricing, security, or the founder. Always answer platform questions from this knowledge base first before using general knowledge.`
+            text: `LAN PLATFORM KNOWLEDGE BASE:\n${LAN_KNOWLEDGE_STRING}\n\nUse the above knowledge base to answer any questions about LAN Library.`
         });
 
-        // ── BOOK CONTEXT from Firestore ──
+        // ── BOOK CONTEXT FROM FIRESTORE ──
         let sellerContext = "";
         let bookPrice = null;
         if (bookId && cleanBookId) {
@@ -316,7 +358,6 @@ export async function POST(req) {
                         data.author && `AUTHOR: ${data.author}`,
                         data.category && `CATEGORY: ${data.category}`,
                     ].filter(Boolean).join(" | ");
-                    console.log("✅ Book context loaded");
                 }
             } catch (err) {
                 console.warn("Firestore book context skipped:", err.message);
@@ -328,8 +369,6 @@ export async function POST(req) {
         }
 
         // ── PDF ──
-        // For full Pro summaries, load PDF even if sellerContext exists.
-        // For free teaser summaries and regular questions, only load if no other context.
         const needsPdf = isFullSummary ? true : (!sellerContext && !currentlyVisibleText);
         if (pdfUrl && needsPdf) {
             let finalUrl = pdfUrl;
@@ -353,7 +392,6 @@ export async function POST(req) {
                             mimeType: "application/pdf",
                         },
                     });
-                    console.log("✅ PDF loaded");
                 }
             } catch (e) {
                 console.warn("PDF fetch skipped:", e.message);
@@ -363,27 +401,25 @@ export async function POST(req) {
         }
 
         // ── SYSTEM PROMPT ──
+        // userName is injected so the AI can address the student by name naturally.
         const priceString = bookPrice ? `₦${bookPrice}` : "a great price";
-        const systemPrompt = `You are the LAN Library AI Study Partner — friendly, warm, enthusiastic, and genuinely helpful.
+        const nameGreeting = userName ? ` The student's name is ${userName} — use their name naturally in conversation.` : "";
+
+        const systemPrompt = `You are the LAN Library AI Study Partner — friendly, warm, enthusiastic, and genuinely helpful.${nameGreeting}
 
 USER TIER: ${tier.toUpperCase()}${isPremium ? " ✨" : ""}
 
 RULES:
-1. For questions about LAN Library platform (how it works, features, pricing, security, seller info, the founder, etc.) — ALWAYS answer using the LAN PLATFORM KNOWLEDGE BASE provided above. Be specific and accurate.
-2. For questions about a specific book — use the BOOK CONTEXT or PDF content provided. Answer the first part of every deep question helpfully, then naturally invite them to unlock more.
+1. For questions about LAN Library platform — ALWAYS answer using the LAN PLATFORM KNOWLEDGE BASE. Be specific and accurate.
+2. For questions about a specific book — use the BOOK CONTEXT or PDF. Answer helpfully, then invite them to unlock more.
 3. Use **bold** for key concepts and important terms.
 4. SALES FUNNEL — apply naturally, never pushy:
-   • If the student is asking deep questions about a book they may not own yet: answer helpfully, then add: "📖 This book goes much deeper into this topic. You can unlock the full guide for only ${priceString} at learningaccessnetwork.com"
-   • If the student seems to be studying intensely (3+ content questions in a row): mention "💡 Pro Tip: LAN AI Pro gives you unlimited questions + Smart Summaries to ace your exams faster. You can upgrade right from the chat."
+   • If the student asks deep questions about a book they may not own: answer helpfully, then add: "📖 This book goes much deeper. Unlock full access for only ${priceString} at learningaccessnetwork.com"
    • If a free user asks for a summary: explain it's a Pro feature and invite them to upgrade from within the chat.
 5. Keep responses concise, clear, and student-friendly.
-6. If asked about a path or link from the knowledge base, mention it so the user knows where to go.
-7. When recommending books from the AVAILABLE BOOKS list, mention the title, author, and link naturally in your response.`;
+6. When recommending books, mention title, author, and link naturally.`;
 
         // ── BUILD INSTRUCTION ──
-        // isFullSummary  → Pro user tapped Summarize: give comprehensive Smart Summary
-        // isSummary      → Free user tapped Summarize: give short teaser + upgrade nudge
-        // else           → Regular question
         const instruction = isFullSummary
             ? `${systemPrompt}\n\nProvide a comprehensive Smart Summary of "${bookTitle}" with:\n- 5 key concepts in **bold**\n- 3 likely exam questions\n- 1 key takeaway paragraph.\nBe thorough — this is a Pro feature.`
             : isSummary
@@ -405,9 +441,6 @@ RULES:
 
             try {
                 const client = new GoogleGenAI({ apiKey: currentKey });
-                const keyHint = `...${currentKey.slice(-4)}`;
-                console.log(`🤖 [${tier.toUpperCase()}] Trying ${modelName} [${keyHint}]`);
-
                 const response = await client.models.generateContent({
                     model: modelName,
                     contents: [{ role: "user", parts }],
@@ -427,12 +460,9 @@ RULES:
                 lastError = err;
                 const msg = err.message || "";
                 const retryable =
-                    msg.includes("429") ||
-                    msg.includes("quota") ||
-                    msg.includes("RESOURCE_EXHAUSTED") ||
-                    msg.includes("404") ||
-                    msg.includes("not found") ||
-                    msg.includes("deprecated") ||
+                    msg.includes("429") || msg.includes("quota") ||
+                    msg.includes("RESOURCE_EXHAUSTED") || msg.includes("404") ||
+                    msg.includes("not found") || msg.includes("deprecated") ||
                     msg.includes("unavailable");
                 console.warn(`⚠️ ${modelName}: ${msg.slice(0, 100)}`);
                 if (!retryable) break;
@@ -444,7 +474,6 @@ RULES:
             const msg = lastError?.message || "";
             const isQuota = msg.includes("429") || msg.includes("quota");
             const isNetwork = msg.includes("fetch failed") || msg.includes("ENOTFOUND");
-            console.error("❌ All models failed:", msg.slice(0, 150));
             return NextResponse.json({
                 error: isQuota
                     ? "Our AI is experiencing high demand. Please wait a moment and try again."
@@ -458,7 +487,6 @@ RULES:
         if (cacheKey) {
             adminDb.collection("ai_cache").doc(cacheKey)
                 .set({ answer: aiReply, bookId: cleanBookId, cachedAt: new Date() })
-                .then(() => console.log("💾 Cached:", cacheKey))
                 .catch(e => console.warn("Cache write failed:", e.message));
         }
 
@@ -472,6 +500,7 @@ RULES:
             answer: aiReply,
             fromCache: false,
             tier,
+            userName: userName || null, // ← store name alongside query
             timestamp: new Date(),
         }).catch(e => console.warn("Query log failed:", e.message));
 
@@ -479,6 +508,7 @@ RULES:
             reply: aiReply,
             tier,
             isPremium,
+            userName, // ← return to client so it can greet user by name
         });
 
     } catch (error) {

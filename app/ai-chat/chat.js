@@ -18,12 +18,10 @@ import { booksData } from "@/lib/booksData";
 
 /* ══════════════════════════════════════
    UPGRADE MODAL
-   Shown when free user hits rate limit or
-   tries a Pro-only feature (summaries).
-   No /upgrade or /credits page needed —
-   everything is handled inline.
+   Now shows MINUTES (not hours) for reset.
+   Only appears after 15 questions are used.
 ══════════════════════════════════════ */
-function UpgradeModal({ type, hoursLeft, onClose, onContactSupport }) {
+function UpgradeModal({ type, minutesLeft, onClose, onContactSupport }) {
     const isRateLimit = type === "rateLimit";
 
     return (
@@ -42,11 +40,11 @@ function UpgradeModal({ type, hoursLeft, onClose, onContactSupport }) {
                         <Crown size={26} className="text-yellow-300" />
                     </div>
                     <h2 className="text-[18px] font-bold text-white mb-1">
-                        {isRateLimit ? "Daily Limit Reached" : "Pro Feature"}
+                        {isRateLimit ? "Session Limit Reached" : "Pro Feature"}
                     </h2>
                     <p className="text-[13px] text-sky-200">
                         {isRateLimit
-                            ? `You've used your 5 free questions${hoursLeft ? `. Resets in ${hoursLeft}h` : ""}.`
+                            ? `You've used your 15 free questions${minutesLeft ? `. Resets in ${minutesLeft} min` : ""}.`
                             : "Smart Summaries are exclusive to LAN AI Pro."}
                     </p>
                 </div>
@@ -66,7 +64,7 @@ function UpgradeModal({ type, hoursLeft, onClose, onContactSupport }) {
                         </div>
                         <ul className="space-y-1.5 mb-3">
                             {[
-                                "Unlimited questions daily",
+                                "Unlimited questions",
                                 "Smart Book Summaries",
                                 "Gemini 2.5 Flash (best model)",
                                 "Longer, richer AI answers",
@@ -100,7 +98,7 @@ function UpgradeModal({ type, hoursLeft, onClose, onContactSupport }) {
                                 </div>
                             </div>
                             <p className="text-[12px] text-slate-400 mb-3">
-                                Buy a pack of AI credits. Each credit = 1 question beyond your daily limit.
+                                Buy a pack of AI credits. Each credit = 1 extra question.
                             </p>
                             <button
                                 onClick={() => onContactSupport("credits")}
@@ -122,10 +120,10 @@ function UpgradeModal({ type, hoursLeft, onClose, onContactSupport }) {
 }
 
 /* ══════════════════════════════════════
-   UPGRADE MESSAGE CARD
-   Rendered inline in chat instead of plain error text
+   UPGRADE MESSAGE CARD (inline in chat)
+   Shows minutes, not hours.
 ══════════════════════════════════════ */
-function UpgradeCard({ upgradeType, hoursLeft, onShowModal }) {
+function UpgradeCard({ upgradeType, minutesLeft, onShowModal }) {
     const isRateLimit = upgradeType === "rateLimit";
     return (
         <div className="mt-2 bg-gradient-to-br from-indigo-950/80 to-slate-900 border border-indigo-500/30 rounded-2xl p-4 shadow-lg">
@@ -135,11 +133,11 @@ function UpgradeCard({ upgradeType, hoursLeft, onShowModal }) {
                 </div>
                 <div className="flex-1">
                     <p className="text-[12px] font-bold text-indigo-300 uppercase tracking-wider mb-0.5">
-                        {isRateLimit ? "Daily limit reached" : "Pro feature"}
+                        {isRateLimit ? "Session limit reached" : "Pro feature"}
                     </p>
                     <p className="text-[12px] text-slate-300 leading-relaxed">
                         {isRateLimit
-                            ? `You've used all 5 free questions today${hoursLeft ? `. Resets in ${hoursLeft}h` : ""}. Upgrade for unlimited access.`
+                            ? `You've used all 15 free questions${minutesLeft ? `. Resets in ${minutesLeft} min` : ""}. Upgrade for unlimited access.`
                             : "Smart Summaries are available on LAN AI Pro. Upgrade to unlock full summaries, unlimited questions, and the best AI models."}
                     </p>
                 </div>
@@ -629,12 +627,9 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
 
 /* ══════════════════════════════════════
    CONTACT SUPPORT HELPER
-   Opens WhatsApp / email with a pre-filled
-   message. No /upgrade page needed.
-   Customise the phone number below.
 ══════════════════════════════════════ */
 function openSupportContact(type, userId) {
-    const phone = "2348000000000"; // ← Replace with your actual WhatsApp number (no + sign)
+    const phone = "2348000000000"; // ← Replace with your actual WhatsApp number
     const messages = {
         pro: `Hi, I'd like to upgrade to LAN AI Pro. My user ID is: ${userId || "not logged in"}`,
         credits: `Hi, I'd like to buy AI Credits for LAN Library. My user ID is: ${userId || "not logged in"}`,
@@ -658,6 +653,9 @@ export default function AiChatContentClient() {
 
     const [firebaseUserId, setFirebaseUserId] = useState(paramUserId || "");
     const [authReady, setAuthReady] = useState(!!paramUserId);
+
+    // ── Stored user name (persists across messages) ──
+    const [userName, setUserName] = useState(null);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -686,8 +684,8 @@ export default function AiChatContentClient() {
     const [chatSessions, setChatSessions] = useState([]);
     const [currentSessionId, setCurrentSessionId] = useState(null);
 
-    // ── Upgrade modal state ──
-    const [upgradeModal, setUpgradeModal] = useState(null); // null | { type, hoursLeft }
+    // ── Upgrade modal state (stores minutesLeft instead of hoursLeft) ──
+    const [upgradeModal, setUpgradeModal] = useState(null); // null | { type, minutesLeft }
 
     const bottomRef = useRef(null);
     const textareaRef = useRef(null);
@@ -741,7 +739,7 @@ export default function AiChatContentClient() {
         try {
             const sessionData = {
                 userId, bookId, bookTitle,
-                messages: updatedMessages.map(({ showPurchaseCta, upgradePrompt, upgradeType, hoursLeft, ...rest }) => rest),
+                messages: updatedMessages.map(({ showPurchaseCta, upgradePrompt, upgradeType, minutesLeft, ...rest }) => rest),
                 title: firstUserMessage?.slice(0, 60) || "New conversation",
                 updatedAt: serverTimestamp(),
                 ...(sessionType ? { sessionType } : {}),
@@ -837,16 +835,20 @@ export default function AiChatContentClient() {
 
             const data = await res.json();
 
+            // ── Store name if returned from API ──
+            if (data.userName && data.userName !== userName) {
+                setUserName(data.userName);
+            }
+
             // ── Handle upgrade/rate limit responses ──
             if (!res.ok) {
                 if (data.upgradePrompt) {
-                    // Add a styled upgrade card to the chat
                     const upgradeMsg = {
                         role: "ai",
                         text: data.error,
                         upgradePrompt: true,
                         upgradeType: data.upgradeType || "rateLimit",
-                        hoursLeft: data.hoursLeft,
+                        minutesLeft: data.minutesLeft, // ← minutes now
                     };
                     setMessages(prev => [...prev, upgradeMsg]);
                     setLoading(false);
@@ -878,12 +880,11 @@ export default function AiChatContentClient() {
             const friendlyError = isNetwork
                 ? "No internet connection. Please check your network and try again."
                 : err.message || "Something went wrong. Please try again.";
-            console.error("AI Error:", err.message);
             setMessages(prev => [...prev, { role: "ai", text: `**${friendlyError}**` }]);
         } finally {
             setLoading(false);
         }
-    }, [loading, bookTitle, bookId, pdfUrl, userId, messages, currentSessionId, saveSessionToFirebase]);
+    }, [loading, bookTitle, bookId, pdfUrl, userId, messages, currentSessionId, saveSessionToFirebase, userName]);
 
     const handleSubmit = (e) => { e?.preventDefault(); sendMessage(input); };
     const handleKeyDown = (e) => {
@@ -908,11 +909,11 @@ export default function AiChatContentClient() {
 
     return (
         <>
-            {/* ── Upgrade Modal (full-screen overlay) ── */}
+            {/* ── Upgrade Modal ── */}
             {upgradeModal && (
                 <UpgradeModal
                     type={upgradeModal.type}
-                    hoursLeft={upgradeModal.hoursLeft}
+                    minutesLeft={upgradeModal.minutesLeft}
                     onClose={() => setUpgradeModal(null)}
                     onContactSupport={(type) => {
                         setUpgradeModal(null);
@@ -955,7 +956,10 @@ export default function AiChatContentClient() {
                                     <BookMarked size={15} className="text-sky-400" />
                                 </div>
                                 <div>
-                                    <p className="text-[13px] font-semibold text-sky-50 leading-tight">LAN Library AI</p>
+                                    {/* Show user name in header if known */}
+                                    <p className="text-[13px] font-semibold text-sky-50 leading-tight">
+                                        LAN Library AI{userName ? ` · Hi, ${userName}!` : ""}
+                                    </p>
                                     <button
                                         onClick={() => setSelectedBook(null)}
                                         className="text-[10px] text-slate-500 truncate max-w-[130px] sm:max-w-xs leading-tight hover:text-sky-400 transition-colors text-left flex items-center gap-1"
@@ -968,7 +972,7 @@ export default function AiChatContentClient() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                            {/* Upgrade button in header — always visible */}
+                            {/* Pro button — always visible in header for upgrade access */}
                             <button
                                 onClick={() => setUpgradeModal({ type: "rateLimit" })}
                                 className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-400 hover:bg-amber-500/20 transition-colors text-[11px] font-medium"
@@ -1037,18 +1041,18 @@ export default function AiChatContentClient() {
                                     {msg.role === "ai" ? (
                                         <>
                                             <RenderMessage text={msg.text} onSaveVocab={handleSaveVocab} />
-                                            {/* Upgrade card — shown instead of plain error for gated features */}
+                                            {/* Upgrade card — uses minutesLeft */}
                                             {msg.upgradePrompt && (
                                                 <UpgradeCard
                                                     upgradeType={msg.upgradeType}
-                                                    hoursLeft={msg.hoursLeft}
+                                                    minutesLeft={msg.minutesLeft}
                                                     onShowModal={() => setUpgradeModal({
                                                         type: msg.upgradeType,
-                                                        hoursLeft: msg.hoursLeft,
+                                                        minutesLeft: msg.minutesLeft,
                                                     })}
                                                 />
                                             )}
-                                            {/* Purchase CTA for non-owned books */}
+                                            {/* Purchase CTA */}
                                             {msg.showPurchaseCta && !msg.upgradePrompt && (
                                                 <PurchaseSuggestionCard
                                                     bookTitle={bookTitle}
@@ -1119,7 +1123,6 @@ export default function AiChatContentClient() {
                 </div>
             </div>
 
-            {/* Slide-up animation for modal */}
             <style>{`
                 @keyframes slide-up {
                     from { transform: translateY(40px); opacity: 0; }
