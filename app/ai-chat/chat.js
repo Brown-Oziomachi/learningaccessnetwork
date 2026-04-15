@@ -5,17 +5,156 @@ import {
     Sparkles, Loader2, X, Send, ChevronRight,
     BookMarked, Star, ArrowLeft, Copy, Check,
     PlusCircle, MessageSquare, Menu, ShoppingCart,
-    ChevronLeft, Trash2, Search, Library, ChevronDown,
+    Trash2, Search, Library, ChevronDown, Zap,
+    Crown, CreditCard, Lock,
 } from "lucide-react";
 import {
     collection, addDoc, serverTimestamp, query,
-    where, orderBy, getDocs, doc, updateDoc, deleteDoc,
-    getDoc,
+    where, getDocs, doc, updateDoc, deleteDoc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebaseConfig";
-import { auth } from "@/lib/firebaseConfig";
+import { db, auth } from "@/lib/firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { booksData } from "@/lib/booksData";
+
+/* ══════════════════════════════════════
+   UPGRADE MODAL
+   Shown when free user hits rate limit or
+   tries a Pro-only feature (summaries).
+   No /upgrade or /credits page needed —
+   everything is handled inline.
+══════════════════════════════════════ */
+function UpgradeModal({ type, hoursLeft, onClose, onContactSupport }) {
+    const isRateLimit = type === "rateLimit";
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <div className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-3xl overflow-hidden shadow-2xl animate-slide-up">
+
+                {/* Header */}
+                <div className="relative bg-gradient-to-br from-sky-600 to-indigo-700 px-6 pt-8 pb-6 text-center">
+                    <button
+                        onClick={onClose}
+                        className="absolute top-4 right-4 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-colors"
+                    >
+                        <X size={13} />
+                    </button>
+                    <div className="w-14 h-14 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center mx-auto mb-3">
+                        <Crown size={26} className="text-yellow-300" />
+                    </div>
+                    <h2 className="text-[18px] font-bold text-white mb-1">
+                        {isRateLimit ? "Daily Limit Reached" : "Pro Feature"}
+                    </h2>
+                    <p className="text-[13px] text-sky-200">
+                        {isRateLimit
+                            ? `You've used your 5 free questions${hoursLeft ? `. Resets in ${hoursLeft}h` : ""}.`
+                            : "Smart Summaries are exclusive to LAN AI Pro."}
+                    </p>
+                </div>
+
+                {/* Options */}
+                <div className="p-5 space-y-3">
+                    {/* Pro Plan */}
+                    <div className="rounded-2xl border border-sky-500/40 bg-sky-500/8 p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center shrink-0">
+                                <Zap size={16} className="text-sky-400" />
+                            </div>
+                            <div>
+                                <p className="text-[13px] font-bold text-sky-300">LAN AI Pro</p>
+                                <p className="text-[11px] text-slate-400">Unlimited questions & summaries</p>
+                            </div>
+                        </div>
+                        <ul className="space-y-1.5 mb-3">
+                            {[
+                                "Unlimited questions daily",
+                                "Smart Book Summaries",
+                                "Gemini 2.5 Flash (best model)",
+                                "Longer, richer AI answers",
+                            ].map((f) => (
+                                <li key={f} className="flex items-center gap-2 text-[12px] text-slate-300">
+                                    <Check size={11} className="text-sky-400 shrink-0" />
+                                    {f}
+                                </li>
+                            ))}
+                        </ul>
+                        <button
+                            onClick={() => onContactSupport("pro")}
+                            className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 active:scale-95 text-white text-[13px] font-bold py-3 rounded-xl transition-all"
+                        >
+                            <Crown size={14} />
+                            Upgrade to Pro
+                            <ChevronRight size={14} />
+                        </button>
+                    </div>
+
+                    {/* Credits option */}
+                    {isRateLimit && (
+                        <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-4">
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
+                                    <CreditCard size={16} className="text-amber-400" />
+                                </div>
+                                <div>
+                                    <p className="text-[13px] font-bold text-amber-300">AI Credits</p>
+                                    <p className="text-[11px] text-slate-400">Pay-as-you-go, no subscription</p>
+                                </div>
+                            </div>
+                            <p className="text-[12px] text-slate-400 mb-3">
+                                Buy a pack of AI credits. Each credit = 1 question beyond your daily limit.
+                            </p>
+                            <button
+                                onClick={() => onContactSupport("credits")}
+                                className="w-full flex items-center justify-center gap-2 bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 active:scale-95 text-amber-300 text-[13px] font-semibold py-3 rounded-xl transition-all"
+                            >
+                                <CreditCard size={14} />
+                                Buy AI Credits
+                            </button>
+                        </div>
+                    )}
+
+                    <p className="text-center text-[11px] text-slate-500">
+                        Contact support to activate your plan instantly
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ══════════════════════════════════════
+   UPGRADE MESSAGE CARD
+   Rendered inline in chat instead of plain error text
+══════════════════════════════════════ */
+function UpgradeCard({ upgradeType, hoursLeft, onShowModal }) {
+    const isRateLimit = upgradeType === "rateLimit";
+    return (
+        <div className="mt-2 bg-gradient-to-br from-indigo-950/80 to-slate-900 border border-indigo-500/30 rounded-2xl p-4 shadow-lg">
+            <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                    {isRateLimit ? <Lock size={15} className="text-indigo-400" /> : <Crown size={15} className="text-yellow-400" />}
+                </div>
+                <div className="flex-1">
+                    <p className="text-[12px] font-bold text-indigo-300 uppercase tracking-wider mb-0.5">
+                        {isRateLimit ? "Daily limit reached" : "Pro feature"}
+                    </p>
+                    <p className="text-[12px] text-slate-300 leading-relaxed">
+                        {isRateLimit
+                            ? `You've used all 5 free questions today${hoursLeft ? `. Resets in ${hoursLeft}h` : ""}. Upgrade for unlimited access.`
+                            : "Smart Summaries are available on LAN AI Pro. Upgrade to unlock full summaries, unlimited questions, and the best AI models."}
+                    </p>
+                </div>
+            </div>
+            <button
+                onClick={onShowModal}
+                className="mt-3 w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-[13px] font-bold py-2.5 rounded-xl transition-all"
+            >
+                <Crown size={13} />
+                {isRateLimit ? "Upgrade or Buy Credits" : "Upgrade to Pro"}
+                <ChevronRight size={13} />
+            </button>
+        </div>
+    );
+}
 
 /* ══════════════════════════════════════
    COPY BUTTON
@@ -296,7 +435,7 @@ function BookPickerScreen({ onSelectBook }) {
                                 onClick={() => onSelectBook(book)}
                                 className="group text-left flex flex-col gap-2 focus:outline-none"
                             >
-                                <div className="relative overflow-hidden object-cover border border-slate-700/60 group-hover:border-sky-500/50 transition-all group-hover:shadow-lg group-hover:shadow-sky-500/10">
+                                <div className="relative overflow-hidden border border-slate-700/60 group-hover:border-sky-500/50 transition-all group-hover:shadow-lg group-hover:shadow-sky-500/10">
                                     <img
                                         src={book.image}
                                         alt={book.title}
@@ -327,7 +466,6 @@ function BookPickerScreen({ onSelectBook }) {
 
 /* ══════════════════════════════════════
    QUICK ACTIONS
-   sessionType: unique key used to find/reuse an existing session
 ══════════════════════════════════════ */
 const QUICK_ACTIONS = [
     { label: "Summarize this book", type: "summary", sessionType: "summary" },
@@ -336,14 +474,13 @@ const QUICK_ACTIONS = [
 ];
 
 /* ══════════════════════════════════════
-   BOOK GROUP (collapsible section in sidebar)
+   BOOK GROUP (collapsible sidebar section)
 ══════════════════════════════════════ */
 function BookSessionGroup({ bookTitle, sessions, currentSessionId, onSelectSession, onDeleteSession, defaultOpen }) {
     const [open, setOpen] = useState(defaultOpen);
 
     return (
         <div className="mb-1">
-            {/* Book title header — clickable to collapse/expand */}
             <button
                 onClick={() => setOpen(v => !v)}
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors group"
@@ -365,15 +502,14 @@ function BookSessionGroup({ bookTitle, sessions, currentSessionId, onSelectSessi
                 </div>
             </button>
 
-            {/* Sessions list — shown when expanded */}
             {open && (
                 <div className="ml-3 pl-2 border-l border-slate-700/60 space-y-0.5 mt-0.5">
                     {sessions.map((session) => (
                         <div
                             key={session.id}
                             className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-colors ${session.id === currentSessionId
-                                    ? "bg-sky-500/15 border border-sky-500/20"
-                                    : "hover:bg-slate-800 border border-transparent"
+                                ? "bg-sky-500/15 border border-sky-500/20"
+                                : "hover:bg-slate-800 border border-transparent"
                                 }`}
                             onClick={() => onSelectSession(session)}
                         >
@@ -405,11 +541,9 @@ function BookSessionGroup({ bookTitle, sessions, currentSessionId, onSelectSessi
 }
 
 /* ══════════════════════════════════════
-   SIDEBAR COMPONENT
+   SIDEBAR
 ══════════════════════════════════════ */
 function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelectSession, onNewChat, onDeleteSession, bookTitle }) {
-
-    // Group sessions by bookTitle
     const groupedSessions = chatSessions.reduce((acc, session) => {
         const title = session.bookTitle || "Unknown Book";
         if (!acc[title]) acc[title] = [];
@@ -417,7 +551,6 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
         return acc;
     }, {});
 
-    // Sort groups: current book first, then by most recent session
     const sortedGroupKeys = Object.keys(groupedSessions).sort((a, b) => {
         if (a === bookTitle) return -1;
         if (b === bookTitle) return 1;
@@ -437,7 +570,6 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
                 ${isOpen ? "translate-x-0" : "-translate-x-full"}
                 lg:relative lg:translate-x-0 lg:z-auto lg:shrink-0
             `}>
-                {/* Header */}
                 <div className="flex items-center justify-between px-4 py-4 border-b border-slate-700/50">
                     <div className="flex items-center gap-2">
                         <BookMarked size={16} className="text-sky-400" />
@@ -451,7 +583,6 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
                     </button>
                 </div>
 
-                {/* New chat button */}
                 <div className="p-3">
                     <button
                         onClick={onNewChat}
@@ -462,7 +593,6 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
                     </button>
                 </div>
 
-                {/* Sessions grouped by book */}
                 <div className="flex-1 overflow-y-auto px-2 py-1">
                     {chatSessions.length === 0 ? (
                         <div className="px-3 py-8 text-center">
@@ -480,7 +610,6 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
                                     currentSessionId={currentSessionId}
                                     onSelectSession={(session) => { onSelectSession(session); onClose(); }}
                                     onDeleteSession={onDeleteSession}
-                                    // Auto-expand current book's group
                                     defaultOpen={groupBookTitle === bookTitle}
                                 />
                             ))}
@@ -499,7 +628,23 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
 }
 
 /* ══════════════════════════════════════
-   MAIN PAGE CONTENT
+   CONTACT SUPPORT HELPER
+   Opens WhatsApp / email with a pre-filled
+   message. No /upgrade page needed.
+   Customise the phone number below.
+══════════════════════════════════════ */
+function openSupportContact(type, userId) {
+    const phone = "2348000000000"; // ← Replace with your actual WhatsApp number (no + sign)
+    const messages = {
+        pro: `Hi, I'd like to upgrade to LAN AI Pro. My user ID is: ${userId || "not logged in"}`,
+        credits: `Hi, I'd like to buy AI Credits for LAN Library. My user ID is: ${userId || "not logged in"}`,
+    };
+    const text = encodeURIComponent(messages[type] || messages.pro);
+    window.open(`https://wa.me/${phone}?text=${text}`, "_blank");
+}
+
+/* ══════════════════════════════════════
+   MAIN PAGE
 ══════════════════════════════════════ */
 export default function AiChatContentClient() {
     const router = useRouter();
@@ -516,9 +661,7 @@ export default function AiChatContentClient() {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                setFirebaseUserId(user.uid);
-            }
+            if (user) setFirebaseUserId(user.uid);
             setAuthReady(true);
         });
         return () => unsubscribe();
@@ -543,6 +686,9 @@ export default function AiChatContentClient() {
     const [chatSessions, setChatSessions] = useState([]);
     const [currentSessionId, setCurrentSessionId] = useState(null);
 
+    // ── Upgrade modal state ──
+    const [upgradeModal, setUpgradeModal] = useState(null); // null | { type, hoursLeft }
+
     const bottomRef = useRef(null);
     const textareaRef = useRef(null);
 
@@ -558,15 +704,10 @@ export default function AiChatContentClient() {
     }, [input]);
 
     useEffect(() => {
-        if (!authReady) return;
-        if (!userId || userId === "anonymous") return;
-
+        if (!authReady || !userId || userId === "anonymous") return;
         const loadSessions = async () => {
             try {
-                const q = query(
-                    collection(db, "ai_chat_sessions"),
-                    where("userId", "==", userId)
-                );
+                const q = query(collection(db, "ai_chat_sessions"), where("userId", "==", userId));
                 const snapshot = await getDocs(q);
                 const sessions = snapshot.docs
                     .map(d => ({ id: d.id, ...d.data() }))
@@ -580,7 +721,6 @@ export default function AiChatContentClient() {
                 console.warn("Could not load chat sessions:", err.message);
             }
         };
-
         loadSessions();
     }, [userId, authReady]);
 
@@ -597,15 +737,11 @@ export default function AiChatContentClient() {
     }, [bookId, bookTitle, userId]);
 
     const saveSessionToFirebase = useCallback(async (sessionId, updatedMessages, firstUserMessage, sessionType = null) => {
-        if (!userId || userId === "anonymous") return sessionId;
-        if (!bookId) return sessionId;
-
+        if (!userId || userId === "anonymous" || !bookId) return sessionId;
         try {
             const sessionData = {
-                userId,
-                bookId,
-                bookTitle,
-                messages: updatedMessages.map(({ showPurchaseCta, ...rest }) => rest),
+                userId, bookId, bookTitle,
+                messages: updatedMessages.map(({ showPurchaseCta, upgradePrompt, upgradeType, hoursLeft, ...rest }) => rest),
                 title: firstUserMessage?.slice(0, 60) || "New conversation",
                 updatedAt: serverTimestamp(),
                 ...(sessionType ? { sessionType } : {}),
@@ -677,7 +813,6 @@ export default function AiChatContentClient() {
         const trimmed = text?.trim();
         if (!trimmed || loading) return;
 
-        // Use overrides when resuming an existing session (from handleQuickAction)
         const activeSessionId = overrideSessionId !== undefined ? overrideSessionId : currentSessionId;
         const baseMessages = overrideMessages !== undefined ? overrideMessages : messages;
 
@@ -699,8 +834,26 @@ export default function AiChatContentClient() {
                     type,
                 }),
             });
+
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Connection Error");
+
+            // ── Handle upgrade/rate limit responses ──
+            if (!res.ok) {
+                if (data.upgradePrompt) {
+                    // Add a styled upgrade card to the chat
+                    const upgradeMsg = {
+                        role: "ai",
+                        text: data.error,
+                        upgradePrompt: true,
+                        upgradeType: data.upgradeType || "rateLimit",
+                        hoursLeft: data.hoursLeft,
+                    };
+                    setMessages(prev => [...prev, upgradeMsg]);
+                    setLoading(false);
+                    return;
+                }
+                throw new Error(data.error || "Connection Error");
+            }
 
             const purchaseKeywords = [
                 "purchase", "buy", "unlock", "full access", "full content",
@@ -725,7 +878,6 @@ export default function AiChatContentClient() {
             const friendlyError = isNetwork
                 ? "No internet connection. Please check your network and try again."
                 : err.message || "Something went wrong. Please try again.";
-
             console.error("AI Error:", err.message);
             setMessages(prev => [...prev, { role: "ai", text: `**${friendlyError}**` }]);
         } finally {
@@ -738,19 +890,14 @@ export default function AiChatContentClient() {
         if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
     };
 
-    /* ── Smart quick action: reuse existing session for this book+sessionType ── */
     const handleQuickAction = useCallback((label, type, sessionType) => {
-        const existing = chatSessions.find(
-            s => s.bookId === bookId && s.sessionType === sessionType
-        );
+        const existing = chatSessions.find(s => s.bookId === bookId && s.sessionType === sessionType);
         if (existing) {
-            // Resume the existing session and append the new message into it
             setCurrentSessionId(existing.id);
             setMessages(existing.messages || []);
             setShowWelcome(false);
             sendMessage(label, type, sessionType, existing.id, existing.messages || []);
         } else {
-            // No existing session — create a new one tagged with sessionType
             sendMessage(label, type, sessionType, null, []);
         }
     }, [chatSessions, bookId, sendMessage]);
@@ -760,182 +907,226 @@ export default function AiChatContentClient() {
     }
 
     return (
-        <div className="flex h-screen bg-slate-950 overflow-hidden">
+        <>
+            {/* ── Upgrade Modal (full-screen overlay) ── */}
+            {upgradeModal && (
+                <UpgradeModal
+                    type={upgradeModal.type}
+                    hoursLeft={upgradeModal.hoursLeft}
+                    onClose={() => setUpgradeModal(null)}
+                    onContactSupport={(type) => {
+                        setUpgradeModal(null);
+                        openSupportContact(type, userId);
+                    }}
+                />
+            )}
 
-            <ChatSidebar
-                isOpen={sidebarOpen}
-                onClose={() => setSidebarOpen(false)}
-                chatSessions={chatSessions}
-                currentSessionId={currentSessionId}
-                onSelectSession={handleSelectSession}
-                onNewChat={() => { handleNewChat(); setSidebarOpen(false); }}
-                onDeleteSession={handleDeleteSession}
-                bookTitle={bookTitle}
-            />
+            <div className="flex h-screen bg-slate-950 overflow-hidden">
 
-            <div className="flex flex-col flex-1 min-w-0 h-full">
+                <ChatSidebar
+                    isOpen={sidebarOpen}
+                    onClose={() => setSidebarOpen(false)}
+                    chatSessions={chatSessions}
+                    currentSessionId={currentSessionId}
+                    onSelectSession={handleSelectSession}
+                    onNewChat={() => { handleNewChat(); setSidebarOpen(false); }}
+                    onDeleteSession={handleDeleteSession}
+                    bookTitle={bookTitle}
+                />
 
-                <header className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-sky-500/20 shrink-0">
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => setSidebarOpen(v => !v)}
-                            className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                        >
-                            <Menu size={16} />
-                        </button>
-                        <button
-                            onClick={() => router.back()}
-                            className="flex items-center justify-center w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/25 text-sky-400 hover:bg-sky-500/20 transition-colors"
-                        >
-                            <ArrowLeft size={16} />
-                        </button>
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/25 flex items-center justify-center">
-                                <BookMarked size={15} className="text-sky-400" />
-                            </div>
-                            <div>
-                                <p className="text-[13px] font-semibold text-sky-50 leading-tight">LAN Library AI</p>
-                                <button
-                                    onClick={() => setSelectedBook(null)}
-                                    className="text-[10px] text-slate-500 truncate max-w-[130px] sm:max-w-xs leading-tight hover:text-sky-400 transition-colors text-left flex items-center gap-1"
-                                    title="Change book"
-                                >
-                                    <span className="truncate">{bookTitle}</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                <div className="flex flex-col flex-1 min-w-0 h-full">
 
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={handleNewChat}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-sky-500/40 transition-colors text-[11px] font-medium"
-                        >
-                            <PlusCircle size={12} />
-                            <span className="hidden sm:inline">New chat</span>
-                        </button>
-                        <Sparkles size={14} className="text-sky-400" />
-                    </div>
-                </header>
-
-                <main className="flex-1 overflow-y-auto bg-slate-950 px-4 py-5 space-y-4">
-
-                    {showWelcome && messages.length === 0 && (
-                        <div className="flex flex-col items-center pt-8 pb-4 px-2 gap-3">
-                            <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center mb-1">
-                                <BookMarked size={28} className="text-sky-500" />
-                            </div>
-                            <h1 className="text-lg font-semibold text-slate-200 text-center">What do you want to know?</h1>
-                            <p className="text-[13px] text-slate-400 text-center">
-                                Ask anything about <span className="text-sky-400 font-medium">{bookTitle}</span>
-                            </p>
-                            <div className="w-full max-w-md flex flex-col gap-2 mt-3">
-                                {QUICK_ACTIONS.map(({ label, type, sessionType }, i) => (
-                                    <button
-                                        key={label}
-                                        onClick={() => handleQuickAction(label, type, sessionType)}
-                                        className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-[13.5px] border transition-all
-                                            ${i === 0
-                                                ? "border-sky-500/30 text-sky-300 bg-sky-500/10 hover:bg-sky-500/15 font-medium"
-                                                : "border-slate-700 text-slate-300 bg-slate-800/50 hover:bg-slate-800 hover:border-slate-600"
-                                            }`}
-                                    >
-                                        <span>{label}</span>
-                                        <ChevronRight size={14} className={i === 0 ? "text-sky-400" : "text-slate-500"} />
-                                    </button>
-                                ))}
-                            </div>
-                            <div className="flex items-center gap-2 mt-2">
-                                <span className="text-[11px] bg-slate-800 border border-slate-700 text-slate-400 rounded-md px-2 py-0.5 font-semibold">Highlight</span>
-                                <span className="text-[12px] text-slate-500">any text on the book page, then ask here</span>
-                            </div>
-                        </div>
-                    )}
-
-                    {messages.map((msg, i) => (
-                        <div key={i} className={`flex items-end gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                            {msg.role === "ai" && (
-                                <div className="w-7 h-7 rounded-full bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0 mb-0.5">
-                                    <BookMarked size={12} className="text-sky-500" />
-                                </div>
-                            )}
-                            <div className={`max-w-[82%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-[13.5px] leading-relaxed
-                                ${msg.role === "ai"
-                                    ? "  text-slate-200 rounded-bl-sm"
-                                    : "bg-black text-white rounded-br-sm"
-                                }`}
+                    <header className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-sky-500/20 shrink-0">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setSidebarOpen(v => !v)}
+                                className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
                             >
-                                {msg.role === "ai" ? (
-                                    <>
-                                        <RenderMessage text={msg.text} onSaveVocab={handleSaveVocab} />
-                                        {msg.showPurchaseCta && (
-                                            <PurchaseSuggestionCard
-                                                bookTitle={bookTitle}
-                                                bookId={bookId}
-                                                price={bookPrice}
-                                                onPurchase={handlePurchaseRedirect}
-                                            />
-                                        )}
-                                    </>
-                                ) : (
-                                    <p className="text-white">{msg.text}</p>
+                                <Menu size={16} />
+                            </button>
+                            <button
+                                onClick={() => router.back()}
+                                className="flex items-center justify-center w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/25 text-sky-400 hover:bg-sky-500/20 transition-colors"
+                            >
+                                <ArrowLeft size={16} />
+                            </button>
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/25 flex items-center justify-center">
+                                    <BookMarked size={15} className="text-sky-400" />
+                                </div>
+                                <div>
+                                    <p className="text-[13px] font-semibold text-sky-50 leading-tight">LAN Library AI</p>
+                                    <button
+                                        onClick={() => setSelectedBook(null)}
+                                        className="text-[10px] text-slate-500 truncate max-w-[130px] sm:max-w-xs leading-tight hover:text-sky-400 transition-colors text-left flex items-center gap-1"
+                                        title="Change book"
+                                    >
+                                        <span className="truncate">{bookTitle}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {/* Upgrade button in header — always visible */}
+                            <button
+                                onClick={() => setUpgradeModal({ type: "rateLimit" })}
+                                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-400 hover:bg-amber-500/20 transition-colors text-[11px] font-medium"
+                            >
+                                <Crown size={11} />
+                                Pro
+                            </button>
+                            <button
+                                onClick={handleNewChat}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-sky-500/40 transition-colors text-[11px] font-medium"
+                            >
+                                <PlusCircle size={12} />
+                                <span className="hidden sm:inline">New chat</span>
+                            </button>
+                            <Sparkles size={14} className="text-sky-400" />
+                        </div>
+                    </header>
+
+                    <main className="flex-1 overflow-y-auto bg-slate-950 px-4 py-5 space-y-4">
+
+                        {showWelcome && messages.length === 0 && (
+                            <div className="flex flex-col items-center pt-8 pb-4 px-2 gap-3">
+                                <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center mb-1">
+                                    <BookMarked size={28} className="text-sky-500" />
+                                </div>
+                                <h1 className="text-lg font-semibold text-slate-200 text-center">What do you want to know?</h1>
+                                <p className="text-[13px] text-slate-400 text-center">
+                                    Ask anything about <span className="text-sky-400 font-medium">{bookTitle}</span>
+                                </p>
+                                <div className="w-full max-w-md flex flex-col gap-2 mt-3">
+                                    {QUICK_ACTIONS.map(({ label, type, sessionType }, i) => (
+                                        <button
+                                            key={label}
+                                            onClick={() => handleQuickAction(label, type, sessionType)}
+                                            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-[13.5px] border transition-all
+                                                ${i === 0
+                                                    ? "border-sky-500/30 text-sky-300 bg-sky-500/10 hover:bg-sky-500/15 font-medium"
+                                                    : "border-slate-700 text-slate-300 bg-slate-800/50 hover:bg-slate-800 hover:border-slate-600"
+                                                }`}
+                                        >
+                                            <span>{label}</span>
+                                            <ChevronRight size={14} className={i === 0 ? "text-sky-400" : "text-slate-500"} />
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="flex items-center gap-2 mt-2">
+                                    <span className="text-[11px] bg-slate-800 border border-slate-700 text-slate-400 rounded-md px-2 py-0.5 font-semibold">Highlight</span>
+                                    <span className="text-[12px] text-slate-500">any text on the book page, then ask here</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {messages.map((msg, i) => (
+                            <div key={i} className={`flex items-end gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                                {msg.role === "ai" && (
+                                    <div className="w-7 h-7 rounded-full bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0 mb-0.5">
+                                        <BookMarked size={12} className="text-sky-500" />
+                                    </div>
+                                )}
+                                <div className={`max-w-[82%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-[13.5px] leading-relaxed
+                                    ${msg.role === "ai"
+                                        ? "text-slate-200 rounded-bl-sm"
+                                        : "bg-black text-white rounded-br-sm"
+                                    }`}
+                                >
+                                    {msg.role === "ai" ? (
+                                        <>
+                                            <RenderMessage text={msg.text} onSaveVocab={handleSaveVocab} />
+                                            {/* Upgrade card — shown instead of plain error for gated features */}
+                                            {msg.upgradePrompt && (
+                                                <UpgradeCard
+                                                    upgradeType={msg.upgradeType}
+                                                    hoursLeft={msg.hoursLeft}
+                                                    onShowModal={() => setUpgradeModal({
+                                                        type: msg.upgradeType,
+                                                        hoursLeft: msg.hoursLeft,
+                                                    })}
+                                                />
+                                            )}
+                                            {/* Purchase CTA for non-owned books */}
+                                            {msg.showPurchaseCta && !msg.upgradePrompt && (
+                                                <PurchaseSuggestionCard
+                                                    bookTitle={bookTitle}
+                                                    bookId={bookId}
+                                                    price={bookPrice}
+                                                    onPurchase={handlePurchaseRedirect}
+                                                />
+                                            )}
+                                        </>
+                                    ) : (
+                                        <p className="text-white">{msg.text}</p>
+                                    )}
+                                </div>
+                                {msg.role === "user" && (
+                                    <div className="w-7 h-7 rounded-full bg-sky-500 flex items-center justify-center shrink-0 mb-0.5">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="white">
+                                            <circle cx="12" cy="8" r="4" />
+                                            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                                        </svg>
+                                    </div>
                                 )}
                             </div>
-                            {msg.role === "user" && (
-                                <div className="w-7 h-7 rounded-full bg-sky-500 flex items-center justify-center shrink-0 mb-0.5">
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="white">
-                                        <circle cx="12" cy="8" r="4" />
-                                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-                                    </svg>
+                        ))}
+
+                        {loading && (
+                            <div className="flex items-end gap-2 justify-start">
+                                <div className="w-7 h-7 rounded-full bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0">
+                                    <BookMarked size={12} className="text-sky-500" />
                                 </div>
-                            )}
-                        </div>
-                    ))}
-
-                    {loading && (
-                        <div className="flex items-end gap-2 justify-start">
-                            <div className="w-7 h-7 rounded-full bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0">
-                                <BookMarked size={12} className="text-sky-500" />
+                                <div className="bg-slate-800 border border-slate-700 rounded-2xl rounded-bl-sm px-4 py-3.5 flex gap-1.5 items-center">
+                                    {[0, 200, 400].map(delay => (
+                                        <span key={delay} className="w-2 h-2 rounded-full bg-sky-400 opacity-40 animate-bounce"
+                                            style={{ animationDelay: `${delay}ms` }} />
+                                    ))}
+                                </div>
                             </div>
-                            <div className="bg-slate-800 border border-slate-700 rounded-2xl rounded-bl-sm px-4 py-3.5 flex gap-1.5 items-center">
-                                {[0, 200, 400].map(delay => (
-                                    <span key={delay} className="w-2 h-2 rounded-full bg-sky-400 opacity-40 animate-bounce"
-                                        style={{ animationDelay: `${delay}ms` }} />
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                        )}
 
-                    <div ref={bottomRef} />
-                </main>
+                        <div ref={bottomRef} />
+                    </main>
 
-                <footer className="shrink-0 bg-slate-900 border-t border-slate-700/50 px-4 pt-3 pb-5 sm:pb-4">
-                    <form
-                        onSubmit={handleSubmit}
-                        className="flex items-end gap-2.5 bg-slate-800 border border-slate-700 rounded-2xl px-3 py-2.5 focus-within:border-sky-500/50 transition-colors"
-                    >
-                        <textarea
-                            ref={textareaRef}
-                            value={input}
-                            onChange={e => setInput(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder="Ask anything about this book…"
-                            rows={1}
-                            className="flex-1 bg-transparent border-none outline-none resize-none text-[13.5px] text-slate-200 placeholder-slate-500 leading-relaxed max-h-36"
-                        />
-                        <button
-                            type="submit"
-                            disabled={loading || !input.trim()}
-                            className="w-9 h-9 shrink-0 bg-sky-600 rounded-xl flex items-center justify-center text-white hover:bg-sky-500 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none transition-all"
+                    <footer className="shrink-0 bg-slate-900 border-t border-slate-700/50 px-4 pt-3 pb-5 sm:pb-4">
+                        <form
+                            onSubmit={handleSubmit}
+                            className="flex items-end gap-2.5 bg-slate-800 border border-slate-700 rounded-2xl px-3 py-2.5 focus-within:border-sky-500/50 transition-colors"
                         >
-                            {loading ? <Loader2 size={15} className="animate-spin" /> : <Send size={14} />}
-                        </button>
-                    </form>
-                    <p className="text-center text-[9px] text-slate-300 uppercase tracking-wider mt-2">
-                        LAN Library AI · Ask questions, get summaries, and explore key concepts with ease
-                    </p>
-                </footer>
+                            <textarea
+                                ref={textareaRef}
+                                value={input}
+                                onChange={e => setInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Ask anything about this book…"
+                                rows={1}
+                                className="flex-1 bg-transparent border-none outline-none resize-none text-[13.5px] text-slate-200 placeholder-slate-500 leading-relaxed max-h-36"
+                            />
+                            <button
+                                type="submit"
+                                disabled={loading || !input.trim()}
+                                className="w-9 h-9 shrink-0 bg-sky-600 rounded-xl flex items-center justify-center text-white hover:bg-sky-500 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none transition-all"
+                            >
+                                {loading ? <Loader2 size={15} className="animate-spin" /> : <Send size={14} />}
+                            </button>
+                        </form>
+                        <p className="text-center text-[9px] text-slate-300 uppercase tracking-wider mt-2">
+                            LAN Library AI · Ask questions, get summaries, and explore key concepts with ease
+                        </p>
+                    </footer>
+                </div>
             </div>
-        </div>
+
+            {/* Slide-up animation for modal */}
+            <style>{`
+                @keyframes slide-up {
+                    from { transform: translateY(40px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+                .animate-slide-up { animation: slide-up 0.25s ease-out; }
+            `}</style>
+        </>
     );
 }
