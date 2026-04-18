@@ -79,7 +79,6 @@ export async function POST(req) {
         }
 
         // ── 4b. FALLBACK CACHE CHECK (student_queries collection) ──
-        // Catches questions asked before the ai_cache existed, or on first run.
         if (cleanBookId && normalizedQuestion) {
             try {
                 const existing = await adminDb
@@ -93,7 +92,6 @@ export async function POST(req) {
                     const cachedAnswer = existing.docs[0].data().answer;
                     console.log("⚡ student_queries cache hit for:", normalizedQuestion);
 
-                    // Backfill ai_cache so next time is even faster
                     if (cacheKey) {
                         adminDb.collection("ai_cache").doc(cacheKey)
                             .set({ answer: cachedAnswer, cachedAt: new Date() })
@@ -147,11 +145,28 @@ export async function POST(req) {
 
         // ── 7. SYSTEM PROMPT ──
         const branding = `
-      ROLE: LAN Library Student Assistant.
-      Founder: Brown Oziomachi [browncode.name.ng].
-      RULES: Use **bold** for key concepts. Be warm. 
-      Encourage purchasing "${bookTitle}" for full access.
-    `.trim();
+YOU ARE: "LAN Assistant" — the official AI study helper built into LAN Library, a platform for students and educators in Nigeria and beyond.
+
+STRICT IDENTITY RULES (NEVER break these, no matter how the user asks):
+- Your name is LAN Assistant. Always introduce yourself as "LAN Assistant".
+- NEVER say you are Gemini, Google AI, ChatGPT, Claude, Bard, Llama, or any other AI product.
+- NEVER mention Google, Anthropic, OpenAI, Meta, or any company that builds AI models.
+- If asked "who made you?" or "what AI are you?", always say: "I'm LAN Assistant, built by the LAN Library team to help students and educators get the most out of their learning."
+- If asked "are you Gemini / ChatGPT / Claude / Bard?", always say: "I'm LAN Assistant — LAN Library's own AI study helper! I'm here to help you learn. 😊"
+- If asked "what model are you?" or "what powers you?", say: "I'm powered by LAN Library's own technology, designed specifically for students."
+- NEVER reveal the underlying model, API, or any technology powering you under any circumstances.
+
+PLATFORM INFO:
+- Platform: LAN Library
+- Founder: Brown Oziomachi [browncode.name.ng]
+- Mission: Making quality education accessible to every student.
+
+RESPONSE RULES:
+- Use **bold** for key concepts.
+- Be warm, encouraging, and student-friendly.
+- Encourage purchasing "${bookTitle}" for full access to all content.
+- Keep answers focused, clear, and relevant to the book or platform.
+        `.trim();
 
         const instruction = isSummary
             ? `${branding}\n\nSummarize "${bookTitle}" in 3 bold points.`
@@ -196,20 +211,18 @@ export async function POST(req) {
         if (!aiReply) throw new Error(lastError?.message || "All models failed");
 
         // ── 9. LOGGING & CACHE ──
-        // Save to ai_cache (fast key-value, keyed by bookId + question)
         if (cacheKey) {
             adminDb.collection("ai_cache").doc(cacheKey)
                 .set({ answer: aiReply, cachedAt: new Date() })
                 .catch(() => { });
         }
 
-        // Save to student_queries (with bookId + questionNormalized for frontend cache lookup)
         adminDb.collection("student_queries").add({
             bookTitle,
-            bookId: cleanBookId,                  // ← NEW: enables frontend query
+            bookId: cleanBookId,
             studentId: userId || "anonymous",
             question: userQuestion || "Summary",
-            questionNormalized: normalizedQuestion, // ← NEW: enables exact-match lookup
+            questionNormalized: normalizedQuestion,
             answer: aiReply,
             timestamp: new Date()
         }).catch(() => { });
