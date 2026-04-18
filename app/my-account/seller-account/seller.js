@@ -462,12 +462,18 @@ export default function SellerAccountClient() {
             if (userDoc.exists()) {
                 const userData = userDoc.data();
 
+                // ── Block deactivated accounts ──
+                if (userData.isDeactivated === true) {
+                    await auth.signOut();
+                    router.push("/auth/signin?reason=deactivated");
+                    return;
+                }
+
                 if (!userData.isSeller) {
                     router.push('/my-account');
                     return;
                 }
 
-                //  Redirect regular users trying to access seller account
                 if (userData.isSeller && window.location.pathname === '/my-account') {
                     router.push('/my-account/seller-account');
                     return;
@@ -480,7 +486,7 @@ export default function SellerAccountClient() {
                     const sellerData = sellerDoc.data();
                     bankDetails = sellerData.bankDetails || null;
 
-                    setSeller({ uid, ...sellerData }); // ✅ ADD THIS
+                    setSeller({ uid, ...sellerData });
                     setAccountBalance(sellerData.accountBalance || 0);
                     setTotalEarnings(sellerData.totalEarnings || 0);
                     setBooksSold(sellerData.booksSold || 0);
@@ -2168,130 +2174,116 @@ export default function SellerAccountClient() {
                 router={router}
             />
             {showDeactivateModal && (
-    <div className="fixed inset-0 bg-black/70 z-[80] flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
-        <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl">
- 
-            {/* Red header */}
-            <div className="bg-gradient-to-br from-red-600 to-red-800 px-6 pt-8 pb-6 text-center relative">
-                <button
-                    onClick={() => setShowDeactivateModal(false)}
-                    className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-colors"
-                >
-                    <X size={14} />
-                </button>
- 
-                {/* Warning icon with pulse ring */}
-                <div className="relative w-20 h-20 mx-auto mb-4">
-                    <div className="absolute inset-0 bg-red-400/30 rounded-full animate-ping" />
-                    <div className="relative w-20 h-20 bg-white/15 border-2 border-white/25 rounded-full flex items-center justify-center">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-9 h-9 text-white">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                        </svg>
-                    </div>
-                </div>
- 
-                <h2 className="text-[20px] font-bold text-white mb-1">Deactivate Account?</h2>
-                <p className="text-red-200 text-[13px]">This action is permanent and cannot be undone</p>
-            </div>
- 
-            {/* Body */}
-            <div className="p-6">
- 
-                {/* Warning list */}
-                <div className="bg-red-50 border border-red-100 rounded-2xl p-4 mb-5 space-y-2.5">
-                    {[
-                        "You will be immediately signed out",
-                        "All your uploaded documents will be hidden",
-                        "Your wallet balance will be frozen",
-                        "You will lose access to all earnings",
-                        "This cannot be reversed without contacting support",
-                    ].map((warning, i) => (
-                        <div key={i} className="flex items-start gap-2.5">
-                            <div className="w-4 h-4 rounded-full bg-red-200 flex items-center justify-center shrink-0 mt-0.5">
-                                <svg viewBox="0 0 12 12" fill="none" className="w-2.5 h-2.5">
-                                    <path d="M2 2l8 8M10 2l-8 8" stroke="#dc2626" strokeWidth={2} strokeLinecap="round" />
-                                </svg>
+                <div className="fixed inset-0 bg-black/55 z-[80] flex items-end justify-center backdrop-blur-sm sm:items-center">
+                    <div className="bg-white w-full sm:max-w-sm rounded-t-[28px] sm:rounded-[28px] overflow-hidden">
+
+                        {/* Header */}
+                        <div className="relative px-6 pt-9 pb-7 text-center" style={{ background: "#A32D2D" }}>
+                            <button
+                                onClick={() => { setShowDeactivateModal(false); setDeactivateConfirmText(""); setDeactivateError(""); }}
+                                className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                                style={{ background: "rgba(255,255,255,0.12)" }}
+                            >
+                                <X size={16} />
+                            </button>
+                            <div className="relative w-[72px] h-[72px] mx-auto mb-4">
+                                <div className="absolute inset-0 rounded-full animate-ping" style={{ background: "rgba(255,255,255,0.15)" }} />
+                                <div className="relative w-[72px] h-[72px] rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.12)", border: "1.5px solid rgba(255,255,255,0.2)" }}>
+                                    <AlertCircle size={32} className="text-white" />
+                                </div>
                             </div>
-                            <p className="text-[12.5px] text-red-700 leading-snug">{warning}</p>
+                            <p className="text-white text-[20px] font-semibold mb-1.5">Deactivate account?</p>
+                            <p className="text-white/60 text-[13px]">This action is permanent and cannot be undone</p>
                         </div>
-                    ))}
-                </div>
- 
-                {/* Confirm input */}
-                <div className="mb-5">
-                    <label className="block text-[12px] font-bold text-gray-500 uppercase tracking-wider mb-2">
-                        Type <span className="text-red-600 font-black">DELETE</span> to confirm
-                    </label>
-                    <input
-                        type="text"
-                        value={deactivateConfirmText}
-                        onChange={(e) => setDeactivateConfirmText(e.target.value.toUpperCase())}
-                        placeholder="Type DELETE here"
-                        className={`w-full border-2 rounded-xl px-4 py-3 text-[14px] font-mono tracking-widest text-center outline-none transition-all
-                            ${deactivateConfirmText === "DELETE"
-                                ? "border-red-500 bg-red-50 text-red-700 focus:border-red-600"
-                                : "border-gray-200 bg-gray-50 text-gray-700 focus:border-gray-400"
-                            }`}
-                        maxLength={6}
-                    />
-                    {deactivateConfirmText.length > 0 && deactivateConfirmText !== "DELETE" && (
-                        <p className="text-[11px] text-gray-400 text-center mt-1.5">
-                            {6 - deactivateConfirmText.length} character{6 - deactivateConfirmText.length !== 1 ? "s" : ""} remaining
-                        </p>
-                    )}
-                </div>
- 
-                {/* Error */}
-                {deactivateError && (
-                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
-                        <AlertCircle size={15} className="text-red-500 shrink-0" />
-                        <p className="text-[12px] text-red-600">{deactivateError}</p>
+
+                        {/* Body */}
+                        <div className="px-5 pt-5">
+                            {/* Warning list */}
+                            <div className="rounded-2xl p-4 mb-5" style={{ background: "#FCEBEB", border: "0.5px solid #F7C1C1" }}>
+                                <p className="text-[11.5px] font-semibold uppercase tracking-wider mb-3" style={{ color: "#791F1F" }}>
+                                    What happens when you deactivate
+                                </p>
+                                <div className="space-y-2">
+                                    {[
+                                        "You will be immediately signed out",
+                                        "All uploaded documents will be hidden",
+                                        "Wallet balance will be frozen",
+                                        "You will lose access to all earnings",
+                                        "Cannot be reversed without contacting support",
+                                    ].map((w, i) => (
+                                        <div key={i} className="flex items-start gap-2.5">
+                                            <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: "#F09595" }}>
+                                                <X size={8} color="#A32D2D" strokeWidth={2.5} />
+                                            </div>
+                                            <p className="text-[13px] leading-snug" style={{ color: "#791F1F" }}>{w}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Input */}
+                            <div className="mb-5">
+                                <label className="block text-[11.5px] font-semibold uppercase tracking-wider mb-2 text-gray-400">
+                                    Type <span style={{ color: "#A32D2D" }}>DELETE</span> to confirm
+                                </label>
+                                <input
+                                    type="text"
+                                    value={deactivateConfirmText}
+                                    onChange={(e) => setDeactivateConfirmText(e.target.value.toUpperCase())}
+                                    placeholder="Type DELETE here"
+                                    maxLength={6}
+                                    className="w-full rounded-xl px-4 py-3.5 text-[15px] font-mono tracking-widest text-center outline-none transition-all"
+                                    style={{
+                                        border: deactivateConfirmText === "DELETE" ? "1.5px solid #A32D2D" : "1.5px solid #e5e7eb",
+                                        background: deactivateConfirmText === "DELETE" ? "#FCEBEB" : "#f9fafb",
+                                        color: deactivateConfirmText === "DELETE" ? "#A32D2D" : "#374151",
+                                    }}
+                                />
+                                {deactivateConfirmText.length > 0 && deactivateConfirmText !== "DELETE" && (
+                                    <p className="text-[11px] text-gray-400 text-center mt-1.5">
+                                        {6 - deactivateConfirmText.length} character{6 - deactivateConfirmText.length !== 1 ? "s" : ""} remaining
+                                    </p>
+                                )}
+                            </div>
+
+                            {deactivateError && (
+                                <div className="flex items-center gap-2 rounded-xl p-3 mb-4" style={{ background: "#FCEBEB", border: "0.5px solid #F7C1C1" }}>
+                                    <AlertCircle size={14} style={{ color: "#A32D2D", flexShrink: 0 }} />
+                                    <p className="text-[12px]" style={{ color: "#A32D2D" }}>{deactivateError}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Buttons */}
+                        <div className="px-5 pb-10 space-y-2.5">
+                            <button
+                                onClick={handleDeactivateAccount}
+                                disabled={deactivateConfirmText !== "DELETE" || deactivating}
+                                className="w-full py-[15px] rounded-[14px] text-[14px] font-semibold flex items-center justify-center gap-2 transition-all"
+                                style={{
+                                    background: deactivateConfirmText === "DELETE" && !deactivating ? "#A32D2D" : "#f3f4f6",
+                                    color: deactivateConfirmText === "DELETE" && !deactivating ? "#fff" : "#9ca3af",
+                                    cursor: deactivateConfirmText !== "DELETE" || deactivating ? "not-allowed" : "pointer",
+                                }}
+                            >
+                                {deactivating ? (
+                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deactivating...</>
+                                ) : (
+                                    <>Yes, deactivate my account</>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => { setShowDeactivateModal(false); setDeactivateConfirmText(""); setDeactivateError(""); }}
+                                disabled={deactivating}
+                                className="w-full py-[13px] rounded-[14px] text-[14px] font-semibold text-gray-500 hover:bg-gray-50 transition-colors"
+                                style={{ border: "0.5px solid #e5e7eb" }}
+                            >
+                                Cancel, keep my account
+                            </button>
+                        </div>
                     </div>
-                )}
- 
-                {/* Buttons */}
-                <div className="space-y-2.5">
-                    <button
-                        onClick={handleDeactivateAccount}
-                        disabled={deactivateConfirmText !== "DELETE" || deactivating}
-                        className={`w-full py-3.5 rounded-xl font-bold text-[14px] flex items-center justify-center gap-2 transition-all
-                            ${deactivateConfirmText === "DELETE" && !deactivating
-                                ? "bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white shadow-lg shadow-red-200"
-                                : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                            }`}
-                    >
-                        {deactivating ? (
-                            <>
-                                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                                Deactivating...
-                            </>
-                        ) : (
-                            <>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                                Yes, Deactivate My Account
-                            </>
-                        )}
-                    </button>
- 
-                    <button
-                        onClick={() => {
-                            setShowDeactivateModal(false);
-                            setDeactivateConfirmText("");
-                            setDeactivateError("");
-                        }}
-                        disabled={deactivating}
-                        className="w-full py-3 rounded-xl font-semibold text-[13px] text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                        Cancel, keep my account
-                    </button>
                 </div>
-            </div>
-        </div>
-    </div>
-)
-}
+            )}
         </div>
     );
 }

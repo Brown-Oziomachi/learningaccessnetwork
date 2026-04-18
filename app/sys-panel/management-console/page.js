@@ -544,8 +544,29 @@ export default function ComprehensiveAdminPanel() {
 
   const updateTicketStatus = async (id, status) => { await updateDoc(doc(db, 'supportTickets', id), { status, resolvedAt: serverTimestamp() }); setSupportTickets(supportTickets.map(t => t.id === id ? { ...t, status } : t)); };
   const updateReportStatus = async (id, status) => { await updateDoc(doc(db, 'bookReports', id), { status, resolvedAt: serverTimestamp() }); setBookReports(bookReports.map(r => r.id === id ? { ...r, status } : r)); };
-  const updateUserStatus = async (userId, status) => { if (!confirm(`Set user to ${status}?`)) return; await updateDoc(doc(db, 'users', userId), { accountStatus: status, updatedAt: serverTimestamp() }); fetchUsers(); };
-  const deleteUserAccount = async (userId) => { if (!confirm('DELETE this user? Cannot undo!')) return; try { await deleteDoc(doc(db, 'users', userId)); fetchUsers(); setShowModal(false); } catch (e) { alert('Failed: ' + e.message); } };
+  const updateUserStatus = async (userId, status) => {
+    if (!confirm(`Set user to ${status}?`)) return;
+
+    const updateData = {
+      accountStatus: status,
+      updatedAt: serverTimestamp()
+    };
+
+    // ── If reactivating, also clear the isDeactivated flag ──
+    if (status === 'active') {
+      updateData.isDeactivated = false;
+      updateData.status = 'active';
+    }
+
+    // ── If deactivating, set the isDeactivated flag too ──
+    if (status === 'suspended' || status === 'deactivated') {
+      updateData.isDeactivated = true;
+      updateData.status = status;
+    }
+
+    await updateDoc(doc(db, 'users', userId), updateData);
+    fetchUsers();
+  };  const deleteUserAccount = async (userId) => { if (!confirm('DELETE this user? Cannot undo!')) return; try { await deleteDoc(doc(db, 'users', userId)); fetchUsers(); setShowModal(false); } catch (e) { alert('Failed: ' + e.message); } };
   const deleteFeedback = async (feedbackId) => { if (!confirm('Delete this feedback?')) return; try { await deleteDoc(doc(db, 'bookFeedbacks', feedbackId)); setFeedbacks(feedbacks.filter(f => f.id !== feedbackId)); } catch (e) { alert('Failed: ' + e.message); } };
 
   const processFlutterwaveTransfer = async (withdrawal) => {

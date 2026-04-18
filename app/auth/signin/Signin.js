@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Globe, AlertCircle, CheckCircle, BookOpen } from 'lucide-react';
+import { AlertCircle, CheckCircle, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 import { handleEmailPasswordSignIn } from '@/lib/auth/authHelpers';
@@ -15,64 +15,42 @@ export default function SignInClient() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
-    const [loginData, setLoginData] = useState({
-        email: '',
-        password: ''
-    });
+    const [loginData, setLoginData] = useState({ email: '', password: '' });
 
     useEffect(() => {
         const passwordReset = searchParams.get('passwordReset');
         if (passwordReset === 'success') {
             setSuccessMessage('Password reset successful! Please sign in with your new password.');
-            setTimeout(() => {
-                router.replace('/auth/signin', { scroll: false });
-            }, 100);
+            setTimeout(() => { router.replace('/auth/signin', { scroll: false }); }, 100);
         }
-
         const prefilledEmail = searchParams.get('email');
-        if (prefilledEmail) {
-            setLoginData(prev => ({ ...prev, email: prefilledEmail }));
-        }
+        if (prefilledEmail) setLoginData(prev => ({ ...prev, email: prefilledEmail }));
+
+        // Show deactivated banner if redirected from a protected page
+        const reason = searchParams.get('reason');
+        if (reason === 'deactivated') setError('deactivated');
     }, [searchParams, router]);
 
     const handleLogin = async () => {
-        if (!loginData.email || !loginData.password) {
-            setError('Please fill in all fields');
-            return;
-        }
-
+        if (!loginData.email || !loginData.password) { setError('Please fill in all fields'); return; }
         setLoading(true);
         setError(null);
-
         try {
             const result = await handleEmailPasswordSignIn(
                 loginData.email.toLowerCase().trim(),
                 loginData.password
             );
-
             if (result.success) {
-                // Success! The useAuth hook or a router.push('/home') can go here
                 router.push('/home');
             } else {
                 const errorCode = result.error?.code || '';
-
-                // Handle your specific status codes
-                if (errorCode === 'auth/account-suspended') {
-                    setError('suspended');
-                } else if (errorCode === 'auth/account-pending') {
-                    setError('pending');
-                } else {
-                    // Fallback for standard Firebase auth errors
-                    switch (errorCode) {
-                        case 'auth/invalid-credential':
-                            setError('Incorrect email or password.');
-                            break;
-                        case 'auth/too-many-requests':
-                            setError('Too many attempts. Try again later.');
-                            break;
-                        default:
-                            setError(result.error?.message || 'Login failed.');
-                    }
+                switch (errorCode) {
+                    case 'auth/account-deactivated': setError('deactivated'); break;
+                    case 'auth/account-suspended': setError('suspended'); break;
+                    case 'auth/account-pending': setError('pending'); break;
+                    case 'auth/invalid-credential': setError('Incorrect email or password.'); break;
+                    case 'auth/too-many-requests': setError('Too many attempts. Try again later.'); break;
+                    default: setError(result.error?.message || 'Login failed. Please try again.');
                 }
             }
         } catch (err) {
@@ -81,7 +59,6 @@ export default function SignInClient() {
             setLoading(false);
         }
     };
-
 
     if (authLoading) {
         return (
@@ -99,11 +76,7 @@ export default function SignInClient() {
                 <div className="absolute inset-0 flex items-center justify-center p-12">
                     <div className="max-w-lg">
                         <div className="relative mb-8">
-                            <img
-                                src="/lan.png"
-                                alt="Student"
-                                className="shadow-2xl w-full mt-40"
-                            />
+                            <img src="/lan.png" alt="Student" className="shadow-2xl w-full mt-40" />
                             <div className="absolute top-8 -right-4 bg-white rounded-2xl shadow-xl p-4 animate-bounce">
                                 <div className="flex items-center gap-3">
                                     <div className="bg-blue-950 p-3 rounded-xl">
@@ -124,10 +97,8 @@ export default function SignInClient() {
                 </div>
                 <div className="absolute top-0 left-8">
                     <div className="flex items-center gap-2 text-blue-950 px-10 py-3 rounded-xl">
-                        <h1
-                            className="text-4xl max-md:text-2xl lg:text-6xl font-bold text-gray-50"
-                            style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
-                        >
+                        <h1 className="text-4xl max-md:text-2xl lg:text-6xl font-bold text-gray-50"
+                            style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}>
                             [LAN Library]
                             <p className="text-xs sm:text-base font-light" style={{ fontFamily: "'Lato', sans-serif" }}>
                                 The Global Student Library 📚
@@ -140,55 +111,25 @@ export default function SignInClient() {
             {/* ── Right Side / Mobile Full Page ── */}
             <div className="w-full lg:w-1/2 flex flex-col bg-white">
 
-                {/* ── Mobile Hero Image (LAN Library + Globe) ── */}
+                {/* ── Mobile Hero Image ── */}
                 <div className="lg:hidden relative w-full overflow-hidden" style={{ height: '320px' }}>
-                    <img
-                        src="/lanlog.png"
-                        alt="background"
-                        className="absolute inset-0 w-full h-full object-cover"
-                    />
-                    {/* Dark overlay */}
+                    <img src="/lanlog.png" alt="background" className="absolute inset-0 w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-b mask-b-from-0%" />
-
-                    {/* Content on top of image */}
-                    <div className="relative z-10 h-full flex flex-col items-center justify-center gap-5">
-                        {/* <div className="text-center">
-                            <h1
-                                className="text-3xl font-bold text-white"
-                                style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
-                            >
-                                [LAN Library]
-                            </h1>
-                            <p
-                                className="text-sm font-light text-white/90 mt-1"
-                                style={{ fontFamily: "'Lato', sans-serif" }}
-                            >
-                                The Global Student Library 📚
-                            </p>
-                        </div> */}
-
-                        {/* Globe */}
-                        {/* <div className="w-24 h-24 border-4 border-white rounded-full flex items-center justify-center">
-                            <Globe className="w-12 h-12 text-white" />
-                        </div> */}
-                    </div>
+                    <div className="relative z-10 h-full flex flex-col items-center justify-center gap-5" />
                 </div>
 
                 {/* ── Form Section ── */}
                 <div className="flex-1 flex items-start justify-center px-8 pt-8 pb-8 lg:mt-35">
                     <div className="w-full max-w-md">
 
-                                                <div className="hidden lg:flex justify-center mb-10">
-                                                    <div className="w-24 h-24 border-4 border-blue-950 rounded-full flex items-center justify-center overflow-hidden">
-                                                        <img 
-                                                            src="/lanlog.png" 
-                                                            alt="LAN Library Logo"
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
-                                                </div>
+                        {/* Desktop Logo */}
+                        <div className="hidden lg:flex justify-center mb-10">
+                            <div className="w-24 h-24 border-4 border-blue-950 rounded-full flex items-center justify-center overflow-hidden">
+                                <img src="/lanlog.png" alt="LAN Library Logo" className="w-full h-full object-cover" />
+                            </div>
+                        </div>
 
-                                                {/* Success Message */}
+                        {/* ── Success Message ── */}
                         {successMessage && (
                             <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
                                 <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
@@ -196,7 +137,26 @@ export default function SignInClient() {
                             </div>
                         )}
 
-                        {/* Error Messages */}
+                        {/* ── Deactivated Banner ── */}
+                        {error === 'deactivated' && (
+                            <div className="mb-6 bg-red-600 rounded-2xl overflow-hidden shadow-lg">
+                                <div className="px-5 py-4 text-center">
+                                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <AlertCircle className="w-7 h-7 text-white" />
+                                    </div>
+                                    <p className="text-white font-black text-lg mb-1">Account Deactivated</p>
+                                    <p className="text-red-100 text-sm mb-4">
+                                        This account has been deactivated. Contact support if you'd like to restore access.
+                                    </p>
+                                    <a href="mailto:support@lanlibrary.com"
+                                        className="inline-block bg-white text-red-600 font-bold px-6 py-2 rounded-full text-sm hover:bg-red-50 transition-colors">
+                                        Contact Support
+                                    </a>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Suspended Banner ── */}
                         {error === 'suspended' && (
                             <div className="mb-6 bg-red-600 rounded-2xl overflow-hidden shadow-lg">
                                 <div className="px-5 py-4 text-center">
@@ -205,18 +165,17 @@ export default function SignInClient() {
                                     </div>
                                     <p className="text-white font-black text-lg mb-1">Account Suspended</p>
                                     <p className="text-red-100 text-sm mb-4">
-                                        This account has been suspended due to a violation of our Terms of Service. You cannot log in.
+                                        This account has been suspended due to a violation of our Terms of Service.
                                     </p>
-                                    <a
-                                        href="mailto:support@lanlibrary.com"
-                                        className="inline-block bg-white text-red-600 font-bold px-6 py-2 rounded-full text-sm hover:bg-red-50 transition-colors"
-                                    >
+                                    <a href="mailto:support@lanlibrary.com"
+                                        className="inline-block bg-white text-red-600 font-bold px-6 py-2 rounded-full text-sm hover:bg-red-50 transition-colors">
                                         Contact Support
                                     </a>
                                 </div>
                             </div>
                         )}
 
+                        {/* ── Pending Banner ── */}
                         {error === 'pending' && (
                             <div className="mb-6 bg-yellow-500 rounded-2xl overflow-hidden shadow-lg">
                                 <div className="px-5 py-4 text-center">
@@ -227,26 +186,23 @@ export default function SignInClient() {
                                     <p className="text-yellow-100 text-sm mb-4">
                                         Your account is currently under review. You'll be notified once approved.
                                     </p>
-                                    <a
-                                        href="mailto:support@lanlibrary.com"
-                                        className="inline-block bg-white text-yellow-600 font-bold px-6 py-2 rounded-full text-sm hover:bg-yellow-50 transition-colors"
-                                    >
+                                    <a href="mailto:support@lanlibrary.com"
+                                        className="inline-block bg-white text-yellow-600 font-bold px-6 py-2 rounded-full text-sm hover:bg-yellow-50 transition-colors">
                                         Contact Support
                                     </a>
                                 </div>
                             </div>
                         )}
 
-                        {error && error !== 'suspended' && error !== 'pending' && (
+                        {/* ── Generic Error ── */}
+                        {error && !['suspended', 'pending', 'deactivated'].includes(error) && (
                             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
                                 <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                                <p className="text-red-800 text-sm">Failed to login: network-request-failed</p>
+                                <p className="text-red-800 text-sm">{error}</p>
                             </div>
                         )}
 
-
-
-
+                        {/* ── Divider ── */}
                         <div className="mb-8">
                             <div className="relative">
                                 <div className="absolute inset-0 flex items-center">
@@ -258,40 +214,32 @@ export default function SignInClient() {
                             </div>
                         </div>
 
-                        {/* Email Input */}
+                        {/* ── Email Input ── */}
                         <div className="mb-5">
                             <input
                                 type="email"
                                 placeholder="Email address"
                                 value={loginData.email}
-                                onChange={(e) => {
-                                    setLoginData(prev => ({ ...prev, email: e.target.value }));
-                                    setError(null);
-                                    setSuccessMessage(null);
-                                }}
+                                onChange={(e) => { setLoginData(prev => ({ ...prev, email: e.target.value })); setError(null); setSuccessMessage(null); }}
                                 className="w-full px-5 py-4 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-950 focus:ring-1 focus:ring-blue-950 transition-colors"
                                 disabled={loading}
                             />
                         </div>
 
-                        {/* Password Input */}
+                        {/* ── Password Input ── */}
                         <div className="mb-6">
                             <input
                                 type="password"
                                 placeholder="Password"
                                 value={loginData.password}
-                                onChange={(e) => {
-                                    setLoginData(prev => ({ ...prev, password: e.target.value }));
-                                    setError(null);
-                                    setSuccessMessage(null);
-                                }}
+                                onChange={(e) => { setLoginData(prev => ({ ...prev, password: e.target.value })); setError(null); setSuccessMessage(null); }}
                                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                                 className="w-full px-5 py-4 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-950 focus:ring-1 focus:ring-blue-950 transition-colors"
                                 disabled={loading}
                             />
                         </div>
 
-                        {/* Sign In Button */}
+                        {/* ── Sign In Button ── */}
                         <button
                             onClick={handleLogin}
                             disabled={loading}
@@ -300,21 +248,21 @@ export default function SignInClient() {
                             {loading ? 'Logging in...' : 'Log in'}
                         </button>
 
-                        {/* Forgot Password */}
+                        {/* ── Forgot Password ── */}
                         <div className="text-center mb-10">
                             <Link href="/auth/forgot-password" className="text-blue-950 hover:underline text-base">
                                 Forgotten password?
                             </Link>
                         </div>
 
-                        {/* Create Account Button */}
+                        {/* ── Create Account ── */}
                         <Link href="/auth/signup" className="block mb-6">
                             <button className="w-full bg-white border-2 border-gray-900 text-gray-900 py-4 rounded-full font-semibold text-lg hover:bg-gray-50 transition-colors">
                                 Create new account
                             </button>
                         </Link>
 
-                        {/* Footer */}
+                        {/* ── Footer ── */}
                         <div className="text-center text-base text-gray-500">
                             <span>Learning Access Network</span>
                         </div>
