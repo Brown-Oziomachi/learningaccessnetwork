@@ -175,7 +175,7 @@ export default function StudentDashboardClient() {
     const [latestBooks, setLatestBooks] = useState([]);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [aiSessions, setAiSessions] = useState([]);
-
+    const [topStudents, setTopStudents] = useState([]);
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (u) => {
             if (u) await fetchAll(u.uid);
@@ -213,11 +213,52 @@ export default function StudentDashboardClient() {
                 setAiSessions(sessions);
             } catch { }
 
-            // ── Fetch lecturers & their books ──────────────────────────────────
-            // From BecomeSellerClient we know lecturers are stored in the 'sellers'
-            // collection with title = "Lecturer" | "Dr." | "Prof." | "Professor"
-            // Fields: sellerName, title, businessInfo.businessName, businessInfo.businessDescription
-            // Their books are in 'advertMyBook' with sellerId = sellers doc ID
+            // Fetch top selling students
+            // Fetch top selling students (minimum 15 books sold, students only)
+            try {
+                // Step 1 — get all sellers with 15+ books sold
+                const sellersSnap = await getDocs(
+                    query(
+                        collection(db, 'sellers'),
+                        where('booksSold', '>=', 15),
+                        orderBy('booksSold', 'desc'),
+                        limit(30) // fetch more so we can filter down to students
+                    )
+                );
+
+                // Step 2 — check each seller's users doc for isStudent flag
+                const results = await Promise.all(
+                    sellersSnap.docs.map(async (d) => {
+                        try {
+                            const userDoc = await getDoc(doc(db, 'users', d.id));
+                            if (!userDoc.exists()) return null;
+                            const userData = userDoc.data();
+
+                            // Only include if they are a student
+                            if (!userData.isStudent) return null;
+
+                            return {
+                                id: d.id,
+                                name: d.data().sellerName || userData.firstName || 'Anonymous',
+                                earnings: d.data().totalEarnings || 0,
+                                booksSold: d.data().booksSold || 0,
+                                photoURL: userData.photoBase64 || d.data().photoURL || null,
+                            };
+                        } catch {
+                            return null;
+                        }
+                    })
+                );
+
+                const topSellers = results
+                    .filter(Boolean) // remove nulls
+                    .slice(0, 10);   // keep top 10
+
+                setTopStudents(topSellers);
+            } catch (e) {
+                console.warn('Top sellers fetch error:', e.message);
+            }
+
             try {
                 const ACADEMIC_TITLES = ['Lecturer', 'Dr.', 'Prof.', 'Professor'];
                 const seenLecturerIds = new Set();
@@ -324,9 +365,23 @@ export default function StudentDashboardClient() {
             }
 
             // Fetch latest books overall — deduplicate by firestoreId
+            // Fetch latest books — exclude any book already shown in lecturer section
             try {
                 const bq = query(collection(db, 'advertMyBook'), where('status', '==', 'approved'));
                 const bs = await getDocs(bq);
+
+                // Get current lecturer book IDs from state to exclude them
+                const lecturerBookSnap = await getDocs(query(
+                    collection(db, 'advertMyBook'),
+                    where('status', '==', 'approved'),
+                    where('sellerId', 'in',
+                        lecturers.length > 0
+                            ? lecturers.map(l => l.id).slice(0, 30)
+                            : ['__none__']
+                    )
+                ));
+                const lecturerFirestoreIds = new Set(lecturerBookSnap.docs.map(d => d.id));
+
                 const seenIds = new Set();
                 const all = bs.docs
                     .map(d => ({
@@ -336,6 +391,7 @@ export default function StudentDashboardClient() {
                         thumbnail: getThumbnailUrl(d.data()),
                     }))
                     .filter(b => {
+                        if (lecturerFirestoreIds.has(b.firestoreId)) return false; // exclude lecturer books
                         if (seenIds.has(b.firestoreId)) return false;
                         seenIds.add(b.firestoreId);
                         return true;
@@ -476,8 +532,9 @@ export default function StudentDashboardClient() {
                         </button>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {library.slice(0, 5).map(b => <BookCard key={b.bookId || b.id} book={b} />)}
-                    </div>
+                        {library.slice(0, 5).map((b, idx) => (
+                            <BookCard key={`lib-${idx}`} book={b} />
+                        ))}                    </div>
                 </section>
             )}
 
@@ -531,8 +588,9 @@ export default function StudentDashboardClient() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {lecturerBooks.slice(0, 5).map(b => <BookCard key={b.id} book={b} badge="Lecturer" />)}
-                    </div>
+                        {lecturerBooks.slice(0, 5).map((b, idx) => (
+                            <BookCard key={`lec-${idx}`} book={b} badge="Lecturer" />
+                        ))}                    </div>
                 )}
             </section>
 
@@ -566,8 +624,7 @@ export default function StudentDashboardClient() {
                     {[
                         { icon: Sparkles, label: 'AI Book Chat', desc: 'Ask anything about your books', href: '/ai-chat', bg: 'from-indigo-600 to-violet-600', text: 'text-white' },
                         { icon: FileText, label: 'Study Notes', desc: 'Summarise & save notes', href: '/ai-chat', bg: 'from-blue-50 to-indigo-50', text: 'text-slate-800', border: 'border border-indigo-100' },
-                        { icon: BookCopy, label: 'Past Questions', desc: 'Exam prep resources', href: '/documents', bg: 'from-emerald-50 to-teal-50', text: 'text-slate-800', border: 'border border-emerald-100' },
-                        { icon: Users, label: 'Study Groups', desc: 'Collaborate with peers', href: '/documents', bg: 'from-orange-50 to-amber-50', text: 'text-slate-800', border: 'border border-orange-100' },
+                        { icon: BookCopy, label: 'Past Questions', desc: 'Exam prep resources', href: '/documents?filter=past-questions', bg: 'from-emerald-50 to-teal-50', text: 'text-slate-800', border: 'border border-emerald-100' }, { icon: Users, label: 'Study Groups', desc: 'Collaborate with peers', href: '/documents', bg: 'from-orange-50 to-amber-50', text: 'text-slate-800', border: 'border border-orange-100' },
                     ].map(({ icon: Icon, label, desc, href, bg, text, border }) => (
                         <Link href={href} key={label}>
                             <div className={`bg-gradient-to-br ${bg} ${border || ''} rounded-2xl p-4 hover:shadow-md transition-all cursor-pointer h-full`}>
@@ -580,79 +637,108 @@ export default function StudentDashboardClient() {
                 </div>
             </section>
 
-          <CampusPulse />
+            <CampusPulse />
 
             {/* ── Seller/Author Card ── */}
             {user?.isSeller ? (
-                    <div className="bg-[#0d2b1e] rounded-3xl p-6 text-white shadow-xl flex flex-col justify-between">
-                        <div>
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="p-2.5 bg-emerald-500/20 rounded-xl">
-                                    <DollarSign size={20} className="text-emerald-400" />
-                                </div>
-                                <span className="text-[9px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded-md uppercase tracking-wider">Author</span>
+                <div className="bg-[#0d2b1e] rounded-3xl p-6 text-white shadow-xl flex flex-col justify-between">
+                    <div>
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="p-2.5 bg-emerald-500/20 rounded-xl">
+                                <DollarSign size={20} className="text-emerald-400" />
                             </div>
-                            <p className="text-emerald-300/60 text-xs font-semibold">Available Balance</p>
-                            <h3 className="text-4xl font-black mt-0.5">₦{sellerStats?.accountBalance?.toLocaleString() || '0'}</h3>
-                            <p className="text-emerald-400/50 text-[10px] mt-1">{sellerStats?.totalSales || 0} total sales</p>
+                            <span className="text-[9px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded-md uppercase tracking-wider">Author</span>
                         </div>
-                        <div className="mt-6 grid grid-cols-2 gap-3">
-                            <Link href="/advertise">
-                                <button className="w-full bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors">
-                                    <Plus size={14} /> Upload
-                                </button>
-                            </Link>
-                            <Link href="/my-account/seller-account">
-                                <button className="w-full bg-white/10 hover:bg-white/20 text-white font-black py-2.5 rounded-xl text-xs transition-colors">
-                                    Studio
-                                </button>
-                            </Link>
-                        </div>
+                        <p className="text-emerald-300/60 text-xs font-semibold">Available Balance</p>
+                        <h3 className="text-4xl font-black mt-0.5">₦{sellerStats?.accountBalance?.toLocaleString() || '0'}</h3>
+                        <p className="text-emerald-400/50 text-[10px] mt-1">{sellerStats?.totalSales || 0} total sales</p>
                     </div>
-                ) : (
-                    <div className="bg-gradient-to-br from-indigo-700 to-violet-800 rounded-3xl p-6 text-white shadow-xl flex flex-col justify-between">
-                        <div>
-                            <div className="p-2.5 bg-white/10 rounded-xl w-fit mb-4">
-                                <Store size={20} className="text-white" />
-                            </div>
-                            <h3 className="text-xl font-black leading-tight">Turn Notes<br />into Cash 💸</h3>
-                            <p className="text-indigo-200 text-xs mt-2 leading-relaxed">
-                                Your study guides could earn thousands. Join 500+ student authors on LAN Library.
-                            </p>
-                        </div>
-                        <Link href="/become-seller" className="mt-5">
-                            <button className="w-full bg-white text-indigo-700 font-black py-3 rounded-2xl shadow-lg hover:bg-indigo-50 transition-colors text-sm">
-                                Start Selling Now →
+                    <div className="mt-6 grid grid-cols-2 gap-3">
+                        <Link href="/advertise">
+                            <button className="w-full bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors">
+                                <Plus size={14} /> Upload
+                            </button>
+                        </Link>
+                        <Link href="/my-account/seller-account">
+                            <button className="w-full bg-white/10 hover:bg-white/20 text-white font-black py-2.5 rounded-xl text-xs transition-colors">
+                                Studio
                             </button>
                         </Link>
                     </div>
-                )}
+                </div>
+            ) : (
+                <div className="bg-gradient-to-br from-indigo-700 to-violet-800 rounded-3xl p-6 text-white shadow-xl flex flex-col justify-between">
+                    <div>
+                        <div className="p-2.5 bg-white/10 rounded-xl w-fit mb-4">
+                            <Store size={20} className="text-white" />
+                        </div>
+                        <h3 className="text-xl font-black leading-tight">Turn Notes<br />into Cash 💸</h3>
+                        <p className="text-indigo-200 text-xs mt-2 leading-relaxed">
+                            Your study guides could earn thousands. Join 500+ student authors on LAN Library.
+                        </p>
+                    </div>
+                    <Link href="/become-seller" className="mt-5">
+                        <button className="w-full bg-white text-indigo-700 font-black py-3 rounded-2xl shadow-lg hover:bg-indigo-50 transition-colors text-sm">
+                            Start Selling Now →
+                        </button>
+                    </Link>
+                </div>
+            )}
 
             {/* ── Top Contributors ── */}
+            {/* ── Top Students Making Money ── */}
             <section className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
                 <h3 className="text-sm font-black text-slate-800 flex items-center gap-2 mb-5">
-                    <Award size={15} className="text-yellow-500" /> Top Contributors
+                    <Award size={15} className="text-yellow-500" /> Top Students Making Money on LAN Library
                 </h3>
                 <div className="space-y-3">
-                    {[
-                        { name: 'Sarah A.', school: 'UNILAG', uploads: 42, earnings: '₦128k' },
-                        { name: 'David O.', school: 'UNILAG', uploads: 38, earnings: '₦96k' },
-                        { name: 'Emeka W.', school: 'UNILAG', uploads: 29, earnings: '₦74k' },
-                    ].map((c, i) => (
-                        <div key={i} className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${i === 0 ? 'bg-yellow-100 text-yellow-700' : i === 1 ? 'bg-slate-100 text-slate-600' : 'bg-orange-100 text-orange-600'}`}>
-                                {i + 1}
-                            </div>
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-blue-500 flex items-center justify-center text-white font-black text-xs">
-                                {c.name.charAt(0)}
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-xs font-black text-slate-800">{c.name}</p>
-                                <p className="text-[10px] text-slate-400">{c.uploads} docs · {c.school}</p>
-                            </div>
-                            <span className="text-xs font-black text-emerald-600">{c.earnings}</span>
+                    {topStudents.length === 0 ? (
+                        <div className="text-center py-6">
+                            <Award size={32} className="mx-auto text-slate-200 mb-2" />
+                            <p className="text-xs font-bold text-slate-400">No student with 15+ sales yet</p>
+                            <p className="text-[10px] text-slate-300 mt-1">Be the first to make the leaderboard!</p>
                         </div>
-                    ))}
+                    ) : (
+                        topStudents.map((s, i) => (
+                            <div key={s.id} className="flex items-center gap-3">
+                                {/* Rank badge */}
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs flex-shrink-0 ${i === 0 ? 'bg-yellow-100 text-yellow-700' :
+                                    i === 1 ? 'bg-slate-100 text-slate-600' :
+                                        i === 2 ? 'bg-orange-100 text-orange-600' :
+                                            'bg-gray-50 text-gray-400'
+                                    }`}>
+                                    {i + 1}
+                                </div>
+
+                                {/* Avatar */}
+                                {s.photoURL ? (
+                                    <img
+                                        src={s.photoURL}
+                                        alt={s.name}
+                                        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                                        onError={e => {
+                                            e.target.style.display = 'none';
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-blue-500 flex items-center justify-center text-white font-black text-xs flex-shrink-0">
+                                        {s.name.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+
+                                {/* Info */}
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-black text-slate-800 truncate">{s.name}</p>
+                                    <p className="text-[10px] text-slate-400">{s.booksSold} docs sold</p>
+                                </div>
+
+                                {/* Earnings */}
+                                <span className="text-xs font-black text-emerald-600 flex-shrink-0">
+                                    ₦{Number(s.earnings).toLocaleString()}
+                                </span>
+                            </div>
+                        ))
+                    )}
                 </div>
             </section>
         </div>
@@ -751,8 +837,13 @@ export default function StudentDashboardClient() {
                 <div className="space-y-3">
                     <h3 className="text-sm font-black text-slate-700">Chat About Your Books</h3>
                     <div className="space-y-2">
-                        {library.map(b => <AIChatBanner key={b.bookId || b.id} bookTitle={b.title} bookId={b.bookId || b.id} />)}
-                    </div>
+                        {library.slice(0, 2).map((b, idx) => (
+                            <AIChatBanner
+                                key={`ai-${idx}`}
+                                bookTitle={b.title}
+                                bookId={b.bookId || b.firestoreId || b.id}
+                            />
+                        ))}                    </div>
                 </div>
             )}
         </div>

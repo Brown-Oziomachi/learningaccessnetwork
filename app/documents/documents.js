@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { Globe, Search, User, Menu, X, ChevronDown, ShoppingBag, ChevronRight, Download, Lock, FileText, LogOut, Filter, AlignEndVertical, MoreVertical, Bookmark, Share2, Flag, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
 import { booksData } from "@/lib/booksData";
@@ -37,9 +37,11 @@ export default function AllBooksClient() {
 
     const booksPerRow = 10;
     const rowsPerLoad = 2; // Load 2 more rows when "Load More" is clicked
-
+const searchParams = useSearchParams();
+const filter = searchParams.get('filter'); // returns 'past-questions'
     const categories = [
         { value: 'all', label: 'All Categories' },
+        { value: 'past questions', label: 'Past Questions' }, // ← add this
         { value: 'education', label: 'Education' },
         { value: 'personal development', label: 'Personal Development' },
         { value: 'business', label: 'Business' },
@@ -77,6 +79,14 @@ export default function AllBooksClient() {
         return book.image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
     };
 
+    // Place this after your existing useEffects in the documents page
+    useEffect(() => {
+        if (filter === 'past-questions') {
+            setSelectedCategory('past questions');
+            setSearchQuery('past questions');
+        }
+    }, [filter]);
+    
     // ✅ FETCH ALL BOOKS (Platform + Firestore) - SIMPLIFIED VERSION
     useEffect(() => {
         const fetchAllBooks = async () => {

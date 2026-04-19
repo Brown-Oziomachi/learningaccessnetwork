@@ -19,13 +19,18 @@ export default function DOBClient() {
             surname: searchParams.get('surname') || '',
             email: searchParams.get('email') || '',
             accountType: searchParams.get('accountType') || '',
-            country: searchParams.get('country') || '', // ✅ add this
+            country: searchParams.get('country') || '',
+            role: searchParams.get('role') || '',
+            // ✅ Student academic fields
+            studentSubRole: searchParams.get('studentSubRole') || '',
+            studyLevel: searchParams.get('studyLevel') || '',
+            fieldOfStudy: searchParams.get('fieldOfStudy') || '',
+            institution: searchParams.get('institution') || '',
         });
     }, [searchParams]);
 
     const handleNext = () => {
         const validation = validateDateOfBirth(dateOfBirth);
-
         if (!validation.isValid) {
             setErrors(validation.errors);
             return;
@@ -37,9 +42,9 @@ export default function DOBClient() {
             dateOfBirth,
         });
 
-        if (ref) params.append('ref', ref);
+        if (ref) params.append('referral_code', ref);
 
-        router.push(`/auth/create-account/country?${params.toString()}`); // ✅ changed from email to country
+        router.push(`/auth/create-account/country?${params.toString()}`);
     };
 
     return (

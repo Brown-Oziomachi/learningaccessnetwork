@@ -1,5 +1,4 @@
-"use client"
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -7,8 +6,6 @@ import Link from 'next/link';
 import { CheckCircle } from 'lucide-react';
 import AuthLayout from '@/components/auth/AuthLayout';
 import { createUserAccount } from '@/lib/auth/authHelpers';
-import { db } from '@/lib/firebaseConfig';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc, increment } from 'firebase/firestore';
 
 export default function ConfirmClient() {
     const router = useRouter();
@@ -25,11 +22,24 @@ export default function ConfirmClient() {
         dateOfBirth: '',
         email: '',
         password: '',
-        country: ''
+        country: '',
+        role: '',
+        studentSubRole: '',
+        studyLevel: '',
+        fieldOfStudy: '',
+        institution: '',
     });
 
+    // Sub-role display labels
+    const subRoleLabels = {
+        undergraduate: 'Undergraduate',
+        postgraduate: 'Postgraduate',
+        researcher: 'PhD / Researcher',
+        professional: 'Professional learner',
+    };
+
     useEffect(() => {
-        const role = sessionStorage.getItem('userRole') || 'student';
+        const role = searchParams.get('role') || sessionStorage.getItem('userRole') || 'student';
         setUserRole(role);
 
         const type = searchParams.get('accountType') || '';
@@ -46,6 +56,13 @@ export default function ConfirmClient() {
             email: searchParams.get('email') || '',
             password: searchParams.get('password') || '',
             country: searchParams.get('country') || '',
+            role,
+            // ✅ Student academic fields — read from URL (carried all the way through)
+            // Fallback to sessionStorage in case a step dropped them
+            studentSubRole: searchParams.get('studentSubRole') || sessionStorage.getItem('studentSubRole') || '',
+            studyLevel: searchParams.get('studyLevel') || sessionStorage.getItem('studyLevel') || '',
+            fieldOfStudy: searchParams.get('fieldOfStudy') || sessionStorage.getItem('fieldOfStudy') || '',
+            institution: searchParams.get('institution') || sessionStorage.getItem('institution') || '',
         });
     }, [searchParams]);
 
@@ -61,29 +78,37 @@ export default function ConfirmClient() {
 
     const handleSubmit = async () => {
         setLoading(true);
-
         try {
-            const accountData = {
-                ...formData,
+            const result = await createUserAccount({
+                firstName: formData.firstName,
+                surname: formData.surname,
+                dateOfBirth: formData.dateOfBirth,
+                email: formData.email,
+                password: formData.password,
+                country: formData.country,
                 role: userRole,
                 referredBy: referredBy || null,
-            };
-
-            // 1. All logic (Auth, Unique Account No, Firestore, Referrals) happens here
-            const result = await createUserAccount(accountData);
+                // ✅ These are now saved to Firestore under users/{uid}
+                studentSubRole: formData.studentSubRole || null,
+                studyLevel: formData.studyLevel || null,
+                fieldOfStudy: formData.fieldOfStudy || null,
+                institution: formData.institution || null,
+            });
 
             if (result.success) {
-                // 2. Cleanup session storage
+                // ✅ Clear all session data after successful account creation
                 sessionStorage.removeItem('userRole');
                 sessionStorage.removeItem('referredBy');
+                sessionStorage.removeItem('studentSubRole');
+                sessionStorage.removeItem('studyLevel');
+                sessionStorage.removeItem('fieldOfStudy');
+                sessionStorage.removeItem('institution');
 
-                // 3. Show success UI and redirect
                 setShowToast(true);
                 setTimeout(() => {
                     setShowToast(false);
                     handleRedirect(userRole, accountType);
                 }, 3000);
-
             } else {
                 handleAuthError(result.error);
                 setLoading(false);
@@ -112,8 +137,11 @@ export default function ConfirmClient() {
     const editParams = new URLSearchParams({
         firstName: formData.firstName,
         surname: formData.surname,
-        email: formData.email
+        email: formData.email,
     });
+
+    const displayRole = accountType === 'university' ? 'University' : userRole;
+    const displaySubRole = formData.studentSubRole ? subRoleLabels[formData.studentSubRole] : null;
 
     return (
         <>
@@ -139,13 +167,23 @@ export default function ConfirmClient() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {[
-                            { label: 'Account Type', value: accountType === 'university' ? 'University' : userRole },
+                            {
+                                label: 'Account Type',
+                                value: displaySubRole
+                                    ? `${displayRole} · ${displaySubRole}`
+                                    : displayRole
+                            },
                             { label: 'Name', value: `${formData.firstName} ${formData.surname}` },
                             { label: 'Email', value: formData.email },
-                            { label: 'Country', value: formData.country || 'Not provided' }
+                            { label: 'Country', value: formData.country || 'Not provided' },
+                            ...(formData.studyLevel ? [{ label: 'Year of Study', value: formData.studyLevel }] : []),
+                            ...(formData.fieldOfStudy ? [{ label: 'Field of Study', value: formData.fieldOfStudy }] : []),
+                            ...(formData.institution ? [{ label: 'Institution', value: formData.institution }] : []),
                         ].map((item, i) => (
                             <div key={i}>
-                                <label className="text-xs text-blue-200 uppercase font-bold tracking-wider">{item.label}</label>
+                                <label className="text-xs text-blue-200 uppercase font-bold tracking-wider">
+                                    {item.label}
+                                </label>
                                 <p className="text-lg font-semibold capitalize">{item.value}</p>
                             </div>
                         ))}

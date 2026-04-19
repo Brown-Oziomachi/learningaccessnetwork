@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
 import NotificationBell from "@/components/NotificationBell";
 import { usePayment } from "@/app/hooks/usePayment";
+import { addStudentRoleToExistingUser } from "@/lib/auth/authHelpers";
 
 const nigerianBanks = [
     { name: "Access Bank", code: "044" },
@@ -313,6 +314,32 @@ function VTUQuickAccess() {
 
 
 function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
+
+    const handleEnrollAsStudent = async () => {
+        try {
+            const currentUser = auth.currentUser;
+
+            if (!currentUser) {
+                // Not logged in — full registration flow
+                router.push('/auth/role-selection');
+                return;
+            }
+
+            const result = await addStudentRoleToExistingUser(currentUser.uid);
+
+            if (result.success) {
+                onClose();
+                router.push('/student/dashboard');
+            } else {
+                console.error('Failed to add student role:', result.error);
+                alert('Something went wrong. Please try again.');
+            }
+        } catch (error) {
+            console.error('Enroll error:', error);
+            alert('Something went wrong. Please try again.');
+        }
+    };
+
     return (
         <>
             <div
@@ -331,11 +358,14 @@ function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
                     <div className="p-4 space-y-3 pb-10">
 
                         {/* Student Account */}
-                        <div className={!isStudent ? "opacity-40" : ""}>
+                        <div>
                             <button
                                 onClick={() => { if (isStudent) { router.push("/student/dashboard"); onClose(); } }}
                                 disabled={!isStudent}
-                                className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all ${!isStudent ? "cursor-not-allowed" : "active:scale-[0.98]"}`}
+                                className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all ${isStudent
+                                        ? "border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.98]"
+                                        : "border-gray-100 opacity-60 cursor-not-allowed"
+                                    }`}
                             >
                                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white flex-shrink-0">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-6 h-6">
@@ -344,18 +374,42 @@ function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
                                     </svg>
                                 </div>
                                 <div className="flex-1 text-left">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                         <p className="font-bold text-blue-950 text-sm">Student Account</p>
-                                        {!isStudent && <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold">Not enrolled</span>}
+                                        {!isStudent && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold">
+                                                Not enrolled
+                                            </span>
+                                        )}
                                     </div>
                                     <p className="text-xs text-gray-400 mt-0.5">Access courses, assignments & library</p>
                                 </div>
-                                {!isStudent
-                                    ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-gray-300"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" strokeLinecap="round" /></svg>
-                                    : <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-gray-300"><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                {isStudent
+                                    ? <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-gray-300 flex-shrink-0"><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                    : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-gray-300 flex-shrink-0"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" strokeLinecap="round" /></svg>
                                 }
                             </button>
-                            {!isStudent && <p className="text-xs text-center text-gray-400 mt-1">Enroll as a student to access this</p>}
+
+                            {/* Enroll button shown only when NOT a student */}
+                            {!isStudent && (
+                                <button
+                                    onClick={handleEnrollAsStudent}
+                                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-400 active:scale-[0.98] transition-all group"
+                                >
+                                    {/* Enroll icon */}
+                                    <div className="w-5 h-5 rounded-full bg-emerald-500 group-hover:bg-emerald-600 flex items-center justify-center transition-colors flex-shrink-0">
+                                        <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth={2.5} className="w-3 h-3">
+                                            <path d="M8 3v10M3 8h10" strokeLinecap="round" />
+                                        </svg>
+                                    </div>
+                                    <span className="text-sm font-semibold text-emerald-700 group-hover:text-emerald-800">
+                                        Enrol as a Student
+                                    </span>
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5 text-emerald-500 group-hover:translate-x-0.5 transition-transform">
+                                        <path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                </button>
+                            )}
                         </div>
 
                         {/* Seller Account */}
@@ -377,7 +431,7 @@ function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
                                 </div>
                                 <p className="text-xs text-gray-400 mt-0.5">Manage earnings, documents & withdrawals</p>
                             </div>
-                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-blue-800"><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-blue-800 flex-shrink-0"><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                         </button>
 
                     </div>
@@ -2167,12 +2221,14 @@ export default function SellerAccountClient() {
                     </div>
                 </div>
             )}
+
             <AccountSwitchSheet
                 isOpen={showSwitchModal}
                 onClose={() => setShowSwitchModal(false)}
-                isStudent={user?.role === "student"}
+                isStudent={user?.isStudent === true}  // ← also fix this check
                 router={router}
             />
+            
             {showDeactivateModal && (
                 <div className="fixed inset-0 bg-black/55 z-[80] flex items-end justify-center backdrop-blur-sm sm:items-center">
                     <div className="bg-white w-full sm:max-w-sm rounded-t-[28px] sm:rounded-[28px] overflow-hidden">

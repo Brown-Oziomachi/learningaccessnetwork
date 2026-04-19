@@ -24,7 +24,13 @@ export default function EmailClient() {
             surname: searchParams.get('surname') || '',
             dateOfBirth: searchParams.get('dateOfBirth') || '',
             accountType: searchParams.get('accountType') || '',
-            country: searchParams.get('country') || '', // ✅ add this
+            country: searchParams.get('country') || '',
+            role: searchParams.get('role') || '',
+            // ✅ Student academic fields
+            studentSubRole: searchParams.get('studentSubRole') || '',
+            studyLevel: searchParams.get('studyLevel') || '',
+            fieldOfStudy: searchParams.get('fieldOfStudy') || '',
+            institution: searchParams.get('institution') || '',
         });
         if (prefilledEmail) setEmail(prefilledEmail);
     }, [searchParams]);
@@ -44,14 +50,13 @@ export default function EmailClient() {
                 return;
             }
 
-            // ✅ Read ref from URL or sessionStorage
             const ref = searchParams.get('referral_code') || sessionStorage.getItem('referredBy') || '';
             const params = new URLSearchParams({
                 ...formData,
                 email,
             });
 
-            if (ref) params.append('ref', ref); // ✅ pass ref forward
+            if (ref) params.append('referral_code', ref);
 
             router.push(`/auth/create-account/password?${params.toString()}`);
         } catch (error) {
@@ -67,7 +72,7 @@ export default function EmailClient() {
 
     return (
         <AuthLayout
-            backPath={`/auth/create-account/dob?${backParams.toString()}`}
+            backPath={`/auth/create-account/country?${backParams.toString()}`}
             showFindAccount={true}
         >
             <h1 className="text-3xl font-bold text-gray-900 mb-2">

@@ -4,21 +4,18 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import AuthLayout from '@/components/auth/AuthLayout';
 
+// ✅ Africa-only country list
 const countries = [
-    "Afghanistan", "Albania", "Algeria", "Angola", "Argentina", "Australia",
-    "Austria", "Bangladesh", "Belgium", "Benin", "Bolivia", "Botswana",
-    "Brazil", "Burkina Faso", "Burundi", "Cameroon", "Canada", "Chad",
-    "Chile", "China", "Colombia", "Congo", "Côte d'Ivoire", "Denmark",
-    "DR Congo", "Ecuador", "Egypt", "Ethiopia", "Finland", "France",
-    "Gabon", "Gambia", "Germany", "Ghana", "Guinea", "India", "Indonesia",
-    "Iran", "Iraq", "Ireland", "Italy", "Jamaica", "Japan", "Jordan",
-    "Kenya", "Liberia", "Libya", "Madagascar", "Malawi", "Malaysia",
-    "Mali", "Mauritania", "Mauritius", "Mexico", "Morocco", "Mozambique",
-    "Namibia", "Netherlands", "New Zealand", "Niger", "Nigeria", "Norway",
-    "Pakistan", "Philippines", "Poland", "Portugal", "Rwanda", "Senegal",
-    "Sierra Leone", "Somalia", "South Africa", "South Sudan", "Spain",
-    "Sudan", "Sweden", "Switzerland", "Tanzania", "Togo", "Tunisia",
-    "Uganda", "United Kingdom", "United States", "Zambia", "Zimbabwe"
+    "Algeria", "Angola", "Benin", "Botswana", "Burkina Faso", "Burundi",
+    "Cabo Verde", "Cameroon", "Central African Republic", "Chad", "Comoros",
+    "Congo", "Côte d'Ivoire", "DR Congo", "Djibouti", "Egypt",
+    "Equatorial Guinea", "Eritrea", "Eswatini", "Ethiopia", "Gabon",
+    "Gambia", "Ghana", "Guinea", "Guinea-Bissau", "Kenya", "Lesotho",
+    "Liberia", "Libya", "Madagascar", "Malawi", "Mali", "Mauritania",
+    "Mauritius", "Morocco", "Mozambique", "Namibia", "Niger", "Nigeria",
+    "Rwanda", "São Tomé and Príncipe", "Senegal", "Seychelles",
+    "Sierra Leone", "Somalia", "South Africa", "South Sudan", "Sudan",
+    "Tanzania", "Togo", "Tunisia", "Uganda", "Zambia", "Zimbabwe"
 ];
 
 export default function CountryClient() {
@@ -36,6 +33,12 @@ export default function CountryClient() {
             surname: searchParams.get('surname') || '',
             dateOfBirth: searchParams.get('dateOfBirth') || '',
             accountType: searchParams.get('accountType') || '',
+            role: searchParams.get('role') || '',
+            // ✅ Student academic fields
+            studentSubRole: searchParams.get('studentSubRole') || '',
+            studyLevel: searchParams.get('studyLevel') || '',
+            fieldOfStudy: searchParams.get('fieldOfStudy') || '',
+            institution: searchParams.get('institution') || '',
         });
     }, [searchParams]);
 
@@ -50,13 +53,12 @@ export default function CountryClient() {
         }
 
         const ref = searchParams.get('referral_code') || sessionStorage.getItem('referredBy') || '';
-
         const params = new URLSearchParams({
             ...formData,
-            country, // ✅ country added here
+            country,
         });
 
-        if (ref) params.append('referral_code', ref); // ✅ fixed from 'ref' to 'referral_code'
+        if (ref) params.append('referral_code', ref);
 
         router.push(`/auth/create-account/email?${params.toString()}`);
     };
@@ -70,7 +72,7 @@ export default function CountryClient() {
                 Where are you from?
             </h1>
             <p className="text-gray-600 mb-6">
-                Select the country you currently live in.
+                Select the African country you currently live in.
             </p>
 
             {/* Search */}
