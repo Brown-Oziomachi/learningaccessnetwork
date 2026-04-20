@@ -26,7 +26,23 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        <script src="https://checkout.flutterwave.com/v3.js"></script>
+        {/* Payment */}
+        <script src="https://checkout.flutterwave.com/v3.js" />
+
+        {/* pdf.js — required for offline book reading via IndexedDB */}
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('load', function () {
+                if (window.pdfjsLib) {
+                  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+                    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                }
+              });
+            `,
+          }}
+        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

@@ -843,7 +843,8 @@ export default function StudentDashboardClient() {
                                 bookTitle={b.title}
                                 bookId={b.bookId || b.firestoreId || b.id}
                             />
-                        ))}                    </div>
+                        ))}
+                    </div>
                 </div>
             )}
         </div>

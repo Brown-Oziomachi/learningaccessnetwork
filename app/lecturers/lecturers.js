@@ -1,11 +1,11 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, BookOpen, ChevronRight, Search, X, GraduationCap, BookMarked, CheckCircle2, UserPlus, UserCheck } from 'lucide-react';
+import { ArrowLeft, BookOpen, ChevronRight, Search, GraduationCap, BookMarked, CheckCircle2, UserPlus, UserCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
     collection, getDocs, query, where, deleteDoc,
-    setDoc, doc, updateDoc, increment, serverTimestamp
+    setDoc, doc, getDoc, updateDoc, increment, serverTimestamp
 } from 'firebase/firestore';
 import { auth, db } from "@/lib/firebaseConfig";
 import Navbar from '@/components/NavBar';
@@ -20,6 +20,9 @@ export default function LecturersClient() {
     const [user, setUser] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [followingIds, setFollowingIds] = useState(new Set());
+    const [activeFilter, setActiveFilter] = useState('All');
+
+    const filters = ['All', 'Professor', 'Dr.', 'Lecturer', 'Mrs', 'Mr'];
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -44,24 +47,19 @@ export default function LecturersClient() {
         e.preventDefault();
         if (!user) return;
 
-        // Deterministic ID = always findable for unfollow
         const followId = `${user.uid}_${lecturerId}`;
         const followRef = doc(db, "follows", followId);
         const sellerRef = doc(db, "sellers", lecturerId);
 
         try {
             if (followingIds.has(lecturerId)) {
-                // Unfollow
                 await deleteDoc(followRef);
-                try {
-                    await updateDoc(sellerRef, { followersCount: increment(-1) });
-                } catch (e) { console.log("Seller doc not found for decrement"); }
+                try { await updateDoc(sellerRef, { followersCount: increment(-1) }); } catch (e) { }
                 followingIds.delete(lecturerId);
             } else {
-                // Follow
                 await setDoc(followRef, {
                     followerId: user.uid,
-                    lecturerId: lecturerId,
+                    lecturerId,
                     lecturerName: lecturerName || '',
                     createdAt: serverTimestamp()
                 });
@@ -91,6 +89,18 @@ export default function LecturersClient() {
                     const academicTitles = ['lecturer', 'dr.', 'prof.', 'professor', 'mrs', 'mr'];
 
                     if (academicTitles.some(t => title.includes(t))) {
+                        // ✅ Fetch user doc to get photoBase64
+                        let photoBase64 = null;
+                        let photoURL = null;
+                        try {
+                            const userDoc = await getDoc(doc(db, 'users', docSnap.id));
+                            if (userDoc.exists()) {
+                                const userData = userDoc.data();
+                                photoBase64 = userData.photoBase64 || null;
+                                photoURL = userData.photoURL || userData.profilePicture || null;
+                            }
+                        } catch (e) { }
+
                         lecturerList.push({
                             sellerId: docSnap.id,
                             sellerName: data.sellerName || data.displayName || 'Unknown Lecturer',
@@ -98,7 +108,9 @@ export default function LecturersClient() {
                             department: data.department || 'General Studies',
                             university: data.university || 'University Member',
                             isVerified: data.verifiedSchool || false,
-                            uploadedBooks: 0
+                            uploadedBooks: 0,
+                            // ✅ Use photoBase64 first, fallback to photoURL
+                            photo: photoBase64 || photoURL || null,
                         });
                     }
                 }
@@ -125,120 +137,213 @@ export default function LecturersClient() {
         fetchLecturers();
     }, []);
 
-    // Search logic remains same...
     useEffect(() => {
         const q = searchTerm.toLowerCase();
-        setFilteredLecturers(lecturers.filter(l =>
+        let results = lecturers.filter(l =>
             l.sellerName?.toLowerCase().includes(q) ||
             l.department?.toLowerCase().includes(q) ||
             l.university?.toLowerCase().includes(q)
-        ));
-    }, [searchTerm, lecturers]);
+        );
+        if (activeFilter !== 'All') {
+            results = results.filter(l =>
+                l.title?.toLowerCase().includes(activeFilter.toLowerCase())
+            );
+        }
+        setFilteredLecturers(results);
+    }, [searchTerm, lecturers, activeFilter]);
 
-    if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    const getInitials = (name) => {
+        const parts = name.trim().split(' ');
+        if (parts.length === 1) return parts[0][0]?.toUpperCase() || '?';
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    };
+
+    const avatarColors = [
+        'from-blue-900 to-blue-700',
+        'from-amber-700 to-amber-500',
+        'from-emerald-800 to-emerald-600',
+        'from-rose-800 to-rose-600',
+        'from-indigo-800 to-indigo-600',
+        'from-teal-800 to-teal-600',
+    ];
+    const getAvatarGradient = (name) => avatarColors[name.charCodeAt(0) % avatarColors.length];
+
+    if (loading) return (
+        <div className="min-h-screen flex items-center justify-center bg-stone-50">
+            <div className="text-center">
+                <GraduationCap className="w-12 h-12 text-blue-950 mx-auto mb-4 animate-pulse" />
+                <p className="text-gray-500 font-medium">Loading faculty...</p>
+            </div>
+        </div>
+    );
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-stone-50">
             <Navbar />
 
-            {/* Premium Header Section */}
-            <div className="bg-blue-950 text-white py-16 relative overflow-hidden">
-                <div className="absolute top-0 right-0 opacity-10 translate-x-1/4 -translate-y-1/4">
-                    <GraduationCap size={400} />
+            {/* ── HERO ── */}
+            <div className="bg-blue-950 text-white relative overflow-hidden">
+                <div className="absolute inset-0 opacity-5"
+                    style={{
+                        backgroundImage: `linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)`,
+                        backgroundSize: '40px 40px'
+                    }}
+                />
+                <div className="absolute bottom-0 right-0 w-80 h-80 opacity-5">
+                    <GraduationCap className="w-full h-full" />
                 </div>
 
-                <div className="max-w-7xl mx-auto px-4 relative z-10">
-                    <button onClick={() => router.back()} className="flex items-center gap-2 text-blue-200 hover:text-white mb-8 transition-all">
-                        <ArrowLeft size={18} /> <span>Return to Library</span>
+                <div className="max-w-6xl mx-auto px-4 py-12 relative z-10">
+                    <button onClick={() => router.back()} className="flex items-center gap-2 text-blue-300 hover:text-white mb-8 transition-colors text-sm">
+                        <ArrowLeft size={16} /> Return to Library
                     </button>
 
-                    <h1 className="text-5xl font-serif font-bold mb-4 tracking-tight">Academic Directory</h1>
-                    <p className="text-blue-100 text-lg max-w-2xl font-light">
-                        Connect with distinguished educators and access verified course materials,
-                        lecture notes, and academic publications.
-                    </p>
-
-                    <div className="flex gap-6 mt-10">
-                        <div className="border-l-2 border-blue-400 pl-4">
-                            <p className="text-3xl font-bold">{lecturers.length}</p>
-                            <p className="text-xs uppercase tracking-widest text-blue-300">Verified Faculty</p>
+                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+                        <div>
+                            <p className="text-blue-400 text-xs uppercase tracking-[0.2em] font-semibold mb-2">Academic Directory</p>
+                            <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-3">Our Faculty</h1>
+                            <p className="text-blue-200 text-base max-w-xl leading-relaxed">
+                                Connect with distinguished educators and access verified course materials, lecture notes, and academic publications.
+                            </p>
                         </div>
-                        <div className="border-l-2 border-blue-400 pl-4">
-                            <p className="text-3xl font-bold">{lecturers.reduce((s, l) => s + l.uploadedBooks, 0)}</p>
-                            <p className="text-xs uppercase tracking-widest text-blue-300">Total Publications</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Search & Results */}
-            <div className="max-w-7xl mx-auto px-4 -mt-8">
-                <div className="bg-white p-2 rounded-2xl shadow-xl border border-gray-100 mb-12">
-                    <div className="relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Find a lecturer, department, or university..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-12 pr-4 py-4 rounded-xl focus:ring-2 focus:ring-blue-900 outline-none text-lg"
-                        />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-20">
-                    {filteredLecturers.map((lecturer) => (
-                        <div key={lecturer.sellerId} className="bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-2xl transition-all duration-500 group overflow-hidden">
-                            <div className="p-8">
-                                <div className="flex justify-between items-start mb-6">
-                                    <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-950 text-3xl font-serif font-bold group-hover:bg-blue-950 group-hover:text-white transition-colors duration-300">
-                                        {lecturer.sellerName.charAt(0)}
-                                    </div>
-                                    <button
-                                        onClick={(e) => handleFollow(e, lecturer.sellerId, lecturer.sellerName)}
-                                        className={`p-3 rounded-xl transition-all ${followingIds.has(lecturer.sellerId) ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600'}`}
-                                    >
-                                        {followingIds.has(lecturer.sellerId) ? <UserCheck size={22} /> : <UserPlus size={22} />}
-                                    </button>
-                                </div>
-
-                                <div className="mb-6">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="text-xl font-bold text-gray-900 font-serif leading-tight">{lecturer.sellerName}</h3>
-                                        {lecturer.isVerified && <CheckCircle2 size={18} className="text-blue-600" fill="currentColor" fillOpacity={0.1} />}
-                                    </div>
-                                    <p className="text-blue-700 font-medium text-sm">{lecturer.title}</p>
-                                </div>
-
-                                <div className="space-y-3 mb-8">
-                                    <div className="flex items-center gap-3 text-gray-500 text-sm">
-                                        <BookMarked size={16} className="text-gray-400" />
-                                        <span>{lecturer.department}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-gray-500 text-sm">
-                                        <GraduationCap size={16} className="text-gray-400" />
-                                        <span>{lecturer.university}</span>
-                                    </div>
-                                </div>
-
-                                <div className="pt-6 border-t border-gray-50 flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-gray-900">
-                                        <BookOpen size={16} className="text-blue-900" />
-                                        <span className="font-bold">{lecturer.uploadedBooks}</span>
-                                        <span className="text-sm text-gray-500">Files</span>
-                                    </div>
-                                    <Link
-                                        href={`/seller-profile?sellerId=${lecturer.sellerId}`}
-                                        className="text-blue-950 font-bold text-sm flex items-center gap-1 hover:gap-3 transition-all"
-                                    >
-                                        View Profile <ChevronRight size={18} />
-                                    </Link>
-                                </div>
+                        <div className="flex gap-8 flex-shrink-0">
+                            <div className="text-center">
+                                <p className="text-3xl font-bold">{lecturers.length}</p>
+                                <p className="text-blue-400 text-xs uppercase tracking-widest mt-1">Faculty</p>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-3xl font-bold">{lecturers.reduce((s, l) => s + l.uploadedBooks, 0)}</p>
+                                <p className="text-blue-400 text-xs uppercase tracking-widest mt-1">Publications</p>
                             </div>
                         </div>
-                    ))}
+                    </div>
                 </div>
             </div>
+
+            {/* ── SEARCH + FILTERS ── */}
+            <div className="max-w-6xl mx-auto px-4">
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 -mt-6 relative z-10 mb-8">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <input
+                            type="text"
+                            placeholder="Search by name, department, or university..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:outline-none focus:border-blue-950 focus:bg-white text-sm transition-colors"
+                        />
+                    </div>
+                    <div className="flex gap-2 mt-3 flex-wrap">
+                        {filters.map(f => (
+                            <button
+                                key={f}
+                                onClick={() => setActiveFilter(f)}
+                                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${activeFilter === f
+                                        ? 'bg-blue-950 text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                            >
+                                {f}
+                            </button>
+                        ))}
+                        <span className="ml-auto text-xs text-gray-400 self-center">
+                            {filteredLecturers.length} result{filteredLecturers.length !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                </div>
+
+                {/* ── GRID: 2 cols mobile, 3 tablet, 4 desktop ── */}
+                {filteredLecturers.length === 0 ? (
+                    <div className="text-center py-20">
+                        <GraduationCap className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-gray-400 font-medium">No faculty members found</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 pb-20">
+                        {filteredLecturers.map((lecturer) => {
+                            const isFollowing = followingIds.has(lecturer.sellerId);
+                            const initials = getInitials(lecturer.sellerName);
+                            const avatarGradient = getAvatarGradient(lecturer.sellerName);
+
+                            return (
+                                <div
+                                    key={lecturer.sellerId}
+                                    className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group"
+                                >
+                                    {/* Photo / Avatar */}
+                                    <div className="relative">
+                                        {lecturer.photo ? (
+                                            <img
+                                                src={lecturer.photo}
+                                                alt={lecturer.sellerName}
+                                                className="w-full aspect-[4/3] object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                                            />
+                                        ) : (
+                                            <div className={`w-full aspect-[4/3] bg-gradient-to-br ${avatarGradient} flex items-center justify-center`}>
+                                                <span className="text-white text-4xl md:text-5xl font-bold">
+                                                    {initials}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Follow button overlay */}
+                                        <button
+                                            onClick={(e) => handleFollow(e, lecturer.sellerId, lecturer.sellerName)}
+                                            className={`absolute top-2 right-2 p-2 rounded-full shadow-md transition-all ${isFollowing
+                                                    ? 'bg-green-500 text-white'
+                                                    : 'bg-white text-gray-500 hover:bg-blue-950 hover:text-white'
+                                                }`}
+                                            title={isFollowing ? 'Unfollow' : 'Follow'}
+                                        >
+                                            {isFollowing ? <UserCheck size={14} /> : <UserPlus size={14} />}
+                                        </button>
+
+                                        {/* Verified badge */}
+                                        {lecturer.isVerified && (
+                                            <div className="absolute top-2 left-2 bg-blue-950 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1 font-semibold">
+                                                <CheckCircle2 size={10} /> Verified
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Info */}
+                                    <div className="p-3 md:p-4">
+                                        <h3 className="font-bold text-gray-900 text-sm md:text-base leading-tight mb-0.5 line-clamp-2">
+                                            {lecturer.sellerName}
+                                        </h3>
+                                        <p className="text-blue-700 text-xs font-semibold mb-2">{lecturer.title}</p>
+
+                                        <div className="space-y-1 mb-3">
+                                            <p className="text-gray-500 text-xs flex items-center gap-1.5 line-clamp-1">
+                                                <BookMarked size={11} className="flex-shrink-0 text-gray-400" />
+                                                {lecturer.department}
+                                            </p>
+                                            <p className="text-gray-500 text-xs flex items-center gap-1.5 line-clamp-1">
+                                                <GraduationCap size={11} className="flex-shrink-0 text-gray-400" />
+                                                {lecturer.university}
+                                            </p>
+                                        </div>
+
+                                        <div className="flex items-center justify-between pt-2 border-t border-gray-50">
+                                            <span className="text-xs text-gray-500 flex items-center gap-1">
+                                                <BookOpen size={11} className="text-blue-900" />
+                                                <strong className="text-gray-800">{lecturer.uploadedBooks}</strong> files
+                                            </span>
+                                            <Link
+                                                href={`/seller-profile?sellerId=${lecturer.sellerId}`}
+                                                className="text-blue-950 text-xs font-bold flex items-center gap-0.5 hover:gap-1.5 transition-all"
+                                            >
+                                                Profile <ChevronRight size={13} />
+                                            </Link>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
             <Footer />
         </div>
     );
