@@ -82,7 +82,7 @@ export default function Footer() {
 
      if (isSeller) {
        // User is already a seller, go to upload page
-       router.push("/advertise");
+       router.push("/upload-document");
      } else {
        // User is not a seller, go to become seller page
        router.push("/become-seller");

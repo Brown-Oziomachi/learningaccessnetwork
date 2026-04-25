@@ -133,7 +133,8 @@ export const usePayment = (book, formData, sellerDetails) => {
         }
     };
 
-    const saveTransaction = async (paymentData, status = 'completed') => {
+    // Change the function signature to accept extraData
+    const saveTransaction = async (paymentData, status = 'completed', extraData = {}) => {
         try {
             const distribution = calculatePaymentDistribution(book);
             const currentUser = auth.currentUser;
@@ -150,6 +151,10 @@ export const usePayment = (book, formData, sellerDetails) => {
                 bookTitle: book.title,
                 buyerId: currentUser.uid,
                 buyerEmail: formData.email,
+                buyerName: formData.name || null,        // ← ADD
+                buyerPhone: formData.phone || null,       // ← ADD
+                studentRegNo: extraData.studentRegNo || null,  // ← ADD
+                department: extraData.department || null,    // ← ADD
                 sellerId: sellerDetails?.id || null,
                 platformFee: distribution.platformFee,
                 sellerAmount: distribution.sellerAmount,
@@ -157,6 +162,7 @@ export const usePayment = (book, formData, sellerDetails) => {
             };
 
             const transactionRef = await addDoc(collection(db, 'transactions'), transactionData);
+
             const userRef = doc(db, 'users', currentUser.uid);
             await updateDoc(userRef, {
                 [`purchasedBooks.${book.id}`]: {
@@ -172,21 +178,23 @@ export const usePayment = (book, formData, sellerDetails) => {
                 await updateDoc(sellersRef, {
                     accountBalance: increment(distribution.sellerAmount),
                     totalEarnings: increment(distribution.sellerAmount),
+                    booksSold: increment(1),   // ← ADD this, was missing
                     updatedAt: serverTimestamp()
                 });
             }
+
             return transactionRef.id;
         } catch (err) {
             throw err;
         }
     };
 
-    const processFlutterwavePayment = () => {
+    // processFlutterwavePayment — accept studentRegNo
+    const processFlutterwavePayment = (extraData = {}) => {
         if (!book || !formData.email) {
             setError({ message: "Please fill in your email before paying." });
             return;
         }
-
         if (!flutterwaveLoaded || !window.FlutterwaveCheckout) {
             setError({ message: "Payment gateway is still loading. Please try again." });
             return;
@@ -214,7 +222,7 @@ export const usePayment = (book, formData, sellerDetails) => {
                 if (response.status === "successful" || response.status === "completed") {
                     try {
                         setProcessing(true);
-                        await saveTransaction(response, 'completed');
+                        await saveTransaction(response, 'completed', extraData); // ← pass extraData
                         setPaymentSuccess(true);
                     } catch (err) {
                         setError({ message: "Payment recorded but failed to save. Contact support." });
@@ -225,24 +233,67 @@ export const usePayment = (book, formData, sellerDetails) => {
                     setError({ message: "Payment was not completed. Please try again." });
                 }
             },
-            onclose: () => {
-                console.log("Flutterwave modal closed");
-            },
+            onclose: () => console.log("Flutterwave modal closed"),
         });
     };
 
-    const processPayPalPayment = async (details) => {
-        if (!details) return;
+    // processWalletPayment — accept studentRegNo
+    const processWalletPayment = async (enteredPin, extraData = {}) => {
+        setProcessing(true);
+        setError(null);
         try {
-            setProcessing(true);
-            await saveTransaction({
-                transaction_id: details.id || `PP-${Date.now()}`,
-                tx_ref: `TXN-PP-${Date.now()}`,
-                payment_type: 'paypal',
-            }, 'completed');
+            const currentUser = auth.currentUser;
+            if (!currentUser) throw new Error("Please log in.");
+            if (!enteredPin || enteredPin.toString().trim().length < 4) {
+                throw new Error("Please enter your 4-digit PIN.");
+            }
+
+            const sellerRef = doc(db, 'sellers', currentUser.uid);
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            let updatedBalance = null;
+
+            await runTransaction(db, async (transaction) => {
+                const sellerSnap = await transaction.get(sellerRef);
+                if (!sellerSnap.exists()) throw new Error("Wallet not active. Become a seller to use LAN wallet");
+
+                const sellerData = sellerSnap.data();
+                const storedValue = sellerData.transactionPin || sellerData.transferPin;
+
+                if (storedValue === undefined || storedValue === null) {
+                    throw new Error("PIN_NOT_SET");
+                }
+                if (enteredPin.toString().trim() !== storedValue.toString().trim()) {
+                    throw new Error("Incorrect PIN. Please try again.");
+                }
+
+                const currentBalance = sellerData.accountBalance || 0;
+                if (currentBalance < book.price) {
+                    throw new Error(`Insufficient funds. Balance: ₦${currentBalance.toLocaleString()}`);
+                }
+
+                updatedBalance = currentBalance - book.price;
+                transaction.update(sellerRef, {
+                    accountBalance: updatedBalance,
+                    updatedAt: serverTimestamp()
+                });
+            });
+
+            const walletResponse = {
+                transaction_id: `WAL-${Date.now()}`,
+                tx_ref: `TXN-WAL-${Date.now()}`,
+                payment_type: 'lan_wallet',
+            };
+            await saveTransaction(walletResponse, 'completed', extraData); // ← pass extraData
+            setNewBalance(updatedBalance);
             setPaymentSuccess(true);
+
         } catch (err) {
-            setError({ message: "Failed to record PayPal payment." });
+            setError({
+                message: err.message === "PIN_NOT_SET"
+                    ? "You haven't set a PIN yet. Please set pin to continue."
+                    : err.message
+            });
         } finally {
             setProcessing(false);
         }
@@ -304,67 +355,6 @@ export const usePayment = (book, formData, sellerDetails) => {
         }
     };
 
-    const processWalletPayment = async (enteredPin) => {
-        setProcessing(true);
-        setError(null);
-        try {
-            const currentUser = auth.currentUser;
-            if (!currentUser) throw new Error("Please log in.");
-            if (!enteredPin || enteredPin.toString().trim().length < 4) {
-                throw new Error("Please enter your 4-digit PIN.");
-            }
-
-            const sellerRef = doc(db, 'sellers', currentUser.uid);
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            let updatedBalance = null;
-
-            await runTransaction(db, async (transaction) => {
-                const sellerSnap = await transaction.get(sellerRef);
-                if (!sellerSnap.exists()) throw new Error("Wallet not active. Become a seller to use LAN wallet");
-
-                const sellerData = sellerSnap.data();
-                const storedValue = sellerData.transactionPin || sellerData.transferPin;
-
-                if (storedValue === undefined || storedValue === null) {
-                    throw new Error("PIN_NOT_SET");
-                }
-
-                if (enteredPin.toString().trim() !== storedValue.toString().trim()) {
-                    throw new Error("Incorrect PIN. Please try again.");
-                }
-
-                const currentBalance = sellerData.accountBalance || 0;
-                if (currentBalance < book.price) {
-                    throw new Error(`Insufficient funds. Balance: ₦${currentBalance.toLocaleString()}`);
-                }
-
-                updatedBalance = currentBalance - book.price;
-                transaction.update(sellerRef, {
-                    accountBalance: updatedBalance,
-                    updatedAt: serverTimestamp()
-                });
-            });
-
-            const walletResponse = {
-                transaction_id: `WAL-${Date.now()}`,
-                tx_ref: `TXN-WAL-${Date.now()}`,
-                payment_type: 'lan_wallet',
-            };
-            await saveTransaction(walletResponse, 'completed');
-            setNewBalance(updatedBalance);
-            setPaymentSuccess(true);
-
-        } catch (err) {
-            setError({
-                message: err.message === "PIN_NOT_SET"
-                    ? "You haven't set a PIN yet. Please set one to continue."
-                    : err.message
-            });
-        } finally {
-            setProcessing(false);
-        }
-    };
 
     return {
         processing,
@@ -376,7 +366,6 @@ export const usePayment = (book, formData, sellerDetails) => {
         showPin,
         setShowPin,
         processFlutterwavePayment,
-        processPayPalPayment,
         processWalletPayment,
         setupInitialPin,
         requestPinReset,

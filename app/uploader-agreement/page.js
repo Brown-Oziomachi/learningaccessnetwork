@@ -419,7 +419,7 @@ export default function UploaderAgreement() {
                     </div>
 
                     {/* Agreement checkbox + CTA */}
-                    <div className="bg-[#060912] border border-[#1e2535] rounded-2xl p-6 sticky bottom-4 shadow-2xl shadow-black/50">
+                    <div className="bg-[#060912] border border-white rounded-2xl p-6 sticky bottom-4 shadow-2xl shadow-black/50">
                         <label className="flex items-start gap-3 cursor-pointer mb-5 group">
                             <div
                                 onClick={() => setAgreed(a => !a)}
@@ -448,7 +448,7 @@ export default function UploaderAgreement() {
                                 I Agree — Start Uploading
                             </Link>
                             <Link
-                                href="/lan/net/help-center"
+                                href="/lan/net/help-center" target="_blank"
                                 className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-[13px] font-medium text-[#64748b] border border-[#1e2535] hover:border-[#2a3a5c] hover:text-[#94a3b8] transition-colors no-underline"
                             >
                                 Questions? Visit Help Center

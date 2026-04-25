@@ -227,48 +227,75 @@ export default function NotificationBell({ userId }) {
                   No notifications yet
                 </p>
               </div>
-            ) : (
-              displayed.map((n) => (
-                <div
-                  key={n.id}
-                  className={`px-4 py-3 cursor-pointer transition-all ${getNotificationBg(n.type, n.read)}`}
-                  onClick={() => {
-                    if (!n.read) markAsRead(n.id);
-                    if (n.link) window.location.href = n.link;
-                  }}
-                >
-                  <div className="flex items-start gap-3">
-                    {getNotificationIcon(n.type)}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <p
-                          className={`text-sm font-semibold leading-tight ${n.read ? "text-gray-500" : "text-gray-900"}`}
-                        >
-                          {n.title}
-                        </p>
+) : (
+  displayed.map((n) => (
+    <div
+      key={n.id}
+      className={`px-4 py-3 cursor-pointer transition-all ${getNotificationBg(n.type, n.read)}`}
+      onClick={() => {
+        if (!n.read) markAsRead(n.id);
+        setOpen(false);
 
-                        {/* --- DELETE BUTTON --- */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-xs text-gray-400 whitespace-nowrap">
-                            {formatTime(n.createdAt)}
-                          </span>
-                          <button
-                            onClick={(e) => deleteNotification(e, n.id)}
-                            className="p-1 text-gray-300 hover:text-red-500 transition-colors rounded-md hover:bg-red-50"
-                            title="Delete"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
+        // Handle new_upload notifications
+        if (n.type === "new_upload") {
+          const rawId = (
+            n.bookId ||
+            n.docId ||
+            n.relatedId ||
+            ""
+          ).replace("firestore-", "");
+          if (rawId) {
+            window.location.href = `/book/preview?id=${rawId}`;
+            return;
+          }
+        }
+
+        // Fallback to explicit link
+        if (n.link) {
+          window.location.href = n.link;
+        }
+      }}
+    >
+      <div className="flex items-start gap-3">
+        {getNotificationIcon(n.type)}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p
+              className={`text-sm font-semibold leading-tight ${n.read ? "text-gray-500" : "text-gray-900"}`}
+            >
+              {n.title}
+            </p>
+
+            {/* --- DELETE BUTTON --- */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-xs text-gray-400 whitespace-nowrap">
+                {formatTime(n.createdAt)}
+              </span>
+              <button
+                onClick={(e) => deleteNotification(e, n.id)}
+                className="p-1 text-gray-300 hover:text-red-500 transition-colors rounded-md hover:bg-red-50"
+                title="Delete"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
           </div>
 
-          {notifications.length > 5 && (
+          {/* ── Message body ── */}
+          {n.message && (
+            <p className={`text-xs mt-0.5 leading-relaxed line-clamp-2 ${n.read ? "text-gray-400" : "text-gray-600"}`}>
+              {n.message}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  ))
+)}
+        
+      </div>
+
+      {notifications.length > 5 && (
             <div className="border-t border-gray-100 px-4 py-2.5 bg-gray-50">
               <button
                 onClick={() => setShowAll((prev) => !prev)}

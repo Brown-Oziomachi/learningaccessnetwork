@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import SellerProfileClient from "@/components/SellerProfileClient";
 
 export const metadata = {
-    title: "Access Your Purchased Books in One Place | LAN Library",
+    title: "Find a lecturer | LAN Library",
     description: "Have access to all your books when you purchased them, download them again when you want."
 }
 export default function SellerProfilePage() {

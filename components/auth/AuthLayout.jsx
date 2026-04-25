@@ -14,7 +14,10 @@ export default function AuthLayout({
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ backgroundColor: "#f9f6f0" }}
+    >
       {showBack && (
         <div className="p-4">
           <button

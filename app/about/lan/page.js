@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import AboutClient from "../about";
 
 export const metadata = {
-    title: "LAN Library | Find out more about us",
+    title: "About Us | LAN Library",
     description: "Discover everything about LAN Library ."
 }
 

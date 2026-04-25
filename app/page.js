@@ -444,7 +444,7 @@ export default function LearningAccessNetwork() {
             <a href="/docs" target="_blank"
               className="cursor-pointer px-8 py-4 border-2 text-center border-white text-white font-bold rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
             >
-              Platform Guide
+              Documentation
             </a>
           </div>
         </div>
@@ -504,7 +504,7 @@ export default function LearningAccessNetwork() {
                   <a href="/docs" target="_blank"
                     className="cursor-pointer px-8 py-4 border-2 border-white text-white font-bold rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
                   >
-                    Platform Guide
+                    Documentation
                   </a>
                 </div>
 
@@ -1362,7 +1362,8 @@ export default function LearningAccessNetwork() {
               <div>
                 <h3 className="font-bold mb-4">Company</h3>
                 <ul className="space-y-2 text-blue-950">
-                  <li><Link href="/docs" className="hover:text-white">Platform guide</Link></li>
+                  <li><Link href="/about/lan" className="hover:text-white">About Us</Link></li>
+                  <li><Link href="/docs" className="hover:text-white">Documentation</Link></li>
                   <li><Link href="/lan/privacy-policy" className="hover:text-white">Privacy Policy</Link></li>
                   <li><Link href="/lan/terms-of-service" className="hover:text-white">Terms of Service</Link></li>
                 </ul>

@@ -367,7 +367,7 @@ export default function MyPostedBooksClient() {
                             <h1 className="text-3xl font-bold text-blue-950">My Posted Books</h1>
                             <p className="text-gray-600 mt-1">Manage all your uploaded documents</p>
                         </div>
-                        <Link href="/advertise">
+                        <Link href="/upload-document">
                             <button className="bg-blue-950 text-white px-6 py-3 rounded-xl font-semibold flex items-center gap-2 hover:bg-blue-900 transition-colors">
                                 <Plus size={20} />
                                 Upload New Document

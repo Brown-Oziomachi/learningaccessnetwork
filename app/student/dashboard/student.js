@@ -80,7 +80,6 @@ function BookCard({ book, badge }) {
     );
 }
 
-/* ─── lecturer card ─── */
 function LecturerCard({ lecturer }) {
     const [imgErr, setImgErr] = useState(false);
     const initial = lecturer.name?.charAt(0)?.toUpperCase() || 'L';
@@ -91,15 +90,13 @@ function LecturerCard({ lecturer }) {
     ];
     const grad = gradients[initial.charCodeAt(0) % gradients.length];
 
-    // Display name with title prefix e.g. "Dr. John Doe"
     const displayName = lecturer.title
         ? `${lecturer.title} ${lecturer.name}`.trim()
         : lecturer.name;
 
     return (
-        <Link href={`/lecturers/${lecturer.id}`}>
+        <Link href={`/seller-profile?sellerId=${lecturer.id}`}>  {/* ✅ FIXED */}
             <div className="flex-shrink-0 w-40 bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer text-center group">
-                {/* Avatar */}
                 <div className="relative w-14 h-14 mx-auto mb-2">
                     {lecturer.photoURL && !imgErr ? (
                         <img
@@ -116,7 +113,6 @@ function LecturerCard({ lecturer }) {
                     <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-400 rounded-full border-2 border-white" />
                 </div>
 
-                {/* Title badge */}
                 {lecturer.title && (
                     <span className="inline-block text-[8px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full mb-1">
                         {lecturer.title}
@@ -443,7 +439,7 @@ export default function StudentDashboardClient() {
                         </span>
                         <h2 className="text-3xl md:text-4xl font-black leading-tight">
                             Welcome back,<br />
-                            <span className="text-blue-300">{user?.firstName || 'Scholar'} ✦</span>
+                            <span className="text-blue-300">{user?.firstName || 'Student'} ✦</span>
                         </h2>
                         <p className="text-blue-200/70 text-sm mt-2 max-w-sm">
                             {library.length} books in your library · {aiSessions.length} AI conversations

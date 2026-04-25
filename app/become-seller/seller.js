@@ -1,21 +1,14 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import {
-    Store,
-    Building2,
-    CreditCard,
-    CheckCircle,
-    ArrowLeft,
-    Loader2,
-    GraduationCap,
-    Info,
-    X,
+    Store, Building2, CreditCard, CheckCircle, ArrowLeft,
+    Loader2, GraduationCap, Info, X, TrendingUp, Clock,
+    Shield, ChevronRight, Star,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
-import { doc, getDoc, updateDoc, setDoc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, writeBatch, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import Navbar from '@/components/NavBar';
 
 export default function BecomeSellerClient() {
     const [user, setUser] = useState(null);
@@ -24,28 +17,18 @@ export default function BecomeSellerClient() {
     const router = useRouter();
     const [showLecturerInfo, setShowLecturerInfo] = useState(false);
     const [formData, setFormData] = useState({
-        firstName: "",
-        surname: "",
-        email: "",
-        phoneNumber: "",
-        title: "",
-        bankName: "",
-        bankCode: "",
-        accountNumber: "",
-        accountName: "",
-        isCustomBank: false,
-        businessName: "",
-        businessDescription: "",
-        agreeToTerms: false
+        firstName: "", surname: "", email: "", phoneNumber: "",
+        title: "", bankName: "", bankCode: "", accountNumber: "",
+        accountName: "", isCustomBank: false, businessName: "",
+        businessDescription: "", university: "", department: "",
+        agreeToTerms: false,
     });
-
     const [errors, setErrors] = useState({});
     const [toast, setToast] = useState({ show: false, message: "", type: "error" });
 
-    // Helper to show the toast and auto-hide it
     const showToast = (message, type = "error") => {
         setToast({ show: true, message, type });
-        setTimeout(() => setToast({ show: false, message: "", type }), 5000); // Auto-hide after 5s
+        setTimeout(() => setToast({ show: false, message: "", type }), 5000);
     };
 
     const nigerianBanks = [
@@ -67,82 +50,49 @@ export default function BecomeSellerClient() {
         { name: "United Bank for Africa (UBA)", code: "033" },
         { name: "Unity Bank", code: "215" },
         { name: "Wema Bank", code: "035" },
-        { name: "Zenith Bank", code: "057" }
+        { name: "Zenith Bank", code: "057" },
+        { name: "Opay Bank", code: "999992" },
+
     ];
 
-    // FIXED: Removed duplicate useEffect, kept only one
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                await fetchUserData(currentUser.uid);
-            } else {
-                router.push('/auth/signin');
-            }
-        });
+    const isAcademic = ["Lecturer", "Dr.", "Prof.", "Professor"].includes(formData.title);
+    const set = (key, val) => setFormData(p => ({ ...p, [key]: val }));
 
-        return () => unsubscribe();
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, async (cu) => {
+            if (cu) await fetchUserData(cu.uid);
+            else router.push("/auth/signin");
+        });
+        return () => unsub();
     }, [router]);
 
     const fetchUserData = async (uid) => {
         try {
             setLoading(true);
-
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Connection timeout')), 8000)
-            );
-
-            const fetchPromise = getDoc(doc(db, "users", uid));
-
-            const userDoc = await Promise.race([fetchPromise, timeoutPromise]);
-
-            if (userDoc.exists()) {
-                const userData = userDoc.data();
-
-                if (userData.isSeller) {
-                    router.push('/my-account/seller-account');
-                    return;
-                }
-
-                setUser({ uid, ...userData });
-
-                setFormData(prev => ({
-                    ...prev,
-                    firstName: userData.firstName || "",
-                    surname: userData.surname || "",
-                    email: userData.email || auth.currentUser?.email || "",
-                    phoneNumber: userData.phoneNumber || ""
+            const timeout = new Promise((_, r) => setTimeout(() => r(new Error("timeout")), 8000));
+            const snap = await Promise.race([getDoc(doc(db, "users", uid)), timeout]);
+            if (snap.exists()) {
+                const d = snap.data();
+                if (d.isSeller) { router.push("/my-account/seller-account"); return; }
+                setUser({ uid, ...d });
+                setFormData(p => ({
+                    ...p,
+                    firstName: d.firstName || "",
+                    surname: d.surname || "",
+                    email: d.email || auth.currentUser?.email || "",
+                    phoneNumber: d.phoneNumber || "",
                 }));
             } else {
-                setUser({
-                    uid,
-                    email: auth.currentUser?.email || "",
-                    firstName: "",
-                    surname: ""
-                });
-                setFormData(prev => ({
-                    ...prev,
-                    email: auth.currentUser?.email || ""
-                }));
+                setUser({ uid, email: auth.currentUser?.email || "", firstName: "", surname: "" });
+                setFormData(p => ({ ...p, email: auth.currentUser?.email || "" }));
             }
-        } catch (error) {
-            console.error("Error fetching user data:", error);
-
+        } catch {
             if (auth.currentUser) {
-                setUser({
-                    uid: auth.currentUser.uid,
-                    email: auth.currentUser.email,
-                    firstName: "",
-                    surname: ""
-                });
-                setFormData(prev => ({
-                    ...prev,
-                    email: auth.currentUser.email
-                }));
-
-                showToast("Could not load user data. You can still proceed with the form.", "error");
+                setUser({ uid: auth.currentUser.uid, email: auth.currentUser.email, firstName: "", surname: "" });
+                setFormData(p => ({ ...p, email: auth.currentUser.email }));
+                showToast("Could not load profile. You can still proceed.", "error");
             } else {
-                showToast("Connection error. Please check your internet and try again.", "error");
-                router.push('/my-account');
+                router.push("/my-account");
             }
         } finally {
             setLoading(false);
@@ -150,598 +100,893 @@ export default function BecomeSellerClient() {
     };
 
     const validateForm = () => {
-        const newErrors = {};
-
-        if (!formData.phoneNumber) newErrors.phoneNumber = "Phone number is required";
-        if (!formData.bankName) newErrors.bankName = "Please select a bank or enter bank name";
-
-        // Validate bank code for custom banks
-        if (formData.isCustomBank && !formData.bankCode) {
-            newErrors.bankCode = "Bank code is required for custom banks";
-        }
-
-        if (!formData.accountNumber) newErrors.accountNumber = "Account number is required";
-        if (formData.accountNumber && formData.accountNumber.length !== 10) {
-            newErrors.accountNumber = "Account number must be 10 digits";
-        }
-        if (!formData.accountName) newErrors.accountName = "Account name is required";
-        if (!formData.agreeToTerms) newErrors.agreeToTerms = "You must agree to the terms";
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        const e = {};
+        if (!formData.phoneNumber) e.phoneNumber = "Phone number is required";
+        if (!formData.bankName) e.bankName = "Please select a bank";
+        if (formData.isCustomBank && !formData.bankCode) e.bankCode = "Bank code is required";
+        if (!formData.accountNumber) e.accountNumber = "Account number is required";
+        if (formData.accountNumber && formData.accountNumber.length !== 10) e.accountNumber = "Must be 10 digits";
+        if (!formData.accountName) e.accountName = "Account name is required";
+        if (!formData.agreeToTerms) e.agreeToTerms = "You must agree to the terms";
+        setErrors(e);
+        return Object.keys(e).length === 0;
     };
 
+    const handleSubmit = async () => {
+        if (!validateForm()) return;
+        setSubmitting(true);
+        try {
+            const flwRes = await fetch("/api/flutterwave/create-subaccount", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    uid: user.uid, email: formData.email,
+                    firstName: formData.firstName, surname: formData.surname,
+                    phoneNumber: formData.phoneNumber, bankCode: formData.bankCode,
+                    accountNumber: formData.accountNumber,
+                    businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
+                }),
+            });
+            const flwData = await flwRes.json();
+            if (!flwData.success) throw new Error(flwData.error || "Failed to create subaccount.");
+            const flutterwaveSubaccountId = flwData.subaccount_id;
 
-const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    setSubmitting(true);
-
-    try {
-        // 1. Create Flutterwave Subaccount
-        // We do this first because if it fails, we shouldn't update the Database.
-        const flwRes = await fetch('/api/flutterwave/create-subaccount', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                uid: user.uid,
-                email: formData.email,
-                firstName: formData.firstName,
-                surname: formData.surname,
-                phoneNumber: formData.phoneNumber,
-                bankCode: formData.bankCode,
-                accountNumber: formData.accountNumber,
-                businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
-            }),
-        });
-
-        const flwData = await flwRes.json();
-
-        if (!flwData.success) {
-            throw new Error(flwData.error || "Failed to create Flutterwave subaccount.");
+            const batch = writeBatch(db);
+            batch.update(doc(db, "users", user.uid), {
+                isSeller: true, phoneNumber: formData.phoneNumber,
+                flutterwaveSubaccountId, updatedAt: serverTimestamp(),
+            });
+            batch.set(doc(db, "sellers", user.uid), {
+                accountBalance: 0, totalEarnings: 0, booksSold: 0,
+                bankDetails: {
+                    bankName: formData.bankName, bankCode: formData.bankCode,
+                    accountNumber: formData.accountNumber, accountName: formData.accountName,
+                },
+                businessInfo: {
+                    businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
+                    businessDescription: formData.businessDescription,
+                },
+                sellerName: `${formData.firstName} ${formData.surname}`.trim(),
+                title: formData.title || "",
+                university: formData.university || "",
+                department: formData.department || "",
+                createdAt: serverTimestamp(),
+                status: "active",
+                flutterwaveSubaccountId,
+            });
+            await batch.commit();
+            showToast("Seller account created successfully! 🎉", "success");
+            setTimeout(() => router.push("/my-account/seller-account"), 2000);
+        } catch (error) {
+            let msg = `Setup failed: ${error.message}`;
+            if (error.message.includes("permission")) msg = "Setup failed: Permission denied. Contact support.";
+            else if (error.message.includes("account")) msg = "We couldn't verify your account number. Please check and retry.";
+            else if (error.message.includes("timeout")) msg = "Request timed out. Check your connection.";
+            showToast(msg, "error");
+        } finally {
+            setSubmitting(false);
         }
+    };
 
-        const flutterwaveSubaccountId = flwData.subaccount_id;
-
-        // 2. Initialize Firestore Batch
-        // A batch ensures that EITHER both documents save, OR neither does.
-        const batch = writeBatch(db);
-        const userRef = doc(db, "users", user.uid);
-        const sellerRef = doc(db, "sellers", user.uid);
-
-        // Prepare User Document Update
-        batch.update(userRef, {
-            isSeller: true,
-            phoneNumber: formData.phoneNumber,
-            flutterwaveSubaccountId: flutterwaveSubaccountId,
-            updatedAt: serverTimestamp()
-        });
-
-        // Prepare Seller Document Creation
-        // ... inside handleSubmit
-        batch.set(sellerRef, {
-            accountBalance: 0,
-            totalEarnings: 0,
-            booksSold: 0,
-            bankDetails: {
-                bankName: formData.bankName,
-                bankCode: formData.bankCode,
-                accountNumber: formData.accountNumber,
-                accountName: formData.accountName,
-                // Ensure this matches the object structure your rules expect
-            },
-            businessInfo: {
-                businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
-                businessDescription: formData.businessDescription
-            },
-            sellerName: `${formData.firstName} ${formData.surname}`.trim(),
-            title: formData.title || "",
-            createdAt: serverTimestamp(),
-            status: "active",
-            flutterwaveSubaccountId: flutterwaveSubaccountId // Move to top level if rules struggle with nested objects
-        });
-
-        // 3. Commit the Batch
-        await batch.commit();
-
-        // Replace alert with showToast
-        showToast("Seller account created successfully! 🎉", "success");
-
-        // Delay the redirect slightly so the user can actually see the success message
-        setTimeout(() => {
-            router.push('/my-account/seller-account');
-        }, 10000);
-        router.push('/my-account/seller-account');
-
-    } catch (error) {
-        console.error("Onboarding Error:", error);
-
-        let userFriendlyMessage = "An unexpected error occurred.";
-
-        if (error.message.includes("permission")) {
-            userFriendlyMessage = "Setup failed: Permissions denied. Please contact support.";
-        } else if (error.message.includes("account")) {
-            userFriendlyMessage = "Setup failed: Sorry, we couldn't verify your account number. Kindly pass a valid account number.";
-        } else if (error.message.includes("timeout")) {
-            userFriendlyMessage = "Request timed out. Please check your internet connection.";
-        } else {
-            userFriendlyMessage = `Setup failed: ${error.message}`;
-        }
-
-        showToast(userFriendlyMessage, "error");
-    } finally {
-        setSubmitting(false);
-    }
-};
-
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-950 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading...</p>
-                </div>
-            </div>
-        );
-    }
+    if (loading) return (
+        <div className="lsb-loading">
+            <div className="lsb-spinner" />
+            <p>Loading your profile…</p>
+        </div>
+    );
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <header className="bg-blue-950 text-white shadow-lg">
-                <div className="max-w-4xl mx-auto px-4 py-6">
-                    <button
-                        onClick={() => router.back()}
-                        className="flex items-center gap-2 text-blue-200 hover:text-white mb-4 transition-colors"
-                    >
-                        <ArrowLeft size={20} />
-                        Back
-                    </button>
-                    <div className="text-center">
-                        <div className="inline-flex items-center justify-center w-16 h-16 bg-white text-blue-950 rounded-full mb-4">
-                            <Store size={32} />
-                        </div>
-                        <h1 className="text-3xl sm:text-4xl font-bold mb-2">Become a Seller</h1>
-                        <p className="text-blue-200 text-lg">Start selling your books and earn money</p>
+        <>
+            <style>{CSS}</style>
+
+            {/* Top nav bar */}
+            <header className="lsb-topbar">
+                <div className="lsb-topbar-inner">
+                    <div className="lsb-topbar-right">
+                        <span className="lsb-topbar-user">{formData.firstName || "Seller"} Account</span>
                     </div>
                 </div>
             </header>
 
-            <main className="max-w-4xl mx-auto px-4 py-8">
-                <div className="bg-white text-blue-950 rounded-lg shadow-lg p-6 mb-8">
-                    <h2 className="text-2xl font-bold mb-4">Seller Benefits</h2>
-                    <div className="grid sm:grid-cols-3 gap-4">
-                        <div className="text-center p-4">
-                            <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <CreditCard className="text-green-600" size={28} />
-                            </div>
-                            <h3 className="font-semibold mb-2">Earn 80%</h3>
-                            <p className="text-sm text-gray-600">You keep 80% of every sale</p>
-                        </div>
-                        <div className="text-center p-4">
-                            <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <Building2 className="text-blue-600" size={28} />
-                            </div>
-                            <h3 className="font-semibold mb-2">Easy Withdrawals</h3>
-                            <p className="text-sm text-gray-600">Withdraw anytime to your bank</p>
-                        </div>
-                        <div className="text-center p-4">
-                            <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <CheckCircle className="text-purple-600" size={28} />
-                            </div>
-                            <h3 className="font-semibold mb-2">No Setup Fees</h3>
-                            <p className="text-sm text-gray-600">Free to join and start selling</p>
-                        </div>
-                    </div>
+            {/* Orange accent bar */}
+            <div className="lsb-accent-bar" />
+
+            <div className="lsb-root">
+                {/* Breadcrumb */}
+                <div className="lsb-breadcrumb">
+                    <button onClick={() => router.back()} className="lsb-bread-link">
+                        <ArrowLeft size={13} /> Back
+                    </button>
+                    <ChevronRight size={12} className="lsb-bread-sep" />
+                    <span className="lsb-bread-link">My Account</span>
+                    <ChevronRight size={12} className="lsb-bread-sep" />
+                    <span className="lsb-bread-active">Become a Seller</span>
                 </div>
 
-                <div className="bg-white text-blue-950 rounded-lg shadow-lg p-6 sm:p-8">
-                    <h2 className="text-2xl font-bold mb-6">Seller Application</h2>
+                <div className="lsb-layout">
 
-                    <div className="mb-8">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <CheckCircle className="text-green-600" size={20} />
-                            Personal Information
-                        </h3>
-                        <div className="grid sm:grid-cols-2 gap-4">
-                            <div>
-                                <label className="font-semibold text-gray-700 block mb-2">First Name</label>
-                                <input
-                                    value={formData.firstName}
-                                    disabled
-                                    className="w-full border border-gray-300 px-4 py-3 rounded-lg bg-gray-100 cursor-not-allowed"
-                                />
-                            </div>
-                            <div>
-                                <label className="font-semibold text-gray-700 block mb-2">Surname</label>
-                                <input
-                                    value={formData.surname}
-                                    disabled
-                                    className="w-full border border-gray-300 px-4 py-3 rounded-lg bg-gray-100 cursor-not-allowed"
-                                />
-                            </div>
-                            <div className="sm:col-span-2">
-                                <label className="font-semibold text-gray-700 block mb-2">Email</label>
-                                <input
-                                    value={formData.email}
-                                    disabled
-                                    className="w-full border border-gray-300 px-4 py-3 rounded-lg bg-gray-100 cursor-not-allowed"
-                                />
-                            </div>
-                            <div className="sm:col-span-2">
-                                <label className="font-semibold text-gray-700 block mb-2">
-                                    Phone Number <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="tel"
-                                    value={formData.phoneNumber}
-                                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                                    placeholder="08012345678"
-                                    className={`w-full border px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.phoneNumber ? 'border-red-500' : 'border-gray-300'}`}
-                                />
-                                {errors.phoneNumber && (
-                                    <p className="text-red-500 text-sm mt-1">{errors.phoneNumber}</p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    {/* ── LEFT COLUMN: main form ── */}
+                    <div className="lsb-main">
 
-                    <div className="sm:col-span-2">
-                        <div className="flex items-center gap-2 mb-2">
-                            <label className="font-semibold text-gray-700">
-                                Title / Profession
-                            </label>
-                            <button
-                                type="button"
-                                onClick={() => setShowLecturerInfo(true)}
-                                className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center hover:bg-blue-200 transition-colors shrink-0 "
-                                title="Why select Lecturer?"
-                            >
-                                <Info size={12} />
-                            </button>
+                        {/* Page title */}
+                        <div className="lsb-page-title-block">
+                            <h1 className="lsb-page-title">Seller Registration</h1>
+                            <p className="lsb-page-sub">Complete your application to start selling on LAN Library</p>
                         </div>
-                        <select
-                            value={formData.title}
-                            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                            className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                            <option value="">Select title (optional)</option>
-                            <option value="Lecturer">Lecturer</option>
-                            <option value="Dr.">Dr.</option>
-                            <option value="Prof.">Prof.</option>
-                            <option value="Professor">Professor</option>
-                        </select>
-                        {(formData.title === 'Lecturer' || formData.title === 'Dr.' || formData.title === 'Prof.' || formData.title === 'Professor') && (
-                            <div className="mt-3 bg-gradient-to-br from-blue-950 to-indigo-900 text-white rounded-2xl p-5 shadow-lg border border-blue-800">
-                                <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <GraduationCap className="w-5 h-5 text-blue-200" />
-                                    </div>
-                                    <div>
-                                        <p className="font-bold text-base mb-1">You're registering as an Academic! 🎓</p>
-                                        <p className="text-blue-200 text-sm leading-relaxed mb-3">
-                                            As a <span className="text-white font-semibold">{formData.title}</span>, your profile will be featured in our exclusive <span className="text-white font-semibold">University Lecturers</span> directory, giving students direct access to your academic materials.
-                                        </p>
-                                        <div className="space-y-2">
-                                            {[
-                                                "Your profile appears in the Lecturers section",
-                                                "Students can find your materials by department & university",
-                                                "Builds your academic brand on LAN Library",
-                                                "Earn from every download of your course materials"
-                                            ].map((benefit, i) => (
-                                                <div key={i} className="flex items-center gap-2 text-sm text-blue-100">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-300 flex-shrink-0" />
-                                                    {benefit}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
+
+                        {/* STEP 1 – Personal Info */}
+                        <div className="lsb-section">
+                            <div className="lsb-section-head">
+                                <span className="lsb-step-badge">1</span>
+                                <h2 className="lsb-section-title">Personal Information</h2>
+                            </div>
+                            <div className="lsb-grid2">
+                                <div className="lsb-field">
+                                    <label className="lsb-label">First Name</label>
+                                    <input value={formData.firstName} disabled className="lsb-input lsb-input-disabled" />
+                                </div>
+                                <div className="lsb-field">
+                                    <label className="lsb-label">Surname</label>
+                                    <input value={formData.surname} disabled className="lsb-input lsb-input-disabled" />
+                                </div>
+                                <div className="lsb-field lsb-span2">
+                                    <label className="lsb-label">Email Address</label>
+                                    <input value={formData.email} disabled className="lsb-input lsb-input-disabled" />
+                                </div>
+                                <div className="lsb-field lsb-span2">
+                                    <label className="lsb-label">Phone Number <span className="lsb-req">*</span></label>
+                                    <input
+                                        type="tel"
+                                        value={formData.phoneNumber}
+                                        onChange={e => set("phoneNumber", e.target.value)}
+                                        placeholder="08012345678"
+                                        className={`lsb-input${errors.phoneNumber ? " lsb-input-err" : ""}`}
+                                    />
+                                    {errors.phoneNumber && <p className="lsb-err-msg">{errors.phoneNumber}</p>}
                                 </div>
                             </div>
-                        )}
-                    </div>
 
-                    <div className="mb-8 mt-5">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <Building2 className="text-blue-600" size={20} />
-                            Bank Account Details
-                        </h3>
-                        <div className="grid sm:grid-cols-2 gap-4">
-                            <div className="sm:col-span-2">
-                                <label className="font-semibold text-gray-700 block mb-2">
-                                    Bank Name <span className="text-red-500">*</span>
-                                </label>
+                            {/* Title / Profession */}
+                            <div className="lsb-field" style={{ marginTop: 16 }}>
+                                <div className="lsb-label-row">
+                                    <label className="lsb-label">Title / Profession</label>
+                                    <button type="button" onClick={() => setShowLecturerInfo(true)} className="lsb-info-btn">
+                                        <Info size={11} /> Why?
+                                    </button>
+                                </div>
                                 <select
-                                    value={formData.isCustomBank ? "other" : formData.bankName}
-                                    onChange={(e) => {
-                                        const selectedValue = e.target.value;
-
-                                        if (selectedValue === "other") {
-                                            // User selected "Other Bank"
-                                            setFormData({
-                                                ...formData,
-                                                bankName: "",
-                                                bankCode: "",
-                                                isCustomBank: true
-                                            });
-                                        } else {
-                                            // User selected a bank from the list
-                                            const selectedBank = nigerianBanks.find(bank => bank.name === selectedValue);
-                                            setFormData({
-                                                ...formData,
-                                                bankName: selectedValue,
-                                                bankCode: selectedBank ? selectedBank.code : "",
-                                                isCustomBank: false
-                                            });
-                                        }
-                                    }}
-                                    className={`w-full border px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.bankName ? 'border-red-500' : 'border-gray-300'}`}
+                                    value={formData.title}
+                                    onChange={e => set("title", e.target.value)}
+                                    className="lsb-input lsb-select"
                                 >
-                                    <option value="">Select your bank</option>
-                                    {nigerianBanks.map(bank => (
-                                        <option key={bank.code} value={bank.name}>{bank.name}</option>
-                                    ))}
-                                    <option value="other">🏦 Other Bank (Not Listed)</option>
+                                    <option value="">Select title (optional)</option>
+                                    <option value="Lecturer">Lecturer</option>
+                                    <option value="Dr.">Dr.</option>
+                                    <option value="Prof.">Prof.</option>
+                                    <option value="Professor">Professor</option>
                                 </select>
-                                {errors.bankName && (
-                                    <p className="text-red-500 text-sm mt-1">{errors.bankName}</p>
-                                )}
                             </div>
 
-                            {/* Show these fields only if "Other Bank" is selected */}
-                            {formData.isCustomBank && (
+                            {isAcademic && (
                                 <>
-                                    <div>
-                                        <label className="font-semibold text-gray-700 block mb-2">
-                                            Bank Name <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.bankName}
-                                            onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                                            placeholder="Enter your bank name"
-                                            className={`w-full border px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.bankName ? 'border-red-500' : 'border-gray-300'}`}
-                                        />
+                                    <div className="lsb-academic-banner">
+                                        <div className="lsb-academic-icon"><GraduationCap size={18} /></div>
+                                        <div>
+                                            <p className="lsb-academic-title">Academic Profile Activated 🎓</p>
+                                            <p className="lsb-academic-sub">
+                                                As <strong>{formData.title}</strong>, you'll be featured in our University Lecturers directory — students can discover your materials by department and university.
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="font-semibold text-gray-700 block mb-2">
-                                            Bank Code <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.bankCode}
-                                            onChange={(e) => setFormData({ ...formData, bankCode: e.target.value.replace(/\D/g, '') })}
-                                            placeholder="Enter bank code (e.g., 044)"
-                                            maxLength={3}
-                                            className={`w-full border px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.bankCode ? 'border-red-500' : 'border-gray-300'}`}
-                                        />
-                                        {errors.bankCode && (
-                                            <p className="text-red-500 text-sm mt-1">{errors.bankCode}</p>
-                                        )}
-                                        <p className="text-sm text-gray-500 mt-1">
-                                            💡 You can find your bank code on your bank's website or app
-                                        </p>
+                                    <div className="lsb-grid2" style={{ marginTop: 14 }}>
+                                        <div className="lsb-field">
+                                            <label className="lsb-label">University</label>
+                                            <input
+                                                type="text"
+                                                value={formData.university}
+                                                onChange={e => set("university", e.target.value)}
+                                                placeholder="e.g. University of Lagos"
+                                                required
+                                                className="lsb-input"
+                                            />
+                                        </div>
+                                        <div className="lsb-field">
+                                            <label className="lsb-label">Department</label>
+                                            <input
+                                                type="text"
+                                                value={formData.department}
+                                                onChange={e => set("department", e.target.value)}
+                                                placeholder="e.g. Computer Science"
+                                                required
+                                                className="lsb-input"
+                                            />
+                                        </div>
                                     </div>
                                 </>
                             )}
+                        </div>
 
-                            {/* Show bank code as read-only if a bank from list is selected */}
-                            {!formData.isCustomBank && formData.bankCode && (
-                                <div className="sm:col-span-2">
-                                    <label className="font-semibold text-gray-700 block mb-2">
-                                        Bank Code
-                                    </label>
+                        {/* STEP 2 – Bank Details */}
+                        <div className="lsb-section">
+                            <div className="lsb-section-head">
+                                <span className="lsb-step-badge">2</span>
+                                <h2 className="lsb-section-title">Bank Account Details</h2>
+                            </div>
+                            <div className="lsb-info-note">
+                                <Shield size={14} />
+                                <span>Your banking information is encrypted and used only for seller payouts.</span>
+                            </div>
+                            <div className="lsb-grid2" style={{ marginTop: 16 }}>
+                                <div className="lsb-field lsb-span2">
+                                    <label className="lsb-label">Bank Name <span className="lsb-req">*</span></label>
+                                    <select
+                                        value={formData.isCustomBank ? "other" : formData.bankName}
+                                        onChange={e => {
+                                            const v = e.target.value;
+                                            if (v === "other") {
+                                                setFormData(p => ({ ...p, bankName: "", bankCode: "", isCustomBank: true }));
+                                            } else {
+                                                const b = nigerianBanks.find(b => b.name === v);
+                                                setFormData(p => ({ ...p, bankName: v, bankCode: b?.code || "", isCustomBank: false }));
+                                            }
+                                        }}
+                                        className={`lsb-input lsb-select${errors.bankName ? " lsb-input-err" : ""}`}
+                                    >
+                                        <option value="">— Select your bank —</option>
+                                        {nigerianBanks.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                                        <option value="other">🏦 Other Bank (Not Listed)</option>
+                                    </select>
+                                    {errors.bankName && <p className="lsb-err-msg">{errors.bankName}</p>}
+                                </div>
+
+                                {formData.isCustomBank && (
+                                    <>
+                                        <div className="lsb-field">
+                                            <label className="lsb-label">Bank Name <span className="lsb-req">*</span></label>
+                                            <input
+                                                type="text"
+                                                value={formData.bankName}
+                                                onChange={e => set("bankName", e.target.value)}
+                                                placeholder="Enter bank name"
+                                                className={`lsb-input${errors.bankName ? " lsb-input-err" : ""}`}
+                                            />
+                                        </div>
+                                        <div className="lsb-field">
+                                            <label className="lsb-label">Bank Code <span className="lsb-req">*</span></label>
+                                            <input
+                                                type="text"
+                                                value={formData.bankCode}
+                                                onChange={e => set("bankCode", e.target.value.replace(/\D/g, ""))}
+                                                placeholder="e.g. 044"
+                                                maxLength={3}
+                                                className={`lsb-input${errors.bankCode ? " lsb-input-err" : ""}`}
+                                            />
+                                            {errors.bankCode && <p className="lsb-err-msg">{errors.bankCode}</p>}
+                                            <p className="lsb-hint">Find your bank code on your bank's website or mobile app.</p>
+                                        </div>
+                                    </>
+                                )}
+
+                                {!formData.isCustomBank && formData.bankCode && (
+                                    <div className="lsb-field lsb-span2">
+                                        <label className="lsb-label">Bank Code</label>
+                                        <input value={formData.bankCode} disabled className="lsb-input lsb-input-disabled" />
+                                    </div>
+                                )}
+
+                                <div className="lsb-field">
+                                    <label className="lsb-label">Account Number <span className="lsb-req">*</span></label>
                                     <input
                                         type="text"
-                                        value={formData.bankCode}
-                                        disabled
-                                        className="w-full border border-gray-300 px-4 py-3 rounded-lg bg-gray-100 cursor-not-allowed"
+                                        maxLength={10}
+                                        value={formData.accountNumber}
+                                        onChange={e => set("accountNumber", e.target.value.replace(/\D/g, ""))}
+                                        placeholder="0123456789"
+                                        className={`lsb-input${errors.accountNumber ? " lsb-input-err" : ""}`}
                                     />
+                                    {errors.accountNumber && <p className="lsb-err-msg">{errors.accountNumber}</p>}
                                 </div>
-                            )}
-
-                            <div>
-                                <label className="font-semibold text-gray-700 block mb-2">
-                                    Account Number <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    maxLength={10}
-                                    value={formData.accountNumber}
-                                    onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value.replace(/\D/g, '') })}
-                                    placeholder="0123456789"
-                                    className={`w-full border px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.accountNumber ? 'border-red-500' : 'border-gray-300'}`}
-                                />
-                                {errors.accountNumber && (
-                                    <p className="text-red-500 text-sm mt-1">{errors.accountNumber}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="font-semibold text-gray-700 block mb-2">
-                                    Account Name <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.accountName}
-                                    onChange={(e) => setFormData({ ...formData, accountName: e.target.value })}
-                                    placeholder="Account holder name"
-                                    className={`w-full border px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.accountName ? 'border-red-500' : 'border-gray-300'}`}
-                                />
-                                {errors.accountName && (
-                                    <p className="text-red-500 text-sm mt-1">{errors.accountName}</p>
-                                )}
+                                <div className="lsb-field">
+                                    <label className="lsb-label">Account Name <span className="lsb-req">*</span></label>
+                                    <input
+                                        type="text"
+                                        value={formData.accountName}
+                                        onChange={e => set("accountName", e.target.value)}
+                                        placeholder="Account holder name"
+                                        className={`lsb-input${errors.accountName ? " lsb-input-err" : ""}`}
+                                    />
+                                    {errors.accountName && <p className="lsb-err-msg">{errors.accountName}</p>}
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="mb-8">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <Store className="text-purple-600" size={20} />
-                            Business Information <span className="text-sm text-gray-500 font-normal">(Optional)</span>
-                        </h3>
-                        <div className="grid gap-4">
-                            <div>
-                                <label className="font-semibold text-gray-700 block mb-2">Business Name</label>
+                        {/* STEP 3 – Business Info */}
+                        <div className="lsb-section">
+                            <div className="lsb-section-head">
+                                <span className="lsb-step-badge">3</span>
+                                <h2 className="lsb-section-title">
+                                    Business Information
+                                    <span className="lsb-optional-badge">Optional</span>
+                                </h2>
+                            </div>
+                            <div className="lsb-field" style={{ marginBottom: 14 }}>
+                                <label className="lsb-label">Business / Store Name</label>
                                 <input
                                     type="text"
                                     value={formData.businessName}
-                                    onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
-                                    placeholder="Your business or store name"
-                                    className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    onChange={e => set("businessName", e.target.value)}
+                                    placeholder={`${formData.firstName} ${formData.surname}`.trim() || "Your store name"}
+                                    className="lsb-input"
                                 />
                             </div>
-                            <div>
-                                <label className="font-semibold text-gray-700 block mb-2">Business Description</label>
+                            <div className="lsb-field">
+                                <label className="lsb-label">Store Description</label>
                                 <textarea
                                     value={formData.businessDescription}
-                                    onChange={(e) => setFormData({ ...formData, businessDescription: e.target.value })}
-                                    placeholder="Tell us about your books and what you specialize in"
-                                    rows={4}
-                                    className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    onChange={e => set("businessDescription", e.target.value)}
+                                    placeholder="Tell buyers what kinds of books and materials you sell…"
+                                    rows={3}
+                                    className="lsb-input lsb-textarea"
                                 />
                             </div>
                         </div>
-                    </div>
 
-                    <div className="mb-8">
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <div className="flex items-start gap-3">
-                                <input
-                                    type="checkbox"
-                                    id="agreeToTerms"
-                                    checked={formData.agreeToTerms}
-                                    onChange={(e) => setFormData({ ...formData, agreeToTerms: e.target.checked })}
-                                    className="mt-1"
-                                />
-                                <label htmlFor="agreeToTerms" className="text-sm text-gray-700 cursor-pointer">
-                                    I agree to the Terms and Conditions and understand that: I will receive 80% of each sale amount, 20% commission goes to platform maintenance, minimum withdrawal amount is ₦1,000, and withdrawals are processed before 24 hours.
-                                </label>
-                            </div>
-                            {errors.agreeToTerms && (
-                                <p className="text-red-500 text-sm mt-2 ml-8">{errors.agreeToTerms}</p>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <button
-                            onClick={() => router.back()}
-                            disabled={submitting}
-                            className="flex-1 border-2 border-gray-300 px-6 py-4 rounded-lg hover:bg-gray-50 font-semibold transition-colors disabled:opacity-50"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSubmit}
-                            disabled={submitting}
-                            className="flex-1 bg-green-600 text-white px-6 py-4 rounded-lg hover:bg-green-700 font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                        >
-                            {submitting ? (
-                                <>
-                                    <Loader2 className="animate-spin" size={20} />
-                                    Creating Account...
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCircle size={20} />
-                                    Complete Setup
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </div>
-                {/* Lecturer Info Popup */}
-                {showLecturerInfo && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center pt-10 bg-black/50 backdrop-blur-sm overflow-y-auto">
-                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-                            {/* Header */}
-                            <div className="bg-gradient-to-br from-blue-950 to-indigo-900 px-6 py-6 text-white text-center">
-                                <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 mt-15 border border-white/20">
-                                    <GraduationCap className="w-7 h-7 text-blue-200" />
-                                </div>
-                                <h3 className="text-xl font-bold">Why Select an Academic Title?</h3>
-                                <p className="text-blue-300 text-sm mt-1">Unlock exclusive features for educators</p>
-                            </div>
-
-                            {/* Body */}
-                            <div className="p-6 space-y-4">
-                                {[
-                                    {
-                                        icon: "🎓",
-                                        title: "Featured in Lecturers Directory",
-                                        desc: "Your profile appears in the dedicated University Lecturers section where students actively search for academic materials."
-                                    },
-                                    {
-                                        icon: "🔍",
-                                        title: "Searchable by Department & University",
-                                        desc: "Students can find you by your department and university once you add those details to your profile."
-                                    },
-                                    {
-                                        icon: "📚",
-                                        title: "Academic Brand Building",
-                                        desc: "Build your reputation as a trusted academic source on LAN Library across Nigeria."
-                                    },
-                                    {
-                                        icon: "💰",
-                                        title: "Earn from Course Materials",
-                                        desc: "Monetize your lecture notes, past questions, and academic resources with every download."
-                                    }
-                                ].map((item, i) => (
-                                    <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
-                                        <span className="text-2xl flex-shrink-0">{item.icon}</span>
-                                        <div>
-                                            <p className="font-semibold text-gray-900 text-sm">{item.title}</p>
-                                            <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">{item.desc}</p>
-                                        </div>
+                        {/* Terms */}
+                        <div className="lsb-terms-box">
+                            <label className="lsb-terms-label">
+                                <div className="lsb-checkbox-wrap">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.agreeToTerms}
+                                        onChange={e => set("agreeToTerms", e.target.checked)}
+                                        className="lsb-checkbox-native"
+                                    />
+                                    <div className={`lsb-checkbox-custom${formData.agreeToTerms ? " checked" : ""}`}>
+                                        {formData.agreeToTerms && <CheckCircle size={12} color="#fff" />}
                                     </div>
-                                ))}
+                                </div>
+                                <span className="lsb-terms-text">
+                                    I agree to LAN Library's Seller Terms. I understand I will receive <strong>80%</strong> of each sale, with a <strong>₦1,000</strong> minimum withdrawal, processed within 24 hours.
+                                </span>
+                            </label>
+                            {errors.agreeToTerms && <p className="lsb-err-msg" style={{ marginTop: 8 }}>{errors.agreeToTerms}</p>}
+                        </div>
 
-                                <p className="text-xs text-center text-gray-400 pt-2">
-                                    Applies to: Lecturer, Dr., Prof., Professor
-                                </p>
-
-                                <button
-                                    onClick={() => setShowLecturerInfo(false)}
-                                    className="w-full bg-blue-950 text-white py-3 rounded-2xl font-bold hover:bg-blue-900 transition-colors"
-                                >
-                                    Got it!
-                                </button>
-                            </div>
+                        {/* Action Buttons */}
+                        <div className="lsb-actions">
+                            <button onClick={() => router.back()} disabled={submitting} className="lsb-btn-cancel">
+                                Cancel
+                            </button>
+                            <button onClick={handleSubmit} disabled={submitting} className="lsb-btn-submit">
+                                {submitting
+                                    ? <><Loader2 size={17} className="lsb-spin" /> Creating Account…</>
+                                    : <><CheckCircle size={17} /> Complete Registration</>
+                                }
+                            </button>
                         </div>
                     </div>
-                )}
-            </main>
-            {/* Sided Pop-out Toast */}
-            {toast.show && (
-                <div className="fixed top-20 right-4 z-50 transition-all duration-500 ease-in-out transform translate-x-0 animate-in slide-in-from-right-full">
-                    <div className={`flex items-center gap-3 p-4 rounded-xl shadow-2xl border-l-4 min-w-[320px] max-w-md ${toast.type === "error"
-                            ? "bg-white border-red-500 text-gray-800"
-                            : "bg-white border-green-500 text-gray-800"
-                        }`}>
-                        {/* Status Icon */}
-                        <div className={`shrink-0 ${toast.type === "error" ? "text-red-500" : "text-green-500"}`}>
-                            {toast.type === "error" ? <Info size={22} /> : <CheckCircle size={22} />}
+
+                    {/* ── RIGHT SIDEBAR ── */}
+                    <aside className="lsb-sidebar">
+
+                        {/* Earnings summary card */}
+                        <div className="lsb-side-card lsb-earnings-card">
+                            <p className="lsb-side-card-title">Your Earnings Breakdown</p>
+                            <div className="lsb-earn-row">
+                                <span className="lsb-earn-label">Book sale (₦1,000)</span>
+                                <span className="lsb-earn-val">₦1,000</span>
+                            </div>
+                            <div className="lsb-earn-row">
+                                <span className="lsb-earn-label">Platform fee (20%)</span>
+                                <span className="lsb-earn-val lsb-earn-neg">−₦200</span>
+                            </div>
+                            <div className="lsb-earn-divider" />
+                            <div className="lsb-earn-row">
+                                <span className="lsb-earn-total-label">You receive</span>
+                                <span className="lsb-earn-total-val">₦800</span>
+                            </div>
+                            <div className="lsb-earn-badge">80% kept by you</div>
                         </div>
 
-                        {/* Message Content */}
-                        <div className="flex-1">
-                            <p className="text-sm font-semibold leading-tight">
-                                {toast.type === "error" ? "Action Failed" : "Success!"}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                                {toast.message}
-                            </p>
+                        {/* Benefits */}
+                        <div className="lsb-side-card">
+                            <p className="lsb-side-card-title">Why Sell on LAN Library?</p>
+                            {[
+                                { icon: <TrendingUp size={15} />, t: "Earn 80% per sale", s: "Industry-leading revenue share" },
+                                { icon: <Clock size={15} />, t: "Fast withdrawals", s: "Funds processed within 24 hours" },
+                                { icon: <Shield size={15} />, t: "Secure & free", s: "No setup or listing fees" },
+                                { icon: <Star size={15} />, t: "Grow your brand", s: "Reach thousands of Nigerian students" },
+                            ].map((b, i) => (
+                                <div key={i} className="lsb-benefit-row">
+                                    <div className="lsb-benefit-icon">{b.icon}</div>
+                                    <div>
+                                        <p className="lsb-benefit-t">{b.t}</p>
+                                        <p className="lsb-benefit-s">{b.s}</p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
 
-                        {/* Manual Close Button */}
-                        <button
-                            onClick={() => setToast({ ...toast, show: false })}
-                            className="p-1.5 hover:bg-gray-100 rounded-full transition-colors text-gray-400"
-                        >
-                            <X size={16} />
-                        </button>
+                        {/* Help */}
+                        <div className="lsb-side-card lsb-help-card">
+                            <p className="lsb-help-title">Need help?</p>
+                            <p className="lsb-help-sub">Our seller support team is available 9am – 6pm WAT.</p>
+                            <a href="mailto:support@lanlibrary.com" className="lsb-help-link">Contact Support →</a>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+
+            {/* Lecturer info modal */}
+            {showLecturerInfo && (
+                <div className="lsb-overlay" onClick={() => setShowLecturerInfo(false)}>
+                    <div className="lsb-modal" onClick={e => e.stopPropagation()}>
+                        <div className="lsb-modal-header">
+                            <div className="lsb-modal-icon"><GraduationCap size={22} /></div>
+                            <div>
+                                <h3 className="lsb-modal-title">Academic Seller Benefits</h3>
+                                <p className="lsb-modal-sub">What you unlock with an academic title</p>
+                            </div>
+                            <button onClick={() => setShowLecturerInfo(false)} className="lsb-modal-close"><X size={18} /></button>
+                        </div>
+                        <div className="lsb-modal-body">
+                            {[
+                                { icon: "🎓", t: "Featured in Lecturers Directory", d: "Your profile appears where students search for academic materials by lecturer name." },
+                                { icon: "🔍", t: "Searchable by Dept & University", d: "Students can filter by your department and institution once you fill in those fields." },
+                                { icon: "📚", t: "Build Your Academic Brand", d: "Establish yourself as a trusted academic resource across Nigerian universities." },
+                                { icon: "💰", t: "Monetise Course Materials", d: "Earn from every download of your notes, past questions, and slides." },
+                            ].map((item, i) => (
+                                <div key={i} className="lsb-modal-item">
+                                    <span className="lsb-modal-emoji">{item.icon}</span>
+                                    <div>
+                                        <p className="lsb-modal-item-t">{item.t}</p>
+                                        <p className="lsb-modal-item-d">{item.d}</p>
+                                    </div>
+                                </div>
+                            ))}
+                            <p className="lsb-modal-note">Applies to: Lecturer · Dr. · Prof. · Professor</p>
+                            <button onClick={() => setShowLecturerInfo(false)} className="lsb-btn-submit" style={{ width: "100%", marginTop: 4 }}>
+                                Got it!
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
-        </div>
+
+            {/* Toast */}
+            {toast.show && (
+                <div className={`lsb-toast lsb-toast-${toast.type}`}>
+                    <div className="lsb-toast-icon">
+                        {toast.type === "error" ? <X size={16} /> : <CheckCircle size={16} />}
+                    </div>
+                    <div className="lsb-toast-body">
+                        <p className="lsb-toast-title">{toast.type === "error" ? "Something went wrong" : "Success!"}</p>
+                        <p className="lsb-toast-msg">{toast.message}</p>
+                    </div>
+                    <button onClick={() => setToast(p => ({ ...p, show: false }))} className="lsb-toast-close"><X size={14} /></button>
+                </div>
+            )}
+        </>
     );
 }
+
+const CSS = `
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --amz-orange: #FF9900;
+    --amz-orange-dark: #c45500;
+    --amz-navy: #131921;
+    --amz-navy2: #232F3E;
+    --amz-blue: #146EB4;
+    --amz-blue-light: #e8f4fb;
+    --amz-green: #067D62;
+    --amz-bg: #EAEDED;
+    --amz-surface: #ffffff;
+    --amz-border: #D5D9D9;
+    --amz-border2: #888C8C;
+    --amz-text: #0F1111;
+    --amz-muted: #565959;
+    --amz-hint: #767676;
+    --amz-err: #CC0C39;
+    --amz-academic-bg: #f0f3fa;
+    --amz-academic-border: #b0bdd6;
+    --amz-academic: #1a3c5e;
+    --font: -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Loading */
+.lsb-loading {
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: var(--amz-bg); font-family: var(--font);
+    gap: 14px; color: var(--amz-muted); font-size: 14px;
+}
+.lsb-spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--amz-border);
+    border-top-color: var(--amz-orange);
+    border-radius: 50%; animation: lsb-spin .75s linear infinite;
+}
+@keyframes lsb-spin { to { transform: rotate(360deg); } }
+
+/* Topbar */
+.lsb-topbar {
+    background: var(--amz-navy);
+    border-bottom: 1px solid #3a4553;
+    position: sticky; top: 0; z-index: 40;
+}
+.lsb-topbar-inner {
+    max-width: 1080px; margin: 0 auto;
+    padding: 0 16px; height: 52px;
+    display: flex; align-items: center; justify-content: space-between;
+}
+.lsb-logo {
+    font-size: 20px; font-weight: 800; color: #fff;
+    letter-spacing: -0.3px; font-family: var(--font);
+}
+.lsb-logo span { color: var(--amz-orange); }
+.lsb-topbar-user { font-size: 12px; color: #ccc; }
+
+/* Orange underline bar */
+.lsb-accent-bar { height: 3px; background: var(--amz-orange); }
+
+/* Page root */
+.lsb-root {
+    max-width: 1080px; margin: 0 auto;
+    padding: 14px 16px 60px;
+    background: var(--amz-bg);
+    min-height: calc(100vh - 55px);
+    font-family: var(--font);
+}
+
+/* Breadcrumb */
+.lsb-breadcrumb {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 12px; color: var(--amz-muted);
+    margin-bottom: 14px; flex-wrap: wrap;
+}
+.lsb-bread-link {
+    display: inline-flex; align-items: center; gap: 3px;
+    color: var(--amz-blue); background: none; border: none;
+    cursor: pointer; font-size: 12px; font-family: var(--font);
+}
+.lsb-bread-link:hover { color: var(--amz-orange-dark); text-decoration: underline; }
+.lsb-bread-sep { color: var(--amz-border2); }
+.lsb-bread-active { color: var(--amz-muted); }
+
+/* Two-column layout */
+.lsb-layout {
+    display: grid;
+    grid-template-columns: 1fr 290px;
+    gap: 16px;
+    align-items: start;
+}
+.lsb-main { display: flex; flex-direction: column; gap: 10px; }
+
+/* Page title block */
+.lsb-page-title-block {
+    background: var(--amz-surface);
+    border: 1px solid var(--amz-border);
+    border-top: 4px solid var(--amz-orange);
+    border-radius: 4px;
+    padding: 18px 22px 16px;
+}
+.lsb-page-title {
+    font-size: 21px; font-weight: 700; color: var(--amz-text);
+    font-family: var(--font); margin-bottom: 4px;
+}
+.lsb-page-sub { font-size: 13px; color: var(--amz-muted); }
+
+/* Form sections */
+.lsb-section {
+    background: var(--amz-surface);
+    border: 1px solid var(--amz-border);
+    border-radius: 4px;
+    padding: 20px 22px;
+}
+.lsb-section-head {
+    display: flex; align-items: center; gap: 10px;
+    padding-bottom: 14px; margin-bottom: 16px;
+    border-bottom: 1px solid #f0f2f2;
+}
+.lsb-step-badge {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--amz-navy); color: var(--amz-orange);
+    font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.lsb-section-title {
+    font-size: 15px; font-weight: 700; color: var(--amz-text);
+    font-family: var(--font); display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.lsb-optional-badge {
+    font-size: 11px; font-weight: 400; color: var(--amz-muted);
+    background: #f0f2f2; border-radius: 99px; padding: 2px 8px;
+}
+
+/* Grid */
+.lsb-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.lsb-span2 { grid-column: 1 / -1; }
+
+/* Fields */
+.lsb-field { display: flex; flex-direction: column; }
+.lsb-label {
+    font-size: 13px; font-weight: 700; color: var(--amz-text);
+    margin-bottom: 4px;
+}
+.lsb-label-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.lsb-req { color: var(--amz-err); }
+
+.lsb-input {
+    width: 100%; padding: 7px 10px;
+    border: 1px solid #a6a6a6; border-radius: 3px;
+    font-size: 13px; color: var(--amz-text);
+    background: #fff; font-family: var(--font);
+    outline: none; transition: border-color .12s, box-shadow .12s;
+    line-height: 1.4;
+}
+.lsb-input:focus {
+    border-color: #e77600;
+    box-shadow: 0 0 0 3px rgba(228,121,17,0.25);
+}
+.lsb-input-disabled {
+    background: #f0f2f2; color: var(--amz-muted);
+    cursor: not-allowed; border-color: #d5d9d9;
+}
+.lsb-input-err { border-color: var(--amz-err) !important; }
+.lsb-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23555'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+}
+.lsb-textarea { resize: vertical; line-height: 1.5; min-height: 76px; }
+.lsb-err-msg { font-size: 12px; color: var(--amz-err); margin-top: 3px; }
+.lsb-hint { font-size: 11px; color: var(--amz-muted); margin-top: 3px; }
+
+.lsb-info-btn {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; color: var(--amz-blue);
+    background: none; border: none; cursor: pointer;
+    padding: 0; font-family: var(--font);
+}
+.lsb-info-btn:hover { text-decoration: underline; }
+
+/* Info note */
+.lsb-info-note {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--amz-blue-light); border: 1px solid #c8e6f5;
+    border-radius: 3px; padding: 9px 11px;
+    font-size: 12px; color: #0066c0;
+}
+
+/* Academic banner */
+.lsb-academic-banner {
+    display: flex; gap: 12px; align-items: flex-start;
+    background: var(--amz-academic-bg);
+    border: 1px solid var(--amz-academic-border);
+    border-left: 4px solid var(--amz-academic);
+    border-radius: 3px; padding: 13px; margin-top: 12px;
+}
+.lsb-academic-icon {
+    width: 32px; height: 32px; border-radius: 6px;
+    background: var(--amz-academic); color: var(--amz-orange);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.lsb-academic-title { font-size: 13px; font-weight: 700; color: var(--amz-academic); }
+.lsb-academic-sub { font-size: 12px; color: #3a506b; margin-top: 3px; line-height: 1.5; }
+
+/* Terms */
+.lsb-terms-box {
+    background: var(--amz-surface); border: 1px solid var(--amz-border);
+    border-radius: 4px; padding: 16px 18px;
+}
+.lsb-terms-label { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; }
+.lsb-checkbox-wrap {
+    position: relative; flex-shrink: 0;
+    width: 17px; height: 17px; margin-top: 1px;
+}
+.lsb-checkbox-native {
+    position: absolute; opacity: 0;
+    width: 100%; height: 100%; cursor: pointer; margin: 0;
+}
+.lsb-checkbox-custom {
+    width: 17px; height: 17px;
+    border: 1px solid #888c8c; border-radius: 2px;
+    background: linear-gradient(to bottom, #f0f2f2, #e3e6e6);
+    display: flex; align-items: center; justify-content: center;
+    transition: all .12s; pointer-events: none;
+}
+.lsb-checkbox-custom.checked {
+    background: linear-gradient(to bottom, #f0c14b, #e47911);
+    border-color: #a66321;
+}
+.lsb-terms-text { font-size: 13px; color: var(--amz-text); line-height: 1.55; }
+
+/* Buttons */
+.lsb-actions { display: flex; gap: 8px; }
+.lsb-btn-cancel {
+    padding: 8px 18px; border-radius: 3px;
+    border: 1px solid #a6a6a6;
+    background: linear-gradient(to bottom, #f7f8fa, #e7e9ec);
+    font-size: 13px; font-weight: 700; color: var(--amz-text);
+    cursor: pointer; font-family: var(--font);
+    box-shadow: 0 1px 0 rgba(255,255,255,.6) inset;
+    transition: all .1s;
+}
+.lsb-btn-cancel:hover { background: linear-gradient(to bottom, #e7e9ec, #d9dce0); }
+.lsb-btn-cancel:disabled { opacity: .55; cursor: not-allowed; }
+
+.lsb-btn-submit {
+    flex: 1; padding: 8px 18px; border-radius: 3px;
+    border: 1px solid #c07800;
+    background: #082f49;
+    font-size: 13px; font-weight: 700; color: #fff;
+    cursor: pointer; font-family: var(--font);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    box-shadow: 0 1px 0 rgba(255,255,255,.4) inset, 0 1px 2px rgba(0,0,0,.2);
+    transition: all .1s;
+}
+.lsb-btn-submit:hover:not(:disabled) {
+    background: linear-gradient(to bottom, #ddb347, #c96c0c);
+}
+.lsb-btn-submit:disabled { opacity: .55; cursor: not-allowed; }
+.lsb-spin { animation: lsb-spin .8s linear infinite; }
+
+/* Sidebar */
+.lsb-sidebar { display: flex; flex-direction: column; gap: 10px; }
+
+.lsb-side-card {
+    background: var(--amz-surface); border: 1px solid var(--amz-border);
+    border-radius: 4px; padding: 16px;
+}
+.lsb-side-card-title {
+    font-size: 14px; font-weight: 700; color: var(--amz-text);
+    margin-bottom: 12px; padding-bottom: 8px;
+    border-bottom: 1px solid #f0f2f2;
+    font-family: var(--font);
+}
+
+/* Earnings card */
+.lsb-earnings-card { border-top: 3px solid var(--amz-orange); }
+.lsb-earn-row {
+    display: flex; justify-content: space-between;
+    align-items: center; padding: 4px 0; font-size: 13px;
+}
+.lsb-earn-label { color: var(--amz-muted); }
+.lsb-earn-val { color: var(--amz-text); font-weight: 500; }
+.lsb-earn-neg { color: var(--amz-err); }
+.lsb-earn-divider { height: 1px; background: var(--amz-border); margin: 7px 0; }
+.lsb-earn-total-label { font-weight: 700; font-size: 13px; color: var(--amz-text); }
+.lsb-earn-total-val { font-size: 20px; font-weight: 700; color: var(--amz-green); }
+.lsb-earn-badge {
+    margin-top: 10px; text-align: center;
+    background: #e8f5e9; color: var(--amz-green);
+    border-radius: 2px; padding: 4px 12px;
+    font-size: 12px; font-weight: 700; border: 1px solid #c8e6c9;
+}
+
+/* Benefit rows */
+.lsb-benefit-row {
+    display: flex; align-items: flex-start; gap: 9px;
+    padding: 7px 0; border-bottom: 1px solid #f7f8fa;
+}
+.lsb-benefit-row:last-child { border-bottom: none; }
+.lsb-benefit-icon {
+    width: 26px; height: 26px; border-radius: 4px;
+    background: #fff8e7; color: var(--amz-orange-dark);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; border: 1px solid #ffd580;
+}
+.lsb-benefit-t { font-size: 13px; font-weight: 700; color: var(--amz-text); }
+.lsb-benefit-s { font-size: 11px; color: var(--amz-muted); margin-top: 1px; }
+
+/* Help card */
+.lsb-help-card { background: #f7fbff; border-color: #c8e6f5; }
+.lsb-help-title { font-size: 13px; font-weight: 700; color: var(--amz-text); margin-bottom: 5px; }
+.lsb-help-sub { font-size: 12px; color: var(--amz-muted); line-height: 1.5; margin-bottom: 8px; }
+.lsb-help-link { font-size: 12px; color: var(--amz-blue); text-decoration: none; font-weight: 700; }
+.lsb-help-link:hover { color: var(--amz-orange-dark); text-decoration: underline; }
+
+/* Modal */
+.lsb-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.52);
+    z-index: 50; display: flex;
+    align-items: center; justify-content: center; padding: 16px;
+}
+.lsb-modal {
+    background: #fff; border-radius: 4px;
+    width: 100%; max-width: 430px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.28);
+    max-height: 90vh; overflow-y: auto;
+}
+.lsb-modal-header {
+    display: flex; align-items: center; gap: 11px;
+    padding: 16px 18px 12px; border-bottom: 1px solid var(--amz-border);
+}
+.lsb-modal-icon {
+    width: 36px; height: 36px; border-radius: 4px;
+    background: var(--amz-navy); color: var(--amz-orange);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.lsb-modal-title { font-size: 14px; font-weight: 700; color: var(--amz-text); }
+.lsb-modal-sub { font-size: 12px; color: var(--amz-muted); margin-top: 1px; }
+.lsb-modal-close {
+    margin-left: auto; background: none; border: none;
+    color: var(--amz-muted); cursor: pointer; padding: 4px; border-radius: 3px;
+}
+.lsb-modal-close:hover { background: #f0f2f2; color: var(--amz-text); }
+.lsb-modal-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; }
+.lsb-modal-item {
+    display: flex; gap: 11px; align-items: flex-start;
+    padding: 11px 12px; background: #fafafa;
+    border: 1px solid #f0f2f2; border-radius: 3px;
+}
+.lsb-modal-emoji { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+.lsb-modal-item-t { font-size: 13px; font-weight: 700; color: var(--amz-text); }
+.lsb-modal-item-d { font-size: 12px; color: var(--amz-muted); margin-top: 2px; line-height: 1.5; }
+.lsb-modal-note { font-size: 11px; color: var(--amz-muted); text-align: center; }
+
+/* Toast */
+.lsb-toast {
+    position: fixed; bottom: 20px; right: 16px; z-index: 60;
+    display: flex; align-items: flex-start; gap: 9px;
+    min-width: 290px; max-width: 360px;
+    background: #fff; border-radius: 4px;
+    padding: 12px 13px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+    border: 1px solid var(--amz-border);
+    border-left: 4px solid transparent;
+    animation: lsb-slide-up .25s ease;
+    font-family: var(--font);
+}
+@keyframes lsb-slide-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+}
+.lsb-toast-error { border-left-color: var(--amz-err); }
+.lsb-toast-success { border-left-color: var(--amz-green); }
+.lsb-toast-icon {
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.lsb-toast-error .lsb-toast-icon { background: #fff0f3; color: var(--amz-err); }
+.lsb-toast-success .lsb-toast-icon { background: #e8f5e9; color: var(--amz-green); }
+.lsb-toast-body { flex: 1; }
+.lsb-toast-title { font-size: 13px; font-weight: 700; color: var(--amz-text); }
+.lsb-toast-msg { font-size: 12px; color: var(--amz-muted); margin-top: 2px; line-height: 1.5; }
+.lsb-toast-close {
+    background: none; border: none;
+    color: var(--amz-muted); cursor: pointer; padding: 2px; flex-shrink: 0;
+}
+.lsb-toast-close:hover { color: var(--amz-text); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 860px) {
+    .lsb-layout { grid-template-columns: 1fr; }
+    .lsb-sidebar {
+        order: -1;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 600px) {
+    .lsb-root { padding: 10px 12px 60px; }
+    .lsb-sidebar { grid-template-columns: 1fr; }
+    .lsb-grid2 { grid-template-columns: 1fr; }
+    .lsb-span2 { grid-column: auto; }
+    .lsb-section { padding: 14px 15px; }
+    .lsb-page-title-block { padding: 14px 15px; }
+    .lsb-page-title { font-size: 18px; }
+    .lsb-actions { flex-direction: column; }
+    .lsb-btn-cancel { order: 2; text-align: center; }
+    .lsb-btn-submit { order: 1; }
+    .lsb-earn-total-val { font-size: 17px; }
+}
+@media (max-width: 360px) {
+    .lsb-page-title { font-size: 16px; }
+    .lsb-logo { font-size: 17px; }
+}
+`;

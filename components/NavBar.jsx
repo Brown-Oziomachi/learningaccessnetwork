@@ -186,7 +186,7 @@ useEffect(() => {
 
     if (isSeller) {
       // User is already a seller, go to upload page
-      router.push("/uploader-agreement");
+      router.push("/upload-document");
     } else {
       // User is not a seller, go to become seller page
       router.push("/become-seller");
@@ -233,7 +233,7 @@ useEffect(() => {
       }
     } catch (err) {
       console.error(err);
-      router.push("/student/dashboard");
+      router.push("/");
     }
   };
 
@@ -334,7 +334,10 @@ useEffect(() => {
     <>
       <header className="bg-blue-950 border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <Link href="/latest/documentations" className="no-underline">
-          <div className="bg-white flex items-center justify-center gap-2 text-blue-950">
+          <div
+            className=" flex items-center justify-center gap-2 text-blue-950"
+            style={{ backgroundColor: "#f9f6f0" }}
+          >
             <h1 className=" font-bold text-lg mt-3">Recently Published...</h1>
             <ChevronRight size={16} className="mt-3" />
           </div>

@@ -198,7 +198,7 @@ export default function SignInClient() {
                         {error && !['suspended', 'pending', 'deactivated'].includes(error) && (
                             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
                                 <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                                <p className="text-red-800 text-sm">{error}</p>
+                                <p className="text-red-800 text-sm">Network error</p>
                             </div>
                         )}
 

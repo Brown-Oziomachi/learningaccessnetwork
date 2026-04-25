@@ -2,35 +2,174 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { 
-  collection, getDocs, doc, getDoc, setDoc, 
-  deleteDoc, query, where, updateDoc, increment // <-- Add these
+import {
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  query,
+  where,
+  updateDoc,
+  increment,
 } from "firebase/firestore";
-
 import { auth, db } from "@/lib/firebaseConfig";
 import {
   ArrowLeft,
   Search,
   X,
   ShoppingBag,
-  TrendingUp,
   BookOpen,
   GraduationCap,
-  BookMarked,
-  Building,
   UserPlus,
   UserCheck,
   Users,
+  MapPin,
+  Building2,
+  Grid3X3,
+  LayoutList,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 import Navbar from "@/components/NavBar";
 
+// ─── THUMBNAIL ────────────────────────────────────────────
+const getThumbnailUrl = (book) => {
+  if (!book)
+    return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+  if (book.driveFileId)
+    return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
+  if (book.embedUrl) {
+    const m = book.embedUrl.match(
+      /\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/,
+    );
+    if (m) {
+      const id = m[1] || m[2] || m[3];
+      if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`;
+    }
+  }
+  if (book.pdfUrl?.includes("drive.google.com")) {
+    const m = book.pdfUrl.match(/[-\w]{25,}/);
+    if (m) return `https://drive.google.com/thumbnail?id=${m[0]}&sz=w400`;
+  }
+  return (
+    book.image ||
+    "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"
+  );
+};
+
+const isLecturer = (title) => {
+  const t = (title || "").toLowerCase();
+  return (
+    t === "lecturer" ||
+    t === "dr." ||
+    t === "prof." ||
+    t === "professor" ||
+    t === "mrs" ||
+    t === "mr"
+  );
+};
+
+// ─── BOOK CARD ────────────────────────────────────────────
+function BookCard({ book, isPurchased, view }) {
+  const href = `/book/preview?id=${String(book.id).replace("firestore-", "")}`;
+
+  if (view === "list") {
+    return (
+      <Link
+        href={href}
+        className="flex items-center gap-4 bg-white rounded-xl border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all p-3 group"
+      >
+        <img
+          src={book.image}
+          alt={book.title}
+          className="w-14 h-20 object-cover rounded-lg flex-shrink-0"
+          onError={(e) => {
+            e.target.src =
+              "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+          }}
+        />
+        <div className="flex-1 min-w-0">
+          <h4 className="font-bold text-sm text-gray-900 line-clamp-1 group-hover:text-blue-700 transition-colors">
+            {book.title}
+          </h4>
+          <p className="text-xs text-gray-400 capitalize mt-0.5">
+            {book.category}
+          </p>
+          <div className="flex items-center gap-2 mt-1.5">
+            {isPurchased(book.id) && (
+              <span className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-semibold">
+                Owned
+              </span>
+            )}
+            {book.soldCount > 0 && (
+              <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                <ShoppingBag size={9} />
+                {book.soldCount} sold
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="text-right flex-shrink-0">
+          <p className="font-bold text-blue-950">
+            ₦{book.price?.toLocaleString()}
+          </p>
+        </div>
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-lg hover:border-blue-200 transition-all duration-200"
+    >
+      <div className="relative">
+        <img
+          src={book.image}
+          alt={book.title}
+          className="w-full aspect-[2/3] object-cover group-hover:scale-105 transition-transform duration-300"
+          onError={(e) => {
+            e.target.src =
+              "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+          }}
+        />
+        {isPurchased(book.id) && (
+          <span className="absolute top-2 left-2 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
+            Owned
+          </span>
+        )}
+        {book.soldCount > 0 && (
+          <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-lg flex items-center gap-1">
+            <ShoppingBag size={9} />
+            {book.soldCount}
+          </span>
+        )}
+      </div>
+      <div className="p-3">
+        <h4 className="font-bold text-xs text-gray-900 line-clamp-2 group-hover:text-blue-700 transition-colors leading-snug">
+          {book.title}
+        </h4>
+        <p className="text-[10px] text-gray-400 capitalize mt-0.5">
+          {book.category}
+        </p>
+        <p className="font-bold text-sm text-blue-950 mt-1.5">
+          ₦{book.price?.toLocaleString()}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+// ─── MAIN ─────────────────────────────────────────────────
 export default function SellerProfileClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const sellerId = searchParams.get("sellerId");
 
   const [seller, setSeller] = useState(null);
+  const [sellerPhoto, setSellerPhoto] = useState(null);
   const [sellerBooks, setSellerBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +178,9 @@ export default function SellerProfileClient() {
   const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
+  const [activeTab, setActiveTab] = useState("materials");
+  const [view, setView] = useState("grid");
+  const [followLoading, setFollowLoading] = useState(false);
   const user = auth.currentUser;
   const [stats, setStats] = useState({
     totalSold: 0,
@@ -46,50 +188,14 @@ export default function SellerProfileClient() {
     totalBooks: 0,
   });
 
-  // ─── THUMBNAIL HELPER ────────────────────────────────────
-  const getThumbnailUrl = (book) => {
-    if (!book)
-      return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-    if (book.driveFileId)
-      return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
-    if (book.embedUrl) {
-      const match = book.embedUrl.match(
-        /\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/,
-      );
-      if (match) {
-        const fileId = match[1] || match[2] || match[3];
-        if (fileId)
-          return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
-      }
-    }
-    if (book.pdfUrl && book.pdfUrl.includes("drive.google.com")) {
-      const match = book.pdfUrl.match(/[-\w]{25,}/);
-      if (match)
-        return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
-    }
-    return (
-      book.image ||
-      "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"
-    );
-  };
-
-  // ─── CHECK IF LECTURER ───────────────────────────────────
-  const isLecturer = (title) => {
-    const t = (title || "").toLowerCase();
-    return (
-      t === "lecturer" || t === "dr." || t === "prof." || t === "professor"
-    );
-  };
-
-  // 1. Check if following on load
+  // ─── FOLLOW CHECK ─────────────────────────────────────────
   useEffect(() => {
-    const checkFollowStatus = async () => {
+    const check = async () => {
       if (!user || !sellerId) return;
-      const followId = `${user.uid}_${sellerId}`;
-      const followDoc = await getDoc(doc(db, "follows", followId));
+      const followDoc = await getDoc(
+        doc(db, "follows", `${user.uid}_${sellerId}`),
+      );
       setIsFollowing(followDoc.exists());
-
-      // Get total follower count
       const q = query(
         collection(db, "follows"),
         where("lecturerId", "==", sellerId),
@@ -97,120 +203,98 @@ export default function SellerProfileClient() {
       const snap = await getDocs(q);
       setFollowerCount(snap.size);
     };
-    checkFollowStatus();
+    check();
   }, [user, sellerId]);
 
-  // 2. The Toggle Function
+  // ─── TOGGLE FOLLOW ────────────────────────────────────────
   const toggleFollow = async () => {
     if (!user) {
-      alert("Please sign in to follow lecturers");
+      alert("Please sign in to follow");
       return;
     }
-
+    if (followLoading) return;
+    setFollowLoading(true);
     const followId = `${user.uid}_${sellerId}`;
     const followRef = doc(db, "follows", followId);
-    const sellerRef = doc(db, "sellers", sellerId); // Reference to the seller's doc
-
+    const sellerRef = doc(db, "sellers", sellerId);
     try {
       if (isFollowing) {
-        // 1. Delete follow record
         await deleteDoc(followRef);
-
-        // 2. Decrement count in the sellers collection
-        // We use try-catch inside in case the 'sellers' doc doesn't exist yet
         try {
-          await updateDoc(sellerRef, {
-            followersCount: increment(-1),
-          });
-        } catch (e) {
-          console.log("Seller doc not found for decrement");
-        }
-
+          await updateDoc(sellerRef, { followersCount: increment(-1) });
+        } catch (e) {}
         setIsFollowing(false);
-        setFollowerCount((prev) => Math.max(0, prev - 1));
+        setFollowerCount((p) => Math.max(0, p - 1));
       } else {
-        // 1. Create follow record
         await setDoc(followRef, {
           followerId: user.uid,
           lecturerId: sellerId,
-          lecturerName: seller.sellerName,
+          lecturerName: seller?.sellerName || "",
           createdAt: new Date(),
         });
-
-        // 2. Increment count in the sellers collection
         try {
-          await updateDoc(sellerRef, {
-            followersCount: increment(1),
-          });
+          await updateDoc(sellerRef, { followersCount: increment(1) });
         } catch (e) {
-          // If the seller doc doesn't exist, create it with count 1
           await setDoc(sellerRef, { followersCount: 1 }, { merge: true });
         }
-
         setIsFollowing(true);
-        setFollowerCount((prev) => prev + 1);
+        setFollowerCount((p) => p + 1);
       }
-    } catch (error) {
-      console.error("Follow error:", error);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setFollowLoading(false);
     }
   };
 
-  // ─── FETCH SELLER + BOOKS + STATS ────────────────────────
+  // ─── FETCH DATA ───────────────────────────────────────────
   useEffect(() => {
     const fetchSellerData = async () => {
       if (!sellerId) {
         router.push("/");
         return;
       }
-
       try {
         setLoading(true);
+        let sellerName = "Unknown",
+          sellerTitle = "",
+          sellerDept = "",
+          sellerUni = "",
+          photo = null;
 
-        // 1. Get seller info from sellers collection
-        let sellerName = "Unknown";
-        let sellerTitle = "";
-        let sellerDepartment = "";
-        let sellerUniversity = "";
-
-        try {
-          const sellerDoc = await getDoc(doc(db, "sellers", sellerId));
-          if (sellerDoc.exists()) {
-            const d = sellerDoc.data();
-            sellerName = d.sellerName || d.displayName || sellerName;
-            sellerTitle = d.title || "";
-            sellerDepartment = d.department || "";
-            sellerUniversity = d.university || "";
-          } else {
-            // Fallback to users collection
-            const userDoc = await getDoc(doc(db, "users", sellerId));
-            if (userDoc.exists()) {
-              const userData = userDoc.data();
-              sellerName =
-                userData.displayName ||
-                `${userData.firstName || ""} ${userData.surname || ""}`.trim() ||
-                sellerName;
-              sellerTitle = userData.title || "";
-              sellerDepartment = userData.department || "";
-              sellerUniversity = userData.university || "";
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching seller info:", error);
+        const sellerDoc = await getDoc(doc(db, "sellers", sellerId));
+        if (sellerDoc.exists()) {
+          const d = sellerDoc.data();
+          sellerName = d.sellerName || d.displayName || sellerName;
+          sellerTitle = d.title || "";
+          sellerDept = d.department || "";
+          sellerUni = d.university || "";
         }
+        const userDoc = await getDoc(doc(db, "users", sellerId));
+        if (userDoc.exists()) {
+          const ud = userDoc.data();
+          if (!sellerName || sellerName === "Unknown")
+            sellerName =
+              ud.displayName ||
+              `${ud.firstName || ""} ${ud.surname || ""}`.trim() ||
+              sellerName;
+          photo = ud.photoBase64 || ud.photoURL || ud.profilePicture || null;
+          if (!sellerDept) sellerDept = ud.department || "";
+          if (!sellerUni) sellerUni = ud.university || "";
+        }
+        setSellerPhoto(photo);
 
-        // 2. Get all books uploaded by this seller from advertMyBook
-        const advertSnapshot = await getDocs(collection(db, "advertMyBook"));
+        const advertSnap = await getDocs(collection(db, "advertMyBook"));
         const uploadedBooks = [];
-
-        advertSnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
+        advertSnap.forEach((ds) => {
+          const data = ds.data();
           if (
             (data.userId === sellerId || data.sellerId === sellerId) &&
             data.status === "approved"
           ) {
-            uploadedBooks.push({
-              id: `firestore-${docSnap.id}`,
-              firestoreId: docSnap.id,
+            const book = {
+              id: `firestore-${ds.id}`,
+              firestoreId: ds.id,
               title: data.bookTitle || data.title,
               author: data.author || "Unknown",
               category: (data.category || "General").toLowerCase(),
@@ -223,66 +307,49 @@ export default function SellerProfileClient() {
               embedUrl: data.embedUrl,
               status: data.status || "pending",
               isFromFirestore: true,
-            });
+            };
+            book.image = getThumbnailUrl(book);
+            uploadedBooks.push(book);
           }
         });
 
-        // Add thumbnail
-        uploadedBooks.forEach((book) => {
-          book.image = getThumbnailUrl(book);
-        });
-
-        // 3. Scan all users for purchase stats of this seller
-        let totalSold = 0;
-        let totalEarnings = 0;
+        let totalSold = 0,
+          totalEarnings = 0;
         const bookSalesMap = {};
-
-        const usersSnapshot = await getDocs(collection(db, "users"));
-        usersSnapshot.docs.forEach((userDoc) => {
-          const userData = userDoc.data();
-          const purchased = userData.purchasedBooks || {};
-
-          Object.values(purchased).forEach((purchase) => {
-            if (purchase.sellerId === sellerId) {
-              totalSold += 1;
-              totalEarnings += purchase.amount || 0;
-              const title = purchase.title || "Untitled";
+        const usersSnap = await getDocs(collection(db, "users"));
+        usersSnap.docs.forEach((ud) => {
+          const purchased = ud.data().purchasedBooks || {};
+          Object.values(purchased).forEach((p) => {
+            if (p.sellerId === sellerId) {
+              totalSold++;
+              totalEarnings += p.amount || 0;
+              const title = p.title || "Untitled";
               bookSalesMap[title] = (bookSalesMap[title] || 0) + 1;
             }
           });
         });
-
-        // Attach sales count to each uploaded book
-        uploadedBooks.forEach((book) => {
-          book.soldCount = bookSalesMap[book.title] || 0;
+        uploadedBooks.forEach((b) => {
+          b.soldCount = bookSalesMap[b.title] || 0;
         });
 
-        // 4. Get purchased IDs for current user
         const currentUser = auth.currentUser;
         if (currentUser) {
           const myDoc = await getDoc(doc(db, "users", currentUser.uid));
           if (myDoc.exists()) {
             const myPurchased = myDoc.data().purchasedBooks || {};
-            const ids = new Set(
-              Object.values(myPurchased)
-                .map((p) => p.bookId || p.id || p.firestoreId)
-                .filter(Boolean),
-            );
+            const ids = new Set();
             Object.values(myPurchased).forEach((p) => {
               const id = p.bookId || p.id || p.firestoreId;
-              if (id) ids.add(`firestore-${id}`);
+              if (id) {
+                ids.add(id);
+                ids.add(`firestore-${id}`);
+              }
             });
             setPurchasedBookIds(ids);
           }
         }
 
-        setSeller({
-          sellerId,
-          sellerName,
-          sellerTitle,
-          sellerDepartment,
-          sellerUniversity,
-        });
+        setSeller({ sellerId, sellerName, sellerTitle, sellerDept, sellerUni });
         setSellerBooks(uploadedBooks);
         setFilteredBooks(uploadedBooks);
         setStats({
@@ -290,428 +357,492 @@ export default function SellerProfileClient() {
           totalEarnings,
           totalBooks: uploadedBooks.length,
         });
-      } catch (error) {
-        console.error("Error fetching seller data:", error);
+      } catch (err) {
+        console.error(err);
       } finally {
         setLoading(false);
       }
     };
-
     fetchSellerData();
   }, [sellerId, router]);
 
-  // ─── FILTER / SEARCH ──────────────────────────────────────
+  // ─── FILTER ───────────────────────────────────────────────
   useEffect(() => {
     const q = searchQuery.toLowerCase();
-    const filtered = sellerBooks.filter((book) => {
-      const matchesSearch =
-        !q ||
-        book.title?.toLowerCase().includes(q) ||
-        book.category?.toLowerCase().includes(q);
-      const matchesCategory =
-        selectedCategory === "all" || book.category === selectedCategory;
-      return matchesSearch && matchesCategory;
-    });
-    setFilteredBooks(filtered);
+    setFilteredBooks(
+      sellerBooks.filter((b) => {
+        const matchSearch =
+          !q ||
+          b.title?.toLowerCase().includes(q) ||
+          b.category?.toLowerCase().includes(q);
+        const matchCat =
+          selectedCategory === "all" || b.category === selectedCategory;
+        return matchSearch && matchCat;
+      }),
+    );
   }, [searchQuery, selectedCategory, sellerBooks]);
 
-  // ─── CATEGORIES ───────────────────────────────────────────
   const categories = [
     { value: "all", label: "All" },
     ...Array.from(new Set(sellerBooks.map((b) => b.category)))
       .filter(Boolean)
-      .map((cat) => ({
-        value: cat,
-        label: cat.charAt(0).toUpperCase() + cat.slice(1),
+      .map((c) => ({
+        value: c,
+        label: c.charAt(0).toUpperCase() + c.slice(1),
       })),
   ];
 
-  const isPurchased = (bookId) => {
-    return purchasedBookIds.has(bookId) || purchasedBookIds.has(String(bookId));
-  };
+  const isPurchased = (id) =>
+    purchasedBookIds.has(id) || purchasedBookIds.has(String(id));
+  const lecturerMode = isLecturer(seller?.sellerTitle);
+  const displayTitle = seller
+    ? lecturerMode
+      ? `${seller.sellerTitle} ${seller.sellerName}`
+      : seller.sellerName
+    : "Profile";
 
   // ─── LOADING ──────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-100">
         <Navbar />
-        <div className="flex items-center justify-center py-32">
-          <div className="text-center">
-            <div className="animate-spin h-12 w-12 border-b-2 border-blue-950 rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading profile...</p>
+        <div className="max-w-2xl mx-auto pt-8 px-4 space-y-4 animate-pulse">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+            <div className="h-48 bg-gray-200" />
+            <div className="px-4 pb-6 pt-16 relative">
+              <div className="absolute -top-12 left-4 w-24 h-24 rounded-full bg-gray-300 border-4 border-white" />
+              <div className="h-5 bg-gray-200 rounded w-40 mb-2" />
+              <div className="h-3 bg-gray-100 rounded w-56" />
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // ─── NO SELLER ────────────────────────────────────────────
   if (!seller) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-100">
         <Navbar />
-        <div className="flex flex-col items-center justify-center py-32 px-4 text-center">
-          <BookOpen size={64} className="text-gray-300 mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <div className="flex flex-col items-center justify-center py-32 text-center px-4">
+          <BookOpen size={56} className="text-gray-300 mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">
             Profile Not Found
           </h2>
-          <p className="text-gray-500 mb-6">
-            This profile doesn't exist or has been removed.
-          </p>
           <button
             onClick={() => router.push("/")}
-            className="bg-blue-950 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-900"
+            className="mt-4 bg-blue-950 text-white px-6 py-2.5 rounded-xl text-sm font-bold"
           >
-            Back to Home
+            Go Home
           </button>
         </div>
       </div>
     );
   }
 
-  const lecturerMode = isLecturer(seller.sellerTitle);
-
   // ─── RENDER ───────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen " style={{ backgroundColor: "#f9f6f0" }}>
       <Navbar />
 
-      {/* ── Back Button ── */}
-      <div className="max-w-7xl mx-auto px-4 pt-5">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-2 text-gray-600 hover:text-blue-950 transition-colors text-sm font-medium"
-        >
-          <ArrowLeft size={18} />
-          Back
-        </button>
+      {/* ── PAGE TITLE BAR ── */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <div className="max-w-[1100px] mx-auto px-4 h-12 flex items-center gap-3">
+          <button
+            onClick={() => router.back()}
+            className="text-gray-500 hover:text-blue-950 transition-colors"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <p className="text-[13px] font-bold text-gray-900 leading-tight">
+              {displayTitle}
+            </p>
+            <p className="text-[11px] text-gray-400 leading-tight">
+              {stats.totalBooks} materials
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* ── Profile Header Banner ── */}
-      <div className="max-w-7xl mx-auto px-4 mt-4">
-        <div className="relative rounded-2xl p-6 md:p-8 text-white overflow-hidden min-h-[200px] flex items-center">
-          {/* Background Image with Overlay */}
-          <div className="absolute inset-0 z-0">
-            <img
-              src="/lanlog.png" // REPLACE with your image URL
-              alt="Banner Background"
-              className="w-full h-full object-cover"
+      <div className="max-w-[1100px] mx-auto pb-16">
+        <div className="bg-white shadow-sm rounded-b-2xl overflow-visible mb-4">
+          {/* Cover Photo */}
+          <div className="relative h-[200px] sm:h-[280px] md:h-[340px] bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 overflow-hidden">
+            {/* Decorative pattern */}
+            <div
+              className="absolute inset-0 "
+              style={{
+                backgroundImage:
+                  "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
+                backgroundSize: "60px 60px",
+              }}
             />
-            {/* Dark overlay to ensure text is always readable */}
-            <div className="absolute inset-0 bg-blue-950/80 backdrop-blur-[2px]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+            {/* LAN watermark */}
+            {/* <img src="lanlog.png" className="h-full  w-full object-cover" /> */}
+            <div className="absolute bottom-4 right-5 text-white/10 font-black text-8xl max-md:text-6xl select-none pointer-events-none">
+              LAN Library
+            </div>
+            {lecturerMode && (
+              <div className="absolute top-4 left-4 flex items-center gap-2 bg-white/15 backdrop-blur border border-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-full">
+                <GraduationCap size={13} />
+                {seller.sellerTitle}
+              </div>
+            )}
           </div>
 
-          <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-6 w-full">
-            {/* Avatar */}
-            <div
-              className={`w-20 h-20 md:w-28 md:h-28 rounded-full border-4 flex items-center justify-center flex-shrink-0 shadow-xl ${
-                lecturerMode
-                  ? "bg-indigo-800/50 border-indigo-400/40"
-                  : "bg-white/10 border-white/30"
-              }`}
-            >
-              {lecturerMode ? (
-                <GraduationCap size={48} className="text-indigo-200" />
-              ) : (
-                <span className="text-3xl md:text-5xl font-black text-white">
-                  {seller.sellerName?.charAt(0)?.toUpperCase() || "?"}
-                </span>
-              )}
+          {/* Avatar + Name row */}
+          <div className="px-4 sm:px-6 pb-0 relative">
+            {/* Avatar — overlaps cover */}
+            <div className="absolute -top-[52px] left-4 sm:left-6">
+              <div className="relative w-[100px] h-[100px] sm:w-[140px] sm:h-[140px]">
+                {sellerPhoto ? (
+                  <img
+                    src={sellerPhoto}
+                    alt={seller.sellerName}
+                    className="w-full h-full rounded-full object-cover border-4 border-white shadow-xl"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-full border-4 border-white shadow-xl bg-gradient-to-br from-blue-900 to-indigo-700 flex items-center justify-center">
+                    {lecturerMode ? (
+                      <GraduationCap size={48} className="text-white/80" />
+                    ) : (
+                      <span className="text-white text-4xl font-black">
+                        {seller.sellerName?.charAt(0)?.toUpperCase() || "?"}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Info Section */}
-            <div className="flex-1 w-full">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="text-center sm:text-left">
-                  {lecturerMode && (
-                    <span className="inline-flex items-center gap-1.5 bg-indigo-500/40 border border-indigo-400/40 text-white text-xs font-bold px-3 py-1 rounded-full mb-2">
-                      <GraduationCap size={12} />
-                      {seller.sellerTitle || "Lecturer"}
-                    </span>
-                  )}
-                  <h1 className="text-2xl md:text-4xl font-black tracking-tight">
-                    {seller.sellerName}
-                  </h1>
-                  <p className="text-blue-200 text-sm mt-1 font-medium">
-                    {lecturerMode
-                      ? "Verified University Lecturer"
-                      : "Verified Seller on LAN Library"}
-                  </p>
-                </div>
-
-                {/* Follow Button */}
+            {/* Name + actions — right of avatar */}
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between pt-2 sm:pt-0 ml-[116px] sm:ml-[160px] min-h-[60px] sm:min-h-[80px] gap-3 sm:gap-4">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black text-gray-900 leading-tight">
+                  {displayTitle}
+                </h1>
+                <p className="text-sm text-gray-500 font-medium">
+                  {stats.totalBooks} materials · {followerCount} followers
+                </p>
+              </div>
+              <div className="flex items-center gap-2 pb-2">
                 <button
                   onClick={toggleFollow}
-                  className={`flex items-center justify-center gap-2 px-8 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95 ${
+                  disabled={followLoading}
+                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all ${
                     isFollowing
-                      ? "bg-white/20 border border-white/40 text-white backdrop-blur-md"
-                      : "bg-white text-blue-950 hover:bg-blue-50"
+                      ? "bg-gray-300 text-gray-700 hover:bg-gray-200"
+                      : "bg-blue-950 text-white hover:bg-blue-700"
                   }`}
                 >
                   {isFollowing ? (
-                    <UserCheck size={20} />
+                    <UserCheck size={16} />
                   ) : (
-                    <UserPlus size={20} />
+                    <UserPlus size={16} />
                   )}
                   {isFollowing ? "Following" : "Follow"}
                 </button>
               </div>
+            </div>
+          </div>
 
-              {/* Stats Row */}
-              <div className="flex flex-wrap justify-center sm:justify-start gap-3 mt-6">
-                {/* Followers Stat */}
-                <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl px-5 py-3 flex items-center gap-3 min-w-[100px]">
-                  <Users size={20} className="text-blue-300" />
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-blue-200 font-bold">
-                      Followers
-                    </p>
-                    <p className="font-bold text-lg leading-none">
-                      {followerCount || 0}
-                    </p>
-                  </div>
-                </div>
+          {/* Divider */}
+          <div className="mx-4 sm:mx-6 mt-4 border-t border-gray-200" />
 
-                <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl px-5 py-3 flex items-center gap-3 min-w-[100px]">
-                  <BookOpen size={20} className="text-blue-300" />
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-blue-200 font-bold">
-                      Materials
-                    </p>
-                    <p className="font-bold text-lg leading-none">
-                      {stats.totalBooks}
-                    </p>
-                  </div>
-                </div>
+          {/* Tab navigation */}
+          <div
+            className="flex overflow-x-auto px-4 sm:px-6 gap-0"
+            style={{ scrollbarWidth: "none" }}
+          >
+            {[
+              { id: "materials", label: lecturerMode ? "Materials" : "Books" },
+              { id: "about", label: "About" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative flex-none px-4 py-3 text-[13px] font-bold transition-colors ${
+                  activeTab === tab.id
+                    ? "text-blue-600 border-b-[3px] border-blue-600"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-                <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl px-5 py-3 flex items-center gap-3 min-w-[100px]">
-                  <ShoppingBag size={20} className="text-blue-300" />
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-blue-200 font-bold">
-                      Sold
-                    </p>
-                    <p className="font-bold text-lg leading-none">
-                      {stats.totalSold}
-                    </p>
+        {/* ══ CONTENT AREA ════════════════════════════════════════════════════ */}
+        <div className="px-4 sm:px-0 grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
+          {/* LEFT SIDEBAR */}
+          <div className="space-y-4">
+            {/* About card */}
+            <div className="bg-white rounded-2xl shadow-sm p-5">
+              <h3 className="text-base font-bold text-gray-900 mb-4">About</h3>
+              <div className="space-y-3 text-sm text-gray-600">
+                {seller.sellerTitle && (
+                  <div className="flex items-center gap-3">
+                    <GraduationCap
+                      size={18}
+                      className="text-gray-400 flex-shrink-0"
+                    />
+                    <span>
+                      <strong className="text-gray-800">
+                        {seller.sellerTitle}
+                      </strong>
+                    </span>
                   </div>
-                </div>
+                )}
+                {seller.sellerDept && (
+                  <div className="flex items-center gap-3">
+                    <BookOpen
+                      size={18}
+                      className="text-gray-400 flex-shrink-0"
+                    />
+                    <span>{seller.sellerDept}</span>
+                  </div>
+                )}
+                {seller.sellerUni && (
+                  <div className="flex items-center gap-3">
+                    <Building2
+                      size={18}
+                      className="text-gray-400 flex-shrink-0"
+                    />
+                    <span>{seller.sellerUni}</span>
+                  </div>
+                )}
+                {!seller.sellerDept && !seller.sellerUni && (
+                  <p className="text-gray-400 text-xs">
+                    No additional info provided.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Stats card */}
+            <div className="bg-white rounded-2xl shadow-sm p-5">
+              <h3 className="text-base font-bold text-gray-900 mb-4">Stats</h3>
+              <div className="space-y-3">
+                {[
+                  {
+                    label: "Total Materials",
+                    value: stats.totalBooks,
+                    icon: BookOpen,
+                  },
+                  {
+                    label: "Total Sold",
+                    value: stats.totalSold,
+                    icon: ShoppingBag,
+                  },
+                  { label: "Followers", value: followerCount, icon: Users },
+                ].map(({ label, value, icon: Icon }) => (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Icon size={16} className="text-gray-400" />
+                      {label}
+                    </div>
+                    <span className="font-bold text-gray-900 text-sm">
+                      {value}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* ── Search + Category Filter ── */}
-      <div className="max-w-7xl mx-auto px-4 mt-6 space-y-4">
-        <div className="relative">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            size={20}
-          />
-          <input
-            type="text"
-            placeholder={
-              lecturerMode
-                ? "Search materials..."
-                : "Search books by this seller..."
-            }
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full text-blue-950 pl-10 pr-10 py-3 border border-gray-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X size={20} />
-            </button>
+          {/* MAIN FEED */}
+          {activeTab === "materials" && (
+            <div className="space-y-4">
+              {/* Search + filter bar */}
+              <div className="bg-white rounded-2xl shadow-sm p-4">
+                <div className="flex gap-3 mb-3">
+                  <div className="relative flex-1">
+                    <Search
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      size={15}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Search materials..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-9 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors text-gray-900"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+                    <button
+                      onClick={() => setView("grid")}
+                      className={`p-2 rounded-lg transition-colors ${view === "grid" ? "bg-white shadow-sm text-blue-600" : "text-gray-500"}`}
+                    >
+                      <Grid3X3 size={16} />
+                    </button>
+                    <button
+                      onClick={() => setView("list")}
+                      className={`p-2 rounded-lg transition-colors ${view === "list" ? "bg-white shadow-sm text-blue-600" : "text-gray-500"}`}
+                    >
+                      <LayoutList size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Category pills */}
+                <div
+                  className="flex gap-2 overflow-x-auto pb-1"
+                  style={{ scrollbarWidth: "none" }}
+                >
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.value}
+                      onClick={() => setSelectedCategory(cat.value)}
+                      className={`flex-none px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                        selectedCategory === cat.value
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Results */}
+              <div className="bg-white rounded-2xl shadow-sm p-4">
+                <p className="text-xs text-gray-400 mb-4 font-medium">
+                  {filteredBooks.length}{" "}
+                  {filteredBooks.length === 1 ? "result" : "results"}
+                </p>
+
+                {filteredBooks.length === 0 ? (
+                  <div className="text-center py-16">
+                    <BookOpen
+                      size={48}
+                      className="mx-auto text-gray-200 mb-3"
+                    />
+                    <p className="text-gray-400 text-sm font-medium">
+                      {searchQuery || selectedCategory !== "all"
+                        ? "No results. Clear your filters."
+                        : "No materials uploaded yet."}
+                    </p>
+                    {(searchQuery || selectedCategory !== "all") && (
+                      <button
+                        onClick={() => {
+                          setSearchQuery("");
+                          setSelectedCategory("all");
+                        }}
+                        className="mt-3 text-blue-600 text-sm font-bold"
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+                ) : view === "list" ? (
+                  <div className="space-y-2">
+                    {filteredBooks.map((book) => (
+                      <BookCard
+                        key={book.id}
+                        book={book}
+                        isPurchased={isPurchased}
+                        view="list"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {filteredBooks.map((book) => (
+                      <BookCard
+                        key={book.id}
+                        book={book}
+                        isPurchased={isPurchased}
+                        view="grid"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ABOUT TAB */}
+          {activeTab === "about" && (
+            <div className="bg-white rounded-2xl shadow-sm p-6 space-y-5">
+              <h3 className="text-base font-bold text-gray-900">
+                About {displayTitle}
+              </h3>
+              <div className="space-y-4 text-sm text-gray-700">
+                {seller.sellerTitle && (
+                  <div className="flex items-start gap-3 border-b border-gray-50 pb-4">
+                    <GraduationCap
+                      size={20}
+                      className="text-blue-500 flex-shrink-0 mt-0.5"
+                    />
+                    <div>
+                      <p className="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-1">
+                        Title
+                      </p>
+                      <p className="font-bold text-gray-900">
+                        {seller.sellerTitle}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {seller.sellerDept && (
+                  <div className="flex items-start gap-3 border-b border-gray-50 pb-4">
+                    <BookOpen
+                      size={20}
+                      className="text-blue-500 flex-shrink-0 mt-0.5"
+                    />
+                    <div>
+                      <p className="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-1">
+                        Department
+                      </p>
+                      <p className="font-bold text-gray-900">
+                        {seller.sellerDept}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {seller.sellerUni && (
+                  <div className="flex items-start gap-3">
+                    <Building2
+                      size={20}
+                      className="text-blue-500 flex-shrink-0 mt-0.5"
+                    />
+                    <div>
+                      <p className="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-1">
+                        University
+                      </p>
+                      <p className="font-bold text-gray-900">
+                        {seller.sellerUni}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {!seller.sellerDept &&
+                  !seller.sellerUni &&
+                  !seller.sellerTitle && (
+                    <p className="text-gray-400">
+                      No profile information added yet.
+                    </p>
+                  )}
+              </div>
+            </div>
           )}
         </div>
-
-        {/* Category pills */}
-        <div
-          className="flex gap-2 overflow-x-auto pb-2"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-        >
-          {categories.map((cat) => (
-            <button
-              key={cat.value}
-              onClick={() => setSelectedCategory(cat.value)}
-              className={`flex-none px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
-                selectedCategory === cat.value
-                  ? "bg-blue-950 text-white"
-                  : "bg-white border border-gray-200 text-gray-700 hover:border-blue-950"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Books / Materials Grid ── */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <p className="text-sm text-gray-500 mb-4">
-          Showing{" "}
-          <span className="font-semibold text-blue-950">
-            {filteredBooks.length}
-          </span>{" "}
-          {lecturerMode ? "material" : "book"}
-          {filteredBooks.length !== 1 ? "s" : ""}
-        </p>
-
-        {filteredBooks.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-16 text-center">
-            <BookOpen size={56} className="mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-bold text-gray-900 mb-1">
-              Nothing found
-            </h3>
-            <p className="text-gray-500 text-sm">
-              {searchQuery || selectedCategory !== "all"
-                ? "Try clearing your search or filters."
-                : lecturerMode
-                  ? "This lecturer hasn't uploaded any materials yet."
-                  : "This seller hasn't uploaded any books yet."}
-            </p>
-            {(searchQuery || selectedCategory !== "all") && (
-              <button
-                onClick={() => {
-                  setSearchQuery("");
-                  setSelectedCategory("all");
-                }}
-                className="mt-4 bg-blue-950 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-blue-900"
-              >
-                Clear Filters
-              </button>
-            )}
-          </div>
-        ) : (
-          <>
-            {/* Mobile carousel rows */}
-            <div className="lg:hidden space-y-6">
-              {(() => {
-                const chunks = [];
-                for (let i = 0; i < filteredBooks.length; i += 5) {
-                  chunks.push(filteredBooks.slice(i, i + 5));
-                }
-                return chunks.map((row, rowIndex) => (
-                  <div
-                    key={rowIndex}
-                    className="overflow-x-auto pb-2"
-                    style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-                  >
-                    <div
-                      className="flex gap-3"
-                      style={{ minWidth: "max-content" }}
-                    >
-                      {row.map((book) => (
-                        <Link
-                          key={book.id}
-                          href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
-                          className="flex-none w-[160px] sm:w-[180px] group"
-                        >
-                          <div className="relative mb-2">
-                            <img
-                              src={book.image}
-                              alt={book.title}
-                              className="w-full h-[220px] sm:h-[250px] group-hover:shadow-lg transition-shadow"
-                              onError={(e) => {
-                                e.target.src =
-                                  "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-                              }}
-                            />
-                            {isPurchased(book.id) && (
-                              <span className="absolute top-2 left-2 bg-green-600 text-white px-2 py-0.5 rounded text-xs font-bold">
-                                Owned
-                              </span>
-                            )}
-                            {book.soldCount > 0 && (
-                              <span className="absolute bottom-2 right-2 bg-black/60 backdrop-blur text-white px-2 py-0.5 rounded-lg text-xs font-semibold flex items-center gap-1">
-                                <ShoppingBag size={10} /> {book.soldCount} sold
-                              </span>
-                            )}
-                          </div>
-                          <h4 className="font-bold text-sm text-gray-900 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                            {book.title}
-                          </h4>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {book.category}
-                          </p>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                ));
-              })()}
-            </div>
-
-            {/* Desktop grid */}
-            <div className="hidden lg:grid grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredBooks.map((book) => (
-                <Link
-                  key={book.id}
-                  href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
-                  className="group bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md hover:border-blue-200 transition-all"
-                >
-                  <div className="relative">
-                    <img
-                      src={book.image}
-                      alt={book.title}
-                      className="w-full h-[280px] object-cover"
-                      onError={(e) => {
-                        e.target.src =
-                          "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-                      }}
-                    />
-                    {isPurchased(book.id) && (
-                      <span className="absolute top-3 left-3 bg-green-600 text-white px-2.5 py-0.5 rounded-full text-xs font-bold shadow">
-                        Owned
-                      </span>
-                    )}
-                    {book.soldCount > 0 && (
-                      <span className="absolute bottom-3 right-3 bg-black/60 backdrop-blur text-white px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow">
-                        <ShoppingBag size={12} /> {book.soldCount} sold
-                      </span>
-                    )}
-                    {book.status && book.status !== "approved" && (
-                      <span
-                        className={`absolute top-3 right-3 px-2.5 py-0.5 rounded-full text-xs font-bold shadow ${
-                          book.status === "pending"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {book.status.charAt(0).toUpperCase() +
-                          book.status.slice(1)}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="p-4">
-                    <h4 className="font-bold text-base text-gray-900 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                      {book.title}
-                    </h4>
-                    <p className="text-xs text-gray-500 mt-1 capitalize">
-                      {book.category}
-                    </p>
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                        {book.pages} pages
-                      </span>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                        {book.format}
-                      </span>
-                    </div>
-                    <p className="text-lg font-bold text-blue-950 mt-3">
-                      ₦{book.price?.toLocaleString()}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
       </div>
     </div>
   );

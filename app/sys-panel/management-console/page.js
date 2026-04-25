@@ -533,9 +533,28 @@ export default function ComprehensiveAdminPanel() {
       await updateDoc(doc(db, 'advertMyBook', id), { status, reviewedAt: serverTimestamp(), reviewedBy: user.email });
       if (status === 'approved' && (ad.pdfUrl || ad.pdfLink)) { fetch('/api/book-embed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bookId: id, pdfUrl: ad.pdfUrl || ad.pdfLink, sellerId: ad.userId || ad.sellerId, title: ad.bookTitle || ad.title }) }).catch(() => { }); }
       if (status === 'approved') {
-        const lecturerId = ad.sellerId; const lecturerName = ad.sellerName || "A lecturer"; const bookTitle = ad.bookTitle || "new material";
-        const followersSnap = await getDocs(query(collection(db, "follows"), where("lecturerId", "==", lecturerId)));
-        if (!followersSnap.empty) { await Promise.all(followersSnap.docs.map(fd => addDoc(collection(db, "notifications"), { userId: fd.data().followerId, type: 'new_upload', title: '📚 New Material Uploaded!', message: `${lecturerName} just uploaded: "${bookTitle}"`, link: `/lecturer-profile?sellerId=${lecturerId}`, createdAt: serverTimestamp(), read: false }))); }
+        const lecturerId = ad.sellerId;
+        const lecturerName = ad.sellerName || "A lecturer";
+        const bookTitle = ad.bookTitle || "new material";
+        const followersSnap = await getDocs(
+          query(collection(db, "follows"), where("lecturerId", "==", lecturerId))
+        );
+        if (!followersSnap.empty) {
+          await Promise.all(
+            followersSnap.docs.map(fd =>
+              addDoc(collection(db, "notifications"), {
+                userId: fd.data().followerId,
+                type: 'new_upload',
+                title: '📚 New Material Uploaded!',
+                message: `${lecturerName} just uploaded: "${bookTitle}"`,
+                link: `/book/preview?id=${id}`,   // ← was /lecturer-profile?sellerId=...
+                bookId: id,                         // ← add this
+                createdAt: serverTimestamp(),
+                read: false,
+              })
+            )
+          );
+        }
       }
       setAdvertisements(advertisements.map(a => a.id === id ? { ...a, status } : a));
       alert(`✅ Book ${status}`); setShowModal(false);

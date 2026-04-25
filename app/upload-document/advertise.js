@@ -1,1102 +1,1076 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { app, auth, db } from "@/lib/firebaseConfig";
-import { storage } from "@/lib/firebaseStorage"; import { addDoc, collection, serverTimestamp, doc, getDoc } from "firebase/firestore";
+import { storage } from "@/lib/firebaseStorage";
+import { addDoc, collection, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { Upload, X, AlertCircle, Building2, BookOpen, GraduationCap } from "lucide-react";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import {
+    Upload, X, AlertCircle, Building2, BookOpen, GraduationCap,
+    ChevronRight, ChevronDown, Check, FileText, FlaskConical,
+    PenLine, ClipboardList, Layers, ScrollText, Briefcase, Star,
+    Image as ImageIcon, DollarSign, Info, Search,
+    ArrowLeft,
+    ArrowRight
+} from "lucide-react";
 
+// ─── ALL DOCUMENT TYPES ───────────────────────────────────────────────────────
+const documentTypes = [
+    // Core Academic
+    { name: 'Textbook', group: 'Core Academic' },
+    { name: 'Lecture Note', group: 'Core Academic' },
+    { name: 'Handwritten Notes', group: 'Core Academic' },
+    { name: 'Summary', group: 'Core Academic' },
+    { name: 'Syllabus', group: 'Core Academic' },
+    { name: 'Course Outline', group: 'Core Academic' },
+    { name: 'Study Guide', group: 'Core Academic' },
+    { name: 'Reading List', group: 'Core Academic' },
+    { name: 'Mind Map', group: 'Core Academic' },
+    { name: 'Flashcards', group: 'Core Academic' },
+    { name: 'Cheat Sheet', group: 'Core Academic' },
+    { name: 'Annotated Bibliography', group: 'Core Academic' },
+    // Exam & Assessment
+    { name: 'Past Question', group: 'Exam & Assessment' },
+    { name: 'Exam Revision', group: 'Exam & Assessment' },
+    { name: 'Assignment', group: 'Exam & Assessment' },
+    { name: 'Mock Exam', group: 'Exam & Assessment' },
+    { name: 'Quiz Bank', group: 'Exam & Assessment' },
+    { name: 'WAEC Past Questions', group: 'Exam & Assessment' },
+    { name: 'JAMB CBT Practice', group: 'Exam & Assessment' },
+    { name: 'NECO Past Questions', group: 'Exam & Assessment' },
+    { name: 'GCE Past Questions', group: 'Exam & Assessment' },
+    { name: 'Post-UTME Past Questions', group: 'Exam & Assessment' },
+    // Research & Writing
+    { name: 'Thesis', group: 'Research & Writing' },
+    { name: 'Research Proposal', group: 'Research & Writing' },
+    { name: 'Seminar Paper', group: 'Research & Writing' },
+    { name: 'Case Study', group: 'Research & Writing' },
+    { name: 'Journal Article', group: 'Research & Writing' },
+    { name: 'Literature Review', group: 'Research & Writing' },
+    { name: 'Conference Paper', group: 'Research & Writing' },
+    { name: 'Essay', group: 'Research & Writing' },
+    { name: 'Dissertation Chapter', group: 'Research & Writing' },
+    { name: 'Group Project Report', group: 'Research & Writing' },
+    // Practical & Technical
+    { name: 'Lab Manual', group: 'Practical & Technical' },
+    { name: 'Project', group: 'Practical & Technical' },
+    { name: 'Technical Drawing', group: 'Practical & Technical' },
+    { name: 'Lab Report', group: 'Practical & Technical' },
+    { name: 'Field Report', group: 'Practical & Technical' },
+    { name: 'Software Documentation', group: 'Practical & Technical' },
+    { name: 'Circuit Diagram', group: 'Practical & Technical' },
+    { name: 'Code Sample', group: 'Practical & Technical' },
+    { name: 'Algorithm Sheet', group: 'Practical & Technical' },
+    // Administrative
+    { name: 'Internship Report', group: 'Administrative' },
+    { name: 'Clearance Guide', group: 'Administrative' },
+    { name: 'Scholarship Guide', group: 'Administrative' },
+    { name: 'CV Template', group: 'Administrative' },
+    { name: 'Cover Letter Template', group: 'Administrative' },
+    { name: 'Student Handbook', group: 'Administrative' },
+    { name: 'Hostel Guide', group: 'Administrative' },
+    { name: 'Admission Letter', group: 'Administrative' },
+    { name: 'Academic Transcript', group: 'Administrative' },
+    { name: 'Fellowship Application', group: 'Administrative' },
+    // Career & Professional
+    { name: 'Portfolio', group: 'Career & Professional' },
+    { name: 'Career Guide', group: 'Career & Professional' },
+    { name: 'Interview Prep', group: 'Career & Professional' },
+    { name: 'Networking Guide', group: 'Career & Professional' },
+    // Digital & Multimedia
+    { name: 'Presentation Slides', group: 'Digital & Multimedia' },
+    { name: 'Infographic', group: 'Digital & Multimedia' },
+    { name: 'Video Lecture Notes', group: 'Digital & Multimedia' },
+    { name: 'Podcast Transcript', group: 'Digital & Multimedia' },
+    { name: 'E-Book', group: 'Digital & Multimedia' },
+    // Professional Schools
+    { name: 'Medical Notes', group: 'Professional Schools' },
+    { name: 'Law Case Brief', group: 'Professional Schools' },
+    { name: 'Nursing Guide', group: 'Professional Schools' },
+    { name: 'Accounting Workbook', group: 'Professional Schools' },
+    { name: 'Engineering Formula Sheet', group: 'Professional Schools' },
+    { name: 'Pharmacy Notes', group: 'Professional Schools' },
+    { name: 'Architecture Portfolio', group: 'Professional Schools' },
+    // General
+    { name: 'Workshop Material', group: 'General' },
+    { name: 'Tutorial Sheet', group: 'General' },
+    { name: 'Translation Resource', group: 'General' },
+    { name: 'Motivational Resource', group: 'General' },
+    { name: 'Community Timetable', group: 'General' },
+];
+
+const docTypeGroups = [...new Set(documentTypes.map(d => d.group))];
+
+const categories = [
+    'Education', 'Law', 'Medicine', 'Engineering', 'Personal Development',
+    'Business', 'Technology', 'Science', 'Literature', 'Health & Fitness',
+    'History', 'Arts & Culture', 'Relationship', 'Self-Help', 'Finance',
+    'Marketing', 'Programming', 'Psychology', 'Fiction', 'Non-Fiction',
+    'Philosophy', 'Travel', 'Cooking', 'Religion & Spirituality',
+    'Sex Education', 'Social Media'
+];
+
+const institutionalCategories = [
+    { value: '', label: 'None (General Library)' },
+    { value: 'university', label: 'Universities' },
+    { value: 'islamic-institutions', label: 'Islamic Institutions' },
+    { value: 'christian-institutions', label: 'Christian Institutions' },
+    { value: 'jewish-institutions', label: 'Jewish Institutions' },
+    { value: 'secondary-school', label: 'Secondary School' },
+    { value: 'primary-school', label: 'Primary School' },
+    { value: 'exam-prep', label: 'WAEC/NECO/JAMB' },
+    { value: 'polytechnic', label: 'Polytechnics' },
+    { value: 'college-of-education', label: 'Colleges of Education' },
+    { value: 'professional-cert', label: 'Professional Certifications' },
+    { value: 'postgraduate', label: 'Postgraduate Studies' }
+];
+
+const semesters = ['First Semester', 'Second Semester', 'Both Semesters'];
+const levels = [
+    { value: '100', label: '100 Level' },
+    { value: '200', label: '200 Level' },
+    { value: '300', label: '300 Level' },
+    { value: '400', label: '400 Level' },
+    { value: '500', label: '500 Level' },
+    { value: 'pg', label: 'Postgraduate' },
+];
+
+// ─── STEPS ───────────────────────────────────────────────────────────────────
+const STEPS = [
+    { id: 1, label: 'Document Details', icon: FileText },
+    { id: 2, label: 'Academic Info', icon: GraduationCap },
+    { id: 3, label: 'Pricing & Format', icon: DollarSign },
+    { id: 4, label: 'Upload Files', icon: Upload },
+    { id: 5, label: 'Review & Submit', icon: Check },
+];
+
+// ─── SEARCHABLE SELECT ────────────────────────────────────────────────────────
+function SearchableSelect({ label, required, value, onChange, placeholder, options, grouped }) {
+    const [open, setOpen] = useState(false);
+    const [q, setQ] = useState('');
+    const ref = useRef(null);
+
+    useEffect(() => {
+        const fn = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+        document.addEventListener('mousedown', fn);
+        return () => document.removeEventListener('mousedown', fn);
+    }, []);
+
+    let filtered;
+    if (grouped) {
+        filtered = {};
+        docTypeGroups.forEach(g => {
+            const items = documentTypes.filter(d => d.group === g && d.name.toLowerCase().includes(q.toLowerCase()));
+            if (items.length) filtered[g] = items;
+        });
+    } else {
+        filtered = (options || []).filter(o => o.toLowerCase().includes(q.toLowerCase()));
+    }
+
+    const display = value || placeholder || `Select ${label}`;
+
+    return (
+        <div ref={ref} className="relative">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                {label} {required && <span className="text-orange-500">*</span>}
+            </label>
+            <button
+                type="button"
+                onClick={() => setOpen(!open)}
+                className={`w-full flex items-center justify-between px-4 py-3 border text-left transition-all text-sm ${
+                    open ? 'border-[#1a3a5c] ring-2 ring-[#1a3a5c]/10' : 'border-gray-200 hover:border-gray-400'
+                } bg-white rounded-lg`}
+            >
+                <span className={value ? 'text-gray-900 font-medium' : 'text-gray-400'}>{display}</span>
+                <ChevronDown size={15} className={`text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+                <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden max-h-72 flex flex-col">
+                    <div className="p-2 border-b border-gray-100">
+                        <div className="relative">
+                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                autoFocus
+                                value={q}
+                                onChange={e => setQ(e.target.value)}
+                                placeholder="Search..."
+                                className="w-full pl-8 pr-3 py-1.5 text-black text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#1a3a5c]"
+                            />
+                        </div>
+                    </div>
+                    <div className="overflow-y-auto flex-1">
+                        {grouped ? (
+                            Object.keys(filtered).length === 0 ? (
+                                <p className="text-center text-sm text-gray-400 py-4">No results</p>
+                            ) : Object.entries(filtered).map(([group, items]) => (
+                                <div key={group}>
+                                    <p className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50">{group}</p>
+                                    {items.map(item => (
+                                        <button
+                                            key={item.name}
+                                            type="button"
+                                            onClick={() => { onChange(item.name); setOpen(false); setQ(''); }}
+                                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#1a3a5c]/5 transition-colors flex items-center justify-between ${
+                                                value === item.name ? 'text-[#1a3a5c] font-semibold bg-[#1a3a5c]/5' : 'text-gray-700'
+                                            }`}
+                                        >
+                                            {item.name}
+                                            {value === item.name && <Check size={13} />}
+                                        </button>
+                                    ))}
+                                </div>
+                            ))
+                        ) : (
+                            filtered.length === 0 ? (
+                                <p className="text-center text-sm text-gray-400 py-4">No results</p>
+                            ) : filtered.map(opt => (
+                                <button
+                                    key={opt}
+                                    type="button"
+                                    onClick={() => { onChange(opt); setOpen(false); setQ(''); }}
+                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#1a3a5c]/5 transition-colors flex items-center justify-between ${
+                                        value === opt ? 'text-[#1a3a5c] font-semibold bg-[#1a3a5c]/5' : 'text-gray-700'
+                                    }`}
+                                >
+                                    {opt}
+                                    {value === opt && <Check size={13} />}
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── FIELD WRAPPER ────────────────────────────────────────────────────────────
+function Field({ label, required, hint, children }) {
+    return (
+        <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                {label} {required && <span className="text-orange-500">*</span>}
+            </label>
+            {children}
+            {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+        </div>
+    );
+}
+
+function Input({ className = '', ...props }) {
+    return (
+        <input
+            className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#1a3a5c] focus:ring-2 focus:ring-[#1a3a5c]/10 transition-all placeholder:text-gray-400 ${className}`}
+            {...props}
+        />
+    );
+}
+
+function Select({ children, className = '', ...props }) {
+    return (
+        <select
+            className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#1a3a5c] focus:ring-2 focus:ring-[#1a3a5c]/10 transition-all bg-white ${className}`}
+            {...props}
+        >
+            {children}
+        </select>
+    );
+}
+
+function Textarea({ className = '', ...props }) {
+    return (
+        <textarea
+            className={`w-full px-4 py-3 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#1a3a5c] focus:ring-2 focus:ring-[#1a3a5c]/10 transition-all resize-none placeholder:text-gray-400 ${className}`}
+            {...props}
+        />
+    );
+}
+
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function AdvertiseClient() {
     const router = useRouter();
-
+    const [step, setStep] = useState(1);
     const [checkingAuth, setCheckingAuth] = useState(true);
     const [user, setUser] = useState(null);
     const [userData, setUserData] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState("");
+    const [uploadProgress, setUploadProgress] = useState('');
+    const [uploadPercentage, setUploadPercentage] = useState(0);
+    const [uploadingFile, setUploadingFile] = useState(false);
     const [showAccessWarning, setShowAccessWarning] = useState(false);
     const [isValidatingLink, setIsValidatingLink] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [selectedCoverImage, setSelectedCoverImage] = useState(null);
-    const [uploadingFile, setUploadingFile] = useState(false);
-    const [uploadPercentage, setUploadPercentage] = useState(0);
-    const [level, setLevel] = useState('100'); // Default to 100L
+
     const [formData, setFormData] = useState({
-        name: "",
-        email: "",
-        bookTitle: "",
-        author: "",
-        category: "",
-        institutionalCategory: "",
-        isbn: "",
-        courseCode: "",
-        semester: "",
-        session: "",
-        docType: "Textbook",
-        price: "",
-        format: "PDF",
-        level: '100',
-        pages: "",
-        description: "",
-        message: "",
-        driveLink: "",
+        name: '', email: '',
+        bookTitle: '', author: '', category: '', institutionalCategory: '',
+        isbn: '', courseCode: '', semester: '', session: '',
+        docType: '', price: '', format: 'PDF', level: '100',
+        pages: '', description: '', message: '', driveLink: '',
+        coverImagePreview: null,
     });
 
-    const categories = [
-        'Education', 'Law', 'Medicine', 'Engineering', 'Personal Development',
-        'Business', 'Technology', 'Science', 'Literature', 'Health & Fitness',
-        'History', 'Arts & Culture', 'Relationship', 'Self-Help', 'Finance',
-        'Marketing', 'Programming', 'Psychology', 'Fiction', 'Non-Fiction',
-        'Philosophy', 'Travel', 'Cooking', 'Religion & Spirituality',
-        'Sex Education', 'Social Media'
-    ];
-
-    const docTypes = [
-        'Textbook', 'Lecture Note', 'Past Question', 'Thesis',
-        'Summary', 'Syllabus', 'Course Outline', 'Assignment', 'Project'
-    ];
-
-    const institutionalCategories = [
-        { value: '', label: 'None (General Library)' },
-        { value: 'university', label: 'Universities' },
-        { value: 'islamic-institutions', label: 'Islamic Institutions' },
-        { value: 'christian-institutions', label: 'Christian Institutions' },
-        { value: 'jewish-institutions', label: 'Jewish Institutions' },
-        { value: 'secondary-school', label: 'Secondary School' },
-        { value: 'primary-school', label: 'Primary School' },
-        { value: 'exam-prep', label: 'WAEC/NECO/JAMB' },
-        { value: 'polytechnic', label: 'Polytechnics' },
-        { value: 'college-of-education', label: 'Colleges of Education' },
-        { value: 'professional-cert', label: 'Professional Certifications' },
-        { value: 'postgraduate', label: 'Postgraduate Studies' }
-    ];
-
-    const semesters = ['First Semester', 'Second Semester', 'Both Semesters'];
-
+    // Auth
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (!currentUser) {
-                setCheckingAuth(false);
-                router.replace("/auth/signin?redirect=/advertise");
-            } else {
-                setUser(currentUser);
-                try {
-                    const userDocRef = doc(db, 'users', currentUser.uid);
-                    const userDoc = await getDoc(userDocRef);
-                    let displayName = currentUser.displayName || "";
-                    let fullUserData = null;
-
-                    if (userDoc.exists()) {
-                        fullUserData = userDoc.data();
-                        displayName = fullUserData.displayName || fullUserData.name || displayName;
-                    }
-
-                    setUserData(fullUserData);
-                    setFormData((prev) => ({
-                        ...prev,
-                        name: displayName,
-                        email: currentUser.email || "",
-                    }));
-                } catch (error) {
-                    console.error("Error fetching user data:", error);
-                    setFormData((prev) => ({
-                        ...prev,
-                        name: currentUser.displayName || "",
-                        email: currentUser.email || "",
-                    }));
-                }
-                setCheckingAuth(false);
-            }
+        const unsub = onAuthStateChanged(auth, async (cu) => {
+            if (!cu) { setCheckingAuth(false); router.replace('/auth/signin?redirect=/advertise'); return; }
+            setUser(cu);
+            try {
+                const snap = await getDoc(doc(db, 'users', cu.uid));
+                const fd = snap.exists() ? snap.data() : null;
+                setUserData(fd);
+                setFormData(p => ({
+                    ...p,
+                    name: fd?.displayName || fd?.name || cu.displayName || '',
+                    email: cu.email || '',
+                }));
+            } catch { setFormData(p => ({ ...p, name: cu.displayName || '', email: cu.email || '' })); }
+            setCheckingAuth(false);
         });
-
-        return () => unsubscribe();
+        return () => unsub();
     }, [router]);
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData({ ...formData, [name]: value });
-    };
+    useEffect(() => {
+        return () => { if (formData.coverImagePreview) URL.revokeObjectURL(formData.coverImagePreview); };
+    }, [formData.coverImagePreview]);
+
+    const set = (k, v) => setFormData(p => ({ ...p, [k]: v }));
+    const handle = (e) => set(e.target.name, e.target.value);
 
     const extractDriveFileId = (url) => {
         if (!url) return '';
-        const match = url.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})|id=([\w-]{25,})/);
-        if (match) {
-            return match[1] || match[2] || match[3];
-        }
-        return '';
+        const m = url.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})|id=([\w-]{25,})/);
+        return m ? (m[1] || m[2] || m[3]) : '';
     };
 
     const handleDriveLinkChange = (e) => {
-        const { value } = e.target;
-        setFormData({ ...formData, driveLink: value });
-
-        if (value.includes('drive.google.com')) {
+        set('driveLink', e.target.value);
+        if (e.target.value.includes('drive.google.com')) {
             setIsValidatingLink(true);
-            const hasViewParam = value.includes('/view') || value.includes('usp=sharing');
-            const driveFileId = extractDriveFileId(value);
-
-            if (driveFileId && !hasViewParam) {
-                setShowAccessWarning(true);
-            }
+            const hasView = e.target.value.includes('/view') || e.target.value.includes('usp=sharing');
+            if (extractDriveFileId(e.target.value) && !hasView) setShowAccessWarning(true);
             setIsValidatingLink(false);
         }
     };
 
     const handleFileUpload = async (file) => {
-    if (!file) return null;
+        if (!file) return null;
+        if (file.type !== 'application/pdf') { alert('PDF only'); return null; }
+        if (file.size > 50 * 1024 * 1024) { alert('Max 50MB'); return null; }
+        try {
+            setUploadingFile(true);
+            const storageRef = ref(storage, `books/${user.uid}/${Date.now()}_${file.name}`);
+            const task = uploadBytesResumable(storageRef, file);
+            return new Promise((res, rej) => {
+                task.on('state_changed',
+                    s => { const p = Math.round((s.bytesTransferred / s.totalBytes) * 100); setUploadPercentage(p); setUploadProgress(`Uploading PDF: ${p}%`); },
+                    e => { setUploadingFile(false); rej(e); },
+                    async () => { const url = await getDownloadURL(task.snapshot.ref); setUploadingFile(false); setUploadProgress(''); res(url); }
+                );
+            });
+        } catch { setUploadingFile(false); setUploadProgress(''); alert('Upload failed'); return null; }
+    };
 
-    // Validate file type
-    if (file.type !== 'application/pdf') {
-        alert('Please upload a PDF file only');
-        return null;
-    }
+    const handleCoverImageUpload = async (file) => {
+        if (!file) return null;
+        if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) { alert('JPG/PNG/WEBP only'); return null; }
+        if (file.size > 5 * 1024 * 1024) { alert('Max 5MB'); return null; }
+        try {
+            const storageRef = ref(storage, `covers/${user.uid}/${Date.now()}_${file.name}`);
+            const task = uploadBytesResumable(storageRef, file);
+            return new Promise((res, rej) => {
+                task.on('state_changed',
+                    s => setUploadProgress(`Uploading cover: ${Math.round((s.bytesTransferred / s.totalBytes) * 100)}%`),
+                    e => { setUploadProgress(''); rej(e); },
+                    async () => { const url = await getDownloadURL(task.snapshot.ref); setUploadProgress(''); res(url); }
+                );
+            });
+        } catch { setUploadProgress(''); alert('Cover upload failed'); return null; }
+    };
 
-    // Validate file size (max 50MB)
-    const maxSize = 50 * 1024 * 1024; // 50MB
-    if (file.size > maxSize) {
-        alert('File size must be less than 50MB');
-        return null;
-    }
+    const handleFileSelect = (e) => {
+        const f = e.target.files[0];
+        if (f) { setSelectedFile(f); set('driveLink', ''); }
+    };
 
-    try {
-        setUploadingFile(true);
-        setUploadProgress("Uploading PDF...");
-
-        // Create unique filename
-        const timestamp = Date.now();
-        const fileName = `books/${user.uid}/${timestamp}_${file.name}`;
-        const storageRef = ref(storage, fileName);
-
-        // Upload file with progress tracking
-        const uploadTask = uploadBytesResumable(storageRef, file);
-
-        return new Promise((resolve, reject) => {
-            uploadTask.on(
-                'state_changed',
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    setUploadPercentage(Math.round(progress));
-                    setUploadProgress(`Uploading: ${Math.round(progress)}%`);
-                },
-                (error) => {
-                    console.error('Upload error:', error);
-                    setUploadingFile(false);
-                    reject(error);
-                },
-                async () => {
-                    const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                    setUploadingFile(false);
-                    setUploadProgress("");
-                    resolve(downloadURL);
-                }
-            );
-        });
-    } catch (error) {
-        console.error('Error uploading file:', error);
-        setUploadingFile(false);
-        setUploadProgress("");
-        alert('Failed to upload file. Please try again.');
-        return null;
-    }
-};
-
-const handleCoverImageUpload = async (file) => {
-    if (!file) return null;
-
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-        alert('Please upload JPG, PNG, or WEBP image only');
-        return null;
-    }
-
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-        alert('Image size must be less than 5MB');
-        return null;
-    }
-
-    try {
-        setUploadProgress("Uploading cover image...");
-
-        // Create unique filename
-        const timestamp = Date.now();
-        const fileName = `covers/${user.uid}/${timestamp}_${file.name}`;
-        const storageRef = ref(storage, fileName);
-
-        // Upload file
-        const uploadTask = uploadBytesResumable(storageRef, file);
-
-        return new Promise((resolve, reject) => {
-            uploadTask.on(
-                'state_changed',
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    setUploadProgress(`Uploading cover: ${Math.round(progress)}%`);
-                },
-                (error) => {
-                    console.error('Cover upload error:', error);
-                    reject(error);
-                },
-                async () => {
-                    const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                    setUploadProgress("");
-                    resolve(downloadURL);
-                }
-            );
-        });
-    } catch (error) {
-        console.error('Error uploading cover image:', error);
-        setUploadProgress("");
-        alert('Failed to upload cover image. Please try again.');
-        return null;
-    }
-};
-
-const handleCoverImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        setSelectedCoverImage(file);
-        // Create preview URL
-        const previewUrl = URL.createObjectURL(file);
-        setFormData({ ...formData, coverImagePreview: previewUrl });
-    }
-};
-
-const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        setSelectedFile(file);
-        // Clear drive link when file is selected
-        setFormData({ ...formData, driveLink: "" });
-    }
-};
-
-
-   const handleSubmit = async () => {
-    // Validate required fields
-    if (!formData.name || !formData.email || !formData.bookTitle ||
-        !formData.author || !formData.category || !formData.price ||
-        !formData.pages || !formData.description) {
-        alert("Please fill all required fields");
-        return;
-    }
-
-    // Check if either file is uploaded OR drive link is provided
-    if (!selectedFile && !formData.driveLink) {
-        alert("Please either upload a PDF file or provide a Google Drive link");
-        return;
-    }
-
-     try {
-        setLoading(true);
-
-        // Upload PDF file if selected
-        let pdfUrl = formData.driveLink;
-        if (selectedFile) {
-            pdfUrl = await handleFileUpload(selectedFile);
-            if (!pdfUrl) {
-                setLoading(false);
-                return;
-            }
-        }
-
-        // ✅ Upload cover image if selected
-        let coverImageUrl = null;
-        if (selectedCoverImage) {
-            coverImageUrl = await handleCoverImageUpload(selectedCoverImage);
-            if (!coverImageUrl) {
-                // Continue even if cover upload fails - it's optional
-                console.warn('Cover image upload failed, continuing without it');
-            }
-        }
-
-        // Validate URL if using Drive link
-        if (!selectedFile && formData.driveLink) {
-            try {
-                new URL(formData.driveLink);
-            } catch {
-                alert("Please enter a valid Google Drive link");
-                setLoading(false);
-                return;
-            }
-        }
-
-        setUploadProgress("Processing your submission...");
-
-        const driveFileId = extractDriveFileId(pdfUrl);
-        let embedUrl = pdfUrl;
-        if (pdfUrl.includes('drive.google.com') && driveFileId) {
-            embedUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
-        }
-
-        const displayName = userData?.displayName ||
-            userData?.name ||
-            formData.name ||
-            `${userData?.firstName || ''} ${userData?.surname || ''}`.trim();
-
-        const bookData = {
-            userId: user.uid,
-            sellerId: user.uid,
-            sellerEmail: user.email,
-            sellerName: displayName,
-            sellerPhone: userData?.phoneNumber || null,
-            bookTitle: formData.bookTitle,
-            coverImage: coverImageUrl,
-            image: coverImageUrl, 
-            author: formData.author,
-            category: formData.category,
-            institutionalCategory: formData.institutionalCategory || null,
-            isbn: formData.isbn || "N/A",
-            courseCode: formData.courseCode.toUpperCase() || null,
-            semester: formData.semester || null,
-            session: formData.session || null,
-            docType: formData.docType,
-            level: formData.level, 
-            price: Number(formData.price),
-            format: formData.format,
-            pages: Number(formData.pages),
-            description: formData.description,
-            message: formData.message,
-            pdfLink: pdfUrl,
-            pdfUrl: pdfUrl,
-            embedUrl: embedUrl,
-            driveFileId: driveFileId || null,
-            uploadMethod: selectedFile ? 'direct_upload' : 'drive_link', // Track upload method
-            status: "pending",
-            views: 0,
-            purchases: 0,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-        };
-
-        setUploadProgress("Saving book details...");
-        await addDoc(collection(db, "advertMyBook"), bookData);
-
-        alert("Request sent successfully! We'll review your submission and contact you shortly.");
-
-        // Reset form
-        setFormData({
-            name: formData.name,
-            email: formData.email,
-            bookTitle: "",
-            author: "",
-            category: "",
-            institutionalCategory: "",
-            isbn: "",
-            courseCode: "",
-            semester: "",
-            session: "",
-            docType: "Textbook",
-            price: "",
-            format: "PDF",
-            pages: "",
-            description: "",
-            message: "",
-            driveLink: "",
-        });
-        setSelectedFile(null);
-        setUploadPercentage(0);
-        setUploadProgress("");
-
-        router.replace("/advertise/my-submissions");
-    } catch (error) {
-        console.error("Error:", error);
-        alert(error.message || "Something went wrong. Please try again.");
-    } finally {
-        setLoading(false);
-        setUploadProgress("");
-        setUploadingFile(false);
-    }
-};
-
-useEffect(() => {
-    // Cleanup preview URL when component unmounts
-    return () => {
-        if (formData.coverImagePreview) {
-            URL.revokeObjectURL(formData.coverImagePreview);
+    const handleCoverImageSelect = (e) => {
+        const f = e.target.files[0];
+        if (f) {
+            setSelectedCoverImage(f);
+            set('coverImagePreview', URL.createObjectURL(f));
         }
     };
-}, [formData.coverImagePreview]);
 
-    if (checkingAuth) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="text-center">
-                    <div className="animate-spin h-12 w-12 border-b-2 border-blue-950 rounded-full mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading...</p>
-                </div>
+    // Step validation
+    const canProceed = () => {
+        if (step === 1) return formData.bookTitle && formData.author && formData.docType && formData.category;
+        if (step === 2) return true; // academic info is optional
+        if (step === 3) return formData.price && formData.pages;
+        if (step === 4) return selectedFile || formData.driveLink;
+        return true;
+    };
+
+    const handleSubmit = async () => {
+        if (!formData.name || !formData.email || !formData.bookTitle ||
+            !formData.author || !formData.category || !formData.price ||
+            !formData.pages || !formData.description) { alert('Please fill all required fields'); return; }
+        if (!selectedFile && !formData.driveLink) { alert('Please upload a PDF or provide a Drive link'); return; }
+
+        try {
+            setLoading(true);
+            let pdfUrl = formData.driveLink;
+            if (selectedFile) { pdfUrl = await handleFileUpload(selectedFile); if (!pdfUrl) { setLoading(false); return; } }
+            let coverImageUrl = null;
+            if (selectedCoverImage) { coverImageUrl = await handleCoverImageUpload(selectedCoverImage); }
+            if (!selectedFile && formData.driveLink) { try { new URL(formData.driveLink); } catch { alert('Invalid Drive link'); setLoading(false); return; } }
+
+            setUploadProgress('Saving document details...');
+            const driveFileId = extractDriveFileId(pdfUrl);
+            let embedUrl = pdfUrl;
+            if (pdfUrl?.includes('drive.google.com') && driveFileId) embedUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
+
+            const displayName = userData?.displayName || userData?.name || formData.name || `${userData?.firstName || ''} ${userData?.surname || ''}`.trim();
+
+            await addDoc(collection(db, 'advertMyBook'), {
+                userId: user.uid, sellerId: user.uid, sellerEmail: user.email, sellerName: displayName,
+                sellerPhone: userData?.phoneNumber || null,
+                bookTitle: formData.bookTitle, coverImage: coverImageUrl, image: coverImageUrl,
+                author: formData.author, category: formData.category,
+                institutionalCategory: formData.institutionalCategory || null,
+                isbn: formData.isbn || 'N/A', courseCode: formData.courseCode?.toUpperCase() || null,
+                semester: formData.semester || null, session: formData.session || null,
+                docType: formData.docType, level: formData.level,
+                price: Number(formData.price), format: formData.format, pages: Number(formData.pages),
+                description: formData.description, message: formData.message,
+                pdfLink: pdfUrl, pdfUrl, embedUrl, driveFileId: driveFileId || null,
+                uploadMethod: selectedFile ? 'direct_upload' : 'drive_link',
+                status: 'pending', views: 0, purchases: 0,
+                createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+            });
+
+            alert('Submitted successfully! We\'ll review and contact you within 24–48 hours.');
+            router.replace('/upload-document/my-pending-books');
+        } catch (e) {
+            console.error(e);
+            alert(e.message || 'Something went wrong.');
+        } finally { setLoading(false); setUploadProgress(''); setUploadingFile(false); }
+    };
+
+    if (checkingAuth) return (
+        <div className="min-h-screen flex items-center justify-center bg-[#f8f6f2]">
+            <div className="text-center">
+                <div className="w-10 h-10 border-2 border-[#1a3a5c] border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="mt-3 text-sm text-gray-500" style={{ fontFamily: 'Georgia, serif' }}>Loading…</p>
             </div>
-        );
-    }
+        </div>
+    );
+
+    const earnings = formData.price ? (Number(formData.price) * 0.8).toLocaleString() : '0';
 
     return (
-        <div
-            className="min-h-screen flex items-center justify-center px-4 py-8 relative"
-            style={{
-                backgroundImage: 'url(https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=1920&q=80)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat'
-            }}
-        >
-            <div className="absolute inset-0 bg-black/60"></div>
+        <div className="min-h-screen bg-[#f8f6f2]" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700;800&display=swap');
+                .playfair { font-family: 'Playfair Display', Georgia, serif; }
+                .step-line { transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+                .upload-zone { transition: all 0.2s ease; }
+                .upload-zone:hover { border-color: #1a3a5c; background: rgba(26,58,92,0.03); }
+                .upload-zone.active { border-color: #16a34a; background: rgba(22,163,74,0.04); }
+                input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
+            `}</style>
 
-            <div className="bg-white/95 backdrop-blur-sm rounded-2xl max-w-4xl w-full p-8 shadow-2xl relative z-10 my-8">
-                <div className="text-center mb-6">
-                    <h2 className="text-3xl font-bold text-blue-950 mb-2">
-                        Upload Your Book
-                    </h2>
-                    <p className="text-gray-600 text-sm">
-                        Reach thousands of readers and earn 80% per sale
-                    </p>
+            {/* TOP HEADER */}
+            <header className="bg-[#1a3a5c] px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-white/20 rounded flex items-center justify-center">
+                        <BookOpen size={16} color="white" />
+                    </div>
+                    <span className="text-white/40 text-sm mx-2">›</span>
+                    <a href="/uploader-agreement" className="text-white/70 text-sm underline">Uploader Agreement
+                    <ArrowRight size={12} className="inline-block -rotate-90 ml-1" />
+                    </a>
+                </div>
+                <button onClick={() => router.back()} className="text-white/60 hover:text-white text-sm flex items-center gap-1 transition-colors">
+                    <X size={14} /> Exit
+                </button>
+            </header>
+
+            <div className="max-w-5xl mx-auto px-4 py-8">
+
+                {/* PAGE TITLE */}
+                <div className="mb-8">
+                    <h1 className="playfair text-3xl font-bold text-gray-900 mb-1">Publish Your Document</h1>
+                    <p className="text-gray-500 text-sm">Reach thousands of students and earn 80% per sale. Takes less than 5 minutes.</p>
                 </div>
 
-
-                <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
-                    {/* SECTION 1: SELLER INFO */}
-                    <div>
-                        <h3 className="flex items-center gap-2 text-lg font-semibold text-blue-950 mb-4 pb-2 border-b">
-                            <BookOpen className="w-5 h-5" /> Seller Information
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Full Name *
-                                </label>
-                                <input
-                                    name="name"
-                                    placeholder="Enter your full name"
-                                    value={formData.name}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Email Address *
-                                </label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={formData.email}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg bg-gray-50"
-                                    readOnly
-                                />
-                            </div>
-                        </div>
+                {/* STEP INDICATOR */}
+                <div className="mb-10">
+                    <div className="flex items-center gap-0">
+                        {STEPS.map((s, i) => {
+                            const Icon = s.icon;
+                            const done = step > s.id;
+                            const active = step === s.id;
+                            return (
+                                <div key={s.id} className="flex items-center flex-1">
+                                    <div
+                                        className={`flex items-center gap-2 cursor-pointer group ${done ? 'opacity-100' : active ? 'opacity-100' : 'opacity-50'}`}
+                                        onClick={() => done && setStep(s.id)}
+                                    >
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all flex-shrink-0
+                                            ${done ? 'bg-green-500 text-white' : active ? 'bg-[#1a3a5c] text-white' : 'bg-gray-200 text-gray-500'}`}>
+                                            {done ? <Check size={14} /> : <Icon size={14} />}
+                                        </div>
+                                        <span className={`text-xs font-semibold hidden sm:block whitespace-nowrap ${active ? 'text-[#1a3a5c]' : done ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {s.label}
+                                        </span>
+                                    </div>
+                                    {i < STEPS.length - 1 && (
+                                        <div className="flex-1 h-px mx-3 bg-gray-200 relative overflow-hidden">
+                                            <div className={`step-line absolute inset-y-0 left-0 bg-green-500 ${done ? 'w-full' : 'w-0'}`} />
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
+                </div>
 
-                    {/* SECTION 2: BOOK/DOCUMENT INFO */}
-                    <div>
-                        <h3 className="flex items-center gap-2 text-lg font-semibold text-blue-950 mb-4 pb-2 border-b">
-                            <BookOpen className="w-5 h-5" /> Book/Document Information
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Book/Document Title *
-                                </label>
-                                <input
-                                    name="bookTitle"
-                                    placeholder="The title of your book or document"
-                                    value={formData.bookTitle}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
-                                />
-                            </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Author Name *
-                                </label>
-                                <input
-                                    name="author"
-                                    placeholder="Author's name"
-                                    value={formData.author}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
-                                />
-                            </div>
+                    {/* MAIN FORM */}
+                    <div className="lg:col-span-2">
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    ISBN (Optional)
-                                </label>
-                                <input
-                                    name="isbn"
-                                    placeholder="978-1234567890"
-                                    value={formData.isbn}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">Leave blank if self-published or student notes</p>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Document Type *
-                                </label>
-                                <select
-                                    name="docType"
-                                    value={formData.docType}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
-                                >
-                                    {docTypes.map(type => (
-                                        <option key={type} value={type}>{type}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-gray-700">Level</label>
-                                <select
-                                    value={level}
-                                    onChange={(e) => setLevel(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-950"
-                                    required
-                                >
-                                    <option value="100">100 Level</option>
-                                    <option value="200">200 Level</option>
-                                    <option value="300">300 Level</option>
-                                    <option value="400">400 Level</option>
-                                    <option value="500">500 Level</option>
-                                    <option value="pg">Post-Graduate</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* SECTION 3: ACADEMIC METADATA */}
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border-2 border-blue-200">
-                        <h3 className="flex items-center gap-2 text-lg font-semibold text-blue-900 mb-4">
-                            <GraduationCap className="w-5 h-5" /> Academic Metadata (Recommended for Course Materials)
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-blue-900 mb-1">
-                                    Course Code
-                                </label>
-                                <input
-                                    name="courseCode"
-                                    placeholder="e.g., LAW 101, CSC 201"
-                                    value={formData.courseCode}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-blue-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-blue-900 mb-1">
-                                    Semester
-                                </label>
-                                <select
-                                    name="semester"
-                                    value={formData.semester}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-blue-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                >
-                                    <option value="">Select semester</option>
-                                    {semesters.map(sem => (
-                                        <option key={sem} value={sem}>{sem}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-blue-900 mb-1">
-                                    Academic Session
-                                </label>
-                                <input
-                                    name="session"
-                                    placeholder="e.g., 2024/2025"
-                                    value={formData.session}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-blue-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                                />
-                            </div>
-                        </div>
-                        <p className="text-xs text-blue-700 mt-3">
-                            💡 Adding academic details helps students find your materials more easily!
-                        </p>
-                    </div>
-
-                    {/* SECTION 4: CATEGORIES */}
-                    <div>
-                        <h3 className="flex items-center gap-2 text-lg font-semibold text-blue-950 mb-4 pb-2 border-b">
-                            <Building2 className="w-5 h-5" /> Categories
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    General Category *
-                                </label>
-                                <select
-                                    name="category"
-                                    value={formData.category}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
-                                >
-                                    <option value="">Select a category</option>
-                                    {categories.map((cat) => (
-                                        <option key={cat} value={cat}>
-                                            {cat}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-                                    <Building2 className="w-4 h-4" />
-                                    Institutional Category
-                                </label>
-                                <select
-                                    name="institutionalCategory"
-                                    value={formData.institutionalCategory}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
-                                >
-                                    {institutionalCategories.map((cat) => (
-                                        <option key={cat.value} value={cat.value}>
-                                            {cat.label}
-                                        </option>
-                                    ))}
-                                </select>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    Optional: Target specific institutions
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* SECTION 5: PRICING & FILE DETAILS */}
-                    <div>
-                        <h3 className="flex items-center gap-2 text-lg font-semibold text-blue-950 mb-4 pb-2 border-b">
-                            💰 Pricing & File Details
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Price (₦) *
-                                </label>
-                                <input
-                                    type="number"
-                                    name="price"
-                                    placeholder="e.g., 2400"
-                                    value={formData.price}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
-                                />
-                                <p className="text-xs text-green-600 mt-1 font-semibold">
-                                    You'll earn ₦{formData.price ? (Number(formData.price) * 0.8).toLocaleString() : '0'} per sale (80%)
-                                </p>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Number of Pages *
-                                </label>
-                                <input
-                                    type="number"
-                                    name="pages"
-                                    placeholder="e.g., 224"
-                                    value={formData.pages}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Format *
-                                </label>
-                                <select
-                                    name="format"
-                                    value={formData.format}
-                                    onChange={handleChange}
-                                    className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950"
-                                >
-                                    <option value="PDF">PDF</option>
-                                    <option value="EPUB">EPUB</option>
-                                    <option value="MOBI">MOBI</option>
-                                </select>
-                            </div>
-
-                            {formData.driveLink && extractDriveFileId(formData.driveLink) && (
+                            {/* STEP 1: Document Details */}
+                            {step === 1 && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Extracted File ID
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={extractDriveFileId(formData.driveLink)}
-                                        readOnly
-                                        className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg bg-gray-50 text-sm"
-                                    />
-                                    <p className="text-xs text-green-600 mt-1">
-                                        ✓ File ID extracted for thumbnails
-                                    </p>
+                                    <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-[#1a3a5c]/5 to-transparent">
+                                        <h2 className="playfair text-xl font-bold text-gray-900">Document Details</h2>
+                                        <p className="text-gray-500 text-sm mt-0.5">Basic information about what you're selling</p>
+                                    </div>
+                                    <div className="p-8 space-y-6">
+
+                                        {/* Seller Info */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Field label="Your Name" required>
+                                                <Input name="name" value={formData.name} onChange={handle} placeholder="Full name" />
+                                            </Field>
+                                            <Field label="Email">
+                                                <Input value={formData.email} readOnly className="bg-gray-50 text-gray-500 cursor-not-allowed" />
+                                            </Field>
+                                        </div>
+
+                                        <div className="h-px bg-gray-100" />
+
+                                        {/* Document title & author */}
+                                        <Field label="Title" required hint="Use the exact title as it appears on the document">
+                                            <Input name="bookTitle" value={formData.bookTitle} onChange={handle} placeholder="e.g. Introduction to Organic Chemistry" />
+                                        </Field>
+
+                                        <Field label="Author / Creator" required>
+                                            <Input name="author" value={formData.author} onChange={handle} placeholder="e.g. Dr. Adeyemi Okafor" />
+                                        </Field>
+
+                                        {/* Doc type — searchable */}
+                                        <SearchableSelect
+                                            label="Document Type"
+                                            required
+                                            value={formData.docType}
+                                            onChange={v => set('docType', v)}
+                                            placeholder="Select document type"
+                                            grouped
+                                        />
+
+                                        {/* Category */}
+                                        <SearchableSelect
+                                            label="Subject Category"
+                                            required
+                                            value={formData.category}
+                                            onChange={v => set('category', v)}
+                                            placeholder="Select category"
+                                            options={categories}
+                                        />
+
+                                        {/* Institutional */}
+                                        <Field label="Target Institution" hint="Optional — helps students from specific schools find your material">
+                                            <Select name="institutionalCategory" value={formData.institutionalCategory} onChange={handle}>
+                                                {institutionalCategories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                            </Select>
+                                        </Field>
+
+                                        {/* ISBN */}
+                                        <Field label="ISBN" hint="Leave blank for lecture notes, past questions, or student-authored materials">
+                                            <Input name="isbn" value={formData.isbn} onChange={handle} placeholder="978-1234567890" />
+                                        </Field>
+
+                                    </div>
                                 </div>
                             )}
+
+                            {/* STEP 2: Academic Info */}
+                            {step === 2 && (
+                                <div>
+                                    <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-transparent">
+                                        <h2 className="playfair text-xl font-bold text-gray-900">Academic Information</h2>
+                                        <p className="text-gray-500 text-sm mt-0.5">Help students find your material faster — all optional</p>
+                                    </div>
+                                    <div className="p-8 space-y-6">
+
+                                        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                                            <Info size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                                            <p className="text-sm text-amber-800">Filling in academic details boosts discoverability by up to 3× for course-specific materials.</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Field label="Level">
+                                                <Select name="level" value={formData.level} onChange={handle}>
+                                                    {levels.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                                                </Select>
+                                            </Field>
+                                            <Field label="Semester">
+                                                <Select name="semester" value={formData.semester} onChange={handle}>
+                                                    <option value="">— Select —</option>
+                                                    {semesters.map(s => <option key={s} value={s}>{s}</option>)}
+                                                </Select>
+                                            </Field>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Field label="Course Code" hint="e.g. CSC 201, LAW 301">
+                                                <Input name="courseCode" value={formData.courseCode} onChange={handle} placeholder="e.g. BIO 101" />
+                                            </Field>
+                                            <Field label="Academic Session" hint="e.g. 2024/2025">
+                                                <Input name="session" value={formData.session} onChange={handle} placeholder="2024/2025" />
+                                            </Field>
+                                        </div>
+
+                                        <div className="h-px bg-gray-100" />
+
+                                        <Field label="Description" required hint="Give buyers a clear idea of what's inside (2–5 sentences)">
+                                            <Textarea name="description" value={formData.description} onChange={handle}
+                                                placeholder="Briefly describe the content, target readers, and what makes this material valuable…"
+                                                rows={4} />
+                                        </Field>
+
+                                        <Field label="Table of Contents / Key Topics" hint="Summarise the main topics or chapters covered">
+                                            <Textarea name="message" value={formData.message} onChange={handle}
+                                                placeholder="Chapter 1: Introduction…&#10;Chapter 2: …"
+                                                rows={4} />
+                                        </Field>
+
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* STEP 3: Pricing & Format */}
+                            {step === 3 && (
+                                <div>
+                                    <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-green-50 to-transparent">
+                                        <h2 className="playfair text-xl font-bold text-gray-900">Pricing & Format</h2>
+                                        <p className="text-gray-500 text-sm mt-0.5">Set your price — you keep 80% of every sale</p>
+                                    </div>
+                                    <div className="p-8 space-y-6">
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <Field label="Price (₦)" required>
+                                                    <div className="relative">
+                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">₦</span>
+                                                        <Input type="number" name="price" value={formData.price} onChange={handle}
+                                                            placeholder="0" className="pl-9" />
+                                                    </div>
+                                                </Field>
+                                                {formData.price && (
+                                                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                                        <p className="text-xs text-green-700 font-medium">Your earnings per sale</p>
+                                                        <p className="text-2xl font-bold text-green-700 playfair">₦{earnings}</p>
+                                                        <p className="text-xs text-green-600">Platform keeps ₦{formData.price ? (Number(formData.price) * 0.2).toLocaleString() : '0'} (20%)</p>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <Field label="Number of Pages" required>
+                                                <Input type="number" name="pages" value={formData.pages} onChange={handle} placeholder="e.g. 224" />
+                                            </Field>
+                                        </div>
+
+                                        <Field label="File Format">
+                                            <div className="grid grid-cols-3 gap-3">
+                                                {['PDF', 'EPUB', 'MOBI'].map(f => (
+                                                    <button
+                                                        key={f}
+                                                        type="button"
+                                                        onClick={() => set('format', f)}
+                                                        className={`py-3 rounded-lg border-2 text-sm font-semibold transition-all ${
+                                                            formData.format === f
+                                                                ? 'border-[#1a3a5c] bg-[#1a3a5c] text-white'
+                                                                : 'border-gray-200 text-gray-600 hover:border-gray-400'
+                                                        }`}
+                                                    >
+                                                        {f}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </Field>
+
+                                        {/* Pricing tips */}
+                                        <div className="border border-gray-100 rounded-xl p-5 space-y-3">
+                                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">💡 Pricing Tips</p>
+                                            {[
+                                                ['Past Questions / Notes', '₦500 – ₦1,500'],
+                                                ['Lecture Notes / Summaries', '₦1,000 – ₦3,000'],
+                                                ['Textbooks / Full Projects', '₦2,500 – ₦8,000'],
+                                                ['Premium Thesis / Dissertation', '₦5,000 – ₦15,000'],
+                                            ].map(([t, r]) => (
+                                                <div key={t} className="flex items-center justify-between text-sm">
+                                                    <span className="text-gray-600">{t}</span>
+                                                    <span className="font-semibold text-gray-900">{r}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* STEP 4: Upload Files */}
+                            {step === 4 && (
+                                <div>
+                                    <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-transparent">
+                                        <h2 className="playfair text-xl font-bold text-gray-900">Upload Files</h2>
+                                        <p className="text-gray-500 text-sm mt-0.5">Your PDF and an optional cover image</p>
+                                    </div>
+                                    <div className="p-8 space-y-8">
+
+                                        {/* PDF Upload */}
+                                        <div>
+                                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">PDF Document <span className="text-orange-500">*</span></p>
+
+                                            {/* Option A: Direct */}
+                                            <label className={`upload-zone block border-2 border-dashed rounded-xl p-8 text-center cursor-pointer ${selectedFile ? 'active' : 'border-gray-200'}`}>
+                                                <input type="file" accept="application/pdf" onChange={handleFileSelect}
+                                                    className="hidden" disabled={uploadingFile || loading} />
+                                                {selectedFile ? (
+                                                    <div>
+                                                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                            <Check size={22} className="text-green-600" />
+                                                        </div>
+                                                        <p className="font-semibold text-green-700 text-sm">{selectedFile.name}</p>
+                                                        <p className="text-xs text-green-600 mt-1">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB • PDF</p>
+                                                        <button type="button" onClick={e => { e.preventDefault(); setSelectedFile(null); }}
+                                                            className="mt-3 text-xs text-red-500 underline">Remove</button>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                            <Upload size={20} className="text-gray-500" />
+                                                        </div>
+                                                        <p className="font-semibold text-gray-700 text-sm">Click to upload PDF</p>
+                                                        <p className="text-xs text-gray-400 mt-1">Maximum file size: 50MB</p>
+                                                    </div>
+                                                )}
+                                            </label>
+
+                                            {/* Progress */}
+                                            {uploadPercentage > 0 && uploadPercentage < 100 && (
+                                                <div className="mt-3">
+                                                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                        <span>Uploading…</span><span>{uploadPercentage}%</span>
+                                                    </div>
+                                                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-[#1a3a5c] rounded-full transition-all" style={{ width: `${uploadPercentage}%` }} />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* OR divider */}
+                                            <div className="flex items-center gap-3 my-5">
+                                                <div className="flex-1 h-px bg-gray-200" />
+                                                <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">or paste a link</span>
+                                                <div className="flex-1 h-px bg-gray-200" />
+                                            </div>
+
+                                            {/* Option B: Link */}
+                                            <div className="relative">
+                                                <Input
+                                                    name="driveLink" type="url"
+                                                    placeholder="https://drive.google.com/file/d/…"
+                                                    value={formData.driveLink}
+                                                    onChange={handleDriveLinkChange}
+                                                    disabled={!!selectedFile || uploadingFile || loading}
+                                                    className={selectedFile ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : ''}
+                                                />
+                                                {isValidatingLink && (
+                                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                        <div className="w-4 h-4 border-2 border-[#1a3a5c] border-t-transparent rounded-full animate-spin" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {formData.driveLink && (
+                                                <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
+                                                    <AlertCircle size={11} /> Ensure sharing is set to "Anyone with the link can view"
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="h-px bg-gray-100" />
+
+                                        {/* Cover Image */}
+                                        <div>
+                                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Cover Image</p>
+                                            <p className="text-xs text-gray-400 mb-4">Optional — documents with covers sell 2× more. JPG/PNG/WEBP, max 5MB.</p>
+
+                                            <div className="grid grid-cols-2 gap-5">
+                                                <label className={`upload-zone block border-2 border-dashed rounded-xl p-6 text-center cursor-pointer ${selectedCoverImage ? 'active' : 'border-gray-200'}`}>
+                                                    <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp"
+                                                        onChange={handleCoverImageSelect} className="hidden" disabled={loading || uploadingFile} />
+                                                    {selectedCoverImage ? (
+                                                        <div>
+                                                            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                                                                <Check size={18} className="text-green-600" />
+                                                            </div>
+                                                            <p className="text-xs font-semibold text-green-700 truncate">{selectedCoverImage.name}</p>
+                                                            <p className="text-xs text-green-600 mt-0.5">{(selectedCoverImage.size / 1024 / 1024).toFixed(2)} MB</p>
+                                                            <button type="button" onClick={e => { e.preventDefault(); setSelectedCoverImage(null); set('coverImagePreview', null); }}
+                                                                className="mt-2 text-xs text-red-500 underline">Remove</button>
+                                                        </div>
+                                                    ) : (
+                                                        <div>
+                                                            <ImageIcon size={28} className="mx-auto mb-2 text-gray-400" />
+                                                            <p className="text-xs font-semibold text-gray-600">Upload Cover</p>
+                                                        </div>
+                                                    )}
+                                                </label>
+
+                                                <div className="border-2 border-gray-100 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center aspect-[3/4] max-h-48">
+                                                    {formData.coverImagePreview ? (
+                                                        <img src={formData.coverImagePreview} alt="Cover" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="text-center text-gray-300 p-4">
+                                                            <ImageIcon size={32} className="mx-auto mb-2" />
+                                                            <p className="text-xs">Preview</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* STEP 5: Review */}
+                            {step === 5 && (
+                                <div>
+                                    <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-green-50 to-transparent">
+                                        <h2 className="playfair text-xl font-bold text-gray-900">Review & Submit</h2>
+                                        <p className="text-gray-500 text-sm mt-0.5">Confirm everything looks right before publishing</p>
+                                    </div>
+                                    <div className="p-8 space-y-6">
+
+                                        {/* Summary card */}
+                                        <div className="flex gap-5 p-5 bg-gray-50 rounded-xl border border-gray-100">
+                                            {formData.coverImagePreview ? (
+                                                <img src={formData.coverImagePreview} alt="" className="w-20 h-28 object-cover rounded-lg shadow-md flex-shrink-0" />
+                                            ) : (
+                                                <div className="w-20 h-28 bg-[#1a3a5c]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                    <BookOpen size={24} className="text-[#1a3a5c]/40" />
+                                                </div>
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-gray-900 text-base leading-tight playfair">{formData.bookTitle || '—'}</p>
+                                                <p className="text-gray-500 text-sm mt-1">by {formData.author || '—'}</p>
+                                                <div className="flex flex-wrap gap-2 mt-2">
+                                                    {formData.docType && <span className="text-xs px-2 py-0.5 bg-[#1a3a5c]/10 text-[#1a3a5c] rounded-full font-medium">{formData.docType}</span>}
+                                                    {formData.category && <span className="text-xs px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full">{formData.category}</span>}
+                                                    {formData.format && <span className="text-xs px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full">{formData.format}</span>}
+                                                </div>
+                                                <p className="text-2xl font-bold text-gray-900 playfair mt-2">₦{formData.price ? Number(formData.price).toLocaleString() : '—'}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Detail grid */}
+                                        {[
+                                            ['Level', levels.find(l => l.value === formData.level)?.label],
+                                            ['Pages', formData.pages ? `${formData.pages} pages` : null],
+                                            ['Course Code', formData.courseCode?.toUpperCase() || null],
+                                            ['Semester', formData.semester || null],
+                                            ['Session', formData.session || null],
+                                            ['Institution', institutionalCategories.find(c => c.value === formData.institutionalCategory)?.label || null],
+                                            ['File', selectedFile ? selectedFile.name : formData.driveLink ? 'Drive link provided' : null],
+                                            ['Cover Image', selectedCoverImage ? selectedCoverImage.name : 'None (auto-generated)'],
+                                            ['Your Earnings', formData.price ? `₦${earnings} per sale (80%)` : null],
+                                        ].filter(([, v]) => v).map(([k, v]) => (
+                                            <div key={k} className="flex justify-between items-start py-2 border-b border-gray-50 text-sm">
+                                                <span className="text-gray-500 font-medium">{k}</span>
+                                                <span className="text-gray-900 text-right max-w-xs">{v}</span>
+                                            </div>
+                                        ))}
+
+                                        {/* TCs */}
+                                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 space-y-1">
+                                            <p className="font-bold">By submitting you confirm:</p>
+                                            <p>• You own or have rights to distribute this material</p>
+                                            <p>• The content is accurate and suitable for the claimed level</p>
+                                            <p>• You accept our seller agreement (80/20 revenue split)</p>
+                                        </div>
+
+                                        {uploadProgress && (
+                                            <div className="text-center text-sm font-medium text-[#1a3a5c] animate-pulse">{uploadProgress}</div>
+                                        )}
+
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* NAV BUTTONS */}
+                            <div className="px-8 pb-8 flex gap-3">
+                                {step > 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setStep(s => s - 1)}
+                                        disabled={loading}
+                                        className="flex-1 py-3 border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-sm hover:border-gray-400 transition-colors disabled:opacity-40"
+                                    >
+                                        ← Back
+                                    </button>
+                                )}
+                                {step < 5 ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => { if (canProceed()) setStep(s => s + 1); else alert('Please fill all required fields before continuing.'); }}
+                                        className="flex-1 py-3 bg-[#1a3a5c] text-white rounded-xl font-semibold text-sm hover:bg-[#0f2440] transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        Continue <ChevronRight size={16} />
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={handleSubmit}
+                                        disabled={loading}
+                                        className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                    >
+                                        {loading ? (
+                                            <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Submitting…</>
+                                        ) : (
+                                            <><Check size={16} /> Submit for Review</>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    {/* SECTION 6: FILE LINK */}
-                  {/* SECTION 6: FILE UPLOAD OR LINK */}
-<div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border-2 border-purple-200">
-    <h3 className="text-lg font-semibold text-purple-900 mb-4 flex items-center gap-2">
-        <Upload className="w-5 h-5" />
-        Upload Your PDF
-    </h3>
+                    {/* SIDEBAR */}
+                    <div className="space-y-5">
 
-    {/* File Upload Button */}
-    <div className="mb-4">
-        <label className="block text-sm font-medium text-purple-900 mb-2">
-            Option 1: Upload PDF Directly (Recommended)
-        </label>
-        <div className="flex items-center gap-3">
-            <label className="flex-1 cursor-pointer">
-                <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                    selectedFile 
-                        ? 'border-green-500 bg-green-50' 
-                        : 'border-purple-300 bg-white hover:border-purple-500'
-                }`}>
-                    <input
-                        type="file"
-                        accept="application/pdf"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        disabled={uploadingFile || loading}
-                    />
-                    <Upload className={`w-8 h-8 mx-auto mb-2 ${
-                        selectedFile ? 'text-green-600' : 'text-purple-600'
-                    }`} />
-                    {selectedFile ? (
-                        <>
-                            <p className="font-semibold text-green-700">
-                                ✓ {selectedFile.name}
-                            </p>
-                            <p className="text-sm text-green-600 mt-1">
-                                {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-                            </p>
-                        </>
-                    ) : (
-                        <>
-                            <p className="font-semibold text-purple-900">
-                                Click to upload PDF
-                            </p>
-                            <p className="text-sm text-purple-700 mt-1">
-                                Max size: 50MB
-                            </p>
-                        </>
-                    )}
+                        {/* Earnings card */}
+                        <div className="bg-[#1a3a5c] rounded-2xl p-6 text-white">
+                            <p className="text-xs font-bold uppercase tracking-wider text-white/60 mb-1">Your Potential Earnings</p>
+                            <p className="playfair text-4xl font-bold">₦{earnings}</p>
+                            <p className="text-white/60 text-xs mt-1">per sale at ₦{formData.price ? Number(formData.price).toLocaleString() : '0'}</p>
+                            <div className="mt-4 pt-4 border-t border-white/20 space-y-2 text-xs">
+                                <div className="flex justify-between"><span className="text-white/60">Your share</span><span className="font-semibold">80%</span></div>
+                                <div className="flex justify-between"><span className="text-white/60">Platform</span><span>20%</span></div>
+                            </div>
+                        </div>
+
+                        {/* What happens next */}
+                        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                            <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4">What Happens Next</p>
+                            <div className="space-y-3">
+                                {[
+                                    { n: '1', t: 'Submit', d: 'We receive your document for review' },
+                                    { n: '2', t: 'Review', d: 'Quality check within 24–48 hours' },
+                                    { n: '3', t: 'Live', d: 'Listed in the library for students' },
+                                    { n: '4', t: 'Earn', d: 'Get paid for every purchase' },
+                                ].map(s => (
+                                    <div key={s.n} className="flex items-start gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-[#1a3a5c]/10 text-[#1a3a5c] text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{s.n}</div>
+                                        <div>
+                                            <p className="text-sm font-semibold text-gray-900">{s.t}</p>
+                                            <p className="text-xs text-gray-400">{s.d}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Tips */}
+                        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                            <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4">Tips for Faster Approval</p>
+                            <ul className="space-y-2 text-xs text-gray-600">
+                                {[
+                                    'Upload a clear, readable PDF (not scanned blurry images)',
+                                    'Add a cover image — it increases sales significantly',
+                                    'Write a detailed description for better search ranking',
+                                    'Set a fair price — compare similar documents',
+                                    'Ensure Drive link sharing is set to "Anyone with link"',
+                                ].map((t, i) => (
+                                    <li key={i} className="flex items-start gap-2">
+                                        <Check size={12} className="text-green-500 mt-0.5 flex-shrink-0" />
+                                        {t}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        {/* Progress bar mobile */}
+                        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                            <div className="flex justify-between items-center mb-2">
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Progress</p>
+                                <p className="text-xs font-bold text-[#1a3a5c]">{step} of {STEPS.length}</p>
+                            </div>
+                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-[#1a3a5c] rounded-full transition-all duration-500" style={{ width: `${(step / STEPS.length) * 100}%` }} />
+                            </div>
+                            <p className="text-xs text-gray-400 mt-2">{STEPS[step - 1].label}</p>
+                        </div>
+
+                    </div>
                 </div>
-            </label>
-            {selectedFile && (
-                <button
-                    onClick={() => setSelectedFile(null)}
-                    className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
-                >
-                    <X className="w-5 h-5" />
-                </button>
-            )}
-        </div>
-        {uploadPercentage > 0 && uploadPercentage < 100 && (
-            <div className="mt-3">
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                        className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${uploadPercentage}%` }}
-                    ></div>
-                </div>
-                <p className="text-sm text-purple-700 mt-1 text-center">
-                    {uploadPercentage}% uploaded
-                </p>
             </div>
-        )}
-    </div>
 
-{/* SECTION 6.5: COVER IMAGE UPLOAD */}
-<div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-6 rounded-xl border-2 border-indigo-200">
-    <h3 className="text-lg font-semibold text-indigo-900 mb-4 flex items-center gap-2">
-        <BookOpen className="w-5 h-5" />
-        Book Cover Image (Optional)
-    </h3>
-
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Upload Section */}
-        <div>
-            <label className="block text-sm font-medium text-indigo-900 mb-2">
-                Upload Cover Image
-            </label>
-            <label className="cursor-pointer">
-                <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                    selectedCoverImage 
-                        ? 'border-green-500 bg-green-50' 
-                        : 'border-indigo-300 bg-white hover:border-indigo-500'
-                }`}>
-                    <input
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png,image/webp"
-                        onChange={handleCoverImageSelect}
-                        className="hidden"
-                        disabled={loading || uploadingFile}
-                    />
-                    <Upload className={`w-8 h-8 mx-auto mb-2 ${
-                        selectedCoverImage ? 'text-green-600' : 'text-indigo-600'
-                    }`} />
-                    {selectedCoverImage ? (
-                        <>
-                            <p className="font-semibold text-green-700">
-                                ✓ {selectedCoverImage.name}
-                            </p>
-                            <p className="text-sm text-green-600 mt-1">
-                                {(selectedCoverImage.size / (1024 * 1024)).toFixed(2)} MB
-                            </p>
-                        </>
-                    ) : (
-                        <>
-                            <p className="font-semibold text-indigo-900">
-                                Click to upload cover
-                            </p>
-                            <p className="text-sm text-indigo-700 mt-1">
-                                JPG, PNG, WEBP (Max 5MB)
-                            </p>
-                        </>
-                    )}
-                </div>
-            </label>
-            {selectedCoverImage && (
-                <button
-                    onClick={() => {
-                        setSelectedCoverImage(null);
-                        setFormData({ ...formData, coverImagePreview: null });
-                    }}
-                    className="mt-2 w-full px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center justify-center gap-2"
-                >
-                    <X className="w-4 h-4" />
-                    Remove Image
-                </button>
-            )}
-        </div>
-
-        {/* Preview Section */}
-        <div>
-            <label className="block text-sm font-medium text-indigo-900 mb-2">
-                Preview
-            </label>
-            <div className="border-2 border-indigo-200 rounded-lg p-4 bg-white">
-                {formData.coverImagePreview ? (
-                    <img
-                        src={formData.coverImagePreview}
-                        alt="Cover preview"
-                        className="w-full h-48 object-cover rounded-lg shadow-md"
-                    />
-                ) : (
-                    <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <div className="text-center text-gray-400">
-                            <BookOpen className="w-12 h-12 mx-auto mb-2" />
-                            <p className="text-sm">No image selected</p>
-                        </div>
-                    </div>
-                )}
-            </div>
-            <p className="text-xs text-indigo-700 mt-2">
-                💡 A custom cover makes your book more attractive to buyers!
-            </p>
-        </div>
-    </div>
-
-    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
-        <p className="text-xs text-yellow-800">
-            <strong>Note:</strong> If you don't upload a cover image, we'll automatically generate a thumbnail from your PDF.
-        </p>
-    </div>
-</div>
-
-    {/* Divider */}
-    <div className="flex items-center gap-3 my-4">
-        <div className="flex-1 border-t border-purple-300"></div>
-        <span className="text-sm text-purple-700 font-medium">OR</span>
-        <div className="flex-1 border-t border-purple-300"></div>
-    </div>
-
-    {/* Drive Link Option */}
-    <div>
-        <label className="block text-sm font-medium text-purple-900 mb-2">
-            Option 2: Google Drive / Dropbox Link
-        </label>
-        <div className="relative">
-            <input
-                name="driveLink"
-                type="url"
-                placeholder="https://drive.google.com/file/d/..."
-                value={formData.driveLink}
-                onChange={handleDriveLinkChange}
-                disabled={selectedFile || uploadingFile || loading}
-                className={`w-full text-blue-950 border px-4 py-3 rounded-lg focus:outline-none focus:ring-2 ${
-                    selectedFile 
-                        ? 'bg-gray-100 border-gray-300 cursor-not-allowed' 
-                        : 'border-purple-300 focus:ring-purple-500'
-                }`}
-            />
-            {isValidatingLink && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <div className="animate-spin h-5 w-5 border-b-2 border-purple-600 rounded-full"></div>
-                </div>
-            )}
-        </div>
-        <p className="mt-1 text-xs text-purple-700">
-            {selectedFile 
-                ? '✓ File upload selected - Drive link disabled' 
-                : '⚠️ Make sure the link is set to "Anyone with the link can view"'
-            }
-        </p>
-    </div>
-</div>
-
-                    {/* SECTION 7: DESCRIPTIONS */}
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Book Description *
-                            </label>
-                            <textarea
-                                name="description"
-                                placeholder="Brief description of your book..."
-                                rows={3}
-                                value={formData.description}
-                                onChange={handleChange}
-                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 resize-none"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Book Summarization *
-                            </label>
-                            <textarea
-                                name="message"
-                                placeholder="Tell us about your promotion plan..."
-                                rows={3}
-                                value={formData.message}
-                                onChange={handleChange}
-                                className="w-full text-blue-950 border border-gray-300 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 resize-none"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {uploadProgress && (
-                    <div className="mt-4 text-center text-sm text-blue-950 font-medium">
-                        {uploadProgress}
-                    </div>
-                )}
-
-                <div className="flex gap-3 pt-6 mt-4 border-t border-gray-200">
-                    <button
-                        type="button"
-                        onClick={() => router.back()}
-                        disabled={loading}
-                        className="flex-1 border-2 border-gray-300 text-gray-700 py-3 px-6 rounded-lg font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    >
-                        Cancel
-                    </button>
-
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading}
-                        className="flex-1 bg-blue-950 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-900 transition-colors disabled:opacity-50"
-                    >
-                        {loading ? "Uploading..." : "Upload"}
-                    </button>
-                </div>
-
-                <p className="text-center text-xs text-gray-500 mt-4">
-                    We typically respond within 24-48 hours • Thumbnails auto-generated from PDFs
-                </p>
-            </div>
-
+            {/* Access Warning Modal */}
             {showAccessWarning && (
-                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-fadeIn">
-                    <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl animate-slideIn max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-start gap-4 mb-4">
-                            <div className="flex-shrink-0 w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                                <AlertCircle className="w-6 h-6 text-yellow-600" />
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl max-w-lg w-full p-7 shadow-2xl">
+                        <div className="flex items-start gap-4 mb-5">
+                            <div className="w-11 h-11 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                <AlertCircle size={20} className="text-amber-600" />
                             </div>
-                            <div className="flex-1">
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">⚠️ File Access Warning</h3>
-                                <p className="text-gray-600">
-                                    Your Google Drive link might not be publicly accessible. Buyers won't be able to view or download your PDF!
-                                </p>
+                            <div>
+                                <h3 className="playfair text-lg font-bold text-gray-900">Check Your Drive Permissions</h3>
+                                <p className="text-sm text-gray-500 mt-1">Your link may not be publicly accessible. Buyers will see "Access Denied".</p>
                             </div>
-                            <button onClick={() => setShowAccessWarning(false)} className="text-gray-400 hover:text-gray-600">
-                                <X className="w-6 h-6" />
+                            <button onClick={() => setShowAccessWarning(false)} className="text-gray-300 hover:text-gray-600 ml-auto">
+                                <X size={18} />
                             </button>
                         </div>
-
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                            <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                                <AlertCircle className="w-5 h-5" />
-                                          How to Fix This (Easy Steps):
-                                      </h4>
-                                      <ol className="space-y-2 text-sm text-blue-900">
-                                          <li className="flex gap-3"><span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span><span>Go to your file in <strong>Google Drive</strong></span></li>
-                                          <li className="flex gap-3"><span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span><span><strong>Right-click</strong> on the PDF file</span></li>
-                                          <li className="flex gap-3"><span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span><span>Click <strong>"Share"</strong> or <strong>"Get link"</strong></span></li>
-                                          <li className="flex gap-3"><span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">4</span><span>Change to <strong className="text-green-700">"Anyone with the link"</strong></span></li>
-                                          <li className="flex gap-3"><span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">5</span><span>Make sure it says <strong className="text-green-700">"Viewer"</strong> permission</span></li>
-                                          <li className="flex gap-3"><span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">6</span><span><strong>Copy</strong> the new link and paste it here</span></li>
-                                      </ol>
-                                  </div>
-          
-                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                                      <h4 className="font-semibold text-red-900 mb-2 flex items-center gap-2">
-                                          <AlertCircle className="w-5 h-5" />
-                                          If You Don't Fix This:
-                                      </h4>
-                                      <ul className="space-y-1 text-sm text-red-900">
-                                          <li>❌ Buyers will see "Access Denied" error</li>
-                                          <li>❌ No thumbnail will be generated</li>
-                                          <li>❌ PDF preview won't work</li>
-                                          <li>❌ Downloads will fail completely</li>
-                                          <li>❌ You'll get refund requests and complaints</li>
-                                      </ul>
-                                  </div>
-          
-                                  <div className="flex gap-3">
-                                      <button onClick={() => setShowAccessWarning(false)} className="flex-1 bg-gray-200 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors">
-                                          I'll Fix It Later
-                                      </button>
-                                      <button onClick={() => { setShowAccessWarning(false); window.open('https://drive.google.com', '_blank'); }} className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
-                                          <Upload className="w-5 h-5" />
-                                          Open Google Drive
-                                      </button>
-                                  </div>
-                              </div>
-                          </div>
-                      )}
-          
-                      <style jsx>{`
-                          @keyframes fadeIn {
-                              from { opacity: 0; }
-                              to { opacity: 1; }
-                          }
-                          @keyframes slideIn {
-                              from { opacity: 0; transform: scale(0.95) translateY(20px); }
-                              to { opacity: 1; transform: scale(1) translateY(0); }
-                          }
-                          .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
-                          .animate-slideIn { animation: slideIn 0.3s ease-out; }
-                      `}</style>
-
+                        <div className="bg-blue-50 rounded-xl p-4 mb-4 text-sm text-blue-900 space-y-2">
+                            {['Open Google Drive', 'Right-click your PDF → Share', 'Set to "Anyone with the link"', 'Set permission to "Viewer"', 'Copy the new link and paste it here'].map((s, i) => (
+                                <div key={i} className="flex gap-3 items-start">
+                                    <span className="w-5 h-5 bg-blue-600 text-white rounded-full text-xs flex items-center justify-center font-bold flex-shrink-0">{i + 1}</span>
+                                    <span>{s}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setShowAccessWarning(false)}
+                                className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50">
+                                I'll Fix It Later
+                            </button>
+                            <button onClick={() => { setShowAccessWarning(false); window.open('https://drive.google.com', '_blank'); }}
+                                className="flex-1 py-2.5 bg-[#1a3a5c] text-white rounded-xl text-sm font-semibold hover:bg-[#0f2440]">
+                                Open Google Drive →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
-        
     );
 }

@@ -164,7 +164,7 @@ export default function RoleSelectionClient() {
     // ── Render ─────────────────────────────────────────────────────────────────
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#f9f6f0" }}>
 
             {/* ── STEP 1: Landing — choose Student / Seller / Institution ── */}
             {step === "landing" && (

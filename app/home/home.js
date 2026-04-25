@@ -303,18 +303,19 @@ useEffect(() => {
         };
     }, [router]);
 
-    // ✅ Fetch latest 4 books from Firebase
+    // ✅ Fetch Trending 4 books from Firebase
     useEffect(() => {
         const fetchLatestBooks = async () => {
             try {
                 setLoadingBooks(true);
 
+                // Fetch more books so we have enough to sort by sales
                 const advertBooksRef = collection(db, 'advertMyBook');
                 const q = query(
                     advertBooksRef,
-                    where('status', '==', 'approved'),  // ✅ ADD THIS LINE
+                    where('status', '==', 'approved'),
                     orderBy('createdAt', 'desc'),
-                    limit(6)
+                    limit(40) // fetch 40 so sorting by sales gives meaningful results
                 );
 
                 const snapshot = await getDocs(q);
@@ -324,7 +325,6 @@ useEffect(() => {
 
                     snapshot.forEach((doc) => {
                         const data = doc.data();
-
                         if (data.bookTitle && data.price) {
                             const bookData = {
                                 id: `firestore-${doc.id}`,
@@ -335,23 +335,29 @@ useEffect(() => {
                                 price: Number(data.price) || 0,
                                 pages: data.pages || 100,
                                 format: 'PDF',
+                                country: data.country || "Unknown",
                                 description: data.description || `Discover ${data.bookTitle}`,
                                 driveFileId: data.driveFileId,
                                 pdfUrl: data.pdfUrl,
                                 embedUrl: data.embedUrl,
                                 isFromFirestore: true,
-                                isNew: true,
                                 createdAt: data.createdAt,
                                 rating: data.rating || 4.5,
-                                reviews: data.reviews || 0
+                                reviews: data.reviews || 0,
                             };
-
                             bookData.image = getThumbnailUrl(bookData);
                             latestBooks.push(bookData);
                         }
                     });
 
-                    console.log(`✅ Loaded ${latestBooks.length} latest books`);
+                    // Sort by sales count descending — most sold appears first
+                    // bookSalesCount may not be ready yet so we re-sort after sales load too
+                    latestBooks.sort((a, b) => {
+                        const salesA = bookSalesCount[a.id] || bookSalesCount[a.firestoreId] || 0;
+                        const salesB = bookSalesCount[b.id] || bookSalesCount[b.firestoreId] || 0;
+                        return salesB - salesA;
+                    });
+
                     setAllBooks(latestBooks);
                 } else {
                     setAllBooks([]);
@@ -365,7 +371,8 @@ useEffect(() => {
         };
 
         fetchLatestBooks();
-    }, []);
+    }, [bookSalesCount]); // ← re-runs once bookSalesCount is loaded so sort is accurate
+
 
     // ✅ Thumbnail helper function
     const getThumbnailUrl = (book) => {
@@ -511,7 +518,7 @@ useEffect(() => {
         }
 
         if (isSeller) {
-            router.push('/advertise');
+            router.push('/upload-document');
         } else {
             router.push('/become-seller');
         }
@@ -531,8 +538,7 @@ useEffect(() => {
     }
 
     return (
-        <div className="min-h-screen bg-neutral-100">
-            {/* Navbar */}
+        <div className="min-h-screen" style={{ backgroundColor: "#f9f6f0" }}>
             <Navbar />
 
             {/* Featured Content Carousel */}
@@ -609,10 +615,10 @@ useEffect(() => {
             <div className="bg-gradient-to-br from-gray-50 to-gray-100 py-16 shadow-2xl">
                 <div className="max-w-7xl mx-auto px-4">
                     <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 mb-6">
-                        You've seen it all, now understand it all.
+                        "You've seen the notes, now master the course.
                     </h1>
                     <p className="text-lg md:text-xl text-gray-700 max-w-4xl">
-                        Make sense of anything with information on just about everything, shared by a global community of thinkers.
+                        Make sense of complex topics with resources on every subject, shared by top students and educators across the network."
                     </p>
                 </div>
             </div>
@@ -643,40 +649,58 @@ useEffect(() => {
                         {/* Mobile: 2 per row (Grid) | Desktop: Horizontal scroll */}
                         <div className="relative">
                             {/* Mobile Grid (2 columns) */}
-                            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-                                {displayBooks.slice(0, 6).map((book) => (
-                                    <Link
-                                        key={book.id}
-                                        href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
-                                        className="group"
-                                    >
-                                        <div className="relative mb-3">
-                                            <img
-                                                src={book.image}
-                                                alt={book.title}
-                                                className="w-full  object-cover  group-hover:shadow-xl transition-shadow"
-                                                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                                            />
-                                            {isPurchased(book.id) && (
-                                                <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 text-xs font-bold">Owned</span>
-                                            )}
-                                            {book.isFromFirestore && (
-                                                <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 text-xs font-bold">New</span>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                                                {book.title}
-                                            </h4>
-                                            <p className="text-gray-600 text-xs">{book.author}</p>
-                                        </div>
-                                        <p className="text-gray-500 text-xs lg:text-sm flex items-center gap-1 mt-1">
-                                            <ShoppingBag size={12} />
-                                            {bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0} sold
-                                        </p>
-                                    </Link>
-                                ))}
-                            </div>
+                                <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+                                    {displayBooks.slice(0, 6).map((book) => {
+                                        const soldCount = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
+
+                                        // Badge logic: highest sold = "Trending", others = "New"
+                                        const topSoldThreshold = displayBooks.slice(0, 6).reduce((max, b) => {
+                                            const s = bookSalesCount[b.id] || bookSalesCount[b.firestoreId] || 0;
+                                            return Math.max(max, s);
+                                        }, 0);
+
+                                        const isTrending = soldCount > 0 && soldCount === topSoldThreshold;
+
+                                        return (
+                                            <Link
+                                                key={book.id}
+                                                href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
+                                                className="group"
+                                            >
+                                                <div className="relative mb-3">
+                                                    <img
+                                                        src={book.image}
+                                                        alt={book.title}
+                                                        className="w-full object-cover group-hover:shadow-xl transition-shadow"
+                                                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
+                                                    />
+                                                    {isPurchased(book.id) && (
+                                                        <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 text-xs font-bold">Owned</span>
+                                                    )}
+                                                    {/* Trending badge for highest sold, New for others */}
+                                                    {isTrending ? (
+                                                        <span className="absolute top-2 left-2 bg-orange-500 text-white px-2 py-1 text-xs font-bold">
+                                                            🔥 Trending
+                                                        </span>
+                                                    ) : book.isFromFirestore && (
+                                                        <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 text-xs font-bold">New</span>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                                                        {book.title}
+                                                    </h4>
+                                                    <p className="text-gray-600 text-xs">{book.author}</p>
+                                                </div>
+                                                <p className="text-gray-500 text-xs lg:text-sm flex items-center gap-1 mt-1">
+                                                    <ShoppingBag size={12} />
+                                                    {soldCount} sold
+                                                </p>
+                                               
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
 
                             {/* Desktop Horizontal Scroll */}
                             <div className=" relative -mx-4 lg:mx-0">
@@ -773,26 +797,28 @@ useEffect(() => {
                                     )}
                                     </div>
                                         {/* Reset Filter Button (Visible only when filtering) */}
-                                        {selectedCategory && (
-                                            <div className="mt-8 flex justify-center">
-                                                <main className="max-w-7xl mx-auto px-4 py-12">
-                                                    {/* Desktop Categories Grid - Hidden on mobile */}
-
-                                                    {/* Explore All Link */}
-                                                    <div className="text-center mt-12">
-                                                        <a
-                                                            href="/documents"
-                                                            className="inline-flex items-center text-blue-950 font-semibold text-lg hover:underline"
-                                                        >
-                                                            Explore all of our categories
-                                                            <ChevronRight className="w-5 h-5 ml-1" />
-                                                        </a>
-                                                    </div>
-                                                </main>
-
-                                            </div>
+                                       {selectedCategory && (
+    <div className="mt-12 flex justify-center">
+        {activeTab === 'subjects' ? (
+            <a
+                href="/documents"
+                className="inline-flex items-center text-blue-950 font-semibold text-lg hover:underline"
+            >
+                Explore all of our categories
+                <ChevronRight className="w-5 h-5 ml-1" />
+            </a>
+        ) : (
+            <a
+                href="/resources"
+                className="inline-flex items-center text-blue-950 font-semibold text-lg hover:underline"
+            >
+                Explore all student resources
+                <ChevronRight className="w-5 h-5 ml-1" />
+            </a>
+        )}
+    </div>
                                         )}
-                                </div>
+                                        </div>
                             </div>
                         </div>
                         </div>

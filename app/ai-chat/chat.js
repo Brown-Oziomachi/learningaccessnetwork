@@ -372,9 +372,14 @@ function BookPickerScreen({ onSelectBook }) {
         ));
     }, [searchQuery, allBooks]);
 
+    // Replace the entire BookPickerScreen return statement with this.
+    // Fixes: blocked scroll, collapsed grid, flex height issues on mobile.
+
     return (
-        <div className="flex flex-col h-screen bg-slate-950">
-            <header className="flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-sky-500/20 shrink-0">
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#020617', overflow: 'hidden' }}>
+
+            {/* ── Header ── */}
+            <header className="flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-sky-500/20 flex-shrink-0">
                 <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/25 flex items-center justify-center">
                     <Library size={15} className="text-sky-400" />
                 </div>
@@ -384,11 +389,12 @@ function BookPickerScreen({ onSelectBook }) {
                 </div>
                 <div className="ml-auto flex items-center gap-1">
                     <Sparkles size={14} className="text-sky-400" />
-                    <span className="text-[10px] text-slate-500 hidden sm:block">Gemini Flash</span>
+                    <span className="text-[10px] text-slate-500 hidden sm:block">LAN Flash</span>
                 </div>
             </header>
 
-            <div className="px-5 pt-8 pb-5 text-center">
+            {/* ── Hero text ── */}
+            <div className="px-5 pt-8 pb-5 text-center flex-shrink-0">
                 <div className="w-16 h-16 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center mx-auto mb-4">
                     <BookMarked size={30} className="text-sky-400" />
                 </div>
@@ -398,7 +404,8 @@ function BookPickerScreen({ onSelectBook }) {
                 </p>
             </div>
 
-            <div className="px-4 pb-4">
+            {/* ── Search ── */}
+            <div className="px-4 pb-4 flex-shrink-0">
                 <div className="flex items-center gap-2.5 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 focus-within:border-sky-500/50 transition-colors max-w-lg mx-auto">
                     <Search size={15} className="text-slate-500 shrink-0" />
                     <input
@@ -416,7 +423,10 @@ function BookPickerScreen({ onSelectBook }) {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 pb-6">
+            {/* ── Scrollable grid — KEY FIX: explicit overflow-y-auto with min-h-0 ── */}
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}
+                className="px-4 pb-8">
+
                 {loadingBooks ? (
                     <div className="flex items-center justify-center py-16">
                         <Loader2 size={28} className="animate-spin text-sky-500" />
@@ -463,7 +473,7 @@ function BookPickerScreen({ onSelectBook }) {
         </div>
     );
 }
-
+    
 /* ══════════════════════════════════════
    QUICK ACTIONS
 ══════════════════════════════════════ */

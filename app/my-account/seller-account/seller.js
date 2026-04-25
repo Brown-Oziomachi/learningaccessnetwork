@@ -9,6 +9,7 @@ import Navbar from "@/components/NavBar";
 import NotificationBell from "@/components/NotificationBell";
 import { usePayment } from "@/app/hooks/usePayment";
 import { addStudentRoleToExistingUser } from "@/lib/auth/authHelpers";
+import ExportStudentsModal from "@/components/Exportstudentsmodal";
 
 const nigerianBanks = [
     { name: "Access Bank", code: "044" },
@@ -314,13 +315,17 @@ function VTUQuickAccess() {
 
 
 function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
+    const [showEnrollConfirm, setShowEnrollConfirm] = useState(false);
+    const [enrolling, setEnrolling] = useState(false);
+    const [enrollError, setEnrollError] = useState("");
 
     const handleEnrollAsStudent = async () => {
         try {
+            setEnrolling(true);
+            setEnrollError("");
             const currentUser = auth.currentUser;
 
             if (!currentUser) {
-                // Not logged in — full registration flow
                 router.push('/auth/role-selection');
                 return;
             }
@@ -328,39 +333,64 @@ function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
             const result = await addStudentRoleToExistingUser(currentUser.uid);
 
             if (result.success) {
+                setShowEnrollConfirm(false);
                 onClose();
                 router.push('/student/dashboard');
             } else {
                 console.error('Failed to add student role:', result.error);
-                alert('Something went wrong. Please try again.');
+                setEnrollError('Something went wrong. Please try again.');
             }
         } catch (error) {
             console.error('Enroll error:', error);
-            alert('Something went wrong. Please try again.');
+            setEnrollError('Something went wrong. Please try again.');
+        } finally {
+            setEnrolling(false);
         }
+    };
+
+    const handleClose = () => {
+        setShowEnrollConfirm(false);
+        setEnrollError("");
+        onClose();
     };
 
     return (
         <>
+            {/* ── BACKDROP ── */}
             <div
-                className={`fixed inset-0 bg-black/50 z-[80] transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-                onClick={onClose}
+                className={`fixed inset-0 bg-black/50 z-[80] transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+                    }`}
+                onClick={handleClose}
             />
-            <div className={`fixed bottom-0 left-0 right-0 z-[90] transition-transform duration-300 ease-out ${isOpen ? "translate-y-0" : "translate-y-full"}`}>
+
+            {/* ── MAIN SHEET ── */}
+            <div
+                className={`fixed bottom-0 left-0 right-0 z-[90] transition-transform duration-300 ease-out ${isOpen ? "translate-y-0" : "translate-y-full"
+                    }`}
+            >
                 <div className="bg-white rounded-t-3xl shadow-2xl max-w-lg mx-auto">
+                    {/* Drag handle */}
                     <div className="flex justify-center pt-3 pb-1">
                         <div className="w-10 h-1 rounded-full bg-gray-300" />
                     </div>
+
+                    {/* Header */}
                     <div className="px-6 pt-3 pb-4 border-b border-gray-100">
                         <p className="text-lg font-bold text-blue-950 antialiased tracking-tight">Switch Account</p>
                         <p className="text-xs text-gray-500 mt-0.5 antialiased">Choose which account to view</p>
                     </div>
+
                     <div className="p-4 space-y-3 pb-10">
 
                         {/* Student Account */}
                         <div>
                             <button
-                                onClick={() => { if (isStudent) { router.push("/student/dashboard"); onClose(); } }}
+                                onClick={() => {
+                                    if (isStudent) {
+                                        router.push("/student/dashboard");
+                                        onClose();
+                                    }
+                                }}
                                 disabled={!isStudent}
                                 className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all ${isStudent
                                         ? "border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.98]"
@@ -384,19 +414,27 @@ function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
                                     </div>
                                     <p className="text-xs text-gray-400 mt-0.5">Access courses, assignments & library</p>
                                 </div>
-                                {isStudent
-                                    ? <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-gray-300 flex-shrink-0"><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                    : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-gray-300 flex-shrink-0"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" strokeLinecap="round" /></svg>
-                                }
+                                {isStudent ? (
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-gray-300 flex-shrink-0">
+                                        <path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                ) : (
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-gray-300 flex-shrink-0">
+                                        <rect x="5" y="11" width="14" height="10" rx="2" />
+                                        <path d="M8 11V7a4 4 0 018 0v4" strokeLinecap="round" />
+                                    </svg>
+                                )}
                             </button>
 
-                            {/* Enroll button shown only when NOT a student */}
+                            {/* Enroll button — only when NOT a student */}
                             {!isStudent && (
                                 <button
-                                    onClick={handleEnrollAsStudent}
+                                    onClick={() => {
+                                        setEnrollError("");
+                                        setShowEnrollConfirm(true);
+                                    }}
                                     className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-400 active:scale-[0.98] transition-all group"
                                 >
-                                    {/* Enroll icon */}
                                     <div className="w-5 h-5 rounded-full bg-emerald-500 group-hover:bg-emerald-600 flex items-center justify-center transition-colors flex-shrink-0">
                                         <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth={2.5} className="w-3 h-3">
                                             <path d="M8 3v10M3 8h10" strokeLinecap="round" />
@@ -431,9 +469,127 @@ function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
                                 </div>
                                 <p className="text-xs text-gray-400 mt-0.5">Manage earnings, documents & withdrawals</p>
                             </div>
-                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-blue-800 flex-shrink-0"><path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-blue-800 flex-shrink-0">
+                                <path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── ENROLL CONFIRMATION SHEET (slides up over the switch sheet) ── */}
+            <div
+                className={`fixed inset-0 z-[100] flex items-end justify-center transition-all duration-300 ${showEnrollConfirm ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                    }`}
+            >
+                {/* Confirmation backdrop */}
+                <div
+                    className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                    onClick={() => { setShowEnrollConfirm(false); setEnrollError(""); }}
+                />
+
+                <div
+                    className={`relative bg-white w-full max-w-lg rounded-t-[28px] shadow-2xl transition-transform duration-300 ease-out ${showEnrollConfirm ? "translate-y-0" : "translate-y-full"
+                        }`}
+                >
+                    {/* Drag handle */}
+                    <div className="flex justify-center pt-3 pb-1">
+                        <div className="w-10 h-1 rounded-full bg-gray-200" />
+                    </div>
+
+                    {/* Icon + title */}
+                    <div className="px-6 pt-4 pb-5 text-center">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-200">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={1.8} className="w-8 h-8">
+                                <path d="M12 3L2 9l10 6 10-6-10-6z" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M6 11.5V16c0 1.5 2.686 3 6 3s6-1.5 6-3v-4.5" strokeLinecap="round" />
+                            </svg>
+                        </div>
+                        <p className="text-[19px] font-bold text-blue-950 tracking-tight">Enrol as a Student?</p>
+                        <p className="text-sm text-gray-500 mt-1.5 leading-relaxed max-w-xs mx-auto">
+                            You'll get a student account linked to your existing seller profile — no separate login needed.
+                        </p>
+                    </div>
+
+                    {/* What you get */}
+                    <div className="mx-5 mb-5 rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-3">
+                            What you'll get access to
+                        </p>
+                        <div className="space-y-2.5">
+                            {[
+                                "Browse and purchase documents from the library",
+                                "Track your purchases in a personal library dashboard",
+                                "Switch between your seller and student accounts instantly",
+                                "Access student-only features and resources",
+                            ].map((item, i) => (
+                                <div key={i} className="flex items-start gap-2.5">
+                                    <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <svg viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth={2} className="w-2.5 h-2.5">
+                                            <path d="M2 6l2.5 2.5L10 3" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                    </div>
+                                    <p className="text-[13px] text-emerald-900 leading-snug">{item}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Note */}
+                    <div className="mx-5 mb-5 flex items-start gap-2.5 bg-blue-50 border border-blue-100 rounded-xl p-3">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M12 8v4M12 16h.01" strokeLinecap="round" />
+                        </svg>
+                        <p className="text-[12px] text-blue-700 leading-relaxed">
+                            Your seller account and wallet remain completely unchanged. This just adds a student role to your profile.
+                        </p>
+                    </div>
+
+                    {/* Error */}
+                    {enrollError && (
+                        <div className="mx-5 mb-4 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
+                            <AlertCircle size={14} className="text-red-500 flex-shrink-0" />
+                            <p className="text-[12px] text-red-600">{enrollError}</p>
+                        </div>
+                    )}
+
+                    {/* Buttons */}
+                    <div className="px-5 pb-10 space-y-2.5">
+                        <button
+                            onClick={handleEnrollAsStudent}
+                            disabled={enrolling}
+                            className="w-full py-[15px] rounded-[14px] text-[14px] font-semibold text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                            style={{
+                                background: enrolling
+                                    ? "#6b7280"
+                                    : "linear-gradient(135deg, #10b981, #0d9488)",
+                                cursor: enrolling ? "not-allowed" : "pointer",
+                            }}
+                        >
+                            {enrolling ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    Enrolling...
+                                </>
+                            ) : (
+                                <>
+                                    Yes, enrol me as a student
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth={2} className="w-4 h-4">
+                                        <path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                </>
+                            )}
                         </button>
 
+                        <button
+                            onClick={() => { setShowEnrollConfirm(false); setEnrollError(""); }}
+                            disabled={enrolling}
+                            className="w-full py-[13px] rounded-[14px] text-[14px] font-semibold text-gray-500 hover:bg-gray-50 transition-colors"
+                            style={{ border: "0.5px solid #e5e7eb" }}
+                        >
+                            No, go back
+                        </button>
                     </div>
                 </div>
             </div>
@@ -446,7 +602,7 @@ export default function SellerAccountClient() {
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [accountBalance, setAccountBalance] = useState(0);
+    const [accountBalance, setAccountBalance] = useState(50);
     const [totalEarnings, setTotalEarnings] = useState(0);
     const [booksSold, setBooksSold] = useState(0);
     const [transactions, setTransactions] = useState([]);
@@ -475,6 +631,8 @@ export default function SellerAccountClient() {
     const [resetPinSuccess, setResetPinSuccess] = useState(false);
     const [showSwitchModal, setShowSwitchModal] = useState(false);
     const router = useRouter();
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [sellerBooks, setSellerBooks] = useState([]);
     const [showBankModal, setShowBankModal] = useState(false);
     const [bankFormData, setBankFormData] = useState({
         accountName: "",
@@ -544,6 +702,18 @@ export default function SellerAccountClient() {
                     setAccountBalance(sellerData.accountBalance || 0);
                     setTotalEarnings(sellerData.totalEarnings || 0);
                     setBooksSold(sellerData.booksSold || 0);
+
+                    const booksQuery = query(
+                        collection(db, "advertMyBook"),
+                        where("sellerId", "==", uid)
+                    );
+                    const booksSnap = await getDocs(booksQuery);
+                    setSellerBooks(booksSnap.docs.map((d) => ({
+                        ...d.data(),
+                        id: `firestore-${d.id}`,
+                        title: d.data().bookTitle,  // ← ExportStudentsModal reads .title, but field is bookTitle
+                    })));
+
                 } else {
                     const sellerDocRef = doc(db, "sellers", uid);
                     await setDoc(sellerDocRef, {
@@ -1119,7 +1289,7 @@ export default function SellerAccountClient() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100">
+        <div className="min-h-screen background: '#f9f6f0'">
             <Navbar />
 
             {/* Main Container - Responsive Layout */}
@@ -1317,7 +1487,7 @@ export default function SellerAccountClient() {
                                     <ChevronRight size={20} className="text-gray-400" />
                                 </Link>
 
-                                <Link href="/advertise" className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                                <Link href="/upload-document" className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
                                     <div className="bg-blue-950 p-3 rounded-lg">
                                         <TrendingUp className="text-white" size={20} />
                                     </div>
@@ -1327,6 +1497,18 @@ export default function SellerAccountClient() {
                                     </div>
                                     <ChevronRight size={20} className="text-gray-400" />
                                 </Link>
+
+                                <Link href="/upload-document/my-pending-books" className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                                    <div className="bg-blue-950 p-3 rounded-lg">
+                                        <TrendingUp className="text-white" size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-blue-950">Pending documents</p>
+                                        <p className="text-xs text-gray-600">Track document</p>
+                                    </div>
+                                    <ChevronRight size={20} className="text-gray-400" />
+                                </Link>
+                            
                             </div>
                         </div>
 
@@ -1517,6 +1699,27 @@ export default function SellerAccountClient() {
                                             <ChevronRight size={20} className="text-gray-300" />
                                         </button>
 
+{seller?.title === "Lecturer" && (
+    <button
+        onClick={() => {
+            setShowProfileModal(false);
+            setShowExportModal(true);
+        }}
+        className="w-full bg-blue-950 rounded-xl p-4 flex items-center justify-between hover:bg-blue-900 transition-colors"
+    >
+        <div className="flex items-center gap-3">
+            <div className="bg-white p-2 rounded-lg">
+                <Download size={20} className="text-blue-950" />
+            </div>
+            <div className="text-left">
+                <span className="font-semibold text-white block">Export Student List</span>
+                <span className="text-xs text-blue-300">Download buyer CSV</span>
+            </div>
+        </div>
+        <ChevronRight size={20} className="text-gray-300" />
+    </button>
+                                        )}
+                                        
                                         <button
                                             onClick={() => {
                                                 setShowProfileModal(false);
@@ -2340,6 +2543,12 @@ export default function SellerAccountClient() {
                     </div>
                 </div>
             )}
+            <ExportStudentsModal
+                isOpen={showExportModal}
+                onClose={() => setShowExportModal(false)}
+                sellerId={user?.uid}
+                sellerBooks={sellerBooks}
+            />
         </div>
     );
 }
