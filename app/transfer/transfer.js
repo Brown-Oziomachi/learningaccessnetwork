@@ -1,908 +1,887 @@
-"use client"
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, Copy, Check, Loader2, CheckCircle2, AlertCircle, ArrowUpRight, Wallet, Search, Shield, Lock, Eye, EyeOff, X, ArrowDownLeft } from 'lucide-react';
-import Navbar from '@/components/NavBar';
-import { onAuthStateChanged } from 'firebase/auth';
+import React, { useState, useEffect, useRef } from "react";
 import {
-    doc, getDoc, collection, query, where,
-    getDocs, runTransaction, serverTimestamp,
-    increment, orderBy, limit, updateDoc
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebaseConfig';
-import TransferReceipt, { TransferReceiptModal } from '@/components/Transferreceipt';
-import Link from 'next/link';
-import { Smartphone } from 'lucide-react';
-import SHA256 from 'crypto-js/sha256';
+  ArrowRight, Copy, Check, Loader2, CheckCircle2, AlertCircle,
+  ArrowUpRight, Wallet, Search, Lock, Eye, EyeOff, X, ArrowDownLeft,
+} from "lucide-react";
+import Navbar from "@/components/NavBar";
+import { onAuthStateChanged } from "firebase/auth";
+import {
+  doc, getDoc, collection, query, where,
+  getDocs, runTransaction, serverTimestamp,
+  increment, orderBy, limit, updateDoc,
+} from "firebase/firestore";
+import { auth, db } from "@/lib/firebaseConfig";
+import TransferReceipt, { TransferReceiptModal } from "@/components/Transferreceipt";
+import Link from "next/link";
+import { Smartphone } from "lucide-react";
 
+/* ─── colour tokens ─────────────────────────────────────────── */
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG    = "#f5f1ea";
+
+/* ─── helpers ───────────────────────────────────────────────── */
 export const generateAccountNumber = () => {
-    const digits = Math.floor(1000000 + Math.random() * 9000000);
-    return `LAN${digits}`;
+  const digits = Math.floor(1000000 + Math.random() * 9000000);
+  return `LAN${digits}`;
 };
 
 const formatAccountNumber = (acc) => {
-    if (!acc) return '';
-    const num = acc.replace('LAN', '');
-    return `LAN-${num.slice(0, 3)}-${num.slice(3)}`;
+  if (!acc) return "";
+  const num = acc.replace("LAN", "");
+  return `LAN-${num.slice(0, 3)}-${num.slice(3)}`;
 };
 
-// ── PIN Input Grid ─────────────────────────────────────────────────────────
+/* ─── shared inline style objects ───────────────────────────── */
+const inputStyle = (focus) => ({
+  width: "100%",
+  padding: "11px 13px",
+  border: `0.5px solid ${focus ? GOLD : "#e5ddd0"}`,
+  background: CREAM,
+  fontSize: "13px",
+  color: NAVY,
+  fontFamily: "'Lato', sans-serif",
+  outline: "none",
+  boxSizing: "border-box",
+  transition: "border-color 0.18s",
+});
+
+const navyBtn = (disabled) => ({
+  width: "100%",
+  background: disabled ? "#aaa" : NAVY,
+  color: "#fff",
+  padding: "13px",
+  border: "none",
+  fontSize: "12px",
+  fontWeight: 700,
+  cursor: disabled ? "not-allowed" : "pointer",
+  fontFamily: "'Lato', sans-serif",
+  letterSpacing: "0.06em",
+  transition: "background 0.18s",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  opacity: disabled ? 0.5 : 1,
+});
+
+const goldBtn = (disabled) => ({
+  width: "100%",
+  background: disabled ? "#ccc" : GOLD,
+  color: NAVY,
+  padding: "13px",
+  border: "none",
+  fontSize: "12px",
+  fontWeight: 700,
+  cursor: disabled ? "not-allowed" : "pointer",
+  fontFamily: "'Lato', sans-serif",
+  letterSpacing: "0.06em",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  opacity: disabled ? 0.5 : 1,
+});
+
+const sectionCard = {
+  background: "#fff",
+  border: `0.5px solid #e5ddd0`,
+  padding: "22px",
+  marginBottom: "16px",
+};
+
+const eyebrow = {
+  fontSize: "9px",
+  fontWeight: 700,
+  letterSpacing: "0.18em",
+  textTransform: "uppercase",
+  color: GOLD,
+  marginBottom: "4px",
+  fontFamily: "'Lato', sans-serif",
+};
+
+/* ─── PIN Input Grid ─────────────────────────────────────────── */
 function PinInput({ value, onChange, disabled = false, masked = true }) {
-    const inputs = useRef([]);
+  const inputs = useRef([]);
 
-    const handleChange = (i, e) => {
-        const v = e.target.value.replace(/\D/g, '').slice(-1);
-        const arr = value.split('');
-        arr[i] = v;
-        const next = arr.join('').slice(0, 4);
-        onChange(next);
-        if (v && i < 3) inputs.current[i + 1]?.focus();
-    };
+  const handleChange = (i, e) => {
+    const v = e.target.value.replace(/\D/g, "").slice(-1);
+    const arr = value.split("");
+    arr[i] = v;
+    const next = arr.join("").slice(0, 4);
+    onChange(next);
+    if (v && i < 3) inputs.current[i + 1]?.focus();
+  };
 
-    const handleKeyDown = (i, e) => {
-        if (e.key === 'Backspace' && !value[i] && i > 0) {
-            inputs.current[i - 1]?.focus();
-            const arr = value.split('');
-            arr[i - 1] = '';
-            onChange(arr.join(''));
-        }
-    };
+  const handleKeyDown = (i, e) => {
+    if (e.key === "Backspace" && !value[i] && i > 0) {
+      inputs.current[i - 1]?.focus();
+      const arr = value.split("");
+      arr[i - 1] = "";
+      onChange(arr.join(""));
+    }
+  };
 
-    const handlePaste = (e) => {
-        const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
-        onChange(paste);
-        inputs.current[Math.min(paste.length, 3)]?.focus();
-        e.preventDefault();
-    };
+  const handlePaste = (e) => {
+    const paste = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
+    onChange(paste);
+    inputs.current[Math.min(paste.length, 3)]?.focus();
+    e.preventDefault();
+  };
 
-    // Auto-focus first input on mount
-    useEffect(() => { inputs.current[0]?.focus(); }, []);
+  useEffect(() => { inputs.current[0]?.focus(); }, []);
 
-    return (
-        <div className="flex gap-3 justify-center">
-            {[0, 1, 2, 3].map((i) => (
-                <input
-                    key={i}
-                    ref={(el) => (inputs.current[i] = el)}
-                    type={masked ? 'password' : 'text'}
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={value[i] || ''}
-                    onChange={(e) => handleChange(i, e)}
-                    onKeyDown={(e) => handleKeyDown(i, e)}
-                    onPaste={handlePaste}
-                    disabled={disabled}
-                    className={`w-14 h-14 text-center text-2xl font-bold rounded-2xl border-2 outline-none transition-all duration-150
-                        ${value[i]
-                            ? 'border-blue-950 bg-blue-950 text-white shadow-lg scale-105'
-                            : 'border-gray-200 bg-gray-50 text-gray-900'
-                        }
-                        focus:border-blue-950 focus:bg-blue-50 focus:scale-105
-                        disabled:opacity-40 disabled:cursor-not-allowed`}
-                />
-            ))}
-        </div>
-    );
+  return (
+    <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+      {[0, 1, 2, 3].map((i) => (
+        <input
+          key={i}
+          ref={(el) => (inputs.current[i] = el)}
+          type={masked ? "password" : "text"}
+          inputMode="numeric"
+          maxLength={1}
+          value={value[i] || ""}
+          onChange={(e) => handleChange(i, e)}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          onPaste={handlePaste}
+          disabled={disabled}
+          style={{
+            width: "52px",
+            height: "54px",
+            textAlign: "center",
+            fontSize: "22px",
+            fontWeight: 700,
+            border: `1.5px solid ${value[i] ? NAVY : "#e5ddd0"}`,
+            background: value[i] ? CREAM : "#fff",
+            color: NAVY,
+            outline: "none",
+            fontFamily: "'Lato', sans-serif",
+            transition: "all 0.15s",
+            opacity: disabled ? 0.4 : 1,
+          }}
+        />
+      ))}
+    </div>
+  );
 }
 
-// ── CREATE PIN SCREEN ──────────────────────────────────────────────────────
+/* ─── CREATE PIN SCREEN ─────────────────────────────────────── */
 function CreatePinScreen({ onSave }) {
-    const [step, setStep] = useState(1);
-    const [pin, setPin] = useState('');
-    const [confirmPin, setConfirmPin] = useState('');
-    const [masked, setMasked] = useState(true);
-    const [error, setError] = useState('');
-    const [saving, setSaving] = useState(false);
-    const [done, setDone] = useState(false);
+  const [step, setStep]           = useState(1);
+  const [pin, setPin]             = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [masked, setMasked]       = useState(true);
+  const [error, setError]         = useState("");
+  const [saving, setSaving]       = useState(false);
+  const [done, setDone]           = useState(false);
 
-    const handleNext = () => {
-        if (pin.length < 4) { setError('Please enter all 4 digits'); return; }
-        setError(''); setStep(2); setConfirmPin('');
-    };
+  const handleNext = () => {
+    if (pin.length < 4) { setError("Please enter all 4 digits"); return; }
+    setError(""); setStep(2); setConfirmPin("");
+  };
 
-    const handleSave = async () => {
-        if (confirmPin.length < 4) { setError('Please enter all 4 digits'); return; }
-        if (confirmPin !== pin) { setError("PINs don't match. Try again."); setConfirmPin(''); return; }
-        setError(''); setSaving(true);
-        try {
-            await onSave(pin);
-            setDone(true);
-        } catch {
-            setError('Failed to save PIN. Please try again.');
-        } finally {
-            setSaving(false);
-        }
-    };
+  const handleSave = async () => {
+    if (confirmPin.length < 4) { setError("Please enter all 4 digits"); return; }
+    if (confirmPin !== pin) { setError("PINs don't match. Try again."); setConfirmPin(""); return; }
+    setError(""); setSaving(true);
+    try { await onSave(pin); setDone(true); }
+    catch { setError("Failed to save PIN. Please try again."); }
+    finally { setSaving(false); }
+  };
 
-    if (done) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-                <div className="text-center">
-                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <CheckCircle2 size={40} className="text-green-600" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">PIN Created!</h2>
-                    <p className="text-gray-500 text-sm">You can now make transfers securely.</p>
-                    <div className="mt-4 w-6 h-6 border-2 border-blue-950 border-t-transparent rounded-full animate-spin mx-auto" />
-                </div>
-            </div>
-        );
-    }
+  const modalHeader = {
+    background: NAVY,
+    backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)",
+    backgroundSize: "24px 24px",
+    padding: "28px 32px",
+    textAlign: "center",
+    borderBottom: `0.5px solid rgba(184,150,62,0.2)`,
+  };
 
-    return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
-            <Navbar />
-
-            {/* Hero */}
-            <div className="bg-blue-950 px-6 py-10 text-white text-center">
-                <div className="w-16 h-16 bg-blue-800/60 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-700">
-                    <Shield size={30} className="text-blue-200" />
-                </div>
-                <h1 className="text-2xl font-bold mb-1">Secure Your Transfers</h1>
-                <p className="text-blue-300 text-sm max-w-xs mx-auto">
-                    Create a 4-digit PIN that will be required every time you send money
-                </p>
-            </div>
-
-            {/* Step dots */}
-            <div className="flex items-center justify-center gap-3 py-4 bg-white border-b border-gray-100">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all
-                    ${step >= 1 ? 'bg-blue-950 text-white' : 'bg-gray-100 text-gray-400'}`}>1</div>
-                <div className={`h-0.5 w-10 transition-all ${step >= 2 ? 'bg-blue-950' : 'bg-gray-200'}`} />
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all
-                    ${step >= 2 ? 'bg-blue-950 text-white' : 'bg-gray-100 text-gray-400'}`}>2</div>
-            </div>
-
-            <div className="flex-1 flex flex-col items-center justify-center p-6">
-                <div className="w-full max-w-sm">
-                    {step === 1 ? (
-                        <>
-                            <h2 className="text-xl font-bold text-gray-900 text-center mb-1">Create Your PIN</h2>
-                            <p className="text-gray-500 text-sm text-center mb-8">Choose a 4-digit PIN you'll remember</p>
-                            <PinInput value={pin} onChange={setPin} masked={masked} />
-                            <button onClick={() => setMasked(m => !m)}
-                                className="flex items-center gap-1.5 mx-auto mt-4 text-xs text-gray-400 hover:text-gray-600 transition-colors">
-                                {masked ? <Eye size={13} /> : <EyeOff size={13} />}
-                                {masked ? 'Show PIN' : 'Hide PIN'}
-                            </button>
-                            {error && <p className="mt-4 text-sm text-red-600 text-center font-medium">{error}</p>}
-                            <button onClick={handleNext} disabled={pin.length < 4}
-                                className="w-full mt-8 py-4 bg-blue-950 text-white rounded-2xl font-bold hover:bg-blue-900 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
-                                Continue <ArrowRight size={17} />
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <h2 className="text-xl font-bold text-gray-900 text-center mb-1">Confirm Your PIN</h2>
-                            <p className="text-gray-500 text-sm text-center mb-8">Enter the same PIN again to confirm</p>
-                            <PinInput value={confirmPin} onChange={setConfirmPin} masked={masked} />
-                            <button onClick={() => setMasked(m => !m)}
-                                className="flex items-center gap-1.5 mx-auto mt-4 text-xs text-gray-400 hover:text-gray-600 transition-colors">
-                                {masked ? <Eye size={13} /> : <EyeOff size={13} />}
-                                {masked ? 'Show PIN' : 'Hide PIN'}
-                            </button>
-                            {error && <p className="mt-4 text-sm text-red-600 text-center font-medium">{error}</p>}
-                            <button onClick={handleSave} disabled={confirmPin.length < 4 || saving}
-                                className="w-full mt-8 py-4 bg-blue-950 text-white rounded-2xl font-bold hover:bg-blue-900 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
-                                {saving
-                                    ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
-                                    : <><CheckCircle2 size={18} /> Set PIN</>
-                                }
-                            </button>
-                            <button onClick={() => { setStep(1); setError(''); setConfirmPin(''); }}
-                                className="w-full mt-3 py-3 text-gray-400 text-sm hover:text-gray-600 transition-colors">
-                                ← Change PIN
-                            </button>
-                        </>
-                    )}
-
-                    <div className="mt-8 bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                        <p className="text-xs text-amber-700 text-center leading-relaxed">
-                            <strong>Keep your PIN safe.</strong> You'll need it every time you send money. LAN will never ask for your PIN.
-                        </p>
-                    </div>
-                </div>
-            </div>
+  if (done) return (
+    <>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&display=swap');`}</style>
+      <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Lato', sans-serif" }}>
+        <div style={{ background: "#fff", border: `0.5px solid #e5ddd0`, padding: "48px 40px", maxWidth: "380px", width: "100%", textAlign: "center" }}>
+          <div style={{ width: "64px", height: "64px", border: `0.5px solid rgba(22,163,74,0.3)`, background: "rgba(22,163,74,0.06)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+            <CheckCircle2 size={28} style={{ color: "#16a34a" }} />
+          </div>
+          <p style={{ ...eyebrow, textAlign: "center" }}>Success</p>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: NAVY, marginBottom: "8px" }}>PIN Created!</h2>
+          <p style={{ fontSize: "13px", color: "#888" }}>You can now make transfers securely.</p>
+          <div style={{ marginTop: "20px", width: "20px", height: "20px", border: `2px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "20px auto 0" }} />
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
-    );
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap'); @keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{ minHeight: "100vh", background: BG, fontFamily: "'Lato', sans-serif" }}>
+        <Navbar />
+        {/* Hero */}
+        <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)", backgroundSize: "28px 28px", padding: "48px 24px 40px", textAlign: "center" }}>
+          <div style={{ width: "56px", height: "56px", border: `0.5px solid rgba(184,150,62,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+            <Lock size={24} style={{ color: GOLD }} />
+          </div>
+          <p style={{ ...eyebrow, color: GOLDD, textAlign: "center" }}>Security</p>
+          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "28px", fontWeight: 900, color: "#fff", margin: "4px 0 10px" }}>Secure Your Transfers</h1>
+          <p style={{ fontSize: "14px", color: "rgba(245,240,232,0.65)", maxWidth: "380px", margin: "0 auto", lineHeight: 1.7, fontWeight: 300 }}>
+            Create a 4-digit PIN required every time you send money
+          </p>
+          {/* Step dots */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, marginTop: "28px" }}>
+            {[1, 2].map((s, idx) => (
+              <React.Fragment key={s}>
+                <div style={{ width: "30px", height: "30px", borderRadius: "50%", background: step >= s ? GOLD : "rgba(255,255,255,0.1)", color: step >= s ? NAVY : "rgba(255,255,255,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, transition: "all 0.2s" }}>{s}</div>
+                {idx === 0 && <div style={{ width: "48px", height: "0.5px", background: step >= 2 ? GOLD : "rgba(255,255,255,0.15)" }} />}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+
+        {/* Form */}
+        <div style={{ maxWidth: "420px", margin: "0 auto", padding: "32px 20px" }}>
+          <div style={{ background: "#fff", border: `0.5px solid #e5ddd0`, padding: "28px" }}>
+            {step === 1 ? (
+              <>
+                <p style={{ ...eyebrow }}>Step 1 of 2</p>
+                <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", fontWeight: 700, color: NAVY, marginBottom: "20px" }}>Create Your PIN</h2>
+                <p style={{ fontSize: "12px", color: "#888", textAlign: "center", marginBottom: "20px" }}>Choose a 4-digit PIN you'll remember</p>
+                <PinInput value={pin} onChange={setPin} masked={masked} />
+                <button onClick={() => setMasked((m) => !m)} style={{ display: "flex", alignItems: "center", gap: "5px", margin: "12px auto 0", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", fontFamily: "'Lato', sans-serif" }}>
+                  {masked ? <Eye size={12} /> : <EyeOff size={12} />}
+                  {masked ? "Show PIN" : "Hide PIN"}
+                </button>
+                {error && <p style={{ fontSize: "12px", color: "#dc2626", textAlign: "center", marginTop: "12px" }}>{error}</p>}
+                <button onClick={handleNext} disabled={pin.length < 4} style={{ ...navyBtn(pin.length < 4), marginTop: "20px" }}>
+                  Continue <ArrowRight size={14} />
+                </button>
+              </>
+            ) : (
+              <>
+                <p style={{ ...eyebrow }}>Step 2 of 2</p>
+                <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", fontWeight: 700, color: NAVY, marginBottom: "20px" }}>Confirm Your PIN</h2>
+                <p style={{ fontSize: "12px", color: "#888", textAlign: "center", marginBottom: "20px" }}>Enter the same PIN again to confirm</p>
+                <PinInput value={confirmPin} onChange={setConfirmPin} masked={masked} />
+                <button onClick={() => setMasked((m) => !m)} style={{ display: "flex", alignItems: "center", gap: "5px", margin: "12px auto 0", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", fontFamily: "'Lato', sans-serif" }}>
+                  {masked ? <Eye size={12} /> : <EyeOff size={12} />}
+                  {masked ? "Show PIN" : "Hide PIN"}
+                </button>
+                {error && <p style={{ fontSize: "12px", color: "#dc2626", textAlign: "center", marginTop: "12px" }}>{error}</p>}
+                <button onClick={handleSave} disabled={confirmPin.length < 4 || saving} style={{ ...navyBtn(confirmPin.length < 4 || saving), marginTop: "20px" }}>
+                  {saving ? <><div style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> Saving…</> : <><CheckCircle2 size={14} /> Set PIN</>}
+                </button>
+                <button onClick={() => { setStep(1); setError(""); setConfirmPin(""); }} style={{ width: "100%", marginTop: "8px", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", fontFamily: "'Lato', sans-serif", padding: "8px" }}>
+                  ← Change PIN
+                </button>
+              </>
+            )}
+            <div style={{ marginTop: "20px", background: "rgba(184,150,62,0.06)", border: `0.5px solid rgba(184,150,62,0.25)`, padding: "12px 16px" }}>
+              <p style={{ fontSize: "11px", color: "#8a6d1e", textAlign: "center", lineHeight: 1.6 }}>
+                <strong>Keep your PIN safe.</strong> LAN will never ask for your PIN.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
 }
 
-// ── PIN CONFIRM MODAL (shown before every transfer) ────────────────────────
+/* ─── PIN CONFIRM MODAL ─────────────────────────────────────── */
 function PinConfirmModal({ onVerify, onClose }) {
-    const [pin, setPin] = useState('');
-    const [masked, setMasked] = useState(true);
-    const [error, setError] = useState('');
-    const [attempts, setAttempts] = useState(0);
-    const MAX_ATTEMPTS = 3;
+  const [pin, setPin]         = useState("");
+  const [masked, setMasked]   = useState(true);
+  const [error, setError]     = useState("");
+  const [attempts, setAttempts] = useState(0);
+  const MAX = 3;
 
-    const verify = (currentPin) => {
-        if ((currentPin || pin).length < 4) return;
-        const result = onVerify(currentPin || pin);
-        if (!result) {
-            const next = attempts + 1;
-            setAttempts(next);
-            setPin('');
-            if (next >= MAX_ATTEMPTS) {
-                setError('Too many incorrect attempts. Please close and try again later.');
-            } else {
-                setError(`Incorrect PIN. ${MAX_ATTEMPTS - next} attempt${MAX_ATTEMPTS - next === 1 ? '' : 's'} remaining.`);
-            }
-        }
-    };
+  const verify = (p) => {
+    const target = p || pin;
+    if (target.length < 4) return;
+    const ok = onVerify(target);
+    if (!ok) {
+      const next = attempts + 1;
+      setAttempts(next);
+      setPin("");
+      setError(next >= MAX ? "Too many incorrect attempts. Please close and try again." : `Incorrect PIN. ${MAX - next} attempt${MAX - next === 1 ? "" : "s"} remaining.`);
+    }
+  };
 
-    // Auto-submit when 4 digits entered
-    useEffect(() => {
-        if (pin.length === 4 && attempts < MAX_ATTEMPTS) {
-            verify(pin);
-        }
-    }, [pin]); // eslint-disable-line
+  useEffect(() => { if (pin.length === 4 && attempts < MAX) verify(pin); }, [pin]); // eslint-disable-line
+  const locked = attempts >= MAX;
 
-    const locked = attempts >= MAX_ATTEMPTS;
+  const modalHeader = {
+    background: NAVY,
+    backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)",
+    backgroundSize: "22px 22px",
+    padding: "20px 24px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottom: `0.5px solid rgba(184,150,62,0.2)`,
+  };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm"
-            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-            <div className="bg-white w-full md:max-w-sm md:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden">
-
-                {/* Header */}
-                <div className="bg-blue-950 px-6 py-6 text-center relative">
-                    <button onClick={onClose}
-                        className="absolute top-4 right-4 p-1.5 hover:bg-blue-800 rounded-xl transition-colors">
-                        <X size={18} className="text-blue-300" />
-                    </button>
-                    <div className="w-12 h-12 bg-blue-800/60 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-blue-700">
-                        <Lock size={22} className="text-blue-200" />
-                    </div>
-                    <h3 className="text-white font-bold text-lg">Enter Transfer PIN</h3>
-                    <p className="text-blue-300 text-xs mt-1">Your 4-digit security PIN is required</p>
-                </div>
-
-                <div className="p-6">
-                    <PinInput value={pin} onChange={locked ? () => { } : setPin} masked={masked} disabled={locked} />
-
-                    <button onClick={() => setMasked(m => !m)}
-                        className="flex items-center gap-1.5 mx-auto mt-4 text-xs text-gray-400 hover:text-gray-600 transition-colors">
-                        {masked ? <Eye size={13} /> : <EyeOff size={13} />}
-                        {masked ? 'Show PIN' : 'Hide PIN'}
-                    </button>
-
-                    {error && (
-                        <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-3 text-center">
-                            <p className="text-sm text-red-600 font-medium">{error}</p>
-                        </div>
-                    )}
-
-                    {!locked && (
-                        <button onClick={() => verify(pin)} disabled={pin.length < 4}
-                            className="w-full mt-5 py-4 bg-blue-950 text-white rounded-2xl font-bold hover:bg-blue-900 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-                            Confirm
-                        </button>
-                    )}
-
-                    <button onClick={onClose}
-                        className="w-full mt-3 py-3 text-gray-400 text-sm hover:text-gray-600 transition-colors">
-                        Cancel
-                    </button>
-                </div>
-            </div>
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+      <div style={{ background: "#fff", width: "100%", maxWidth: "380px", border: `0.5px solid rgba(184,150,62,0.25)`, overflow: "hidden" }}>
+        <div style={modalHeader}>
+          <div>
+            <p style={{ ...eyebrow, marginBottom: "2px" }}>Confirm Payment</p>
+            <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "16px", fontWeight: 700, color: "#fff", margin: 0 }}>Enter Your PIN</p>
+          </div>
+          <button onClick={onClose} style={{ width: "30px", height: "30px", border: `0.5px solid rgba(255,255,255,0.2)`, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.5)" }}>
+            <X size={15} />
+          </button>
         </div>
-    );
+        <div style={{ padding: "24px" }}>
+          {error && (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#fff1f2", border: `0.5px solid #fca5a5`, padding: "10px 14px", marginBottom: "14px" }}>
+              <AlertCircle size={14} style={{ color: "#ef4444", flexShrink: 0 }} />
+              <p style={{ fontSize: "12px", color: "#dc2626", margin: 0 }}>{error}</p>
+            </div>
+          )}
+          <PinInput value={pin} onChange={locked ? () => {} : setPin} masked={masked} disabled={locked} />
+          <button onClick={() => setMasked((m) => !m)} style={{ display: "flex", alignItems: "center", gap: "5px", margin: "12px auto 0", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", fontFamily: "'Lato', sans-serif" }}>
+            {masked ? <Eye size={12} /> : <EyeOff size={12} />}
+            {masked ? "Show PIN" : "Hide PIN"}
+          </button>
+          {!locked && (
+            <button onClick={() => verify(pin)} disabled={pin.length < 4} style={{ ...navyBtn(pin.length < 4), marginTop: "16px" }}>
+              Confirm
+            </button>
+          )}
+          <button onClick={onClose} style={{ width: "100%", marginTop: "8px", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", fontFamily: "'Lato', sans-serif", padding: "8px" }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-// ── MAIN TRANSFER CLIENT ───────────────────────────────────────────────────
+/* ─── MAIN TRANSFER CLIENT ──────────────────────────────────── */
 export default function TransferClient() {
-    const [seller, setSeller] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [step, setStep] = useState(1);
-    const [copied, setCopied] = useState(false);
+  const [seller, setSeller]         = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [step, setStep]             = useState(1);
+  const [copied, setCopied]         = useState(false);
 
-    // PIN state
-    const [hasPin, setHasPin] = useState(null); // null = not yet checked
-    const [showPinModal, setShowPinModal] = useState(false);
-    const [pinAction, setPinAction] = useState(null); // callback to run after PIN verified
+  const [hasPin, setHasPin]         = useState(null);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinAction, setPinAction]   = useState(null);
 
-    const [recipientAccount, setRecipientAccount] = useState('');
-    const [amount, setAmount] = useState('');
-    const [note, setNote] = useState('');
-    const [recipientInfo, setRecipientInfo] = useState(null);
-    const [lookingUp, setLookingUp] = useState(false);
-    const [lookupError, setLookupError] = useState('');
-    const [transferring, setTransferring] = useState(false);
-    const [transferError, setTransferError] = useState('');
-    const [recentTransfers, setRecentTransfers] = useState([]);
-    const [selectedTransfer, setSelectedTransfer] = useState(null);
-    const [showAllTransfers, setShowAllTransfers] = useState(false);
+  const [recipientAccount, setRecipientAccount] = useState("");
+  const [amount, setAmount]         = useState("");
+  const [note, setNote]             = useState("");
+  const [recipientInfo, setRecipientInfo] = useState(null);
+  const [lookingUp, setLookingUp]   = useState(false);
+  const [lookupError, setLookupError] = useState("");
+  const [transferring, setTransferring] = useState(false);
+  const [transferError, setTransferError] = useState("");
+  const [recentTransfers, setRecentTransfers] = useState([]);
+  const [selectedTransfer, setSelectedTransfer] = useState(null);
+  const [showAllTransfers, setShowAllTransfers] = useState(false);
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-            if (!firebaseUser) { setLoading(false); return; }
-            try {
-                const sellerDoc = await getDoc(doc(db, 'sellers', firebaseUser.uid));
-                if (sellerDoc.exists()) {
-                    const data = sellerDoc.data();
-                    if (!data.accountNumber) {
-                        const newAccNum = generateAccountNumber();
-                        await updateDoc(doc(db, 'sellers', firebaseUser.uid), { accountNumber: newAccNum });
-                        setSeller({ uid: firebaseUser.uid, ...data, accountNumber: newAccNum });
-                    } else {
-                        setSeller({ uid: firebaseUser.uid, ...data });
-                    }
-                    // Check if PIN exists
-                    setHasPin(!!data.transferPin);
-                }
-                await loadRecentTransfers(firebaseUser.uid);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
+  /* input focus states */
+  const [focusAcct, setFocusAcct]   = useState(false);
+  const [focusAmt, setFocusAmt]     = useState(false);
+  const [focusNote, setFocusNote]   = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) { setLoading(false); return; }
+      try {
+        const sellerDoc = await getDoc(doc(db, "sellers", firebaseUser.uid));
+        if (sellerDoc.exists()) {
+          const data = sellerDoc.data();
+          if (!data.accountNumber) {
+            const newAccNum = generateAccountNumber();
+            await updateDoc(doc(db, "sellers", firebaseUser.uid), { accountNumber: newAccNum });
+            setSeller({ uid: firebaseUser.uid, ...data, accountNumber: newAccNum });
+          } else {
+            setSeller({ uid: firebaseUser.uid, ...data });
+          }
+          setHasPin(!!data.transferPin);
+        }
+        await loadRecentTransfers(firebaseUser.uid);
+      } catch (err) { console.error(err); }
+      finally { setLoading(false); }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const loadRecentTransfers = async (uid) => {
+    try {
+      const sentQ = query(collection(db, "transfers"), where("senderId", "==", uid), orderBy("createdAt", "desc"), limit(20));
+      const receivedQ = query(collection(db, "transfers"), where("recipientId", "==", uid), orderBy("createdAt", "desc"), limit(20));
+      const [sentSnap, receivedSnap] = await Promise.all([getDocs(sentQ), getDocs(receivedQ)]);
+      const sent     = sentSnap.docs.map((d) => ({ id: d.id, ...d.data(), type: "sent" }));
+      const received = receivedSnap.docs.map((d) => ({ id: d.id, ...d.data(), type: "received" }));
+      const all = [...sent, ...received].sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      setRecentTransfers(all.slice(0, 20));
+    } catch (err) { console.error("Recent transfers error:", err); }
+  };
+
+  const handleSavePin = async (pin) => {
+    await updateDoc(doc(db, "sellers", seller.uid), { transferPin: pin, updatedAt: serverTimestamp() });
+    setSeller((prev) => ({ ...prev, transferPin: pin }));
+    setHasPin(true);
+  };
+
+  const handleVerifyPin = (enteredPin) => {
+    if (enteredPin === seller?.transferPin) {
+      setShowPinModal(false);
+      if (pinAction) { pinAction(); setPinAction(null); }
+      return true;
+    }
+    return false;
+  };
+
+  const requirePin = (action) => { setPinAction(() => action); setShowPinModal(true); };
+
+  const handleLookup = async () => {
+    const clean = recipientAccount.replace(/-/g, "").toUpperCase();
+    if (!clean.startsWith("LAN") || clean.length < 10) { setLookupError("Enter a valid LAN account number e.g. LAN-284-7391"); return; }
+    if (clean === seller?.accountNumber) { setLookupError("You can't transfer to yourself."); return; }
+    setLookupError(""); setLookingUp(true); setRecipientInfo(null);
+    try {
+      const q = query(collection(db, "sellers"), where("accountNumber", "==", clean));
+      const snap = await getDocs(q);
+      if (snap.empty) { setLookupError("Account number not found. Please check and try again."); }
+      else { setRecipientInfo({ id: snap.docs[0].id, ...snap.docs[0].data() }); }
+    } catch { setLookupError("Error looking up account. Please try again."); }
+    finally { setLookingUp(false); }
+  };
+
+  const TRANSFER_FEE = 50;
+  const LAN_PLATFORM_UID = "LAN_LIBRARY_PLATFORM";
+
+  const handleTransfer = async () => {
+    const amt = Number(amount);
+    const totalDeducted = amt + TRANSFER_FEE;
+    if (!amt || amt < 100) { setTransferError("Minimum transfer is ₦100"); return; }
+    if (totalDeducted > (seller?.accountBalance || 0)) { setTransferError(`Insufficient balance. You need ₦${totalDeducted.toLocaleString()} (₦${amt.toLocaleString()} + ₦50 fee)`); return; }
+    if (!recipientInfo) { setTransferError("Please look up a valid recipient first"); return; }
+    setTransferring(true); setTransferError("");
+    try {
+      const senderRef    = doc(db, "sellers", seller.uid);
+      const recipientRef = doc(db, "sellers", recipientInfo.id);
+      const platformRef  = doc(db, "sellers", LAN_PLATFORM_UID);
+      await runTransaction(db, async (transaction) => {
+        const senderSnap = await transaction.get(senderRef);
+        if (senderSnap.data().accountBalance < totalDeducted) throw new Error("Insufficient balance.");
+        transaction.update(senderRef, { accountBalance: increment(-totalDeducted), updatedAt: serverTimestamp() });
+        transaction.update(recipientRef, { accountBalance: increment(amt), updatedAt: serverTimestamp() });
+        transaction.set(platformRef, { accountBalance: increment(TRANSFER_FEE), totalFeesCollected: increment(TRANSFER_FEE), updatedAt: serverTimestamp() }, { merge: true });
+        const transferRef = doc(collection(db, "transfers"));
+        transaction.set(transferRef, {
+          senderId: seller.uid,
+          senderName: seller.businessInfo?.businessName || seller.bankDetails?.accountName || "Unknown",
+          senderAccountNumber: seller.accountNumber || "",
+          recipientId: recipientInfo.id,
+          recipientName: recipientInfo.businessInfo?.businessName || recipientInfo.bankDetails?.accountName || recipientInfo.sellerName || "Unknown",
+          recipientAccountNumber: recipientInfo.accountNumber || "",
+          amount: amt, fee: TRANSFER_FEE, totalDeducted: amt + TRANSFER_FEE,
+          note: note || "", createdAt: serverTimestamp(), status: "completed",
         });
-        return () => unsubscribe();
-    }, []);
-
-    const loadRecentTransfers = async (uid) => {
-        try {
-            const sentQ = query(
-                collection(db, 'transfers'),
-                where('senderId', '==', uid),
-                orderBy('createdAt', 'desc'),
-                limit(20)
-            );
-            const receivedQ = query(
-                collection(db, 'transfers'),
-                where('recipientId', '==', uid),
-                orderBy('createdAt', 'desc'),
-                limit(20)
-            );
-
-            const [sentSnap, receivedSnap] = await Promise.all([
-                getDocs(sentQ),
-                getDocs(receivedQ)
-            ]);
-
-            const sent = sentSnap.docs.map(d => ({ id: d.id, ...d.data(), type: 'sent' }));
-            const received = receivedSnap.docs.map(d => ({ id: d.id, ...d.data(), type: 'received' }));
-
-            const all = [...sent, ...received].sort((a, b) => {
-                const aTime = a.createdAt?.toMillis?.() || 0;
-                const bTime = b.createdAt?.toMillis?.() || 0;
-                return bTime - aTime;
-            });
-
-            setRecentTransfers(all.slice(0, 20));
-        } catch (err) {
-            console.error('Recent transfers error:', err);
-        }
-    };
-
-    // ── Save PIN to Firestore ──
-    const handleSavePin = async (pin) => {
-        await updateDoc(doc(db, 'sellers', seller.uid), {
-            transferPin: pin,
-            updatedAt: serverTimestamp(),
+        const feeRef = doc(collection(db, "platformFees"));
+        transaction.set(feeRef, {
+          transferId: transferRef.id, senderId: seller.uid,
+          senderName: seller.businessInfo?.businessName || seller.bankDetails?.accountName || "Unknown",
+          fee: TRANSFER_FEE, transferAmount: amt, createdAt: serverTimestamp(), disbursedToFlutterwave: false,
         });
-        setSeller(prev => ({ ...prev, transferPin: pin }));
-        setHasPin(true);
-    };
+      });
+      setSeller((prev) => ({ ...prev, accountBalance: (prev.accountBalance || 0) - totalDeducted }));
+      await loadRecentTransfers(seller.uid);
+      setStep(3);
+    } catch (err) { setTransferError(err.message || "Transfer failed. Please try again."); }
+    finally { setTransferring(false); }
+  };
 
-    // ── Verify PIN (Updated for Hashing) ──
-    const handleVerifyPin = (enteredPin) => {
-        if (enteredPin === seller?.transferPin) {
-            setShowPinModal(false);
-            if (pinAction) {
-                pinAction();
-                setPinAction(null);
-            }
-            return true;
-        }
-        return false;
-    };
-    // ── Request PIN then run action ──
-    const requirePin = (action) => {
-        setPinAction(() => action);
-        setShowPinModal(true);
-    };
+  const handleCopyAccount = async () => {
+    if (!seller?.accountNumber) return;
+    await navigator.clipboard.writeText(formatAccountNumber(seller.accountNumber));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-    const handleLookup = async () => {
-        const clean = recipientAccount.replace(/-/g, '').toUpperCase();
-        if (!clean.startsWith('LAN') || clean.length < 10) {
-            setLookupError('Enter a valid LAN account number e.g. LAN-284-7391');
-            return;
-        }
-        if (clean === seller?.accountNumber) {
-            setLookupError("You can't transfer to yourself.");
-            return;
-        }
-        setLookupError('');
-        setLookingUp(true);
-        setRecipientInfo(null);
-        try {
-            const q = query(collection(db, 'sellers'), where('accountNumber', '==', clean));
-            const snap = await getDocs(q);
-            if (snap.empty) {
-                setLookupError('Account number not found. Please check and try again.');
-            } else {
-                const data = snap.docs[0].data();
-                setRecipientInfo({ id: snap.docs[0].id, ...data });
-            }
-        } catch {
-            setLookupError('Error looking up account. Please try again.');
-        } finally {
-            setLookingUp(false);
-        }
-    };
+  const resetForm = () => {
+    setRecipientAccount(""); setAmount(""); setNote("");
+    setRecipientInfo(null); setLookupError(""); setTransferError(""); setStep(1);
+  };
 
-    const TRANSFER_FEE = 50;
-    const LAN_PLATFORM_UID = 'LAN_LIBRARY_PLATFORM';
+  const sellerName = seller?.bankDetails?.accountName || seller?.businessInfo?.businessName || "Unknown Seller";
 
-    const handleTransfer = async () => {
-        const amt = Number(amount);
-        const totalDeducted = amt + TRANSFER_FEE;
+  /* ─── Guard screens ─────────────────────────────────── */
+  const guardStyle = { minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", fontFamily: "'Lato', sans-serif" };
+  const guardBox   = { background: "#fff", border: `0.5px solid #e5ddd0`, padding: "48px 32px", maxWidth: "380px", width: "100%", textAlign: "center" };
 
-        if (!amt || amt < 100) { setTransferError('Minimum transfer is ₦100'); return; }
-        if (totalDeducted > (seller?.accountBalance || 0)) {
-            setTransferError(`Insufficient balance. You need ₦${totalDeducted.toLocaleString()} (₦${amt.toLocaleString()} + ₦50 fee)`);
-            return;
-        }
-        if (!recipientInfo) { setTransferError('Please look up a valid recipient first'); return; }
-
-        setTransferring(true);
-        setTransferError('');
-
-        try {
-            const senderRef = doc(db, 'sellers', seller.uid);
-            const recipientRef = doc(db, 'sellers', recipientInfo.id);
-            const platformRef = doc(db, 'sellers', LAN_PLATFORM_UID);
-
-            await runTransaction(db, async (transaction) => {
-                const senderSnap = await transaction.get(senderRef);
-                if (senderSnap.data().accountBalance < totalDeducted) {
-                    throw new Error(`Insufficient balance.`);
-                }
-                transaction.update(senderRef, { accountBalance: increment(-totalDeducted), updatedAt: serverTimestamp() });
-                transaction.update(recipientRef, { accountBalance: increment(amt), updatedAt: serverTimestamp() });
-                transaction.set(platformRef, {
-                    accountBalance: increment(TRANSFER_FEE),
-                    totalFeesCollected: increment(TRANSFER_FEE),
-                    updatedAt: serverTimestamp(),
-                }, { merge: true });
-
-                const transferRef = doc(collection(db, 'transfers'));
-                transaction.set(transferRef, {
-                    senderId: seller.uid,
-                    senderName: seller.businessInfo?.businessName || seller.bankDetails?.accountName || 'Unknown',
-                    senderAccountNumber: seller.accountNumber || '',
-                    recipientId: recipientInfo.id,
-                    recipientName: recipientInfo.businessInfo?.businessName || recipientInfo.bankDetails?.accountName || recipientInfo.sellerName || 'Unknown',
-                    recipientAccountNumber: recipientInfo.accountNumber || '',
-                    amount: amt,
-                    fee: TRANSFER_FEE,
-                    totalDeducted: amt + TRANSFER_FEE,
-                    note: note || '',
-                    createdAt: serverTimestamp(),
-                    status: 'completed',
-                });
-
-                const feeRef = doc(collection(db, 'platformFees'));
-                transaction.set(feeRef, {
-                    transferId: transferRef.id,
-                    senderId: seller.uid,
-                    senderName: seller.businessInfo?.businessName || seller.bankDetails?.accountName || 'Unknown',
-                    fee: TRANSFER_FEE,
-                    transferAmount: amt,
-                    createdAt: serverTimestamp(),
-                    disbursedToFlutterwave: false,
-                });
-            });
-
-            setSeller(prev => ({ ...prev, accountBalance: (prev.accountBalance || 0) - totalDeducted }));
-            await loadRecentTransfers(seller.uid);
-            setStep(3);
-        } catch (err) {
-            setTransferError(err.message || 'Transfer failed. Please try again.');
-        } finally {
-            setTransferring(false);
-        }
-    };
-
-    const handleCopyAccount = async () => {
-        if (!seller?.accountNumber) return;
-        await navigator.clipboard.writeText(formatAccountNumber(seller.accountNumber));
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    const resetForm = () => {
-        setRecipientAccount('');
-        setAmount('');
-        setNote('');
-        setRecipientInfo(null);
-        setLookupError('');
-        setTransferError('');
-        setStep(1);
-    };
-
-    // ── Loading ──
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <Loader2 className="animate-spin text-blue-950" size={40} />
-            </div>
-        );
-    }
-
-    // ── No seller account ──
-    if (!seller) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl p-8 text-center max-w-md shadow border border-gray-200">
-                    <Wallet size={48} className="mx-auto text-gray-300 mb-4" />
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">No Seller Account</h2>
-                    <p className="text-gray-500">You need a seller account to use LAN wallet transfers.</p>
-                </div>
-            </div>
-        );
-    }
-
-    // ── No PIN yet → show create PIN screen ──
-    if (hasPin === false) {
-        return <CreatePinScreen onSave={handleSavePin} />;
-    }
-
-    const sellerName = seller.bankDetails?.accountName || seller.businessInfo?.businessName || 'Unknown Seller';
-
-    // ── Transfer UI ──
-    return (
-        <div className="bg-gray-50 min-h-screen">
-            <Navbar />
-
-            <div className="max-w-5xl mx-auto px-4 py-6 md:py-12">
-
-                {/* Page Header */}
-                {/* Page Header */}
-                <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl md:text-4xl font-bold text-blue-900 mb-1">LAN Wallet Transfer</h1>
-                        <p className="text-sm md:text-base text-gray-600">Send money instantly to any seller on LAN</p>
-                    </div>
-                    <Link href="/recharge"
-                        className="flex items-center gap-2 bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm hover:shadow-md hover:border-blue-200 transition-all group flex-shrink-0">
-                        <div className="w-9 h-9 bg-blue-950 rounded-xl flex items-center justify-center group-hover:bg-blue-800 transition-colors">
-                            <Smartphone size={18} className="text-white" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-bold text-gray-900 leading-tight">Buy Airtime & Data</p>
-                            <p className="text-xs text-gray-400">Top up any network</p>
-                        </div>
-                    </Link>
-                </div>
-                {/* Mobile account banner */}
-                <div className="lg:hidden mb-4">
-                    <div className="bg-blue-950 text-white rounded-2xl p-4">
-                        <p className="text-blue-300 text-xs font-semibold uppercase tracking-widest mb-3">Your LAN Account</p>
-                        <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                                <p className="font-bold text-white text-sm truncate">{sellerName}</p>
-                                <p className="text-blue-300 text-xs mt-0.5">LAN Wallet</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <span className="font-mono text-blue-200 text-xs tracking-wider">
-                                        {formatAccountNumber(seller.accountNumber)}
-                                    </span>
-                                    <button onClick={handleCopyAccount}
-                                        className="flex-shrink-0 p-1 hover:bg-blue-800 rounded transition-colors">
-                                        {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} className="text-blue-300" />}
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="flex-shrink-0 text-right">
-                                <p className="text-blue-300 text-xs">Balance</p>
-                                <p className="text-lg font-bold text-white">₦{(seller.accountBalance || 0).toLocaleString()}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid lg:grid-cols-3 gap-6">
-
-                    {/* Desktop sidebar */}
-                    <div className="hidden lg:flex flex-col gap-6">
-                        <div className="bg-blue-950 text-white rounded-2xl p-6 shadow-sm">
-                            <p className="text-blue-300 text-xs font-semibold uppercase tracking-widest mb-4">Your LAN Account</p>
-                            <div className="bg-blue-900/50 rounded-xl px-4 py-3 border border-blue-700 mb-1">
-                                <p className="text-xl font-bold text-white truncate">{sellerName}</p>
-                            </div>
-                            <div className="bg-blue-900/50 rounded-xl px-4 py-3 border border-blue-700 mb-1">
-                                <p className="text-blue-300 text-xs mt-0.5">LAN Wallet</p>
-                            </div>
-                            <div className="flex items-center gap-2 bg-blue-900/50 rounded-xl px-4 py-3 border border-blue-700 mb-3">
-                                <span className="font-mono text-base font-bold text-white tracking-wider flex-1 truncate">
-                                    {formatAccountNumber(seller.accountNumber)}
-                                </span>
-                                <button onClick={handleCopyAccount}
-                                    className="flex-shrink-0 p-1.5 hover:bg-blue-800 rounded-lg transition-colors">
-                                    {copied ? <Check size={16} className="text-green-400" /> : <Copy size={16} className="text-blue-300" />}
-                                </button>
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-blue-800">
-                                <p className="text-blue-300 text-xs mb-1">Available Balance</p>
-                                <p className="text-3xl font-bold text-white">₦{(seller.accountBalance || 0).toLocaleString()}</p>
-                            </div>
-                        </div>
-
-                        {/* Recent Transfers desktop */}
-                        {recentTransfers.length > 0 && (
-                            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200">
-                                <h3 className="font-bold text-gray-900 text-sm mb-4">Recent Transfers</h3>
-                                <div className="space-y-3">
-                                    {(showAllTransfers ? recentTransfers : recentTransfers.slice(0, 5)).map(t => {
-                                        const isSent = t.type === 'sent';
-                                        return (
-                                            <button key={t.id} onClick={() => setSelectedTransfer(t)}
-                                                className="flex items-center gap-3 min-w-0 w-full text-left hover:bg-gray-50 rounded-xl p-1.5 -mx-1.5 transition-colors group">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isSent ? 'bg-red-50' : 'bg-green-50'}`}>
-                                                    {isSent
-                                                        ? <ArrowUpRight size={14} className="text-red-500" />
-                                                        : <ArrowDownLeft size={14} className="text-green-500" />
-                                                    }
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-950">
-                                                        {isSent ? t.recipientName : t.senderName}
-                                                    </p>
-                                                    <p className="text-xs text-gray-400 font-mono truncate">
-                                                        {isSent
-                                                            ? formatAccountNumber(t.recipientAccountNumber)
-                                                            : formatAccountNumber(t.senderAccountNumber)
-                                                        }
-                                                    </p>
-                                                </div>
-                                                <p className={`text-xs font-bold flex-shrink-0 ${isSent ? 'text-red-500' : 'text-green-600'}`}>
-                                                    {isSent
-                                                        ? `-₦${(t.totalDeducted || t.amount + 50).toLocaleString()}`
-                                                        : `+₦${t.amount.toLocaleString()}`
-                                                    }
-                                                </p>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                {recentTransfers.length > 5 && (
-                                    <button onClick={() => setShowAllTransfers(p => !p)}
-                                        className="mt-3 w-full text-xs font-semibold text-blue-950 hover:text-blue-700 py-2 border-t border-gray-100 transition-colors">
-                                        {showAllTransfers ? '↑ Show Less' : `View All (${recentTransfers.length})`}
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Transfer Form */}
-                    <div className="lg:col-span-2 w-full min-w-0">
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden w-full">
-
-                            {/* Step 1 — Form */}
-                            {step === 1 && (
-                                <div className="p-5 md:p-8">
-                                    <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-5">Send Money</h2>
-
-                                    {/* Recipient */}
-                                    <div className="mb-5">
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Recipient Account Number</label>
-                                        <div className="flex gap-2">
-                                            <input type="text" placeholder="LAN-284-7391" value={recipientAccount}
-                                                onChange={e => { setRecipientAccount(e.target.value); setRecipientInfo(null); setLookupError(''); }}
-                                                className="flex-1 min-w-0 border text-black border-gray-200 rounded-xl px-3 py-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent" />
-                                            <button onClick={handleLookup} disabled={lookingUp || !recipientAccount}
-                                                className="flex-shrink-0 px-4 py-3 bg-blue-950 text-white rounded-xl font-semibold hover:bg-blue-900 transition-all flex items-center gap-1.5 disabled:opacity-50 text-sm whitespace-nowrap">
-                                                {lookingUp ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
-                                                Verify
-                                            </button>
-                                        </div>
-                                        {lookupError && <p className="mt-2 text-sm text-red-600 flex items-center gap-1"><AlertCircle size={14} /> {lookupError}</p>}
-                                        {recipientInfo && (
-                                            <div className="mt-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3">
-                                                <CheckCircle2 size={18} className="text-green-600 flex-shrink-0" />
-                                                <div className="min-w-0">
-                                                    <p className="font-semibold text-green-900 truncate">
-                                                        {recipientInfo.bankDetails?.accountName || recipientInfo.businessInfo?.businessName || 'Unknown account'}
-                                                    </p>
-                                                    <p className="text-xs text-green-700 font-mono">{formatAccountNumber(recipientInfo.accountNumber)}</p>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Amount */}
-                                    <div className="mb-5">
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Amount (₦)</label>
-                                        <div className="relative">
-                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-lg">₦</span>
-                                            <input type="number" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)}
-                                                className="w-full border text-black border-gray-200 rounded-xl pl-9 pr-4 py-3 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent" />
-                                        </div>
-                                        <div className="flex gap-2 mt-2 flex-wrap">
-                                            {[500, 1000, 2000, 5000].map(q => (
-                                                <button key={q} onClick={() => setAmount(String(q))}
-                                                    className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-blue-50 hover:text-blue-950 text-gray-600 rounded-lg font-semibold transition-colors">
-                                                    ₦{q.toLocaleString()}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {amount && Number(amount) >= 100 && (
-                                        <div className="mb-4 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center justify-between">
-                                            <div>
-                                                <p className="text-xs text-blue-700 font-semibold">Transaction Fee</p>
-                                                <p className="text-xs text-blue-500">Applied to every transfer</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-sm font-bold text-blue-950">+ ₦50</p>
-                                                <p className="text-xs text-blue-600">Total: ₦{(Number(amount) + 50).toLocaleString()}</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Note */}
-                                    <div className="mb-6">
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Note (optional)</label>
-                                        <input type="text" placeholder="What's this for?" value={note} onChange={e => setNote(e.target.value)}
-                                            className="w-full border text-black border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent" />
-                                    </div>
-
-                                    <button
-                                        onClick={() => {
-                                            if (!recipientInfo) { setLookupError('Please verify the account number first'); return; }
-                                            if (!amount || Number(amount) < 100) { setTransferError('Minimum transfer is ₦100'); return; }
-                                            if (Number(amount) + 50 > (seller?.accountBalance || 0)) { setTransferError('Insufficient balance'); return; }
-                                            setTransferError('');
-                                            setStep(2);
-                                        }}
-                                        disabled={!recipientInfo || !amount}
-                                        className="w-full py-3.5 bg-blue-950 text-white rounded-xl font-bold text-base hover:bg-blue-900 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                                        Continue <ArrowRight size={18} />
-                                    </button>
-                                    {transferError && (
-                                        <p className="mt-3 text-sm text-red-600 flex items-center gap-1 justify-center">
-                                            <AlertCircle size={14} /> {transferError}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Step 2 — Confirm + PIN */}
-                            {step === 2 && (
-                                <div className="p-5 md:p-8">
-                                    <button onClick={() => setStep(1)} className="flex items-center gap-1 text-gray-500 text-sm mb-5 hover:text-gray-800">← Back</button>
-                                    <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-5">Confirm Transfer</h2>
-
-                                    <div className="bg-gray-50 rounded-2xl p-5 mb-5 space-y-4 border border-gray-100">
-                                        <div className="flex justify-between gap-4">
-                                            <span className="text-gray-500 text-sm flex-shrink-0">From</span>
-                                            <div className="text-right min-w-0">
-                                                <p className="font-semibold text-gray-900 truncate">
-                                                    {seller.businessInfo?.businessName || seller.bankDetails?.accountName || 'Unknown Seller'}
-                                                </p>
-                                                <p className="text-xs text-gray-500 font-mono">{formatAccountNumber(seller.accountNumber)}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex justify-center">
-                                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                                <ArrowRight size={16} className="text-blue-950" />
-                                            </div>
-                                        </div>
-                                        <div className="flex justify-between gap-4">
-                                            <span className="text-gray-500 text-sm flex-shrink-0">To</span>
-                                            <div className="text-right min-w-0">
-                                                <p className="font-semibold text-gray-900 truncate">
-                                                    {recipientInfo?.businessInfo?.businessName || recipientInfo?.bankDetails?.accountName || recipientInfo?.sellerName || 'Unknown'}
-                                                </p>
-                                                <p className="text-xs text-gray-500 font-mono">{formatAccountNumber(recipientInfo?.accountNumber)}</p>
-                                            </div>
-                                        </div>
-                                        <div className="border-t border-gray-200 pt-4">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-gray-500 text-sm">Amount</span>
-                                                <span className="text-2xl font-bold text-blue-950">₦{Number(amount).toLocaleString()}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center mt-2">
-                                                <span className="text-gray-500 text-sm">Transfer Fee</span>
-                                                <span className="text-sm font-semibold text-orange-600">+ ₦50</span>
-                                            </div>
-                                            <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
-                                                <span className="text-gray-700 text-sm font-semibold">Total Deducted</span>
-                                                <span className="text-lg font-bold text-blue-950">₦{(Number(amount) + 50).toLocaleString()}</span>
-                                            </div>
-                                            {note && (
-                                                <div className="flex justify-between mt-2 gap-4">
-                                                    <span className="text-gray-500 text-sm flex-shrink-0">Note</span>
-                                                    <span className="text-sm text-gray-700 text-right">{note}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {transferError && (
-                                        <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2">
-                                            <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
-                                            <p className="text-sm text-red-700">{transferError}</p>
-                                        </div>
-                                    )}
-
-                                    {/* PIN-protected confirm button */}
-                                    <button
-                                        onClick={() => requirePin(handleTransfer)}
-                                        disabled={transferring}
-                                        className="w-full py-3.5 bg-blue-950 text-white rounded-xl font-bold text-base hover:bg-blue-900 transition-all flex items-center justify-center gap-2 disabled:opacity-70">
-                                        {transferring
-                                            ? <><Loader2 size={18} className="animate-spin" /> Processing...</>
-                                            : <><Lock size={17} /> Confirm with PIN</>
-                                        }
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Step 3 — Success */}
-                            {step === 3 && (
-                                <TransferReceipt
-                                    seller={seller}
-                                    recipientInfo={recipientInfo}
-                                    amount={amount}
-                                    note={note}
-                                    onReset={resetForm}
-                                />
-                            )}
-                        </div>
-
-                        {/* Recent Transfers mobile */}
-                        {recentTransfers.length > 0 && (
-                            <div className="lg:hidden mt-4 bg-white rounded-2xl p-4 shadow-sm border border-gray-200">
-                                <h3 className="font-bold text-gray-900 text-sm mb-3">Recent Transfers</h3>
-                                <div className="space-y-3">
-                                    {(showAllTransfers ? recentTransfers : recentTransfers.slice(0, 5)).map(t => (
-                                        <button key={t.id} onClick={() => setSelectedTransfer(t)}
-                                            className="flex items-center gap-3 min-w-0 w-full text-left hover:bg-gray-50 rounded-xl p-1.5 -mx-1.5 transition-colors group">
-                                            <div className="w-8 h-8 bg-red-50 rounded-full flex items-center justify-center flex-shrink-0">
-                                                <ArrowUpRight size={14} className="text-red-500" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-950">{t.recipientName}</p>
-                                                <p className="text-xs text-gray-400 font-mono truncate">{formatAccountNumber(t.recipientAccountNumber)}</p>
-                                            </div>
-                                            <p className="text-xs font-bold text-red-500 flex-shrink-0">
-                                                -₦{(t.totalDeducted || t.amount + 50).toLocaleString()}
-                                            </p>
-                                        </button>
-                                    ))}
-                                </div>
-                                {recentTransfers.length > 5 && (
-                                    <button onClick={() => setShowAllTransfers(p => !p)}
-                                        className="mt-3 w-full text-xs font-semibold text-blue-950 hover:text-blue-700 py-2 border-t border-gray-100 transition-colors">
-                                        {showAllTransfers ? '↑ Show Less' : `View All (${recentTransfers.length})`}
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* PIN Confirm Modal */}
-            {showPinModal && (
-                <PinConfirmModal
-                    onVerify={handleVerifyPin}
-                    onClose={() => { setShowPinModal(false); setPinAction(null); }}
-                />
-            )}
-
-            {/* Transfer Receipt Modal */}
-            {selectedTransfer && (
-                <TransferReceiptModal
-                    transfer={selectedTransfer}
-                    onClose={() => setSelectedTransfer(null)}
-                />
-            )}
+  if (loading) return (
+    <>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={guardStyle}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ width: "40px", height: "40px", border: `3px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+          <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "15px", color: NAVY }}>Loading…</p>
         </div>
-    );
+      </div>
+    </>
+  );
+
+  if (!seller) return (
+    <>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Lato:wght@400;700&display=swap');`}</style>
+      <div style={guardStyle}>
+        <div style={guardBox}>
+          <div style={{ width: "56px", height: "56px", border: `0.5px solid #e5ddd0`, background: CREAM, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+            <Wallet size={24} style={{ color: "#ccc" }} />
+          </div>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", fontWeight: 700, color: NAVY, marginBottom: "8px" }}>No Seller Account</h2>
+          <p style={{ fontSize: "13px", color: "#888" }}>You need a seller account to use LAN wallet transfers.</p>
+        </div>
+      </div>
+    </>
+  );
+
+  if (hasPin === false) return <CreatePinScreen onSave={handleSavePin} />;
+
+  /* ─── MAIN UI ──────────────────────────────────────── */
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+        .transfer-root { font-family:'Lato',sans-serif; background:${BG}; min-height:100vh; }
+        .txn-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:0.5px solid #f5f0e8; cursor:pointer; }
+        .txn-row:last-child { border-bottom:none; }
+        .txn-row:hover .txn-name { color:${GOLD}; }
+        .pay-grid { display:grid; grid-template-columns:1fr; gap:16px; }
+        @media(min-width:1024px){ .pay-grid{ grid-template-columns:280px 1fr !important; } }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        @keyframes slideUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+        .anim { animation:slideUp 0.4s cubic-bezier(.4,0,.2,1) both; }
+      `}</style>
+
+      <div className="transfer-root">
+        <Navbar />
+
+        <main style={{ maxWidth: "1100px", margin: "0 auto", padding: "0" }}>
+
+          {/* ── HERO ── */}
+          <section style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px),radial-gradient(rgba(255,255,255,0.025) 1px,transparent 1px)", backgroundSize: "28px 28px,14px 14px", backgroundPosition: "0 0,7px 7px", padding: "40px 24px 0" }}>
+            <div style={{ maxWidth: "1060px", margin: "0 auto" }}>
+              <p style={{ ...eyebrow, color: GOLDD }}>LAN Wallet</p>
+              <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(28px,5vw,46px)", fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-1px", margin: "6px 0 10px" }}>
+                Send money<br /><em style={{ color: GOLD, fontStyle: "italic" }}>to any seller.</em>
+              </h1>
+              <p style={{ fontSize: "14px", color: "rgba(245,240,232,0.65)", maxWidth: "440px", lineHeight: 1.75, fontWeight: 300, marginBottom: "0" }}>
+                Transfer funds instantly within the LAN ecosystem — secure, fee-transparent, PIN-protected.
+              </p>
+              {/* stat strip */}
+              <div style={{ borderTop: "0.5px solid rgba(184,150,62,0.2)", marginTop: "28px", display: "flex", flexWrap: "wrap" }}>
+                {[["₦0", "Setup Fee"], ["₦50", "Per Transfer"], ["∞", "Sellers"], ["Instant", "Settlement"]].map(([val, lbl]) => (
+                  <div key={lbl} style={{ flex: "1 1 100px", padding: "18px 16px 18px", borderRight: "0.5px solid rgba(184,150,62,0.12)" }}>
+                    <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: "#fff" }}>{val}</div>
+                    <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", marginTop: "3px" }}>{lbl}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* ── PAGE CONTENT ── */}
+          <div style={{ padding: "28px 24px" }}>
+            <div style={{ maxWidth: "1060px", margin: "0 auto" }}>
+              <div style={{ marginBottom: "24px", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                <div>
+                  <p style={eyebrow}>Wallet</p>
+                  <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(20px,3vw,30px)", fontWeight: 700, color: NAVY, margin: 0 }}>
+                    {step === 1 ? "Send Money" : step === 2 ? "Confirm Transfer" : "Transfer Successful"}
+                  </h2>
+                </div>
+                <Link href="/recharge" style={{ display: "flex", alignItems: "center", gap: "10px", background: "#fff", border: `0.5px solid #e5ddd0`, padding: "10px 16px", textDecoration: "none" }}>
+                  <div style={{ width: "34px", height: "34px", background: NAVY, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Smartphone size={16} style={{ color: "#fff" }} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: "11px", fontWeight: 700, color: NAVY, margin: 0 }}>Buy Airtime & Data</p>
+                    <p style={{ fontSize: "10px", color: "#aaa", margin: 0 }}>Top up any network</p>
+                  </div>
+                </Link>
+              </div>
+
+              <div className="pay-grid">
+
+                {/* ── LEFT: Account sidebar + recent ── */}
+                <div>
+                  {/* Account box */}
+                  <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", padding: "22px", marginBottom: "14px" }}>
+                    <p style={{ ...eyebrow, color: "rgba(184,150,62,0.75)", marginBottom: "14px" }}>Your LAN Account</p>
+                    <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "15px", fontWeight: 700, color: "#fff", marginBottom: "4px" }}>{sellerName}</p>
+                    <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", marginBottom: "10px" }}>LAN Wallet · Verified Seller</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(255,255,255,0.06)", border: `0.5px solid rgba(184,150,62,0.25)`, padding: "8px 12px", marginBottom: "14px" }}>
+                      <span style={{ fontFamily: "monospace", fontSize: "13px", fontWeight: 700, color: "rgba(184,150,62,0.95)", letterSpacing: "0.05em", flex: 1 }}>{formatAccountNumber(seller?.accountNumber)}</span>
+                      <button onClick={handleCopyAccount} style={{ background: "none", border: "none", cursor: "pointer", color: copied ? "#4ade80" : "rgba(255,255,255,0.4)", padding: "2px", display: "flex", alignItems: "center" }}>
+                        {copied ? <Check size={13} /> : <Copy size={13} />}
+                      </button>
+                    </div>
+                    <div style={{ borderTop: "0.5px solid rgba(184,150,62,0.15)", paddingTop: "12px" }}>
+                      <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", marginBottom: "3px" }}>Available Balance</p>
+                      <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "28px", fontWeight: 700, color: "#fff", margin: 0 }}>₦{(seller?.accountBalance || 0).toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  {/* Recent transfers */}
+                  {recentTransfers.length > 0 && (
+                    <div style={{ background: "#fff", border: `0.5px solid #e5ddd0`, padding: "18px" }}>
+                      <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "14px", fontWeight: 700, color: NAVY, marginBottom: "14px" }}>Recent Transfers</p>
+                      {(showAllTransfers ? recentTransfers : recentTransfers.slice(0, 5)).map((t) => {
+                        const isSent = t.type === "sent";
+                        return (
+                          <button key={t.id} onClick={() => setSelectedTransfer(t)} className="txn-row" style={{ width: "100%", background: "none", border: "none", textAlign: "left" }}>
+                            <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: isSent ? "rgba(239,68,68,0.08)" : "rgba(22,163,74,0.08)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                              {isSent ? <ArrowUpRight size={13} style={{ color: "#dc2626" }} /> : <ArrowDownLeft size={13} style={{ color: "#16a34a" }} />}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p className="txn-name" style={{ fontSize: "11px", fontWeight: 700, color: NAVY, margin: "0 0 1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", transition: "color 0.15s" }}>
+                                {isSent ? t.recipientName : t.senderName}
+                              </p>
+                              <p style={{ fontSize: "9px", color: "#aaa", margin: 0, fontFamily: "monospace" }}>
+                                {isSent ? formatAccountNumber(t.recipientAccountNumber) : formatAccountNumber(t.senderAccountNumber)}
+                              </p>
+                            </div>
+                            <p style={{ fontSize: "11px", fontWeight: 700, color: isSent ? "#dc2626" : "#16a34a", flexShrink: 0 }}>
+                              {isSent ? `-₦${(t.totalDeducted || t.amount + 50).toLocaleString()}` : `+₦${t.amount?.toLocaleString()}`}
+                            </p>
+                          </button>
+                        );
+                      })}
+                      {recentTransfers.length > 5 && (
+                        <button onClick={() => setShowAllTransfers((p) => !p)} style={{ width: "100%", marginTop: "10px", background: "none", border: "none", borderTop: `0.5px solid #f0ebe0`, paddingTop: "10px", cursor: "pointer", fontSize: "10px", fontWeight: 700, color: NAVY, letterSpacing: "0.06em", fontFamily: "'Lato', sans-serif" }}>
+                          {showAllTransfers ? "↑ SHOW LESS" : `VIEW ALL (${recentTransfers.length})`}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── RIGHT: Transfer form ── */}
+                <div>
+
+                  {/* STEP 1 */}
+                  {step === 1 && (
+                    <div style={{ ...sectionCard }} className="anim">
+                      <p style={eyebrow}>Step 1 of 3</p>
+                      <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "18px", fontWeight: 700, color: NAVY, marginBottom: "22px" }}>Payment Information</h3>
+
+                      {/* Recipient */}
+                      <div style={{ marginBottom: "18px" }}>
+                        <label style={{ display: "block", fontSize: "11px", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: NAVY, marginBottom: "8px" }}>Recipient Account Number</label>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <input
+                            type="text"
+                            placeholder="LAN-284-7391"
+                            value={recipientAccount}
+                            onChange={(e) => { setRecipientAccount(e.target.value); setRecipientInfo(null); setLookupError(""); }}
+                            onFocus={() => setFocusAcct(true)}
+                            onBlur={() => setFocusAcct(false)}
+                            style={{ ...inputStyle(focusAcct), fontFamily: "monospace" }}
+                          />
+                          <button onClick={handleLookup} disabled={lookingUp || !recipientAccount} style={{ ...navyBtn(lookingUp || !recipientAccount), width: "auto", padding: "11px 16px", flexShrink: 0 }}>
+                            {lookingUp ? <div style={{ width: "13px", height: "13px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> : <Search size={14} />}
+                            Verify
+                          </button>
+                        </div>
+                        {lookupError && (
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px" }}>
+                            <AlertCircle size={12} style={{ color: "#ef4444", flexShrink: 0 }} />
+                            <p style={{ fontSize: "11px", color: "#dc2626", margin: 0 }}>{lookupError}</p>
+                          </div>
+                        )}
+                        {recipientInfo && (
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "rgba(22,163,74,0.06)", border: `0.5px solid rgba(22,163,74,0.3)`, padding: "10px 13px", marginTop: "8px" }}>
+                            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#16a34a", flexShrink: 0 }} />
+                            <div>
+                              <p style={{ fontSize: "12px", fontWeight: 700, color: "#14532d", margin: 0 }}>
+                                {recipientInfo.bankDetails?.accountName || recipientInfo.businessInfo?.businessName || "Unknown account"}
+                              </p>
+                              <p style={{ fontSize: "10px", color: "#16a34a", fontFamily: "monospace", margin: 0 }}>{formatAccountNumber(recipientInfo.accountNumber)}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Amount */}
+                      <div style={{ marginBottom: "18px" }}>
+                        <label style={{ display: "block", fontSize: "11px", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: NAVY, marginBottom: "8px" }}>Amount (₦)</label>
+                        <div style={{ position: "relative" }}>
+                          <span style={{ position: "absolute", left: "13px", top: "50%", transform: "translateY(-50%)", color: "#aaa", fontWeight: 700, fontSize: "15px" }}>₦</span>
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            onFocus={() => setFocusAmt(true)}
+                            onBlur={() => setFocusAmt(false)}
+                            style={{ ...inputStyle(focusAmt), paddingLeft: "28px" }}
+                          />
+                        </div>
+                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "8px" }}>
+                          {[500, 1000, 2000, 5000].map((q) => (
+                            <button key={q} onClick={() => setAmount(String(q))} style={{ fontSize: "10px", padding: "5px 10px", background: amount === String(q) ? NAVY : "rgba(13,34,68,0.05)", color: amount === String(q) ? "#fff" : NAVY, border: `0.5px solid ${amount === String(q) ? NAVY : "#e5ddd0"}`, cursor: "pointer", fontFamily: "'Lato', sans-serif", fontWeight: 700, transition: "all 0.15s" }}>
+                              ₦{q.toLocaleString()}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Fee strip */}
+                      {amount && Number(amount) >= 100 && (
+                        <div style={{ background: CREAM, border: `0.5px solid rgba(184,150,62,0.2)`, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                          <div>
+                            <p style={{ ...eyebrow, marginBottom: "2px" }}>Transaction Fee</p>
+                            <p style={{ fontSize: "10px", color: "#aaa", margin: 0 }}>Applied to every transfer</p>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <p style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: 0 }}>+ ₦50</p>
+                            <p style={{ fontSize: "10px", color: "#aaa", margin: 0 }}>Total: ₦{(Number(amount) + 50).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Note */}
+                      <div style={{ marginBottom: "18px" }}>
+                        <label style={{ display: "block", fontSize: "11px", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: NAVY, marginBottom: "8px" }}>Note (Optional)</label>
+                        <input
+                          type="text"
+                          placeholder="What's this for?"
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                          onFocus={() => setFocusNote(true)}
+                          onBlur={() => setFocusNote(false)}
+                          style={inputStyle(focusNote)}
+                        />
+                      </div>
+
+                      {transferError && (
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#fff1f2", border: `0.5px solid #fca5a5`, padding: "10px 13px", marginBottom: "14px" }}>
+                          <AlertCircle size={14} style={{ color: "#ef4444", flexShrink: 0 }} />
+                          <p style={{ fontSize: "12px", color: "#dc2626", margin: 0 }}>{transferError}</p>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          if (!recipientInfo) { setLookupError("Please verify the account number first"); return; }
+                          if (!amount || Number(amount) < 100) { setTransferError("Minimum transfer is ₦100"); return; }
+                          if (Number(amount) + 50 > (seller?.accountBalance || 0)) { setTransferError("Insufficient balance"); return; }
+                          setTransferError(""); setStep(2);
+                        }}
+                        disabled={!recipientInfo || !amount}
+                        style={navyBtn(!recipientInfo || !amount)}
+                      >
+                        Continue <ArrowRight size={14} />
+                      </button>
+
+                      {/* Referral strip */}
+                      <div style={{ marginTop: "14px", background: CREAM, border: `0.5px solid rgba(184,150,62,0.2)`, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <p style={{ fontSize: "11px", fontWeight: 700, color: NAVY, margin: 0 }}>Invite friends & earn ₦500</p>
+                        <Link href="/referrals" style={{ fontSize: "11px", fontWeight: 700, color: GOLD, textDecoration: "none" }}>Get link →</Link>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STEP 2 */}
+                  {step === 2 && (
+                    <div style={{ ...sectionCard }} className="anim">
+                      <button onClick={() => setStep(1)} style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", fontFamily: "'Lato', sans-serif", padding: "0", marginBottom: "16px", display: "flex", alignItems: "center", gap: "4px" }}>
+                        ← Back
+                      </button>
+                      <p style={eyebrow}>Step 2 of 3</p>
+                      <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "18px", fontWeight: 700, color: NAVY, marginBottom: "20px" }}>Confirm Transfer</h3>
+
+                      <div style={{ background: CREAM, border: `0.5px solid rgba(184,150,62,0.18)`, padding: "18px", marginBottom: "18px" }}>
+                        {[
+                          ["From", seller?.businessInfo?.businessName || seller?.bankDetails?.accountName || "Unknown", formatAccountNumber(seller?.accountNumber)],
+                          ["To", recipientInfo?.businessInfo?.businessName || recipientInfo?.bankDetails?.accountName || recipientInfo?.sellerName || "Unknown", formatAccountNumber(recipientInfo?.accountNumber)],
+                        ].map(([lbl, name, acc], idx) => (
+                          <React.Fragment key={lbl}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", padding: "8px 0", borderBottom: "0.5px solid rgba(184,150,62,0.15)" }}>
+                              <span style={{ color: "#aaa" }}>{lbl}</span>
+                              <div style={{ textAlign: "right" }}>
+                                <p style={{ fontWeight: 700, color: NAVY, margin: "0 0 1px" }}>{name}</p>
+                                <p style={{ fontSize: "10px", color: "#aaa", margin: 0, fontFamily: "monospace" }}>{acc}</p>
+                              </div>
+                            </div>
+                            {idx === 0 && (
+                              <div style={{ display: "flex", justifyContent: "center", padding: "8px 0" }}>
+                                <div style={{ width: "28px", height: "28px", border: `0.5px solid rgba(184,150,62,0.2)`, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
+                                  <ArrowRight size={13} style={{ color: NAVY, transform: "rotate(90deg)" }} />
+                                </div>
+                              </div>
+                            )}
+                          </React.Fragment>
+                        ))}
+                        <div style={{ borderTop: `0.5px solid rgba(184,150,62,0.2)`, paddingTop: "14px", marginTop: "6px" }}>
+                          {[["Amount", `₦${Number(amount).toLocaleString()}`], ["Transfer Fee", "+ ₦50"]].map(([lbl, val]) => (
+                            <div key={lbl} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", padding: "5px 0" }}>
+                              <span style={{ color: "#aaa" }}>{lbl}</span>
+                              <span style={{ fontWeight: 700, color: lbl === "Transfer Fee" ? "#ea580c" : NAVY }}>{val}</span>
+                            </div>
+                          ))}
+                          <div style={{ display: "flex", justifyContent: "space-between", borderTop: `0.5px solid rgba(184,150,62,0.15)`, paddingTop: "10px", marginTop: "6px" }}>
+                            <span style={{ fontSize: "12px", fontWeight: 700, color: NAVY }}>Total Deducted</span>
+                            <span style={{ fontFamily: "'Playfair Display', serif", fontSize: "18px", fontWeight: 700, color: NAVY }}>₦{(Number(amount) + 50).toLocaleString()}</span>
+                          </div>
+                          {note && (
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", padding: "8px 0 0" }}>
+                              <span style={{ color: "#aaa" }}>Note</span>
+                              <span style={{ fontWeight: 700, color: NAVY }}>{note}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {transferError && (
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#fff1f2", border: `0.5px solid #fca5a5`, padding: "10px 13px", marginBottom: "14px" }}>
+                          <AlertCircle size={14} style={{ color: "#ef4444", flexShrink: 0 }} />
+                          <p style={{ fontSize: "12px", color: "#dc2626", margin: 0 }}>{transferError}</p>
+                        </div>
+                      )}
+
+                      <button onClick={() => requirePin(handleTransfer)} disabled={transferring} style={navyBtn(transferring)}>
+                        {transferring
+                          ? <><div style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> Processing…</>
+                          : <><Lock size={14} /> Confirm with PIN</>
+                        }
+                      </button>
+                    </div>
+                  )}
+
+                  {/* STEP 3 */}
+                  {step === 3 && (
+                    <TransferReceipt seller={seller} recipientInfo={recipientInfo} amount={amount} note={note} onReset={resetForm} />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {showPinModal && (
+          <PinConfirmModal onVerify={handleVerifyPin} onClose={() => { setShowPinModal(false); setPinAction(null); }} />
+        )}
+        {selectedTransfer && (
+          <TransferReceiptModal transfer={selectedTransfer} onClose={() => setSelectedTransfer(null)} />
+        )}
+      </div>
+    </>
+  );
 }

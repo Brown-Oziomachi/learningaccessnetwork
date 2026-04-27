@@ -6,7 +6,8 @@ import {
     BookMarked, Star, ArrowLeft, Copy, Check,
     PlusCircle, MessageSquare, Menu, ShoppingCart,
     Trash2, Search, Library, ChevronDown, Zap,
-    Crown, CreditCard, Lock,
+    Crown, CreditCard, Lock, GraduationCap, FileText,
+    TrendingUp,
 } from "lucide-react";
 import {
     collection, addDoc, serverTimestamp, query,
@@ -16,103 +17,257 @@ import { db, auth } from "@/lib/firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { booksData } from "@/lib/booksData";
 
+/* ─── colour tokens (matches homepage) ─────────────────────── */
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG    = "#f5f1ea";
+
+/* ─── shared CSS injected once ─────────────────────────────── */
+const GLOBAL_STYLES = `
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+.lan-root   { font-family: 'Lato', sans-serif; background: ${BG}; color: ${NAVY}; }
+.lan-serif  { font-family: 'Playfair Display', Georgia, serif; }
+
+/* dot-grid hero (same as homepage) */
+.hero-bg {
+  background-color: ${NAVY};
+  background-image:
+    radial-gradient(rgba(184,150,62,0.06) 1px, transparent 1px),
+    radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 28px 28px, 14px 14px;
+  background-position: 0 0, 7px 7px;
+}
+
+/* cream dot-grid for panels */
+.cream-bg {
+  background-color: ${CREAM};
+  background-image: radial-gradient(rgba(13,34,68,0.05) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* card hover */
+.lan-card {
+  border: 0.5px solid #e5ddd0;
+  background: #fff;
+  transition: transform .25s cubic-bezier(.4,0,.2,1), box-shadow .25s, border-color .25s;
+}
+.lan-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(13,34,68,.12); border-color: ${GOLD}; }
+
+/* book-cover hover */
+.book-cover { transition: box-shadow .2s; }
+.book-cover:hover { box-shadow: 0 8px 28px rgba(13,34,68,.2); }
+
+/* sidebar session row */
+.session-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px; cursor: pointer;
+  border: 0.5px solid transparent;
+  transition: background .15s, border-color .15s;
+}
+.session-row:hover { background: rgba(13,34,68,.05); }
+.session-row.active { background: rgba(184,150,62,.1); border-color: rgba(184,150,62,.3); }
+
+/* gold diamond divider */
+.gold-line { display: flex; align-items: center; gap: 12px; }
+.gold-line::before, .gold-line::after { content:""; flex:1; height:1px; background: rgba(184,150,62,0.3); }
+
+/* tab buttons */
+.lan-tab {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  padding: 9px 20px; border: none; cursor: pointer; font-family: 'Lato', sans-serif;
+  transition: background .18s, color .18s;
+}
+.lan-tab-active   { background: ${NAVY}; color: #fff; }
+.lan-tab-inactive { background: rgba(13,34,68,.06); color: #888; }
+.lan-tab-inactive:hover { background: rgba(13,34,68,.1); color: ${NAVY}; }
+
+/* scrollbar hide */
+.sbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+.sbar-none::-webkit-scrollbar { display: none; }
+
+/* slim gold scrollbar for sidebar */
+.gold-scroll { scrollbar-width: thin; scrollbar-color: rgba(184,150,62,.3) transparent; }
+.gold-scroll::-webkit-scrollbar { width: 4px; }
+.gold-scroll::-webkit-scrollbar-thumb { background: rgba(184,150,62,.3); border-radius: 4px; }
+
+/* message bubbles */
+.msg-ai   { background: #fff; border: 0.5px solid #e5ddd0; color: ${NAVY}; }
+.msg-user { background: ${NAVY}; color: #fff; }
+
+/* input textarea */
+.lan-input {
+  border: 0.5px solid #d9d0c0;
+  background: #fff;
+  font-family: 'Lato', sans-serif;
+  font-size: 13.5px; color: ${NAVY};
+  outline: none; resize: none;
+  transition: border-color .2s;
+}
+.lan-input:focus { border-color: ${GOLD}; }
+.lan-input::placeholder { color: #b0a89a; }
+
+/* send button */
+.send-btn {
+  background: ${NAVY}; color: #fff; border: none; cursor: pointer;
+  transition: background .18s, transform .12s;
+}
+.send-btn:hover:not(:disabled) { background: #1a3a6b; }
+.send-btn:active:not(:disabled) { transform: scale(.95); }
+.send-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+/* quick-action chips */
+.quick-chip {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 13px 18px;
+  border: 0.5px solid #e5ddd0; background: #fff; cursor: pointer;
+  font-family: 'Lato', sans-serif; font-size: 13px; color: ${NAVY};
+  text-align: left; transition: border-color .18s, background .18s;
+}
+.quick-chip:hover { border-color: ${GOLD}; background: ${CREAM}; }
+.quick-chip.primary { border-color: rgba(184,150,62,.5); background: rgba(184,150,62,.06); }
+
+/* upgrade card (inline) */
+.upgrade-card {
+  border: 0.5px solid rgba(184,150,62,.4);
+  background: linear-gradient(135deg, rgba(13,34,68,.04) 0%, rgba(184,150,62,.06) 100%);
+}
+
+/* purchase card */
+.purchase-card { border: 0.5px solid rgba(13,34,68,.15); background: ${CREAM}; }
+
+/* modal backdrop */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 999;
+  background: rgba(13,34,68,.7); backdrop-filter: blur(4px);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 16px;
+}
+@media (min-width: 600px) {
+  .modal-backdrop { align-items: center; }
+}
+
+/* modal panel */
+.modal-panel {
+  width: 100%; max-width: 420px;
+  background: #fff; border: 0.5px solid #e5ddd0;
+  animation: slideUp .28s cubic-bezier(.4,0,.2,1) both;
+}
+
+@keyframes slideUp {
+  from { opacity:0; transform:translateY(28px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* sidebar */
+.sidebar {
+  width: 280px; flex-shrink: 0;
+  background: ${BG}; border-right: 0.5px solid #e5ddd0;
+  display: flex; flex-direction: column; height: 100%;
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
+}
+
+@media (max-width: 1023px) {
+  .sidebar {
+    position: fixed; top:0; left:0; z-index:50; height:100%;
+  }
+  .sidebar.closed { transform: translateX(-100%); }
+  .sidebar.open   { transform: translateX(0); }
+}
+
+/* hero badge */
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(184,150,62,.14); border: 1px solid rgba(184,150,62,.3);
+  border-radius: 999px; padding: 6px 14px;
+}
+
+/* spin */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin .7s linear infinite; }
+
+/* bounce dots */
+@keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+.bounce-dot { animation: bounce 1.2s ease-in-out infinite; }
+`;
+
 /* ══════════════════════════════════════
-   UPGRADE MODAL
-   Shown when free user hits rate limit or
-   tries a Pro-only feature (summaries).
-   No /upgrade or /credits page needed —
-   everything is handled inline.
+   UPGRADE MODAL (homepage style)
 ══════════════════════════════════════ */
 function UpgradeModal({ type, hoursLeft, onClose, onContactSupport }) {
     const isRateLimit = type === "rateLimit";
-
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-            <div className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-3xl overflow-hidden shadow-2xl animate-slide-up">
-
-                {/* Header */}
-                <div className="relative bg-gradient-to-br from-sky-600 to-indigo-700 px-6 pt-8 pb-6 text-center">
-                    <button
-                        onClick={onClose}
-                        className="absolute top-4 right-4 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-colors"
-                    >
-                        <X size={13} />
+        <div className="modal-backdrop">
+            <div className="modal-panel">
+                {/* Navy hero header */}
+                <div className="hero-bg" style={{ padding: "36px 28px 28px", textAlign: "center", position: "relative" }}>
+                    <button onClick={onClose} style={{ position:"absolute", top:14, right:14, background:"rgba(255,255,255,.1)", border:"0.5px solid rgba(255,255,255,.15)", color:"rgba(255,255,255,.7)", width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+                        <X size={12} />
                     </button>
-                    <div className="w-14 h-14 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center mx-auto mb-3">
-                        <Crown size={26} className="text-yellow-300" />
+                    <div style={{ width:52, height:52, border:`1.5px solid ${GOLD}`, transform:"rotate(45deg)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
+                        <Crown size={20} style={{ color:GOLD, transform:"rotate(-45deg)" }} />
                     </div>
-                    <h2 className="text-[18px] font-bold text-white mb-1">
+                    <h2 className="lan-serif" style={{ fontSize:22, fontWeight:700, color:"#fff", marginBottom:6 }}>
                         {isRateLimit ? "Daily Limit Reached" : "Pro Feature"}
                     </h2>
-                    <p className="text-[13px] text-sky-200">
+                    <p style={{ fontSize:13, color:"rgba(245,240,232,.65)", fontWeight:300 }}>
                         {isRateLimit
-                            ? `You've used your 5 free questions${hoursLeft ? `. Resets in ${hoursLeft}h` : ""}.`
+                            ? `Comming Soon${hoursLeft ? `. Resets in ${hoursLeft}h` : ""}.`
                             : "Smart Summaries are exclusive to LAN AI Pro."}
                     </p>
                 </div>
 
                 {/* Options */}
-                <div className="p-5 space-y-3">
-                    {/* Pro Plan */}
-                    <div className="rounded-2xl border border-sky-500/40 bg-sky-500/8 p-4">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center shrink-0">
-                                <Zap size={16} className="text-sky-400" />
+                <div style={{ padding:"24px 24px 28px", display:"flex", flexDirection:"column", gap:12 }}>
+                    {/* Pro */}
+                    <div style={{ border:`0.5px solid rgba(184,150,62,.4)`, background:`rgba(184,150,62,.06)`, padding:18 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+                            <div style={{ width:36, height:36, border:`0.5px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                <Zap size={15} style={{ color:GOLD }} />
                             </div>
                             <div>
-                                <p className="text-[13px] font-bold text-sky-300">LAN AI Pro</p>
-                                <p className="text-[11px] text-slate-400">Unlimited questions & summaries</p>
+                                <p style={{ fontSize:13, fontWeight:700, color:NAVY, fontFamily:"'Lato',sans-serif" }}>LAN AI Pro</p>
+                                <p style={{ fontSize:11, color:"#999", fontFamily:"'Lato',sans-serif" }}>Unlimited questions & summaries</p>
                             </div>
                         </div>
-                        <ul className="space-y-1.5 mb-3">
-                            {[
-                                "Unlimited questions daily",
-                                "Smart Book Summaries",
-                                "Gemini 2.5 Flash (best model)",
-                                "Longer, richer AI answers",
-                            ].map((f) => (
-                                <li key={f} className="flex items-center gap-2 text-[12px] text-slate-300">
-                                    <Check size={11} className="text-sky-400 shrink-0" />
-                                    {f}
-                                </li>
-                            ))}
-                        </ul>
-                        <button
-                            onClick={() => onContactSupport("pro")}
-                            className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 active:scale-95 text-white text-[13px] font-bold py-3 rounded-xl transition-all"
-                        >
-                            <Crown size={14} />
-                            Upgrade to Pro
-                            <ChevronRight size={14} />
+                        {["Unlimited questions daily","Smart Book Summaries","Best AI model","Longer, richer answers"].map(f => (
+                            <div key={f} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                                <Check size={10} style={{ color:GOLD }} />
+                                <span style={{ fontSize:12, color:"#777", fontFamily:"'Lato',sans-serif" }}>{f}</span>
+                            </div>
+                        ))}
+                        <button 
+                        // onClick={() => onContactSupport("pro")}
+                            style={{ marginTop:12, width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"11px 0", background:NAVY, color:"#fff", fontSize:13, fontWeight:700, fontFamily:"'Lato',sans-serif", border:"none", cursor:"pointer", letterSpacing:".04em" }}>
+                            <Crown size={13} /> Upgrade to Pro <ChevronRight size={13} />
                         </button>
                     </div>
 
-                    {/* Credits option */}
+                    {/* Credits */}
                     {isRateLimit && (
-                        <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-4">
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
-                                    <CreditCard size={16} className="text-amber-400" />
+                        <div style={{ border:`0.5px solid #e5ddd0`, background:"#fff", padding:18 }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+                                <div style={{ width:36, height:36, border:`0.5px solid #e5ddd0`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                    <CreditCard size={15} style={{ color:NAVY }} />
                                 </div>
                                 <div>
-                                    <p className="text-[13px] font-bold text-amber-300">AI Credits</p>
-                                    <p className="text-[11px] text-slate-400">Pay-as-you-go, no subscription</p>
+                                    <p style={{ fontSize:13, fontWeight:700, color:NAVY, fontFamily:"'Lato',sans-serif" }}>AI Credits</p>
+                                    <p style={{ fontSize:11, color:"#999", fontFamily:"'Lato',sans-serif" }}>Pay-as-you-go</p>
                                 </div>
                             </div>
-                            <p className="text-[12px] text-slate-400 mb-3">
-                                Buy a pack of AI credits. Each credit = 1 question beyond your daily limit.
-                            </p>
-                            <button
-                                onClick={() => onContactSupport("credits")}
-                                className="w-full flex items-center justify-center gap-2 bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 active:scale-95 text-amber-300 text-[13px] font-semibold py-3 rounded-xl transition-all"
-                            >
-                                <CreditCard size={14} />
-                                Buy AI Credits
+                            <button 
+                            // onClick={() => onContactSupport("credits")}
+                                style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"11px 0", background:"transparent", border:`0.5px solid ${NAVY}`, color:NAVY, fontSize:13, fontWeight:700, fontFamily:"'Lato',sans-serif", cursor:"pointer", letterSpacing:".04em" }}>
+                                <CreditCard size={13} /> Buy AI Credits
                             </button>
                         </div>
                     )}
 
-                    <p className="text-center text-[11px] text-slate-500">
+                    <p style={{ textAlign:"center", fontSize:11, color:"#bbb", fontFamily:"'Lato',sans-serif" }}>
                         Contact support to activate your plan instantly
                     </p>
                 </div>
@@ -122,35 +277,30 @@ function UpgradeModal({ type, hoursLeft, onClose, onContactSupport }) {
 }
 
 /* ══════════════════════════════════════
-   UPGRADE MESSAGE CARD
-   Rendered inline in chat instead of plain error text
+   INLINE UPGRADE CARD
 ══════════════════════════════════════ */
 function UpgradeCard({ upgradeType, hoursLeft, onShowModal }) {
     const isRateLimit = upgradeType === "rateLimit";
     return (
-        <div className="mt-2 bg-gradient-to-br from-indigo-950/80 to-slate-900 border border-indigo-500/30 rounded-2xl p-4 shadow-lg">
-            <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
-                    {isRateLimit ? <Lock size={15} className="text-indigo-400" /> : <Crown size={15} className="text-yellow-400" />}
+        <div className="upgrade-card" style={{ marginTop:12, padding:16 }}>
+            <div style={{ display:"flex", gap:10, alignItems:"flex-start" }}>
+                <div style={{ width:34, height:34, border:`0.5px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    {isRateLimit ? <Lock size={14} style={{ color:GOLD }} /> : <Crown size={14} style={{ color:GOLD }} />}
                 </div>
-                <div className="flex-1">
-                    <p className="text-[12px] font-bold text-indigo-300 uppercase tracking-wider mb-0.5">
+                <div>
+                    <p style={{ fontSize:10, fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:GOLD, fontFamily:"'Lato',sans-serif", marginBottom:4 }}>
                         {isRateLimit ? "Daily limit reached" : "Pro feature"}
                     </p>
-                    <p className="text-[12px] text-slate-300 leading-relaxed">
+                    <p style={{ fontSize:12, color:"#666", lineHeight:1.6, fontFamily:"'Lato',sans-serif" }}>
                         {isRateLimit
                             ? `You've used all 5 free questions today${hoursLeft ? `. Resets in ${hoursLeft}h` : ""}. Upgrade for unlimited access.`
-                            : "Smart Summaries are available on LAN AI Pro. Upgrade to unlock full summaries, unlimited questions, and the best AI models."}
+                            : "Smart Summaries are available on LAN AI Pro. Upgrade to unlock full summaries, unlimited questions, and the best AI model."}
                     </p>
                 </div>
             </div>
-            <button
-                onClick={onShowModal}
-                className="mt-3 w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-[13px] font-bold py-2.5 rounded-xl transition-all"
-            >
-                <Crown size={13} />
-                {isRateLimit ? "Upgrade or Buy Credits" : "Upgrade to Pro"}
-                <ChevronRight size={13} />
+            <button onClick={onShowModal}
+                style={{ marginTop:12, width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"10px 0", background:NAVY, color:"#fff", fontSize:13, fontWeight:700, fontFamily:"'Lato',sans-serif", border:"none", cursor:"pointer" }}>
+                <Crown size={12} /> {isRateLimit ? "Upgrade or Buy Credits" : "Upgrade to Pro"} <ChevronRight size={12} />
             </button>
         </div>
     );
@@ -162,10 +312,10 @@ function UpgradeCard({ upgradeType, hoursLeft, onShowModal }) {
 function CopyButton({ text }) {
     const [copied, setCopied] = useState(false);
     return (
-        <button
-            onClick={() => { navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-            className="flex items-center gap-1 text-slate-400 hover:text-white text-[11px] transition-colors"
-        >
+        <button onClick={() => { navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+            style={{ display:"flex", alignItems:"center", gap:4, color:"#999", fontSize:11, background:"none", border:"none", cursor:"pointer", fontFamily:"'Lato',sans-serif", transition:"color .15s" }}
+            onMouseEnter={e => e.currentTarget.style.color=GOLD}
+            onMouseLeave={e => e.currentTarget.style.color="#999"}>
             {copied ? <Check size={11} /> : <Copy size={11} />}
             {copied ? "Copied" : "Copy"}
         </button>
@@ -173,32 +323,28 @@ function CopyButton({ text }) {
 }
 
 /* ══════════════════════════════════════
-   PURCHASE SUGGESTION CARD
+   PURCHASE CARD
 ══════════════════════════════════════ */
 function PurchaseSuggestionCard({ bookTitle, bookId, price, onPurchase }) {
     return (
-        <div className="mt-3 bg-gradient-to-br from-sky-950 to-slate-900 border border-sky-500/30 rounded-2xl p-4 shadow-lg">
-            <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center shrink-0">
-                    <BookMarked size={16} className="text-sky-400" />
+        <div className="purchase-card" style={{ marginTop:12, padding:16 }}>
+            <div style={{ display:"flex", gap:10, alignItems:"flex-start" }}>
+                <div style={{ width:34, height:34, border:`0.5px solid ${NAVY}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <BookMarked size={14} style={{ color:NAVY }} />
                 </div>
-                <div className="flex-1 min-w-0">
-                    <p className="text-[12px] text-sky-400 font-semibold uppercase tracking-wider mb-0.5">
-                        📚 Unlock Full Access
-                    </p>
-                    <p className="text-[13px] text-slate-200 font-medium line-clamp-2 mb-1">{bookTitle}</p>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Get complete answers, summaries, and AI assistance on every page.
-                    </p>
+                <div>
+                    <p style={{ fontSize:10, fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:GOLD, fontFamily:"'Lato',sans-serif", marginBottom:4 }}>📚 Unlock Full Access</p>
+                    <p style={{ fontSize:13, fontWeight:700, color:NAVY, fontFamily:"'Playfair Display',serif", marginBottom:4, lineHeight:1.3 }}>{bookTitle}</p>
+                    <p style={{ fontSize:11, color:"#888", fontFamily:"'Lato',sans-serif" }}>Get complete answers, summaries, and AI assistance on every page.</p>
                 </div>
             </div>
-            <button
-                onClick={onPurchase}
-                className="mt-3 w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 active:scale-95 text-white text-[13px] font-semibold py-2.5 rounded-xl transition-all"
-            >
-                <ShoppingCart size={14} />
+            <button onClick={onPurchase}
+                style={{ marginTop:12, width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:7, padding:"10px 0", background:GOLD, color:NAVY, fontSize:13, fontWeight:700, fontFamily:"'Lato',sans-serif", border:"none", cursor:"pointer", letterSpacing:".04em" }}
+                onMouseEnter={e => e.currentTarget.style.background=GOLDD}
+                onMouseLeave={e => e.currentTarget.style.background=GOLD}>
+                <ShoppingCart size={13} />
                 {price ? `Purchase for ₦${Number(price).toLocaleString()}` : "Purchase & Unlock"}
-                <ChevronRight size={14} />
+                <ChevronRight size={13} />
             </button>
         </div>
     );
@@ -211,19 +357,19 @@ function RenderMessage({ text, onSaveVocab, onJumpToPage }) {
     if (!text) return null;
     const codeChunks = text.split(/(```[\s\S]*?```)/g);
     return (
-        <div className="space-y-2 text-sm leading-relaxed">
+        <div style={{ lineHeight:1.75, fontSize:13.5 }}>
             {codeChunks.map((chunk, ci) => {
                 if (chunk.startsWith("```")) {
-                    const lines = chunk.slice(3, -3).split("\n");
+                    const lines = chunk.slice(3,-3).split("\n");
                     const lang = lines[0].trim() || "code";
                     const code = lines.slice(1).join("\n");
                     return (
-                        <div key={ci} className="rounded-xl overflow-hidden border border-slate-700 my-2">
-                            <div className="flex items-center justify-between px-4 py-2 bg-slate-800 border-b border-slate-700">
-                                <span className="text-[10px] font-bold tracking-widest text-sky-400 font-mono uppercase">{lang}</span>
+                        <div key={ci} style={{ border:`0.5px solid #e5ddd0`, marginTop:8, marginBottom:8 }}>
+                            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 14px", background:CREAM, borderBottom:`0.5px solid #e5ddd0` }}>
+                                <span style={{ fontSize:10, fontWeight:700, letterSpacing:".12em", textTransform:"uppercase", color:GOLD, fontFamily:"'Lato',sans-serif" }}>{lang}</span>
                                 <CopyButton text={code} />
                             </div>
-                            <pre className="bg-slate-900 px-4 py-3 overflow-x-auto text-[12.5px] leading-relaxed text-slate-200 font-mono whitespace-pre">
+                            <pre style={{ background:"#fff", padding:"12px 16px", overflowX:"auto", fontSize:12.5, color:NAVY, fontFamily:"'Courier New',monospace", lineHeight:1.6 }}>
                                 <code>{code}</code>
                             </pre>
                         </div>
@@ -234,15 +380,15 @@ function RenderMessage({ text, onSaveVocab, onJumpToPage }) {
                         {chunk.split("\n").map((line, li) => {
                             const listMatch = line.match(/^(\d+)\.\s+(.*)/);
                             if (listMatch) return (
-                                <span key={li} className="flex gap-2 my-1">
-                                    <span className="font-bold text-sky-500 shrink-0">{listMatch[1]}.</span>
+                                <span key={li} style={{ display:"flex", gap:8, marginTop:4 }}>
+                                    <span style={{ fontWeight:700, color:GOLD, flexShrink:0 }}>{listMatch[1]}.</span>
                                     <InlineParse text={listMatch[2]} onSaveVocab={onSaveVocab} onJumpToPage={onJumpToPage} />
                                 </span>
                             );
                             return (
                                 <span key={li}>
                                     <InlineParse text={line} onSaveVocab={onSaveVocab} onJumpToPage={onJumpToPage} />
-                                    {li < chunk.split("\n").length - 1 && <br />}
+                                    {li < chunk.split("\n").length-1 && <br />}
                                 </span>
                             );
                         })}
@@ -263,13 +409,13 @@ function InlineParse({ text, onSaveVocab, onJumpToPage }) {
                 const pageMatch = tok.match(/^\[p\.\s*(\d+)\]$/);
                 if (pageMatch) return (
                     <button key={i} onClick={() => onJumpToPage?.(parseInt(pageMatch[1]))}
-                        className="inline-flex items-center bg-sky-50 border border-sky-200 text-sky-700 rounded px-2 py-0.5 text-[11px] font-semibold hover:bg-sky-100 transition-colors mx-0.5">
+                        style={{ display:"inline-flex", alignItems:"center", background:CREAM, border:`0.5px solid rgba(184,150,62,.4)`, color:GOLD, padding:"2px 8px", fontSize:11, fontWeight:700, fontFamily:"'Lato',sans-serif", cursor:"pointer", margin:"0 2px" }}>
                         p. {pageMatch[1]}
                     </button>
                 );
-                if (tok.startsWith("**") && tok.endsWith("**")) return <strong key={i}>{tok.slice(2, -2)}</strong>;
+                if (tok.startsWith("**") && tok.endsWith("**")) return <strong key={i} style={{ fontWeight:700 }}>{tok.slice(2,-2)}</strong>;
                 if (tok.startsWith("`") && tok.endsWith("`")) return (
-                    <code key={i} className="bg-slate-100 border border-slate-200 text-red-600 rounded px-1.5 py-0.5 text-[12px] font-mono mx-0.5">{tok.slice(1, -1)}</code>
+                    <code key={i} style={{ background:CREAM, border:`0.5px solid #e5ddd0`, color:"#c0392b", padding:"1px 6px", fontSize:12, fontFamily:"'Courier New',monospace", margin:"0 2px" }}>{tok.slice(1,-1)}</code>
                 );
                 return <span key={i}>{tok}</span>;
             })}
@@ -281,17 +427,16 @@ function VocabBadge({ term, definition, onSave }) {
     const [expanded, setExpanded] = useState(false);
     const [saved, setSaved] = useState(false);
     return (
-        <span className="inline">
+        <span>
             <button onClick={() => setExpanded(v => !v)}
-                className="inline-flex items-center gap-1 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-full px-2.5 py-0.5 text-[11px] font-semibold hover:bg-yellow-200 transition-colors mx-0.5">
-                <Star size={9} />
-                {term}
+                style={{ display:"inline-flex", alignItems:"center", gap:4, background:CREAM, border:`0.5px solid rgba(184,150,62,.5)`, color:GOLD, padding:"2px 10px", fontSize:11, fontWeight:700, fontFamily:"'Lato',sans-serif", cursor:"pointer", margin:"0 2px", borderRadius:999 }}>
+                <Star size={9} style={{ fill:GOLD }} />{term}
             </button>
             {expanded && (
-                <span className="flex flex-col gap-1.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-[12px] text-amber-900 mt-1.5 max-w-xs">
+                <span style={{ display:"block", background:"#fffdf7", border:`0.5px solid rgba(184,150,62,.3)`, padding:"10px 14px", marginTop:6, fontSize:12, color:NAVY, lineHeight:1.65 }}>
                     {definition}
                     <button onClick={() => { onSave?.({ term, definition }); setSaved(true); }} disabled={saved}
-                        className={`text-left text-[11px] font-semibold ${saved ? "text-green-600 cursor-default" : "text-sky-600 hover:underline"}`}>
+                        style={{ display:"block", marginTop:6, fontSize:11, fontWeight:700, color:saved?"#16a34a":GOLD, background:"none", border:"none", cursor:"pointer", fontFamily:"'Lato',sans-serif" }}>
                         {saved ? "✓ Saved to study list" : "Save to study list"}
                     </button>
                 </span>
@@ -301,7 +446,7 @@ function VocabBadge({ term, definition, onSave }) {
 }
 
 /* ══════════════════════════════════════
-   BOOK PICKER SCREEN
+   BOOK PICKER — homepage style
 ══════════════════════════════════════ */
 function BookPickerScreen({ onSelectBook }) {
     const [allBooks, setAllBooks] = useState([]);
@@ -312,158 +457,131 @@ function BookPickerScreen({ onSelectBook }) {
     const getThumbnailUrl = (book) => {
         if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w200`;
         if (book.embedUrl) {
-            const match = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
-            if (match) { const id = match[1] || match[2] || match[3]; if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w200`; }
+            const m = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
+            if (m) { const id = m[1]||m[2]||m[3]; if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w200`; }
         }
         if (book.pdfUrl?.includes("drive.google.com")) {
-            const match = book.pdfUrl.match(/[-\w]{25,}/);
-            if (match) return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w200`;
+            const m = book.pdfUrl.match(/[-\w]{25,}/);
+            if (m) return `https://drive.google.com/thumbnail?id=${m[0]}&sz=w200`;
         }
         return book.image || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=200";
     };
 
     useEffect(() => {
-        const loadBooks = async () => {
+        const load = async () => {
             setLoadingBooks(true);
             try {
-                const staticBooks = booksData.map(b => ({ ...b, image: getThumbnailUrl(b) }));
-                setAllBooks(staticBooks);
-                setFilteredBooks(staticBooks);
-
-                const q = query(collection(db, "advertMyBook"), where("status", "==", "approved"));
+                const static_ = booksData.map(b => ({ ...b, image: getThumbnailUrl(b) }));
+                setAllBooks(static_); setFilteredBooks(static_);
+                const q = query(collection(db,"advertMyBook"), where("status","==","approved"));
                 const snap = await getDocs(q);
-                const fsBooks = snap.docs.map(d => {
+                const fs = snap.docs.map(d => {
                     const data = d.data();
-                    const book = {
-                        id: `firestore-${d.id}`,
-                        firestoreId: d.id,
-                        title: data.bookTitle,
-                        author: data.author,
-                        category: data.category,
-                        price: data.price,
-                        description: data.description,
-                        driveFileId: data.driveFileId,
-                        pdfUrl: data.pdfUrl,
-                        embedUrl: data.embedUrl,
-                    };
-                    book.image = getThumbnailUrl(book);
-                    return book;
+                    const book = { id:`firestore-${d.id}`, firestoreId:d.id, title:data.bookTitle, author:data.author, category:data.category, price:data.price, description:data.description, driveFileId:data.driveFileId, pdfUrl:data.pdfUrl, embedUrl:data.embedUrl };
+                    book.image = getThumbnailUrl(book); return book;
                 });
-
-                const combined = [...staticBooks, ...fsBooks].sort(() => Math.random() - 0.5);
-                setAllBooks(combined);
-                setFilteredBooks(combined);
-            } catch (err) {
-                console.warn("Book picker load error:", err.message);
-            } finally {
-                setLoadingBooks(false);
-            }
+                const combined = [...static_, ...fs].sort(() => Math.random()-.5);
+                setAllBooks(combined); setFilteredBooks(combined);
+            } catch(e) { console.warn(e.message); }
+            finally { setLoadingBooks(false); }
         };
-        loadBooks();
+        load();
     }, []);
 
     useEffect(() => {
         if (!searchQuery.trim()) { setFilteredBooks(allBooks); return; }
         const q = searchQuery.toLowerCase();
-        setFilteredBooks(allBooks.filter(b =>
-            b.title?.toLowerCase().includes(q) ||
-            b.author?.toLowerCase().includes(q) ||
-            b.category?.toLowerCase().includes(q)
-        ));
+        setFilteredBooks(allBooks.filter(b => b.title?.toLowerCase().includes(q) || b.author?.toLowerCase().includes(q) || b.category?.toLowerCase().includes(q)));
     }, [searchQuery, allBooks]);
 
-    // Replace the entire BookPickerScreen return statement with this.
-    // Fixes: blocked scroll, collapsed grid, flex height issues on mobile.
-
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#020617', overflow: 'hidden' }}>
+        <div className="lan-root" style={{ display:"flex", flexDirection:"column", height:"100dvh", overflow:"hidden" }}>
 
-            {/* ── Header ── */}
-            <header className="flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-sky-500/20 flex-shrink-0">
-                <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/25 flex items-center justify-center">
-                    <Library size={15} className="text-sky-400" />
+            {/* ── Header — navy dot-grid ── */}
+            <header className="hero-bg" style={{ padding:"18px 28px", display:"flex", alignItems:"center", gap:14, flexShrink:0 }}>
+                <div style={{ width:38, height:38, border:`0.5px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <GraduationCap size={18} style={{ color:GOLD }} />
                 </div>
                 <div>
-                    <p className="text-[13px] font-semibold text-sky-50 leading-tight">LAN Library AI</p>
-                    <p className="text-[10px] text-slate-500 leading-tight">Select a book to start chatting</p>
+                    <p className="lan-serif" style={{ fontSize:16, fontWeight:700, color:"#fff", lineHeight:1.1 }}>LAN Library AI</p>
+                    <p style={{ fontSize:10, color:"rgba(245,240,232,.5)", fontFamily:"'Lato',sans-serif", letterSpacing:".06em", textTransform:"uppercase" }}>Select a book to begin</p>
                 </div>
-                <div className="ml-auto flex items-center gap-1">
-                    <Sparkles size={14} className="text-sky-400" />
-                    <span className="text-[10px] text-slate-500 hidden sm:block">LAN Flash</span>
+                <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:6 }}>
+                    <Sparkles size={13} style={{ color:GOLD }} />
+                    <span style={{ fontSize:10, color:"rgba(184,150,62,.7)", fontFamily:"'Lato',sans-serif", fontWeight:700, letterSpacing:".1em", textTransform:"uppercase" }}>LAN Flash</span>
                 </div>
             </header>
 
-            {/* ── Hero text ── */}
-            <div className="px-5 pt-8 pb-5 text-center flex-shrink-0">
-                <div className="w-16 h-16 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center mx-auto mb-4">
-                    <BookMarked size={30} className="text-sky-400" />
+            {/* ── Hero intro — cream dot-grid ── */}
+            <div className="cream-bg" style={{ padding:"40px 28px 32px", textAlign:"center", flexShrink:0 }}>
+                <div style={{ width:64, height:64, border:`1.5px solid ${GOLD}`, transform:"rotate(45deg)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px" }}>
+                    <BookMarked size={26} style={{ color:NAVY, transform:"rotate(-45deg)" }} />
                 </div>
-                <h1 className="text-xl font-bold text-slate-100 mb-1">Which book do you need help with?</h1>
-                <p className="text-[13px] text-slate-400 max-w-sm mx-auto">
-                    Pick a book from LAN library and ask anything — summaries, key concepts, explanations and more.
+                <h1 className="lan-serif" style={{ fontSize:"clamp(24px,5vw,42px)", fontWeight:700, color:NAVY, marginBottom:10 }}>
+                    Which book do you need help with?
+                </h1>
+                <div className="gold-line" style={{ maxWidth:260, margin:"0 auto 12px" }}>
+                    <div style={{ width:7, height:7, background:GOLD, transform:"rotate(45deg)", flexShrink:0 }} />
+                </div>
+                <p style={{ fontSize:14, color:"#888", maxWidth:460, margin:"0 auto", lineHeight:1.75, fontWeight:300 }}>
+                    Pick a book from the LAN library and ask anything — summaries, key concepts, explanations and more.
                 </p>
             </div>
 
-            {/* ── Search ── */}
-            <div className="px-4 pb-4 flex-shrink-0">
-                <div className="flex items-center gap-2.5 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 focus-within:border-sky-500/50 transition-colors max-w-lg mx-auto">
-                    <Search size={15} className="text-slate-500 shrink-0" />
+            {/* ── Search bar ── */}
+            <div style={{ background:"#fff", borderTop:`0.5px solid #e5ddd0`, borderBottom:`0.5px solid #e5ddd0`, padding:"14px 28px", flexShrink:0 }}>
+                <div style={{ maxWidth:600, margin:"0 auto", position:"relative" }}>
+                    <Search size={14} style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", color:"#bbb" }} />
                     <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
+                        type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                         placeholder="Search by title, author, or category…"
-                        className="flex-1 bg-transparent border-none outline-none text-[13px] text-slate-200 placeholder-slate-500"
+                        className="lan-input text-black"
+                        style={{ width:"100%", padding:"10px 14px 10px 38px", border:`0.5px solid #e5ddd0` }}
                     />
                     {searchQuery && (
-                        <button onClick={() => setSearchQuery("")} className="text-slate-500 hover:text-slate-300">
+                        <button onClick={() => setSearchQuery("")}
+                            style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#bbb", cursor:"pointer" }}>
                             <X size={13} />
                         </button>
                     )}
                 </div>
             </div>
 
-            {/* ── Scrollable grid — KEY FIX: explicit overflow-y-auto with min-h-0 ── */}
-            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}
-                className="px-4 pb-8">
-
+            {/* ── Book grid ── */}
+            <div className="gold-scroll" style={{ flex:1, overflowY:"auto", minHeight:0, padding:"28px 28px 48px", background:BG }}>
                 {loadingBooks ? (
-                    <div className="flex items-center justify-center py-16">
-                        <Loader2 size={28} className="animate-spin text-sky-500" />
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", paddingTop:80 }}>
+                        <Loader2 size={28} style={{ color:GOLD, animation:"spin .8s linear infinite" }} />
                     </div>
                 ) : filteredBooks.length === 0 ? (
-                    <div className="text-center py-16">
-                        <BookMarked size={32} className="text-slate-600 mx-auto mb-3" />
-                        <p className="text-slate-400 text-[14px] font-medium">No books found</p>
-                        <p className="text-slate-600 text-[12px] mt-1">Try a different search term</p>
+                    <div style={{ textAlign:"center", paddingTop:80 }}>
+                        <FileText size={36} style={{ color:"#ddd", margin:"0 auto 12px" }} />
+                        <h3 className="lan-serif" style={{ fontSize:20, color:NAVY, marginBottom:6 }}>No books found</h3>
+                        <p style={{ fontSize:13, color:"#bbb" }}>Try a different search term</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-w-4xl mx-auto">
-                        {filteredBooks.map((book) => (
-                            <button
-                                key={book.id}
-                                onClick={() => onSelectBook(book)}
-                                className="group text-left flex flex-col gap-2 focus:outline-none"
-                            >
-                                <div className="relative overflow-hidden border border-slate-700/60 group-hover:border-sky-500/50 transition-all group-hover:shadow-lg group-hover:shadow-sky-500/10">
-                                    <img
-                                        src={book.image}
-                                        alt={book.title}
-                                        className="w-full h-[160px] sm:h-[190px] object-cover group-hover:scale-105 transition-transform duration-300"
-                                        onError={e => { e.target.src = "/lanlog.png"; }}
-                                        loading="lazy"
-                                    />
-                                    <div className="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/10 transition-colors flex items-center justify-center">
-                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-sky-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-lg">
-                                            Ask AI ✦
-                                        </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:20, maxWidth:1100, margin:"0 auto" }}>
+                        {filteredBooks.map(book => (
+                            <button key={book.id} onClick={() => onSelectBook(book)}
+                                style={{ textAlign:"left", display:"flex", flexDirection:"column", gap:10, background:"none", border:"none", cursor:"pointer", padding:0 }}>
+                                <div style={{ position:"relative", background:"#ede8df", overflow:"hidden", border:`0.5px solid #e5ddd0`, transition:"border-color .2s" }}
+                                    onMouseEnter={e => e.currentTarget.style.borderColor=GOLD}
+                                    onMouseLeave={e => e.currentTarget.style.borderColor="#e5ddd0"}>
+                                    <img src={book.image} alt={book.title}
+                                        className="book-cover"
+                                        style={{ width:"100%", aspectRatio:"3/4", objectFit:"cover", display:"block" }}
+                                        onError={e => { e.target.src="/lanlog.png"; }} loading="lazy" />
+                                    {/* overlay badge */}
+                                    <div style={{ position:"absolute", top:8, left:8, background:NAVY, padding:"3px 8px", fontSize:9, fontWeight:700, letterSpacing:".06em", color:"#fff", fontFamily:"'Lato',sans-serif", display:"flex", alignItems:"center", gap:4 }}>
+                                        <span style={{ width:5, height:5, borderRadius:"50%", background:"#22c55e", display:"inline-block" }} />
+                                        PDF
                                     </div>
                                 </div>
                                 <div>
-                                    <p className="text-[12px] font-semibold text-slate-200 line-clamp-2 group-hover:text-sky-300 transition-colors leading-tight">
+                                    <p className="lan-serif" style={{ fontSize:13, fontWeight:700, color:NAVY, lineHeight:1.3, display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden", marginBottom:3 }}>
                                         {book.title}
                                     </p>
-                                    <p className="text-[10px] text-slate-500 mt-0.5 truncate">{book.author}</p>
+                                    <p style={{ fontSize:10, color:"#999", fontFamily:"'Lato',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{book.author}</p>
                                 </div>
                             </button>
                         ))}
@@ -473,7 +591,7 @@ function BookPickerScreen({ onSelectBook }) {
         </div>
     );
 }
-    
+
 /* ══════════════════════════════════════
    QUICK ACTIONS
 ══════════════════════════════════════ */
@@ -484,62 +602,49 @@ const QUICK_ACTIONS = [
 ];
 
 /* ══════════════════════════════════════
-   BOOK GROUP (collapsible sidebar section)
+   BOOK SESSION GROUP (sidebar)
 ══════════════════════════════════════ */
 function BookSessionGroup({ bookTitle, sessions, currentSessionId, onSelectSession, onDeleteSession, defaultOpen }) {
     const [open, setOpen] = useState(defaultOpen);
-
     return (
-        <div className="mb-1">
-            <button
-                onClick={() => setOpen(v => !v)}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors group"
-            >
-                <div className="w-5 h-5 rounded bg-sky-500/15 border border-sky-500/25 flex items-center justify-center shrink-0">
-                    <BookMarked size={10} className="text-sky-400" />
+        <div style={{ marginBottom:4 }}>
+            <button onClick={() => setOpen(v => !v)}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:8, padding:"9px 12px", background:"none", border:"none", cursor:"pointer", fontFamily:"'Lato',sans-serif" }}
+                onMouseEnter={e => e.currentTarget.style.background="rgba(13,34,68,.05)"}
+                onMouseLeave={e => e.currentTarget.style.background="none"}>
+                <div style={{ width:20, height:20, border:`0.5px solid rgba(184,150,62,.4)`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <BookMarked size={10} style={{ color:GOLD }} />
                 </div>
-                <span className="flex-1 text-left text-[11px] font-semibold text-slate-300 group-hover:text-sky-300 truncate transition-colors leading-tight">
+                <span className="lan-serif" style={{ flex:1, textAlign:"left", fontSize:12, fontWeight:700, color:NAVY, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                     {bookTitle}
                 </span>
-                <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[9px] text-slate-500 bg-slate-800 rounded-full px-1.5 py-0.5 font-medium">
-                        {sessions.length}
-                    </span>
-                    <ChevronDown
-                        size={11}
-                        className={`text-slate-500 transition-transform duration-200 ${open ? "rotate-0" : "-rotate-90"}`}
-                    />
-                </div>
+                <span style={{ fontSize:9, fontWeight:700, color:"#999", background:"rgba(13,34,68,.06)", borderRadius:999, padding:"2px 7px", flexShrink:0, fontFamily:"'Lato',sans-serif" }}>
+                    {sessions.length}
+                </span>
+                <ChevronDown size={10} style={{ color:"#bbb", transform: open?"rotate(0)":"rotate(-90deg)", transition:"transform .2s", flexShrink:0 }} />
             </button>
 
             {open && (
-                <div className="ml-3 pl-2 border-l border-slate-700/60 space-y-0.5 mt-0.5">
-                    {sessions.map((session) => (
-                        <div
-                            key={session.id}
-                            className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-colors ${session.id === currentSessionId
-                                ? "bg-sky-500/15 border border-sky-500/20"
-                                : "hover:bg-slate-800 border border-transparent"
-                                }`}
+                <div style={{ marginLeft:12, paddingLeft:8, borderLeft:`0.5px solid #e5ddd0` }}>
+                    {sessions.map(session => (
+                        <div key={session.id}
+                            className={`session-row ${session.id===currentSessionId?"active":""}`}
                             onClick={() => onSelectSession(session)}
-                        >
-                            <MessageSquare
-                                size={11}
-                                className={session.id === currentSessionId ? "text-sky-400 shrink-0" : "text-slate-600 shrink-0"}
-                            />
-                            <div className="flex-1 min-w-0">
-                                <p className={`text-[11.5px] font-medium truncate leading-tight ${session.id === currentSessionId ? "text-sky-300" : "text-slate-400"
-                                    }`}>
+                            style={{ position:"relative" }}>
+                            <MessageSquare size={10} style={{ color:session.id===currentSessionId?GOLD:"#ccc", flexShrink:0 }} />
+                            <div style={{ flex:1, minWidth:0 }}>
+                                <p style={{ fontSize:11.5, fontWeight:600, color:session.id===currentSessionId?NAVY:"#777", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", fontFamily:"'Lato',sans-serif" }}>
                                     {session.title || "New conversation"}
                                 </p>
-                                <p className="text-[9.5px] text-slate-600 truncate mt-0.5">
+                                <p style={{ fontSize:9.5, color:"#bbb", marginTop:2, fontFamily:"'Lato',sans-serif" }}>
                                     {session.updatedAt?.toDate?.()?.toLocaleDateString?.() || ""}
                                 </p>
                             </div>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onDeleteSession(session.id); }}
-                                className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center text-slate-500 hover:text-red-400 transition-all shrink-0"
-                            >
+                            <button onClick={e => { e.stopPropagation(); onDeleteSession(session.id); }}
+                                style={{ opacity:0, position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:"#ccc", transition:"opacity .15s" }}
+                                onMouseEnter={e => { e.currentTarget.style.opacity=1; e.currentTarget.style.color="#e53e3e"; }}
+                                onMouseLeave={e => { e.currentTarget.style.opacity=0; }}
+                                className="delete-btn">
                                 <Trash2 size={10} />
                             </button>
                         </div>
@@ -550,85 +655,77 @@ function BookSessionGroup({ bookTitle, sessions, currentSessionId, onSelectSessi
     );
 }
 
+/* ── make delete button always visible on parent hover ── */
+const DELETE_HOVER_STYLE = `
+  .session-row:hover .delete-btn { opacity: 1 !important; }
+`;
+
 /* ══════════════════════════════════════
    SIDEBAR
 ══════════════════════════════════════ */
 function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelectSession, onNewChat, onDeleteSession, bookTitle }) {
-    const groupedSessions = chatSessions.reduce((acc, session) => {
-        const title = session.bookTitle || "Unknown Book";
-        if (!acc[title]) acc[title] = [];
-        acc[title].push(session);
+    const grouped = chatSessions.reduce((acc, s) => {
+        const t = s.bookTitle || "Unknown Book";
+        if (!acc[t]) acc[t] = [];
+        acc[t].push(s);
         return acc;
     }, {});
 
-    const sortedGroupKeys = Object.keys(groupedSessions).sort((a, b) => {
-        if (a === bookTitle) return -1;
-        if (b === bookTitle) return 1;
-        const aLatest = groupedSessions[a][0]?.updatedAt?.toDate?.()?.getTime() || 0;
-        const bLatest = groupedSessions[b][0]?.updatedAt?.toDate?.()?.getTime() || 0;
-        return bLatest - aLatest;
+    const keys = Object.keys(grouped).sort((a,b) => {
+        if (a===bookTitle) return -1; if (b===bookTitle) return 1;
+        return (grouped[b][0]?.updatedAt?.toDate?.()?.getTime()||0) - (grouped[a][0]?.updatedAt?.toDate?.()?.getTime()||0);
     });
 
     return (
         <>
             {isOpen && (
-                <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={onClose} />
+                <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(13,34,68,.5)", zIndex:40, display:"block" }}
+                    className="lg-hidden" />
             )}
-            <div className={`
-                fixed top-0 left-0 h-full w-72 bg-slate-900 border-r border-slate-700/50 z-50
-                flex flex-col transition-transform duration-300 ease-in-out
-                ${isOpen ? "translate-x-0" : "-translate-x-full"}
-                lg:relative lg:translate-x-0 lg:z-auto lg:shrink-0
-            `}>
-                <div className="flex items-center justify-between px-4 py-4 border-b border-slate-700/50">
-                    <div className="flex items-center gap-2">
-                        <BookMarked size={16} className="text-sky-400" />
-                        <span className="text-[13px] font-semibold text-slate-200">LAN AI Chats</span>
+            <div className={`sidebar ${isOpen?"open":"closed"}`}>
+                {/* header */}
+                <div className="hero-bg" style={{ padding:"18px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        <BookMarked size={14} style={{ color:GOLD }} />
+                        <span className="lan-serif" style={{ fontSize:14, fontWeight:700, color:"#fff" }}>LAN AI Chats</span>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="lg:hidden w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                    >
-                        <X size={15} />
+                    <button onClick={onClose} style={{ background:"rgba(255,255,255,.1)", border:"0.5px solid rgba(255,255,255,.15)", color:"rgba(255,255,255,.7)", width:26, height:26, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}
+                        className="lg-hidden">
+                        <X size={12} />
                     </button>
                 </div>
 
-                <div className="p-3">
-                    <button
-                        onClick={onNewChat}
-                        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-sky-500/10 border border-sky-500/25 text-sky-400 hover:bg-sky-500/20 transition-colors text-[13px] font-medium"
-                    >
-                        <PlusCircle size={15} />
-                        New Chat
+                {/* new chat */}
+                <div style={{ padding:"12px 14px", borderBottom:`0.5px solid #e5ddd0`, flexShrink:0 }}>
+                    <button onClick={onNewChat}
+                        style={{ width:"100%", display:"flex", alignItems:"center", gap:8, padding:"10px 14px", background:"transparent", border:`0.5px solid ${GOLD}`, color:NAVY, fontSize:12, fontWeight:700, fontFamily:"'Lato',sans-serif", cursor:"pointer", letterSpacing:".04em", transition:"background .15s" }}
+                        onMouseEnter={e => e.currentTarget.style.background=CREAM}
+                        onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+                        <PlusCircle size={13} style={{ color:GOLD }} /> New Chat
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-2 py-1">
+                {/* session list */}
+                <div className="gold-scroll" style={{ flex:1, overflowY:"auto", padding:"10px 8px" }}>
                     {chatSessions.length === 0 ? (
-                        <div className="px-3 py-8 text-center">
-                            <MessageSquare size={24} className="text-slate-600 mx-auto mb-2" />
-                            <p className="text-[11px] text-slate-500">No previous chats yet</p>
-                            <p className="text-[10px] text-slate-600 mt-1">Start a conversation to see it here</p>
+                        <div style={{ padding:"48px 16px", textAlign:"center" }}>
+                            <MessageSquare size={24} style={{ color:"#ddd", margin:"0 auto 10px" }} />
+                            <p style={{ fontSize:12, color:"#bbb", fontFamily:"'Lato',sans-serif" }}>No previous chats yet</p>
                         </div>
                     ) : (
-                        <div className="space-y-1 py-1">
-                            {sortedGroupKeys.map((groupBookTitle) => (
-                                <BookSessionGroup
-                                    key={groupBookTitle}
-                                    bookTitle={groupBookTitle}
-                                    sessions={groupedSessions[groupBookTitle]}
-                                    currentSessionId={currentSessionId}
-                                    onSelectSession={(session) => { onSelectSession(session); onClose(); }}
-                                    onDeleteSession={onDeleteSession}
-                                    defaultOpen={groupBookTitle === bookTitle}
-                                />
-                            ))}
-                        </div>
+                        keys.map(k => (
+                            <BookSessionGroup key={k} bookTitle={k} sessions={grouped[k]}
+                                currentSessionId={currentSessionId}
+                                onSelectSession={s => { onSelectSession(s); onClose(); }}
+                                onDeleteSession={onDeleteSession}
+                                defaultOpen={k===bookTitle} />
+                        ))
                     )}
                 </div>
 
-                <div className="p-3 border-t border-slate-700/50">
-                    <p className="text-[9px] text-slate-600 text-center uppercase tracking-wider">
+                {/* footer */}
+                <div style={{ padding:"12px 16px", borderTop:`0.5px solid #e5ddd0`, flexShrink:0, textAlign:"center" }}>
+                    <p style={{ fontSize:9, fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:"#bbb", fontFamily:"'Lato',sans-serif" }}>
                         Powered by LAN Library
                     </p>
                 </div>
@@ -638,19 +735,15 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
 }
 
 /* ══════════════════════════════════════
-   CONTACT SUPPORT HELPER
-   Opens WhatsApp / email with a pre-filled
-   message. No /upgrade page needed.
-   Customise the phone number below.
+   CONTACT SUPPORT
 ══════════════════════════════════════ */
 function openSupportContact(type, userId) {
-    const phone = "2348000000000"; // ← Replace with your actual WhatsApp number (no + sign)
-    const messages = {
-        pro: `Hi, I'd like to upgrade to LAN AI Pro. My user ID is: ${userId || "not logged in"}`,
-        credits: `Hi, I'd like to buy AI Credits for LAN Library. My user ID is: ${userId || "not logged in"}`,
+    const phone = "2348000000000";
+    const msgs = {
+        pro: `Hi, I'd like to upgrade to LAN AI Pro. My user ID is: ${userId||"not logged in"}`,
+        credits: `Hi, I'd like to buy AI Credits for LAN Library. My user ID is: ${userId||"not logged in"}`,
     };
-    const text = encodeURIComponent(messages[type] || messages.pro);
-    window.open(`https://wa.me/${phone}?text=${text}`, "_blank");
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msgs[type]||msgs.pro)}`, "_blank");
 }
 
 /* ══════════════════════════════════════
@@ -660,51 +753,47 @@ export default function AiChatContentClient() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    const paramBookId = searchParams.get("bookId") || "";
+    const paramBookId    = searchParams.get("bookId") || "";
     const paramBookTitle = searchParams.get("bookTitle") || "";
-    const paramPdfUrl = searchParams.get("pdfUrl") || "";
-    const paramUserId = searchParams.get("userId") || "";
-    const paramPrice = searchParams.get("price") || "";
+    const paramPdfUrl    = searchParams.get("pdfUrl") || "";
+    const paramUserId    = searchParams.get("userId") || "";
+    const paramPrice     = searchParams.get("price") || "";
 
     const [firebaseUserId, setFirebaseUserId] = useState(paramUserId || "");
-    const [authReady, setAuthReady] = useState(!!paramUserId);
+    const [authReady, setAuthReady]           = useState(!!paramUserId);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) setFirebaseUserId(user.uid);
+        const unsub = onAuthStateChanged(auth, u => {
+            if (u) setFirebaseUserId(u.uid);
             setAuthReady(true);
         });
-        return () => unsubscribe();
+        return () => unsub();
     }, []);
 
     const userId = firebaseUserId || paramUserId || "anonymous";
 
     const [selectedBook, setSelectedBook] = useState(
-        paramBookId ? { id: paramBookId, title: paramBookTitle, pdfUrl: paramPdfUrl, price: paramPrice } : null
+        paramBookId ? { id:paramBookId, title:paramBookTitle, pdfUrl:paramPdfUrl, price:paramPrice } : null
     );
 
-    const bookId = selectedBook?.id || paramBookId;
+    const bookId    = selectedBook?.id    || paramBookId;
     const bookTitle = selectedBook?.title || paramBookTitle || "this book";
-    const pdfUrl = selectedBook?.pdfUrl || paramPdfUrl;
-    const bookPrice = selectedBook?.price || paramPrice;
+    const pdfUrl    = selectedBook?.pdfUrl || paramPdfUrl;
+    const bookPrice = selectedBook?.price  || paramPrice;
 
-    const [loading, setLoading] = useState(false);
-    const [input, setInput] = useState("");
-    const [messages, setMessages] = useState([]);
-    const [showWelcome, setShowWelcome] = useState(true);
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [chatSessions, setChatSessions] = useState([]);
+    const [loading, setLoading]               = useState(false);
+    const [input, setInput]                   = useState("");
+    const [messages, setMessages]             = useState([]);
+    const [showWelcome, setShowWelcome]       = useState(true);
+    const [sidebarOpen, setSidebarOpen]       = useState(false);
+    const [chatSessions, setChatSessions]     = useState([]);
     const [currentSessionId, setCurrentSessionId] = useState(null);
+    const [upgradeModal, setUpgradeModal]     = useState(null);
 
-    // ── Upgrade modal state ──
-    const [upgradeModal, setUpgradeModal] = useState(null); // null | { type, hoursLeft }
-
-    const bottomRef = useRef(null);
+    const bottomRef   = useRef(null);
     const textareaRef = useRef(null);
 
-    useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, loading]);
+    useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, loading]);
 
     useEffect(() => {
         if (textareaRef.current) {
@@ -714,366 +803,258 @@ export default function AiChatContentClient() {
     }, [input]);
 
     useEffect(() => {
-        if (!authReady || !userId || userId === "anonymous") return;
-        const loadSessions = async () => {
+        if (!authReady || !userId || userId==="anonymous") return;
+        const load = async () => {
             try {
-                const q = query(collection(db, "ai_chat_sessions"), where("userId", "==", userId));
-                const snapshot = await getDocs(q);
-                const sessions = snapshot.docs
-                    .map(d => ({ id: d.id, ...d.data() }))
-                    .sort((a, b) => {
-                        const aTime = a.updatedAt?.toDate?.()?.getTime() || 0;
-                        const bTime = b.updatedAt?.toDate?.()?.getTime() || 0;
-                        return bTime - aTime;
-                    });
+                const q = query(collection(db,"ai_chat_sessions"), where("userId","==",userId));
+                const snap = await getDocs(q);
+                const sessions = snap.docs.map(d => ({ id:d.id, ...d.data() }))
+                    .sort((a,b) => (b.updatedAt?.toDate?.()?.getTime()||0) - (a.updatedAt?.toDate?.()?.getTime()||0));
                 setChatSessions(sessions);
-            } catch (err) {
-                console.warn("Could not load chat sessions:", err.message);
-            }
+            } catch(e) { console.warn(e.message); }
         };
-        loadSessions();
+        load();
     }, [userId, authReady]);
 
     const handleSaveVocab = useCallback(async ({ term, definition }) => {
         try {
-            await addDoc(collection(db, "student_vocabulary"), {
-                term, definition,
-                bookId: bookId || "unknown",
-                bookTitle,
-                studentId: userId,
-                timestamp: serverTimestamp(),
-            });
-        } catch (err) { console.error("Vocab save error:", err); }
+            await addDoc(collection(db,"student_vocabulary"), { term, definition, bookId:bookId||"unknown", bookTitle, studentId:userId, timestamp:serverTimestamp() });
+        } catch(e) { console.error(e); }
     }, [bookId, bookTitle, userId]);
 
-    const saveSessionToFirebase = useCallback(async (sessionId, updatedMessages, firstUserMessage, sessionType = null) => {
-        if (!userId || userId === "anonymous" || !bookId) return sessionId;
+    const saveSessionToFirebase = useCallback(async (sessionId, updatedMessages, firstUserMessage, sessionType=null) => {
+        if (!userId || userId==="anonymous" || !bookId) return sessionId;
         try {
-            const sessionData = {
+            const data = {
                 userId, bookId, bookTitle,
                 messages: updatedMessages.map(({ showPurchaseCta, upgradePrompt, upgradeType, hoursLeft, ...rest }) => rest),
-                title: firstUserMessage?.slice(0, 60) || "New conversation",
+                title: firstUserMessage?.slice(0,60) || "New conversation",
                 updatedAt: serverTimestamp(),
                 ...(sessionType ? { sessionType } : {}),
             };
-
             if (sessionId) {
-                await updateDoc(doc(db, "ai_chat_sessions", sessionId), sessionData);
-                setChatSessions(prev => prev.map(s =>
-                    s.id === sessionId
-                        ? { ...s, ...sessionData, updatedAt: { toDate: () => new Date() } }
-                        : s
-                ));
+                await updateDoc(doc(db,"ai_chat_sessions",sessionId), data);
+                setChatSessions(prev => prev.map(s => s.id===sessionId ? { ...s, ...data, updatedAt:{ toDate:()=>new Date() } } : s));
                 return sessionId;
             } else {
-                const docRef = await addDoc(collection(db, "ai_chat_sessions"), {
-                    ...sessionData,
-                    createdAt: serverTimestamp(),
-                });
-                setCurrentSessionId(docRef.id);
-                setChatSessions(prev => [
-                    { id: docRef.id, ...sessionData, updatedAt: { toDate: () => new Date() } },
-                    ...prev,
-                ]);
-                return docRef.id;
+                const ref = await addDoc(collection(db,"ai_chat_sessions"), { ...data, createdAt:serverTimestamp() });
+                setCurrentSessionId(ref.id);
+                setChatSessions(prev => [{ id:ref.id, ...data, updatedAt:{ toDate:()=>new Date() } }, ...prev]);
+                return ref.id;
             }
-        } catch (err) {
-            console.warn("Could not save session:", err.message);
-            return sessionId;
-        }
+        } catch(e) { console.warn(e.message); return sessionId; }
     }, [userId, bookId, bookTitle]);
 
-    const handleSelectSession = useCallback((session) => {
-        setCurrentSessionId(session.id);
-        setMessages(session.messages || []);
-        setShowWelcome(false);
-        if (session.bookId && session.bookTitle) {
-            setSelectedBook({
-                id: session.bookId,
-                title: session.bookTitle,
-                pdfUrl: session.pdfUrl || "",
-                price: session.price || "",
-            });
-        }
+    const handleSelectSession  = useCallback(s => {
+        setCurrentSessionId(s.id); setMessages(s.messages||[]); setShowWelcome(false);
+        if (s.bookId && s.bookTitle) setSelectedBook({ id:s.bookId, title:s.bookTitle, pdfUrl:s.pdfUrl||"", price:s.price||"" });
     }, []);
 
     const handleNewChat = useCallback(() => {
-        setCurrentSessionId(null);
-        setMessages([]);
-        setShowWelcome(true);
-        setInput("");
+        setCurrentSessionId(null); setMessages([]); setShowWelcome(true); setInput("");
     }, []);
 
-    const handleDeleteSession = useCallback(async (sessionId) => {
+    const handleDeleteSession = useCallback(async sessionId => {
         try {
-            await deleteDoc(doc(db, "ai_chat_sessions", sessionId));
-            setChatSessions(prev => prev.filter(s => s.id !== sessionId));
-            if (currentSessionId === sessionId) handleNewChat();
-        } catch (err) {
-            console.warn("Could not delete session:", err.message);
-        }
+            await deleteDoc(doc(db,"ai_chat_sessions",sessionId));
+            setChatSessions(prev => prev.filter(s => s.id!==sessionId));
+            if (currentSessionId===sessionId) handleNewChat();
+        } catch(e) { console.warn(e.message); }
     }, [currentSessionId, handleNewChat]);
 
     const handlePurchaseRedirect = useCallback(() => {
-        const cleanId = bookId?.replace("firestore-", "") || bookId;
+        const cleanId = bookId?.replace("firestore-","") || bookId;
         router.push(`/payment?bookId=${cleanId}`);
     }, [bookId, router]);
 
-    const sendMessage = useCallback(async (text, type = "question", sessionType = null, overrideSessionId, overrideMessages) => {
+    const sendMessage = useCallback(async (text, type="question", sessionType=null, overrideSessionId, overrideMessages) => {
         const trimmed = text?.trim();
         if (!trimmed || loading) return;
 
-        const activeSessionId = overrideSessionId !== undefined ? overrideSessionId : currentSessionId;
-        const baseMessages = overrideMessages !== undefined ? overrideMessages : messages;
+        const activeSessionId = overrideSessionId!==undefined ? overrideSessionId : currentSessionId;
+        const baseMessages    = overrideMessages!==undefined  ? overrideMessages  : messages;
 
         setShowWelcome(false);
-        const userMsg = { role: "user", text: trimmed };
+        const userMsg = { role:"user", text:trimmed };
         const updatedWithUser = [...baseMessages, userMsg];
-        setMessages(updatedWithUser);
-        setInput("");
-        setLoading(true);
+        setMessages(updatedWithUser); setInput(""); setLoading(true);
 
         try {
-            const res = await fetch("/api/ai/preview", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    bookTitle, bookId, pdfUrl,
-                    userQuestion: trimmed,
-                    userId,
-                    type,
-                }),
-            });
-
+            const res  = await fetch("/api/ai/preview", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ bookTitle, bookId, pdfUrl, userQuestion:trimmed, userId, type }) });
             const data = await res.json();
 
-            // ── Handle upgrade/rate limit responses ──
             if (!res.ok) {
                 if (data.upgradePrompt) {
-                    // Add a styled upgrade card to the chat
-                    const upgradeMsg = {
-                        role: "ai",
-                        text: data.error,
-                        upgradePrompt: true,
-                        upgradeType: data.upgradeType || "rateLimit",
-                        hoursLeft: data.hoursLeft,
-                    };
-                    setMessages(prev => [...prev, upgradeMsg]);
-                    setLoading(false);
-                    return;
+                    setMessages(prev => [...prev, { role:"ai", text:data.error, upgradePrompt:true, upgradeType:data.upgradeType||"rateLimit", hoursLeft:data.hoursLeft }]);
+                    setLoading(false); return;
                 }
                 throw new Error(data.error || "Connection Error");
             }
 
-            const purchaseKeywords = [
-                "purchase", "buy", "unlock", "full access", "full content",
-                "complete book", "acquire", "get the book", "limited preview",
-                "only available", "full version",
-            ];
-            const replyLower = data.reply.toLowerCase();
-            const shouldSuggestPurchase = purchaseKeywords.some(kw => replyLower.includes(kw));
-
-            const aiMsg = { role: "ai", text: data.reply, showPurchaseCta: shouldSuggestPurchase };
+            const purchaseKw = ["purchase","buy","unlock","full access","full content","complete book","acquire","limited preview","only available","full version"];
+            const shouldSuggest = purchaseKw.some(kw => data.reply.toLowerCase().includes(kw));
+            const aiMsg = { role:"ai", text:data.reply, showPurchaseCta:shouldSuggest };
             const finalMessages = [...updatedWithUser, aiMsg];
             setMessages(finalMessages);
 
-            const firstUserText = baseMessages.find(m => m.role === "user")?.text || trimmed;
-            const newSessionId = await saveSessionToFirebase(activeSessionId, finalMessages, firstUserText, sessionType);
-            if (newSessionId && !activeSessionId) {
-                setCurrentSessionId(newSessionId);
-            }
+            const firstUserText = baseMessages.find(m => m.role==="user")?.text || trimmed;
+            const newId = await saveSessionToFirebase(activeSessionId, finalMessages, firstUserText, sessionType);
+            if (newId && !activeSessionId) setCurrentSessionId(newId);
 
-        } catch (err) {
-            const isNetwork = !navigator.onLine || err.message?.includes("fetch") || err.message?.includes("network");
-            const friendlyError = isNetwork
-                ? "No internet connection. Please check your network and try again."
-                : err.message || "Something went wrong. Please try again.";
-            console.error("AI Error:", err.message);
-            setMessages(prev => [...prev, { role: "ai", text: `**${friendlyError}**` }]);
-        } finally {
-            setLoading(false);
-        }
+        } catch(e) {
+            const isNetwork = !navigator.onLine || e.message?.includes("fetch") || e.message?.includes("network");
+            const msg = isNetwork ? "No internet connection. Please check your network." : e.message || "Something went wrong.";
+            setMessages(prev => [...prev, { role:"ai", text:`**${msg}**` }]);
+        } finally { setLoading(false); }
     }, [loading, bookTitle, bookId, pdfUrl, userId, messages, currentSessionId, saveSessionToFirebase]);
 
-    const handleSubmit = (e) => { e?.preventDefault(); sendMessage(input); };
-    const handleKeyDown = (e) => {
-        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
-    };
+    const handleSubmit = e => { e?.preventDefault(); sendMessage(input); };
+    const handleKeyDown = e => { if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); } };
 
     const handleQuickAction = useCallback((label, type, sessionType) => {
-        const existing = chatSessions.find(s => s.bookId === bookId && s.sessionType === sessionType);
+        const existing = chatSessions.find(s => s.bookId===bookId && s.sessionType===sessionType);
         if (existing) {
-            setCurrentSessionId(existing.id);
-            setMessages(existing.messages || []);
-            setShowWelcome(false);
-            sendMessage(label, type, sessionType, existing.id, existing.messages || []);
+            setCurrentSessionId(existing.id); setMessages(existing.messages||[]); setShowWelcome(false);
+            sendMessage(label, type, sessionType, existing.id, existing.messages||[]);
         } else {
             sendMessage(label, type, sessionType, null, []);
         }
     }, [chatSessions, bookId, sendMessage]);
 
-    if (!selectedBook && !paramBookId) {
-        return <BookPickerScreen onSelectBook={(book) => setSelectedBook(book)} />;
-    }
+    if (!selectedBook && !paramBookId) return <BookPickerScreen onSelectBook={b => setSelectedBook(b)} />;
 
+    /* ── chat UI ── */
     return (
         <>
-            {/* ── Upgrade Modal (full-screen overlay) ── */}
+            <style>{GLOBAL_STYLES}</style>
+            <style>{DELETE_HOVER_STYLE}</style>
+            <style>{`
+              @media(min-width:1024px) { .sidebar { position:relative!important; transform:none!important; z-index:auto!important; } .lg-hidden { display:none!important; } }
+            `}</style>
+
             {upgradeModal && (
-                <UpgradeModal
-                    type={upgradeModal.type}
-                    hoursLeft={upgradeModal.hoursLeft}
+                <UpgradeModal type={upgradeModal.type} hoursLeft={upgradeModal.hoursLeft}
                     onClose={() => setUpgradeModal(null)}
-                    onContactSupport={(type) => {
-                        setUpgradeModal(null);
-                        openSupportContact(type, userId);
-                    }}
-                />
+                    onContactSupport={t => { setUpgradeModal(null); openSupportContact(t, userId); }} />
             )}
 
-            <div className="flex h-screen bg-slate-950 overflow-hidden">
+            <div className="lan-root" style={{ display:"flex", height:"100dvh", overflow:"hidden" }}>
 
-                <ChatSidebar
-                    isOpen={sidebarOpen}
-                    onClose={() => setSidebarOpen(false)}
-                    chatSessions={chatSessions}
-                    currentSessionId={currentSessionId}
+                <ChatSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}
+                    chatSessions={chatSessions} currentSessionId={currentSessionId}
                     onSelectSession={handleSelectSession}
                     onNewChat={() => { handleNewChat(); setSidebarOpen(false); }}
-                    onDeleteSession={handleDeleteSession}
-                    bookTitle={bookTitle}
-                />
+                    onDeleteSession={handleDeleteSession} bookTitle={bookTitle} />
 
-                <div className="flex flex-col flex-1 min-w-0 h-full">
+                <div style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column", height:"100%" }}>
 
-                    <header className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-sky-500/20 shrink-0">
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setSidebarOpen(v => !v)}
-                                className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                            >
-                                <Menu size={16} />
+                    {/* ── Top nav bar — navy ── */}
+                    <header className="hero-bg" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", flexShrink:0 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                            <button onClick={() => setSidebarOpen(v => !v)}
+                                style={{ width:34, height:34, border:`0.5px solid rgba(255,255,255,.15)`, background:"rgba(255,255,255,.06)", color:"rgba(255,255,255,.7)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+                                <Menu size={15} />
                             </button>
-                            <button
-                                onClick={() => router.back()}
-                                className="flex items-center justify-center w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/25 text-sky-400 hover:bg-sky-500/20 transition-colors"
-                            >
-                                <ArrowLeft size={16} />
+                            <button onClick={() => router.back()}
+                                style={{ width:34, height:34, border:`0.5px solid rgba(184,150,62,.3)`, background:"rgba(184,150,62,.08)", color:GOLD, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+                                <ArrowLeft size={15} />
                             </button>
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/25 flex items-center justify-center">
-                                    <BookMarked size={15} className="text-sky-400" />
+                            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                                <div style={{ width:32, height:32, border:`0.5px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                                    <BookMarked size={14} style={{ color:GOLD }} />
                                 </div>
                                 <div>
-                                    <p className="text-[13px] font-semibold text-sky-50 leading-tight">LAN Library AI</p>
-                                    <button
-                                        onClick={() => setSelectedBook(null)}
-                                        className="text-[10px] text-slate-500 truncate max-w-[130px] sm:max-w-xs leading-tight hover:text-sky-400 transition-colors text-left flex items-center gap-1"
-                                        title="Change book"
-                                    >
-                                        <span className="truncate">{bookTitle}</span>
-                                    </button>
+                                    <p className="lan-serif" style={{ fontSize:14, fontWeight:700, color:"#fff", lineHeight:1.1 }}>LAN Library AI</p>
+                                    <button onClick={() => setSelectedBook(null)}
+                                        style={{ fontSize:10, color:"rgba(184,150,62,.65)", fontFamily:"'Lato',sans-serif", background:"none", border:"none", cursor:"pointer", padding:0, maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", display:"block", textAlign:"left" }}
+                                        title="Change book">{bookTitle}</button>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            {/* Upgrade button in header — always visible */}
-                            <button
-                                onClick={() => setUpgradeModal({ type: "rateLimit" })}
-                                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-400 hover:bg-amber-500/20 transition-colors text-[11px] font-medium"
-                            >
-                                <Crown size={11} />
-                                Pro
+                        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            <button onClick={() => setUpgradeModal({ type:"rateLimit" })}
+                                style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:"rgba(184,150,62,.12)", border:`0.5px solid rgba(184,150,62,.35)`, color:GOLD, fontSize:11, fontWeight:700, fontFamily:"'Lato',sans-serif", cursor:"pointer", letterSpacing:".06em", textTransform:"uppercase" }}>
+                                <Crown size={11} /> Pro
                             </button>
-                            <button
-                                onClick={handleNewChat}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-sky-500/40 transition-colors text-[11px] font-medium"
-                            >
-                                <PlusCircle size={12} />
-                                <span className="hidden sm:inline">New chat</span>
+                            <button onClick={() => { handleNewChat(); setSidebarOpen(false); }}
+                                style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", background:"rgba(255,255,255,.06)", border:`0.5px solid rgba(255,255,255,.15)`, color:"rgba(255,255,255,.7)", fontSize:11, fontWeight:700, fontFamily:"'Lato',sans-serif", cursor:"pointer" }}>
+                                <PlusCircle size={11} />
+                                <span style={{ display:"none" }} className="sm-show">New chat</span>
                             </button>
-                            <Sparkles size={14} className="text-sky-400" />
                         </div>
                     </header>
 
-                    <main className="flex-1 overflow-y-auto bg-slate-950 px-4 py-5 space-y-4">
+                    {/* ── Message area ── */}
+                    <main className="gold-scroll" style={{ flex:1, overflowY:"auto", background:BG, padding:"28px 24px", minHeight:0 }}>
 
-                        {showWelcome && messages.length === 0 && (
-                            <div className="flex flex-col items-center pt-8 pb-4 px-2 gap-3">
-                                <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center mb-1">
-                                    <BookMarked size={28} className="text-sky-500" />
+                        {/* Welcome screen */}
+                        {showWelcome && messages.length===0 && (
+                            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", paddingTop:40, paddingBottom:20 }}>
+                                {/* diamond icon */}
+                                <div style={{ width:64, height:64, border:`1.5px solid ${GOLD}`, transform:"rotate(45deg)", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:24 }}>
+                                    <BookMarked size={26} style={{ color:NAVY, transform:"rotate(-45deg)" }} />
                                 </div>
-                                <h1 className="text-lg font-semibold text-slate-200 text-center">What do you want to know?</h1>
-                                <p className="text-[13px] text-slate-400 text-center">
-                                    Ask anything about <span className="text-sky-400 font-medium">{bookTitle}</span>
+
+                                <h1 className="lan-serif" style={{ fontSize:"clamp(22px,4vw,38px)", fontWeight:700, color:NAVY, textAlign:"center", marginBottom:10 }}>
+                                    What do you want to know?
+                                </h1>
+
+                                <div className="gold-line" style={{ maxWidth:240, width:"100%", marginBottom:10 }}>
+                                    <div style={{ width:7, height:7, background:GOLD, transform:"rotate(45deg)", flexShrink:0 }} />
+                                </div>
+
+                                <p style={{ fontSize:14, color:"#888", textAlign:"center", marginBottom:32, fontWeight:300, lineHeight:1.75 }}>
+                                    Ask anything about{" "}
+                                    <span className="lan-serif" style={{ color:NAVY, fontWeight:700 }}>{bookTitle}</span>
                                 </p>
-                                <div className="w-full max-w-md flex flex-col gap-2 mt-3">
+
+                                {/* Quick action chips */}
+                                <div style={{ width:"100%", maxWidth:480, display:"flex", flexDirection:"column", gap:8 }}>
                                     {QUICK_ACTIONS.map(({ label, type, sessionType }, i) => (
-                                        <button
-                                            key={label}
-                                            onClick={() => handleQuickAction(label, type, sessionType)}
-                                            className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-[13.5px] border transition-all
-                                                ${i === 0
-                                                    ? "border-sky-500/30 text-sky-300 bg-sky-500/10 hover:bg-sky-500/15 font-medium"
-                                                    : "border-slate-700 text-slate-300 bg-slate-800/50 hover:bg-slate-800 hover:border-slate-600"
-                                                }`}
-                                        >
+                                        <button key={label} onClick={() => handleQuickAction(label, type, sessionType)}
+                                            className={`quick-chip ${i===0?"primary":""}`}>
                                             <span>{label}</span>
-                                            <ChevronRight size={14} className={i === 0 ? "text-sky-400" : "text-slate-500"} />
+                                            <ChevronRight size={13} style={{ color:i===0?GOLD:"#bbb", flexShrink:0 }} />
                                         </button>
                                     ))}
                                 </div>
-                                <div className="flex items-center gap-2 mt-2">
-                                    <span className="text-[11px] bg-slate-800 border border-slate-700 text-slate-400 rounded-md px-2 py-0.5 font-semibold">Highlight</span>
-                                    <span className="text-[12px] text-slate-500">any text on the book page, then ask here</span>
+
+                                {/* hint */}
+                                <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:24 }}>
+                                    <span style={{ fontSize:11, background:"#fff", border:`0.5px solid #e5ddd0`, color:NAVY, padding:"3px 10px", fontWeight:700, fontFamily:"'Lato',sans-serif", letterSpacing:".06em" }}>TIP</span>
+                                    <span style={{ fontSize:12, color:"#aaa", fontFamily:"'Lato',sans-serif" }}>Highlight any text in the book, then ask here</span>
                                 </div>
                             </div>
                         )}
 
+                        {/* Messages */}
                         {messages.map((msg, i) => (
-                            <div key={i} className={`flex items-end gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                                {msg.role === "ai" && (
-                                    <div className="w-7 h-7 rounded-full bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0 mb-0.5">
-                                        <BookMarked size={12} className="text-sky-500" />
+                            <div key={i} style={{ display:"flex", alignItems:"flex-end", gap:10, justifyContent:msg.role==="user"?"flex-end":"flex-start", marginBottom:16 }}>
+                                {msg.role==="ai" && (
+                                    <div style={{ width:30, height:30, border:`0.5px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginBottom:2 }}>
+                                        <BookMarked size={12} style={{ color:GOLD }} />
                                     </div>
                                 )}
-                                <div className={`max-w-[82%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-[13.5px] leading-relaxed
-                                    ${msg.role === "ai"
-                                        ? "text-slate-200 rounded-bl-sm"
-                                        : "bg-black text-white rounded-br-sm"
-                                    }`}
-                                >
-                                    {msg.role === "ai" ? (
+                                <div className={msg.role==="ai"?"msg-ai":"msg-user"}
+                                    style={{ maxWidth:"80%", padding:"14px 16px", fontSize:13.5, lineHeight:1.75, ...(msg.role==="ai" ? {} : { borderRadius:0 }) }}>
+                                    {msg.role==="ai" ? (
                                         <>
                                             <RenderMessage text={msg.text} onSaveVocab={handleSaveVocab} />
-                                            {/* Upgrade card — shown instead of plain error for gated features */}
                                             {msg.upgradePrompt && (
-                                                <UpgradeCard
-                                                    upgradeType={msg.upgradeType}
-                                                    hoursLeft={msg.hoursLeft}
-                                                    onShowModal={() => setUpgradeModal({
-                                                        type: msg.upgradeType,
-                                                        hoursLeft: msg.hoursLeft,
-                                                    })}
-                                                />
+                                                <UpgradeCard upgradeType={msg.upgradeType} hoursLeft={msg.hoursLeft}
+                                                    onShowModal={() => setUpgradeModal({ type:msg.upgradeType, hoursLeft:msg.hoursLeft })} />
                                             )}
-                                            {/* Purchase CTA for non-owned books */}
                                             {msg.showPurchaseCta && !msg.upgradePrompt && (
-                                                <PurchaseSuggestionCard
-                                                    bookTitle={bookTitle}
-                                                    bookId={bookId}
-                                                    price={bookPrice}
-                                                    onPurchase={handlePurchaseRedirect}
-                                                />
+                                                <PurchaseSuggestionCard bookTitle={bookTitle} bookId={bookId} price={bookPrice} onPurchase={handlePurchaseRedirect} />
                                             )}
                                         </>
                                     ) : (
-                                        <p className="text-white">{msg.text}</p>
+                                        <p style={{ color:"#fff", fontFamily:"'Lato',sans-serif", fontSize:13.5 }}>{msg.text}</p>
                                     )}
                                 </div>
-                                {msg.role === "user" && (
-                                    <div className="w-7 h-7 rounded-full bg-sky-500 flex items-center justify-center shrink-0 mb-0.5">
+                                {msg.role==="user" && (
+                                    <div style={{ width:30, height:30, background:NAVY, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginBottom:2 }}>
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="white">
                                             <circle cx="12" cy="8" r="4" />
                                             <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
@@ -1083,15 +1064,15 @@ export default function AiChatContentClient() {
                             </div>
                         ))}
 
+                        {/* Loading dots */}
                         {loading && (
-                            <div className="flex items-end gap-2 justify-start">
-                                <div className="w-7 h-7 rounded-full bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0">
-                                    <BookMarked size={12} className="text-sky-500" />
+                            <div style={{ display:"flex", alignItems:"flex-end", gap:10, justifyContent:"flex-start", marginBottom:16 }}>
+                                <div style={{ width:30, height:30, border:`0.5px solid ${GOLD}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                                    <BookMarked size={12} style={{ color:GOLD }} />
                                 </div>
-                                <div className="bg-slate-800 border border-slate-700 rounded-2xl rounded-bl-sm px-4 py-3.5 flex gap-1.5 items-center">
-                                    {[0, 200, 400].map(delay => (
-                                        <span key={delay} className="w-2 h-2 rounded-full bg-sky-400 opacity-40 animate-bounce"
-                                            style={{ animationDelay: `${delay}ms` }} />
+                                <div className="msg-ai" style={{ padding:"14px 20px", display:"flex", gap:6, alignItems:"center" }}>
+                                    {[0,200,400].map(d => (
+                                        <span key={d} className="bounce-dot" style={{ width:7, height:7, borderRadius:"50%", background:GOLD, display:"inline-block", animationDelay:`${d}ms` }} />
                                     ))}
                                 </div>
                             </div>
@@ -1100,43 +1081,46 @@ export default function AiChatContentClient() {
                         <div ref={bottomRef} />
                     </main>
 
-                    <footer className="shrink-0 bg-slate-900 border-t border-slate-700/50 px-4 pt-3 pb-5 sm:pb-4">
-                        <form
-                            onSubmit={handleSubmit}
-                            className="flex items-end gap-2.5 bg-slate-800 border border-slate-700 rounded-2xl px-3 py-2.5 focus-within:border-sky-500/50 transition-colors"
-                        >
-                            <textarea
-                                ref={textareaRef}
-                                value={input}
-                                onChange={e => setInput(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                placeholder="Ask anything about this book…"
-                                rows={1}
-                                className="flex-1 bg-transparent border-none outline-none resize-none text-[13.5px] text-slate-200 placeholder-slate-500 leading-relaxed max-h-36"
-                            />
-                            <button
-                                type="submit"
-                                disabled={loading || !input.trim()}
-                                className="w-9 h-9 shrink-0 bg-sky-600 rounded-xl flex items-center justify-center text-white hover:bg-sky-500 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none transition-all"
-                            >
-                                {loading ? <Loader2 size={15} className="animate-spin" /> : <Send size={14} />}
+                    {/* ── Input footer ── */}
+                    <footer style={{ flexShrink:0, background:"#fff", borderTop:`0.5px solid #e5ddd0`, padding:"16px 24px 20px" }}>
+
+                        {/* stats strip (echoes homepage) */}
+                        <div style={{ display:"flex", alignItems:"stretch", borderBottom:`0.5px solid #f0ebe0`, paddingBottom:14, marginBottom:14, gap:0, overflowX:"auto" }} className="sbar-none">
+                            {[
+                                { val:"90M+", label:"Documents" },
+                                { val:"2.4M+", label:"Learners" },
+                                { val:"5/day", label:"Free Qs" },
+                                { val:"Pro", label:"Unlimited" },
+                            ].map(({ val, label }, i) => (
+                                <div key={label} style={{ flex:"1 1 60px", padding:"0 16px", borderRight: i<3?"0.5px solid #f0ebe0":"none", textAlign:"center" }}>
+                                    <div className="lan-serif" style={{ fontSize:15, fontWeight:700, color:NAVY }}>{val}</div>
+                                    <div style={{ fontSize:9, fontWeight:700, letterSpacing:".1em", textTransform:"uppercase", color:GOLD, marginTop:1 }}>{label}</div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <form onSubmit={handleSubmit} style={{ display:"flex", alignItems:"flex-end", gap:10, border:`0.5px solid #d9d0c0`, background:"#fff", padding:"10px 12px", transition:"border-color .2s" }}
+                            onFocusCapture={e => e.currentTarget.style.borderColor=GOLD}
+                            onBlurCapture={e => e.currentTarget.style.borderColor="#d9d0c0"}>
+                            <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
+                                placeholder={`Ask anything about "${bookTitle}"…`} rows={1}
+                                className="lan-input"
+                                style={{ flex:1, border:"none", outline:"none", resize:"none", maxHeight:140, padding:"2px 0" }} />
+                            <button type="submit" disabled={loading || !input.trim()} className="send-btn"
+                                style={{ width:38, height:38, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                {loading
+                                    ? <Loader2 size={14} style={{ animation:"spin .8s linear infinite" }} />
+                                    : <Send size={14} />}
                             </button>
                         </form>
-                        <p className="text-center text-[9px] text-slate-300 uppercase tracking-wider mt-2">
-                            LAN Library AI · Ask questions, get summaries, and explore key concepts with ease
+
+                        <p style={{ textAlign:"center", fontSize:9, fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:"#bbb", fontFamily:"'Lato',sans-serif", marginTop:10 }}>
+                            LAN Library AI · Ask questions, get summaries, explore key concepts
                         </p>
                     </footer>
+
                 </div>
             </div>
-
-            {/* Slide-up animation for modal */}
-            <style>{`
-                @keyframes slide-up {
-                    from { transform: translateY(40px); opacity: 0; }
-                    to { transform: translateY(0); opacity: 1; }
-                }
-                .animate-slide-up { animation: slide-up 0.25s ease-out; }
-            `}</style>
         </>
     );
 }

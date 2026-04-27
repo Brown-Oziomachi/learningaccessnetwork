@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, ChevronRight, Sparkles, ArrowRight, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { onAuthStateChanged } from "firebase/auth";
@@ -10,10 +10,18 @@ import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firesto
 import Navbar from '@/components/NavBar';
 import Footer from '@/components/FooterComp';
 
+/* ─── colour tokens ─────────────────────────────────────────── */
+const NAVY = "#0d2244";
+const GOLD = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG = "#f5f1ea";
+
 export default function DocumentTypePage() {
     const params = useParams();
     const router = useRouter();
     const typeSlug = params.slug;
+
     const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
     const [user, setUser] = useState(null);
     const [sortBy, setSortBy] = useState('popularity');
@@ -33,566 +41,529 @@ export default function DocumentTypePage() {
     ];
 
     const documentTypes = [
-        { name: 'Textbook', slug: 'textbook', image: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400', description: 'Standard educational books' },
-        { name: 'Lecture Note', slug: 'lecture-note', image: 'https://images.unsplash.com/photo-1517842645767-c639042777db?w=400', description: 'Summarized class materials' },
-        { name: 'Past Question', slug: 'past-question', image: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=400', description: 'Previous exam papers' },
-        { name: 'Thesis', slug: 'thesis', image: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400', description: 'Academic research papers' },
-        { name: 'Summary', slug: 'summary', image: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=400', description: 'Quick study breakdowns' },
-        { name: 'Syllabus', slug: 'syllabus', image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400', description: 'Course requirements' },
-        { name: 'Course Outline', slug: 'course-outline', image: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=400', description: 'Topic distributions' },
-        { name: 'Assignment', slug: 'assignment', image: 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=400', description: 'Practice tasks and projects' },
-        { name: 'Project', slug: 'project', image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400', description: 'Detailed student projects' },
-
-        // NEW CATEGORIES
-        { name: 'Lab Manual', slug: 'lab-manual', image: 'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=400', description: 'Practical guides and lab reports' },
-        { name: 'Handwritten Notes', slug: 'handwritten-notes', image: 'https://images.unsplash.com/photo-1503467913725-8484b65b0715?w=400', description: 'Authentic student class notes' },
-        { name: 'Exam Revision', slug: 'exam-revision', image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400', description: 'Highly focused exam prep materials' },
-        { name: 'Scholarship Guide', slug: 'scholarship-guide', image: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=400', description: 'Funding and application tips' },
-        { name: 'Research Proposal', slug: 'research-proposal', image: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=400', description: 'Initial project outlines and methodology' },
-        { name: 'Seminar Paper', slug: 'seminar-paper', image: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=400', description: 'Presentations for departmental seminars' },
-
-        // PRACTICAL & TECHNICAL
-        { name: 'Technical Drawing', slug: 'technical-drawing', image: 'https://images.unsplash.com/photo-1503387762-592dec58ef4e?w=400', description: 'Engineering and architectural designs' },
-
-        // STUDY AIDS
-        { name: 'Case Study', slug: 'case-study', image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=400', description: 'Analysis of real-world scenarios (Law/Business)' },
-
-        // ADMINISTRATIVE & CAREER
-        { name: 'Internship Report', slug: 'internship-report', image: 'https://images.unsplash.com/photo-1521791136064-7986c2959d99?w=400', description: 'SIWES or industrial training documentation' },
-        { name: 'Clearance Guide', slug: 'clearance-guide', image: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400', description: 'Step-by-step for graduation clearance' }
+        { name: 'Textbook', slug: 'textbook', description: 'Standard educational books' },
+        { name: 'Lecture Note', slug: 'lecture-note', description: 'Summarized class materials' },
+        { name: 'Past Question', slug: 'past-question', description: 'Previous exam papers' },
+        { name: 'Thesis', slug: 'thesis', description: 'Academic research papers' },
+        { name: 'Summary', slug: 'summary', description: 'Quick study breakdowns' },
+        { name: 'Syllabus', slug: 'syllabus', description: 'Course requirements' },
+        { name: 'Course Outline', slug: 'course-outline', description: 'Topic distributions' },
+        { name: 'Assignment', slug: 'assignment', description: 'Practice tasks and projects' },
+        { name: 'Project', slug: 'project', description: 'Detailed student projects' },
+        { name: 'Lab Manual', slug: 'lab-manual', description: 'Practical guides and lab reports' },
+        { name: 'Handwritten Notes', slug: 'handwritten-notes', description: 'Authentic student class notes' },
+        { name: 'Exam Revision', slug: 'exam-revision', description: 'Highly focused exam prep materials' },
+        { name: 'Scholarship Guide', slug: 'scholarship-guide', description: 'Funding and application tips' },
+        { name: 'Research Proposal', slug: 'research-proposal', description: 'Initial project outlines and methodology' },
+        { name: 'Seminar Paper', slug: 'seminar-paper', description: 'Presentations for departmental seminars' },
+        { name: 'Technical Drawing', slug: 'technical-drawing', description: 'Engineering and architectural designs' },
+        { name: 'Case Study', slug: 'case-study', description: 'Analysis of real-world scenarios' },
+        { name: 'Internship Report', slug: 'internship-report', description: 'SIWES or industrial training documentation' },
+        { name: 'Clearance Guide', slug: 'clearance-guide', description: 'Step-by-step for graduation clearance' },
     ];
-
 
     const getThumbnailUrl = (book) => {
         if (!book) return 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-
-        if (book.driveFileId) {
-            return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
-        }
-
+        if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
         if (book.embedUrl) {
-            const match = book.embedUrl.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})/);
-            if (match) {
-                const fileId = match[1] || match[2];
-                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
-            }
+            const m = book.embedUrl.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})/);
+            if (m) return `https://drive.google.com/thumbnail?id=${m[1] || m[2]}&sz=w400`;
         }
-
-        const pdfSource = book.pdfUrl || book.pdfLink;
-        if (pdfSource && pdfSource.includes('drive.google.com')) {
-            const match = pdfSource.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})/);
-            if (match) {
-                const fileId = match[1] || match[2];
-                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
-            }
+        const src = book.pdfUrl || book.pdfLink;
+        if (src?.includes('drive.google.com')) {
+            const m = src.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})/);
+            if (m) return `https://drive.google.com/thumbnail?id=${m[1] || m[2]}&sz=w400`;
         }
-
         return book.image || book.coverImage || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
     };
 
-    const currentDocType = documentTypes.find(type => type.slug === typeSlug);
+    const currentDocType = documentTypes.find(t => t.slug === typeSlug);
     const documentTypeName = currentDocType?.name || 'Document Type';
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
-            } else {
-                router.push('/auth/signin');
-            }
-        });
-
-        return () => unsubscribe();
+        const unsub = onAuthStateChanged(auth, cu => { cu ? setUser(cu) : router.push('/auth/signin'); });
+        return () => unsub();
     }, [router]);
 
-      // Fetch sales count for all books
     useEffect(() => {
-        const fetchBookSales = async () => {
+        const fetchSales = async () => {
             try {
-                const usersSnapshot = await getDocs(collection(db, "users"));
-                const salesMap = {};
-    
-                usersSnapshot.docs.forEach(userDoc => {
-                    const userData = userDoc.data();
-                    const purchasedBooks = userData.purchasedBooks || {};
-    
-                    Object.values(purchasedBooks).forEach(purchase => {
-                        const bookId = purchase.bookId || purchase.id || purchase.firestoreId;
-                        if (bookId) {
-                            salesMap[bookId] = (salesMap[bookId] || 0) + 1;
-                            // Also track firestore- prefixed version
-                            salesMap[`firestore-${bookId}`] = (salesMap[`firestore-${bookId}`] || 0) + 1;
-                        }
+                const snap = await getDocs(collection(db, "users"));
+                const map = {};
+                snap.docs.forEach(u => {
+                    Object.values(u.data().purchasedBooks || {}).forEach(p => {
+                        const id = p.bookId || p.id || p.firestoreId;
+                        if (id) { map[id] = (map[id] || 0) + 1; map[`firestore-${id}`] = (map[`firestore-${id}`] || 0) + 1; }
                     });
                 });
-    
-                setBookSalesCount(salesMap);
-            } catch (error) {
-                console.error("Error fetching sales count:", error);
-            }
+                setBookSalesCount(map);
+            } catch { }
         };
-    
-        fetchBookSales();
+        fetchSales();
     }, []);
 
     useEffect(() => {
-        const fetchFirestoreBooks = async () => {
+        const fetch = async () => {
             try {
-                const processedBooksData = booksData.map(book => ({
-                    ...book,
-                    image: getThumbnailUrl(book)
-                }));
-
+                const processed = booksData.map(b => ({ ...b, image: getThumbnailUrl(b) }));
                 const q = query(collection(db, 'advertMyBook'), where('status', '==', 'approved'));
-                const querySnapshot = await getDocs(q);
-
-                const books = [];
-                querySnapshot.forEach((docSnap) => {
-                    const data = docSnap.data();
-
-                    console.log('📄 Processing document:', {
-                        id: docSnap.id,
-                        title: data.bookTitle,
-                        docType: data.docType,
-                        category: data.category
-                    });
-
-                    const bookData = {
-                        id: `firestore-${docSnap.id}`,
-                        firestoreId: docSnap.id,
-                        title: data.bookTitle,
-                        author: data.author,
+                const snap = await getDocs(q);
+                const fb = [];
+                snap.forEach(d => {
+                    const data = d.data();
+                    const b = {
+                        id: `firestore-${d.id}`, firestoreId: d.id,
+                        title: data.bookTitle, author: data.author,
                         category: data.category,
                         documentType: data.docType || data.documentType || data.type,
-                        price: data.price,
-                        pages: data.pages,
+                        price: data.price, pages: data.pages,
                         format: data.format || 'PDF',
                         description: data.description,
-                        rating: 4.5,
-                        reviews: 0,
-                        driveFileId: data.driveFileId || data.fileId || data.driveId || data.googleDriveId,
-                        pdfUrl: data.pdfUrl || data.pdf || data.documentUrl,
-                        previewUrl: data.previewUrl,
-                        level: data.level || 'all', 
+                        rating: 4.5, reviews: 0,
+                        driveFileId: data.driveFileId || data.fileId,
+                        pdfUrl: data.pdfUrl || data.pdf,
                         embedUrl: data.embedUrl || data.embed,
-                        isFromFirestore: true
+                        level: data.level || 'all',
+                        isFromFirestore: true,
                     };
-
-                    const thumbnail = getThumbnailUrl(bookData);
-                    bookData.image = thumbnail;
-                    books.push(bookData);
+                    b.image = getThumbnailUrl(b);
+                    fb.push(b);
                 });
-
-                console.log(`✅ Fetched ${books.length} books from Firestore`);
-                console.log('📦 Sample book documentTypes:', books.slice(0, 3).map(b => ({ title: b.title, docType: b.documentType })));
-
-                const combinedBooks = [...processedBooksData, ...books];
-                setAllBooks(combinedBooks);
-            } catch (error) {
-                console.error('❌ Error fetching Firestore books:', error);
-                const processedBooksData = booksData.map(book => ({
-                    ...book,
-                    image: getThumbnailUrl(book)
-                }));
-                setAllBooks(processedBooksData);
-            } finally {
-                setLoading(false);
-            }
+                setAllBooks([...processed, ...fb]);
+            } catch {
+                setAllBooks(booksData.map(b => ({ ...b, image: getThumbnailUrl(b) })));
+            } finally { setLoading(false); }
         };
-
-        fetchFirestoreBooks();
+        fetch();
     }, []);
 
     useEffect(() => {
-        const fetchPurchasedBooks = async () => {
+        const load = async () => {
             try {
-                const user = auth.currentUser;
-                if (user) {
-                    const userDocRef = doc(db, 'users', user.uid);
-                    const userDoc = await getDoc(userDocRef);
-
-                    if (userDoc.exists()) {
-                        const userData = userDoc.data();
-                        const purchasedBooks = userData.purchasedBooks || {};
-
-                        let bookIds = [];
-
-                        if (Array.isArray(purchasedBooks)) {
-                            bookIds = purchasedBooks.map(book => book.id || book);
-                        } else if (typeof purchasedBooks === 'object') {
-                            bookIds = Object.keys(purchasedBooks);
-                        }
-
-                        setPurchasedBookIds(new Set(bookIds));
-                    }
+                const cu = auth.currentUser; if (!cu) return;
+                const ud = await getDoc(doc(db, 'users', cu.uid));
+                if (ud.exists()) {
+                    const pb = ud.data().purchasedBooks || {};
+                    const arr = Array.isArray(pb) ? pb : Object.values(pb);
+                    setPurchasedBookIds(new Set(arr.map(b => b.id || b.bookId || b.firestoreId).filter(Boolean)));
                 }
-            } catch (error) {
-                console.error('Error fetching purchased books:', error);
-            }
+            } catch { }
         };
-
-        if (user) {
-            fetchPurchasedBooks();
-        }
+        if (user) load();
     }, [user]);
 
     const documentTypeCounts = useMemo(() => {
         const counts = {};
         documentTypes.forEach(type => {
-            const count = allBooks.filter(book => {
-                const bookType = book.documentType?.toLowerCase()
-                    .replace(/ /g, '-')
-                    .trim();
-                return bookType === type.slug;
+            counts[type.slug] = allBooks.filter(b => {
+                const s = b.documentType?.toLowerCase().replace(/ /g, '-').trim();
+                return s === type.slug;
             }).length;
-            counts[type.slug] = count;
         });
         return counts;
     }, [allBooks]);
 
     const typeBooks = useMemo(() => {
-        return allBooks.filter(book => {
-            if (!book.documentType) return false;
-
-            // Normalize Type (e.g., "Past Question" -> "past-question")
-            const bookTypeSlug = book.documentType.toLowerCase().trim().replace(/\s+/g, '-');
-            const matchesType = bookTypeSlug === typeSlug;
-
-            // Check Level (If 'all' is selected, show everything for that type)
-            const matchesLevel = selectedLevel === 'all' || String(book.level) === selectedLevel;
-
-            return matchesType && matchesLevel;
+        return allBooks.filter(b => {
+            if (!b.documentType) return false;
+            const s = b.documentType.toLowerCase().trim().replace(/\s+/g, '-');
+            const matchesLevel = selectedLevel === 'all' || String(b.level) === selectedLevel;
+            return s === typeSlug && matchesLevel;
         });
-    }, [allBooks, typeSlug, selectedLevel]); // Add selectedLevel to dependencies!
+    }, [allBooks, typeSlug, selectedLevel]);
 
     const sortBooks = (books) => {
-        const sorted = [...books];
+        const s = [...books];
         switch (sortBy) {
-            case 'price-low':
-                return sorted.sort((a, b) => a.price - b.price);
-            case 'price-high':
-                return sorted.sort((a, b) => b.price - a.price);
-            case 'rating':
-                return sorted.sort((a, b) => b.rating - a.rating);
-            case 'newest':
-                return sorted.sort((a, b) => b.id - a.id);
-            default:
-                return sorted.sort((a, b) => b.reviews - a.reviews);
+            case 'price-low': return s.sort((a, b) => a.price - b.price);
+            case 'price-high': return s.sort((a, b) => b.price - a.price);
+            case 'rating': return s.sort((a, b) => b.rating - a.rating);
+            case 'newest': return s.sort((a, b) => b.id - a.id);
+            default: return s.sort((a, b) => b.reviews - a.reviews);
         }
     };
 
     const displayBooks = useMemo(() => sortBooks(typeBooks), [typeBooks, sortBy]);
-    const isPurchased = (bookId) => purchasedBookIds.has(bookId);
+    const isPurchased = id =>
+        purchasedBookIds.has(id) ||
+        purchasedBookIds.has(`firestore-${id}`) ||
+        purchasedBookIds.has(String(id).replace('firestore-', ''));
 
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-white">
-                <div className="relative w-20 h-24 perspective-1000">
-                    {/* Book Container */}
-                    <div className="book-flip-container">
-                        {/* Front Cover - Book */}
-                        <div className="book-face book-front">
-                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-r-lg shadow-2xl relative overflow-hidden">
-                                {/* Book spine shadow */}
-                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-black/30"></div>
-
-                                {/* Book pages effect */}
-                                <div className="absolute right-0 top-1 bottom-1 w-0.5 bg-white/20"></div>
-                                <div className="absolute right-1 top-2 bottom-2 w-0.5 bg-white/15"></div>
-                                <div className="absolute right-2 top-3 bottom-3 w-0.5 bg-white/10"></div>
-
-                                {/* Book icon */}
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <svg className="w-10 h-10 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                    </svg>
-                                </div>
-
-                                {/* Shine effect */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent"></div>
-                            </div>
-                        </div>
-
-                        {/* Back Cover - LAN */}
-                        <div className="book-face book-back">
-                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-lg shadow-2xl flex items-center justify-center relative overflow-hidden">
-                                {/* LAN Text */}
-                                <div className="flex gap-0.5 text-white font-black text-2xl">
-                                    <span className="inline-block lan-letter" style={{ animationDelay: '0s' }}>L</span>
-                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.15s' }}>A</span>
-                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.3s' }}>N</span>
-                                </div>
-
-                                {/* Glow effect */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 via-transparent to-transparent"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Loading dots */}
-                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
-                        <div className="w-1.5 h-1.5 bg-blue-950 rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
-                        <div className="w-1.5 h-1.5 bg-blue-800 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                    </div>
-
-                    <style jsx>{`
-    .perspective-1000 {
-      perspective: 1000px;
-    }
-    
-    .book-flip-container {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      transform-style: preserve-3d;
-      animation: bookFlip 3s ease-in-out infinite;
-    }
-    
-    .book-face {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
-    }
-    
-    .book-front {
-      z-index: 2;
-    }
-    
-    .book-back {
-      transform: rotateY(180deg);
-    }
-    
-    @keyframes bookFlip {
-      0%, 100% {
-        transform: rotateY(0deg);
-      }
-      25%, 75% {
-        transform: rotateY(180deg);
-      }
-    }
-    
-    @keyframes lan-letter {
-      0%, 100% {
-        transform: translateY(0) scale(1);
-      }
-      50% {
-        transform: translateY(-4px) scale(1.1);
-      }
-    }
-    
-    .lan-letter {
-      animation: lan-letter 0.6s ease-in-out infinite;
-    }
-  `}</style>
-                </div>
+    /* ── Loading ── */
+    if (loading) return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG }}>
+            <div style={{ textAlign: 'center' }}>
+                <div style={{ width: '56px', height: '56px', border: `3px solid ${GOLD}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '18px', color: NAVY }}>Loading…</p>
+                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
-        );
-    }
+        </div>
+    );
 
     return (
-        <div className="min-h-screen bg-white overflow-x-hidden">
-            <Navbar />
+        <>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+                .lan-root  { font-family:'Lato',sans-serif; background:${BG}; }
+                .lan-serif { font-family:'Playfair Display',Georgia,serif; }
 
-            <div className="bg-gray-50 border-b border-gray-200">
-                <div className="max-w-7xl mx-auto px-4 py-3">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Link href="/home" className="hover:text-blue-600">Home</Link>
-                        <span>&gt;</span>
-                        <Link href="/documents" className="hover:text-blue-600">All Documents</Link>
-                        <span>&gt;</span>
-                        <span className="text-gray-900 font-semibold">{documentTypeName}</span>
+                /* ── Book card ── */
+                .book-card { text-decoration:none; display:block; background:#fff; }
+                .book-card:hover .book-cover { box-shadow:0 12px 32px rgba(13,34,68,0.18); transform:translateY(-3px); }
+                .book-cover { transition:box-shadow 0.25s, transform 0.25s; }
+
+                /* scrollbar hide */
+                .sbar-none { scrollbar-width:none; -ms-overflow-style:none; }
+                .sbar-none::-webkit-scrollbar { display:none; }
+
+                /* level pills */
+                .level-pill { border:0.5px solid #e5ddd0; background:#fff; color:${NAVY};
+                    font-family:'Lato',sans-serif; font-size:11px; font-weight:700;
+                    letter-spacing:0.07em; padding:8px 16px; cursor:pointer;
+                    transition:background 0.18s,color 0.18s; }
+                .level-pill.active { background:${NAVY}; color:#fff; border-color:${NAVY}; }
+                .level-pill:hover  { background:rgba(13,34,68,0.08); }
+
+                /* doc-type pills */
+                .dt-pill { display:inline-block; border:0.5px solid #e5ddd0; background:#fff;
+                    color:${NAVY}; font-family:'Lato',sans-serif; font-size:11px; font-weight:700;
+                    letter-spacing:0.05em; padding:9px 16px; text-decoration:none;
+                    transition:background 0.18s,color 0.18s,border-color 0.18s; }
+                .dt-pill:hover { background:${NAVY}; color:#fff; border-color:${NAVY}; }
+
+                .filter-select { border:0.5px solid #e5ddd0; background:#fff; color:${NAVY};
+                    font-family:'Lato',sans-serif; font-size:12px; font-weight:700;
+                    padding:9px 14px; outline:none; cursor:pointer; }
+
+                @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+                .anim-up { animation:slideUp 0.5s cubic-bezier(0.4,0,0.2,1) both; }
+            `}</style>
+
+            <div className="lan-root" style={{ minHeight: '100vh' }}>
+                <Navbar />
+
+                {/* ── Hero ── */}
+                <section style={{
+                    background: NAVY,
+                    backgroundImage: 'radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)',
+                    backgroundSize: '28px 28px',
+                    padding: '60px 24px 52px',
+                }}>
+                    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+                        <div className="anim-up" style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '8px',
+                            background: 'rgba(184,150,62,0.14)',
+                            border: '1px solid rgba(184,150,62,0.3)',
+                            borderRadius: '999px', padding: '6px 14px', marginBottom: '20px',
+                        }}>
+                            <Sparkles size={12} style={{ color: GOLD }} />
+                            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: GOLDD }}>Academic Resources</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+                            <button onClick={() => router.back()} style={{ width: '38px', height: '38px', border: '0.5px solid rgba(255,255,255,0.2)', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                                <ArrowLeft size={18} style={{ color: 'rgba(255,255,255,0.7)' }} />
+                            </button>
+                            <h1 className="lan-serif anim-up" style={{ fontSize: 'clamp(32px,5.5vw,58px)', fontWeight: 900, color: '#fff', lineHeight: 1.05, letterSpacing: '-1px', margin: 0 }}>
+                                {documentTypeName}
+                            </h1>
+                        </div>
+                        <p style={{ fontSize: '15px', color: 'rgba(245,240,232,0.65)', maxWidth: '560px', lineHeight: 1.75, fontWeight: 300, margin: '0 0 8px 52px' }}>
+                            {currentDocType?.description} — {displayBooks.length} document{displayBooks.length !== 1 ? 's' : ''} available.
+                        </p>
+                    </div>
+                </section>
+
+                {/* ── Breadcrumb ── */}
+                <div style={{ background: CREAM, borderBottom: '0.5px solid #e5ddd0', padding: '10px 24px' }}>
+                    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontFamily: "'Lato',sans-serif" }}>
+                        <Link href="/" style={{ color: NAVY, fontWeight: 700, textDecoration: 'none' }}>Home</Link>
+                        <ChevronRight size={12} style={{ color: '#bbb' }} />
+                        <Link href="/documents" style={{ color: NAVY, fontWeight: 700, textDecoration: 'none' }}>All Documents</Link>
+                        <ChevronRight size={12} style={{ color: '#bbb' }} />
+                        <span style={{ color: '#aaa' }}>{documentTypeName}</span>
                     </div>
                 </div>
-            </div>
 
-            <main className="max-w-7xl mx-auto px-4 py-8">
-                <div className="mb-8">
-                    <div className="flex items-center gap-3 mb-3">
-                        <button onClick={() => router.back()} className="p-2 text-blue-950 rounded-lg transition-colors">
-                            <ArrowLeft size={24} />
-                        </button>
-                        <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-                            {documentTypeName}
-                        </h1>
-                    </div>
-                    <p className="text-gray-600 ml-14">
-                        {currentDocType?.description} - Browse {displayBooks.length} document{displayBooks.length !== 1 ? 's' : ''}.
-                    </p>
-                </div>
+                {/* ── Main ── */}
+                <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '56px 24px' }}>
 
-                {/* FILTER & SORT SECTION */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-                    <div className="flex items-center gap-2">
-                        <span className="text-gray-700 font-semibold">Documents recommended for you</span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-4">
-                        {/* NEW: Level Filter Dropdown */}
-                        <div className="flex items-center gap-2 text-blue-950">
-                            <span className="text-blue-950 text-sm">Level:</span>
-                            <select
-                                value={selectedLevel}
-                                onChange={(e) => setSelectedLevel(e.target.value)}
-                                className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-950 bg-white"
-                            >
-                                {universityLevels.map((lvl) => (
-                                    <option key={lvl.value} value={lvl.value}>{lvl.name}</option>
-                                ))}
+                    {/* Controls bar */}
+                    <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '16px 20px', marginBottom: '32px', display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center' }}>
+                        <div style={{ flex: 1, minWidth: '180px' }}>
+                            <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: GOLD, margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>Showing</p>
+                            <p className="lan-serif" style={{ fontSize: '16px', fontWeight: 700, color: NAVY, margin: 0 }}>{displayBooks.length} {documentTypeName}s</p>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#aaa', fontFamily: "'Lato',sans-serif" }}>Level</span>
+                            <select value={selectedLevel} onChange={e => setSelectedLevel(e.target.value)} className="filter-select">
+                                {universityLevels.map(l => <option key={l.value} value={l.value}>{l.name}</option>)}
                             </select>
                         </div>
-
-                        {/* Existing Sort Dropdown */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-gray-700 text-sm">Sort by:</span>
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className="border border-gray-300 text-blue-950 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-950 bg-white"
-                            >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#aaa', fontFamily: "'Lato',sans-serif" }}>Sort</span>
+                            <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="filter-select">
                                 <option value="popularity">Popularity</option>
-                                <option value="price-low">Price: Low to High</option>
-                                <option value="price-high">Price: High to Low</option>
+                                <option value="price-low">Price: Low → High</option>
+                                <option value="price-high">Price: High → Low</option>
                                 <option value="newest">Newest First</option>
                                 <option value="rating">Highest Rated</option>
                             </select>
                         </div>
                     </div>
-                </div>
 
-                {/* No documents message */}
-                {displayBooks.length === 0 ? (
-                    <div className="text-center py-16 bg-gray-50 rounded-lg">
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">No documents found</h3>
-                        <p className="text-gray-600">There are currently no {documentTypeName} documents available.</p>
-                        <Link
-                            href="/documents"
-                            className="inline-block mt-4 text-blue-950 hover:underline font-semibold"
-                        >
-                            Browse all documents →
-                        </Link>
+                    {/* Level pills */}
+                    <div className="sbar-none" style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '40px', paddingBottom: '4px' }}>
+                        {universityLevels.map(l => (
+                            <button key={l.value} onClick={() => setSelectedLevel(l.value)}
+                                className={`level-pill${selectedLevel === l.value ? ' active' : ''}`}>
+                                {l.name}
+                            </button>
+                        ))}
                     </div>
-                ) : (
-                    <>
-                        {/* First Row */}
-                        <div className="mb-8">
-                            <div className="overflow-x-auto scrollbar-hide">
-                                <div className="flex gap-4 pb-4">
-                                    {displayBooks.slice(0, 5).map((book) => (
-                                        <Link
-                                            key={book.id}
-                                            href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                                            className="flex-none w-[180px] sm:w-[200px] group"
-                                        >
-                                            <div className="relative mb-3">
-                                                <img
-                                                    src={book.image}
-                                                    alt={book.title}
-                                                    className="w-full h-[240px] sm:h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
-                                                    onError={(e) => {
-                                                        e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                                                    }}
-                                                />
-                                                {isPurchased(book.id) && (
-                                                    <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
-                                                )}
-                                                {book.isFromFirestore && (
-                                                    <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
-                                                )}
-                                            </div>
 
-                                            <div>
-                                                <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600">
-                                                    {book.title}
-                                                </h4>
-                                                <p className="text-gray-600 text-xs">{book.author}</p>
-                                            </div>
-                                             <p className="text-gray-500 text-xs lg:text-sm flex items-center gap-1 mt-1">
-                                                <ShoppingBag size={12} />
-                                                {bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0} sold
-                                            </p>
-                                        </Link>
-                                    ))}
-                                </div>
+                    {/* Empty state */}
+                    {displayBooks.length === 0 ? (
+                        <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '80px 24px', textAlign: 'center' }}>
+                            <div style={{ width: '52px', height: '52px', border: `0.5px solid #e5ddd0`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                                <Search size={24} style={{ color: '#ddd' }} />
                             </div>
+                            <h3 className="lan-serif" style={{ fontSize: '24px', color: NAVY, marginBottom: '8px' }}>No {documentTypeName}s Found</h3>
+                            <p style={{ fontSize: '13px', color: '#aaa', marginBottom: '20px' }}>There are currently no documents matching your filters.</p>
+                            <Link href="/documents" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '12px 24px', background: NAVY, color: '#fff', fontSize: '13px', fontWeight: 700, textDecoration: 'none', fontFamily: "'Lato',sans-serif" }}>
+                                Browse All Documents <ArrowRight size={13} />
+                            </Link>
                         </div>
+                    ) : (
+                        <>
+                            {/* Row 1 */}
+                            <BookRow
+                                label="Recommended For You"
+                                books={displayBooks.slice(0, 5)}
+                                total={displayBooks.length}
+                                isPurchased={isPurchased}
+                                bookSalesCount={bookSalesCount}
+                            />
 
-                        {/* Second Row */}
-                        {displayBooks.length > 5 && (
-                            <div className="mb-8">
-                                <div className="overflow-x-auto scrollbar-hide">
-                                    <div className="flex gap-4 pb-4">
-                                        {displayBooks.slice(5, 10).map((book) => (
-                                            <Link
-                                                key={book.id}
-                                                href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
-                                                className="flex-none w-[180px] sm:w-[200px] group"
-                                            >
-                                                <div className="relative mb-3">
-                                                    <img
-                                                        src={book.image}
-                                                        alt={book.title}
-                                                        className="w-full h-[240px] sm:h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
-                                                        onError={(e) => {
-                                                            e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                                                        }}
-                                                    />
-                                                    {isPurchased(book.id) && (
-                                                        <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Owned</span>
-                                                    )}
-                                                    {book.isFromFirestore && (
-                                                        <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">New</span>
-                                                    )}
-                                                </div>
+                            {/* Row 2 */}
+                            {displayBooks.length > 5 && (
+                                <BookRow
+                                    label={`More ${documentTypeName}s`}
+                                    books={displayBooks.slice(5, 10)}
+                                    total={displayBooks.length - 5}
+                                    isPurchased={isPurchased}
+                                    bookSalesCount={bookSalesCount}
+                                />
+                            )}
 
-                                                <div>
-                                                    <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600">
-                                                        {book.title}
-                                                    </h4>
-                                                    <p className="text-gray-600 text-xs">{book.author}</p>
-                                                </div>
-                                            </Link>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="mt-12 bg-blue-50 border border-blue-200 rounded-lg p-6">
-                            <h3 className="text-xl font-bold text-gray-900 mb-4">Browse Other Document Types</h3>
-                            <div className="flex flex-wrap gap-3">
-                                {documentTypes
-                                    .filter(type => type.slug !== typeSlug)
-                                    .map((type) => {
-                                        const docCount = documentTypeCounts[type.slug] || 0;
+                            {/* Browse Other Types */}
+                            <section style={{ background: CREAM, border: '0.5px solid #e5ddd0', padding: '40px 32px', marginTop: '24px' }}>
+                                <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: GOLD, marginBottom: '8px', fontFamily: "'Lato',sans-serif" }}>Explore More</p>
+                                <h3 className="lan-serif" style={{ fontSize: 'clamp(20px,3vw,28px)', fontWeight: 700, color: NAVY, margin: '0 0 24px' }}>Browse Other Document Types</h3>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                    {documentTypes.filter(t => t.slug !== typeSlug).map(type => {
+                                        const count = documentTypeCounts[type.slug] || 0;
                                         return (
-                                            <Link
-                                                key={type.slug}
-                                                href={`/document-type/${type.slug}`}
-                                                className="bg-white border border-blue-300 text-blue-950 px-4 py-2 rounded-lg hover:bg-blue-950 hover:text-white transition-colors text-sm font-semibold"
-                                            >
-                                                {type.name} ({docCount})
-                                            </Link>
+                                            <a key={type.slug} href={`/document-type/${type.slug}`} className="dt-pill">
+                                                {type.name}
+                                                <span style={{ marginLeft: '6px', fontSize: '10px', color: GOLD, fontWeight: 700 }}>({count})</span>
+                                            </a>
                                         );
                                     })}
-                            </div>
-                        </div>
-                    </>
-                )}
-            </main>
+                                </div>
+                            </section>
+                        </>
+                    )}
+                </main>
 
-            <Footer />
+                <Footer />
+            </div>
+        </>
+    );
+}
 
-            <style jsx>{`
-                .scrollbar-hide { 
-                    -ms-overflow-style: none; 
-                    scrollbar-width: none; 
-                }
-                .scrollbar-hide::-webkit-scrollbar { 
-                    display: none; 
-                }
-            `}</style>
+/* ── BookRow wrapper ── */
+function BookRow({ label, books, total, isPurchased, bookSalesCount }) {
+    return (
+        <div style={{ marginBottom: '48px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                    {label}
+                </p>
+                <div style={{ height: '1px', flex: 1, background: 'rgba(184,150,62,0.2)', margin: '0 16px' }} />
+                <span style={{ fontSize: '11px', color: '#aaa', fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap' }}>
+                    {books.length} of {total}
+                </span>
+            </div>
+            <div className="sbar-none" style={{ overflowX: 'auto', margin: '0 -4px', padding: '0 4px 8px' }}>
+                <div style={{ display: 'flex', gap: '16px', paddingBottom: '4px' }}>
+                    {books.map(book => (
+                        <BookCard
+                            key={book.id}
+                            book={book}
+                            isPurchased={isPurchased}
+                            bookSalesCount={bookSalesCount}
+                        />
+                    ))}
+                </div>
+            </div>
         </div>
+    );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BookCard — matches the image exactly
+   ▸ book-cover image (3:4, full width of card)
+   ▸ ● LIVE badge top-left  |  OWNED / NEW badge top-right
+   ▸ White meta area below: title (navy bold serif), author (grey),
+     price (navy bold) + optional category tag (cream/gold)
+══════════════════════════════════════════════════════════════ */
+function BookCard({ book, isPurchased, bookSalesCount }) {
+    const sold = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
+    const purchased = isPurchased(book.id);
+
+    return (
+        <a
+            href={`/book/preview?id=${String(book.id).replace('firestore-', '')}`}
+            className="book-card"
+            style={{ flexShrink: 0, width: '200px', textDecoration: 'none' }}
+        >
+            {/* ── Cover image ── */}
+            <div style={{ position: 'relative', background: '#e8e3d8' }}>
+                <img
+                    src={book.image}
+                    alt={book.title}
+                    className="book-cover"
+                    style={{
+                        width: '100%',
+                        aspectRatio: '3/4',
+                        objectFit: 'cover',
+                        display: 'block',
+                    }}
+                    onError={e => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                    }}
+                />
+                {/* Fallback placeholder (hidden until image errors) */}
+                <div style={{
+                    display: 'none',
+                    width: '100%',
+                    aspectRatio: '3/4',
+                    background: '#ede8df',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                    </svg>
+                </div>
+
+                {/* ● LIVE badge — top left (always shown, matches image) */}
+                <div style={{
+                    position: 'absolute', top: '8px', left: '8px',
+                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                    background: NAVY,
+                    padding: '3px 8px',
+                    fontFamily: "'Lato',sans-serif",
+                    fontSize: '9px', fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    color: '#fff',
+                }}>
+                    <span style={{
+                        width: '5px', height: '5px', borderRadius: '50%',
+                        background: '#22c55e',
+                        display: 'inline-block', flexShrink: 0,
+                    }} />
+                    LIVE
+                </div>
+
+                {/* Owned badge — top right */}
+                {purchased && (
+                    <span style={{
+                        position: 'absolute', top: '8px', right: '8px',
+                        background: '#16a34a', color: '#fff',
+                        fontSize: '9px', fontWeight: 700,
+                        padding: '3px 7px',
+                        fontFamily: "'Lato',sans-serif",
+                    }}>OWNED</span>
+                )}
+            </div>
+
+            {/* ── Meta area (white bg) ── */}
+            <div style={{ padding: '10px 10px 12px', background: '#fff', borderTop: '0.5px solid #f0ebe0' }}>
+
+                {/* Title */}
+                <h4 style={{
+                    fontFamily: "'Playfair Display',serif",
+                    fontSize: '13px', fontWeight: 700,
+                    color: NAVY,
+                    margin: '0 0 3px',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    lineHeight: 1.35,
+                }}>
+                    {book.title}
+                </h4>
+
+                {/* Author */}
+                <p style={{
+                    fontSize: '11px', color: '#999',
+                    margin: '0 0 8px',
+                    fontFamily: "'Lato',sans-serif",
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                }}>
+                    {book.author}
+                </p>
+
+                {/* Price row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', flexWrap: 'wrap' }}>
+                    <p style={{
+                        fontSize: '14px', fontWeight: 700,
+                        color: NAVY, margin: 0,
+                        fontFamily: "'Lato',sans-serif",
+                    }}>
+                        {purchased ? 'Owned' : `₦${Number(book.price || 0).toLocaleString()}`}
+                    </p>
+
+                    {/* Category tag — shown when category exists (like "PUBLIC ADMINISTRATION" in image) */}
+                    {book.category && !purchased && (
+                        <span style={{
+                            display: 'inline-block',
+                            background: CREAM,
+                            border: `0.5px solid rgba(184,150,62,0.3)`,
+                            color: GOLD,
+                            fontSize: '8px', fontWeight: 700,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            padding: '3px 7px',
+                            fontFamily: "'Lato',sans-serif",
+                            maxWidth: '110px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                        }}>
+                            {book.category}
+                        </span>
+                    )}
+                </div>
+
+                {/* Sold count — subtle, below price */}
+                {sold > 0 && (
+                    <p style={{
+                        fontSize: '10px', color: '#bbb',
+                        margin: '5px 0 0',
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                        fontFamily: "'Lato',sans-serif",
+                    }}>
+                        <ShoppingBag size={9} /> {sold} sold
+                    </p>
+                )}
+            </div>
+        </a>
     );
 }

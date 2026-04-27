@@ -5,22 +5,16 @@ import {
   User,
   Menu,
   X,
-  Monitor,
   Upload,
-  Smartphone,
   ChevronDown,
-  Download,
   LogOut,
-  AlignEndVertical,
   Bookmark,
-  Globe,
   Book,
   BookOpen,
   ChevronRight,
   Sparkles,
   HelpCircle,
   Crown,
-  School2Icon,
   FileText,
   FileQuestion,
   GraduationCap,
@@ -28,6 +22,8 @@ import {
   ClipboardList,
   PenTool,
   Folder,
+  Bell,
+  Home,
 } from "lucide-react";
 import Link from "next/link";
 import { signOut } from "firebase/auth";
@@ -44,6 +40,59 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
+/* ─── colour tokens ─────────────────────────────────────────── */
+const NAVY = "#0d2244";
+const GOLD = "#b8963e";
+const GOLDD = "#d4aa5a"; // lighter / hover gold
+const CREAM = "#f5f0e8";
+const TOPBAR_BG = "#f9f6f0"; // the "recently published" strip
+
+/* ─── search tag data ────────────────────────────────────────── */
+const searchTags = [
+  { name: "Textbook", description: "Standard educational books", icon: Book },
+  {
+    name: "Lecture Note",
+    description: "Summarized class materials",
+    icon: FileText,
+  },
+  {
+    name: "Past Question",
+    description: "Previous exam papers",
+    icon: FileQuestion,
+  },
+  {
+    name: "Thesis",
+    description: "Academic research papers",
+    icon: GraduationCap,
+  },
+  { name: "Summary", description: "Quick study breakdowns", icon: List },
+  { name: "Syllabus", description: "Course requirements", icon: ClipboardList },
+  {
+    name: "Course Outline",
+    description: "Topic distributions",
+    icon: BookOpen,
+  },
+  {
+    name: "Assignment",
+    description: "Practice tasks and projects",
+    icon: PenTool,
+  },
+  { name: "Project", description: "Detailed student projects", icon: Folder },
+];
+
+/* ─── category nav items ─────────────────────────────────────── */
+const NAV_CATS = [
+  { key: "education", label: "Education" },
+  { key: "business", label: "Business" },
+  { key: "technology", label: "Technology" },
+  { key: "science", label: "Science" },
+  {
+    key: "sexeducation",
+    label: "Sex Education",
+    href: "/category/sex-education",
+  },
+];
+
 export default function Navbar() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -51,41 +100,37 @@ export default function Navbar() {
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [mobileSubmenu, setMobileSubmenu] = useState(null);
   const [allBooks, setAllBooks] = useState([]);
-  const router = useRouter();
   const [isSeller, setIsSeller] = useState(false);
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [checkingSeller, setCheckingSeller] = useState(true);
-  const [userRole, setUserRole] = useState(null);
   const [showSearchTags, setShowSearchTags] = useState(false);
-  const searchTagsRef = useRef(null);
+  const [scrolled, setScrolled] = useState(false);
 
-const searchTags = [
-  { name: "Textbook", description: "Standard educational books", icon: Book },
-  { name: "Lecture Note", description: "Summarized class materials", icon: FileText },
-  { name: "Past Question", description: "Previous exam papers", icon: FileQuestion },
-  { name: "Thesis", description: "Academic research papers", icon: GraduationCap },
-  { name: "Summary", description: "Quick study breakdowns", icon: List },
-  { name: "Syllabus", description: "Course requirements", icon: ClipboardList },
-  { name: "Course Outline", description: "Topic distributions", icon: BookOpen },
-  { name: "Assignment", description: "Practice tasks and projects", icon: PenTool },
-  { name: "Project", description: "Detailed student projects", icon: Folder }
-];
-  // Fetch all books (from booksData + Firestore)
+  const router = useRouter();
+  const searchTagsRef = useRef(null);
+  const dropdownTimer = useRef(null);
+
+  /* scroll shadow */
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  /* fetch books */
   useEffect(() => {
     const fetchBooks = async () => {
       try {
         const q = query(
           collection(db, "advertMyBook"),
-          where("status", "==", "approved")
+          where("status", "==", "approved"),
         );
-        const querySnapshot = await getDocs(q);
-
+        const snap = await getDocs(q);
         const firestoreBooks = [];
-        querySnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
+        snap.forEach((d) => {
+          const data = d.data();
           firestoreBooks.push({
-            id: `firestore-${docSnap.id}`,
+            id: `firestore-${d.id}`,
             title: data.bookTitle,
             author: data.author,
             category: data.category,
@@ -93,112 +138,62 @@ const searchTags = [
             rating: 4.5,
           });
         });
-
         setAllBooks([...booksData, ...firestoreBooks]);
-      } catch (error) {
-        console.error("Error fetching books:", error);
+      } catch {
         setAllBooks(booksData);
       }
     };
-
     fetchBooks();
   }, []);
 
-  
-  const checkSellerStatus = async (userId) => {
-    try {
-      setCheckingSeller(true);
-      console.log("Checking seller status for user:", userId);
-
-      const userDocRef = doc(db, "users", userId);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        const isUserSeller = userData.isSeller === true;
-        console.log("User is seller:", isUserSeller);
-        setIsSeller(isUserSeller);
-        setUserRole(userData.role || null); // ✅ Add this line
-      } else {
-        console.log("User document not found");
-        setIsSeller(false);
-        setUserRole(null); // ✅ Add this line
-      }
-    } catch (error) {
-      console.error("Error checking seller status:", error);
-      setIsSeller(false);
-      setUserRole(null); // ✅ Add this line
-    } finally {
-      setCheckingSeller(false);
-    }
-  };
-
-  // Check seller status
+  /* auth */
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-
-      if (currentUser) {
-        await checkSellerStatus(currentUser.uid);
+    const unsub = onAuthStateChanged(auth, async (cu) => {
+      setUser(cu);
+      if (cu) {
+        try {
+          setCheckingSeller(true);
+          const ud = await getDoc(doc(db, "users", cu.uid));
+          setIsSeller(ud.exists() ? ud.data().isSeller === true : false);
+        } catch {
+          setIsSeller(false);
+        } finally {
+          setCheckingSeller(false);
+        }
       } else {
         setIsSeller(false);
         setCheckingSeller(false);
       }
     });
-
-    return () => unsubscribe();
+    return () => unsub();
   }, []);
 
-  // Click outside to close search tags
-useEffect(() => {
-  const handleClickOutside = (event) => {
-    if (searchTagsRef.current && !searchTagsRef.current.contains(event.target)) {
-      setShowSearchTags(false);
+  /* click outside search tags */
+  useEffect(() => {
+    const handler = (e) => {
+      if (searchTagsRef.current && !searchTagsRef.current.contains(e.target))
+        setShowSearchTags(false);
+    };
+    if (showSearchTags) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showSearchTags]);
+
+  /* helpers */
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push("/");
+    } catch {
+      alert("Failed to logout. Please try again.");
     }
   };
 
-  if (showSearchTags) {
-    document.addEventListener('mousedown', handleClickOutside);
-  }
-
-  return () => {
-    document.removeEventListener('mousedown', handleClickOutside);
-  };
-}, [showSearchTags]);
-
-      const handleLogout = async () => {
-          try {
-              await signOut(auth);
-              router.push('/');
-          } catch (error) {
-              console.error("Logout error:", error);
-              alert("Failed to logout. Please try again.");
-          }
-      };
-
   const HandleClick = () => {
-    console.log("Button clicked, isSeller:", isSeller);
-
     if (!user) {
       router.push("/auth/signin");
       return;
     }
-
-    if (isSeller) {
-      // User is already a seller, go to upload page
-      router.push("/upload-document");
-    } else {
-      // User is not a seller, go to become seller page
-      router.push("/become-seller");
-    }
-  };
-  // Group books by category
-  const getBooksByCategory = (categoryName) => {
-    return allBooks
-      .filter((book) =>
-        book.category?.toLowerCase().includes(categoryName.toLowerCase())
-      )
-      .slice(0, 6);
+    router.push(isSeller ? "/upload-document" : "/become-seller");
   };
 
   const handleMyAccountClick = async () => {
@@ -206,118 +201,61 @@ useEffect(() => {
       router.push("/auth/signin");
       return;
     }
-
     try {
       const snap = await getDoc(doc(db, "users", user.uid));
-
       if (!snap.exists()) {
         router.push("/role-selection");
         return;
       }
-
       const data = snap.data();
-
-      // 👇 NO ROLE YET
-      if (!data.role || data.role === "") {
+      if (!data.role) {
         router.push("/role-selection");
         return;
       }
-
-      // 👇 ROLE ROUTING
-      if (data.role === "student") {
-        router.push("/student/dashboard");
-      } else if (data.role === "seller" || data.isSeller) {
+      if (data.role === "student") router.push("/student/dashboard");
+      else if (data.role === "seller" || data.isSeller)
         router.push("/my-account/seller-account");
-      } else {
-        router.push("/");
-      }
-    } catch (err) {
-      console.error(err);
+      else router.push("/");
+    } catch {
       router.push("/");
     }
   };
 
+  const getBooksByCategory = (cat) =>
+    allBooks
+      .filter((b) => b.category?.toLowerCase().includes(cat.toLowerCase()))
+      .slice(0, 6);
 
- const menuCategories = useMemo(() => {
-  const categories = {
-    education: {
-      title: "Education Documents",
-      description: "Explore educational materials, study guides, and academic resources",
-      books: getBooksByCategory("education"),
-    },
-    business: {
-      title: "Business Documents",
-      description: "Looking to take your organization to new heights? Use our extensive library of business documents",
-      books: getBooksByCategory("business"),
-    },
-    technology: {
-      title: "Technology Documents",
-      description: "Discover programming guides, tech tutorials, and software development resources",
-      books: getBooksByCategory("technology"),
-    },
-    science: {
-      title: "Science Documents",
-      description: "Access scientific papers, research materials, and academic studies",
-      books: getBooksByCategory("science"),
-    },
-    personal: {
-      title: "Personal Development",
-      description: "Improve yourself with self-help books, productivity guides, and wellness resources",
-      books: getBooksByCategory("personal"),
-    },
-    sexeducation: {
-      title: "Sex Education",
-      description: "Learn everything you need to know about sex education through peoples experience",
-      books: getBooksByCategory("sex education"),
-    },
-    relationship: {
-      title: "Relationships",
-      description: "Discover the book written by relation therapist on LAN Library",
-      books: getBooksByCategory("relationship"),
-    },
-  };
-  
-  // Debug log
-  console.log("=== MENU CATEGORIES CREATED ===");
-  Object.entries(categories).forEach(([key, value]) => {
-    console.log(`${key}: ${value.books.length} books`);
-  });
-  
-  return categories;
-}, [allBooks]);
-
-  <div className="bg-gray-50 py-16">
-    <div className="max-w-5xl mx-auto px-4 text-center">
-     
-      <div className="bg-white rounded-xl shadow-lg py-16 flex flex-col items-center justify-center">
-        <div className="flex items-center gap-8 mb-8 text-gray-800">
-          <Monitor size={64} strokeWidth={1.5} />
-          <Upload size={48} strokeWidth={2} />
-          <Smartphone size={56} strokeWidth={1.5} />
-        </div>
-
-        <button
-          onClick={HandleClick}
-          disabled={checkingSeller}
-          className="bg-blue-950 hover:bg-blue-800 text-white px-8 py-4 rounded-lg disabled:opacity-50 flex items-center gap-2"
-        >
-          {checkingSeller ? (
-            <>
-              <div className="animate-spin h-5 w-5 border-b-2 border-white rounded-full" />
-              Loading...
-            </>
-          ) : isSeller ? (
-            <>
-              <Upload size={20} />
-              Upload Document
-            </>
-          ) : (
-            "Become a Seller"
-          )}
-        </button>
-      </div>
-    </div>
-  </div>;
+  const menuCategories = useMemo(
+    () => ({
+      education: {
+        title: "Education Documents",
+        description: "Academic resources and study guides",
+        books: getBooksByCategory("education"),
+      },
+      business: {
+        title: "Business Documents",
+        description: "Management, finance, entrepreneurship",
+        books: getBooksByCategory("business"),
+      },
+      technology: {
+        title: "Technology Documents",
+        description: "Programming, IT, digital innovation",
+        books: getBooksByCategory("technology"),
+      },
+      science: {
+        title: "Science Documents",
+        description: "Research, discoveries, exploration",
+        books: getBooksByCategory("science"),
+      },
+      sexeducation: {
+        title: "Sex Education",
+        description: "Sexual health, relationships, wellness",
+        books: getBooksByCategory("sex education"),
+      },
+    }),
+    [allBooks],
+  );
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -326,94 +264,343 @@ useEffect(() => {
     }
   };
 
-  const handleMobileMenuClick = (category) => {
-    setMobileSubmenu(mobileSubmenu === category ? null : category);
+  /* dropdown hover with delay to avoid flicker */
+  const openDropdown = (key) => {
+    clearTimeout(dropdownTimer.current);
+    setActiveDropdown(key);
+  };
+  const closeDropdown = () => {
+    dropdownTimer.current = setTimeout(() => setActiveDropdown(null), 180);
   };
 
   return (
     <>
-      <header className="bg-blue-950 border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <Link href="/latest/documentations" className="no-underline">
+      {/* ── global styles ──────────────────────────────────────── */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+
+        .lan-nav-link {
+          display: flex; align-items: center; gap: 5px;
+          font-size: 13px; font-family: 'Lato', sans-serif;
+          font-weight: 400; letter-spacing: 0.01em;
+          padding: 8px 12px; border-radius: 6px;
+          color: rgba(245,240,232,0.82);
+          transition: color 0.18s, background 0.18s;
+          text-decoration: none; cursor: pointer;
+          background: none; border: none;
+        }
+        .lan-nav-link:hover { color: ${CREAM}; background: rgba(255,255,255,0.07); }
+
+        .lan-cat-btn {
+          display: flex; align-items: center; gap: 4px;
+          font-size: 12px; font-family: 'Lato', sans-serif;
+          font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+          padding: 10px 14px; color: #555;
+          background: none; border: none; cursor: pointer;
+          transition: color 0.15s, background 0.15s;
+          white-space: nowrap;
+        }
+        .lan-cat-btn:hover, .lan-cat-btn.active { color: ${NAVY}; background: rgba(13,34,68,0.06); }
+
+        .lan-dropdown {
+          position: absolute; top: calc(100% + 1px); left: 0;
+          min-width: 640px; background: #fff;
+          border: 0.5px solid #e8e2d8;
+          box-shadow: 0 20px 60px rgba(13,34,68,0.14);
+          z-index: 999; padding: 0; overflow: hidden;
+          animation: dropIn 0.18s cubic-bezier(0.4,0,0.2,1);
+        }
+        @keyframes dropIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+
+        .lan-book-card {
+          padding: 10px; border: 0.5px solid #ede8df; border-radius: 6px;
+          transition: border-color 0.15s, box-shadow 0.15s;
+          text-decoration: none; display: block;
+        }
+        .lan-book-card:hover { border-color: ${GOLD}; box-shadow: 0 4px 16px rgba(184,150,62,0.12); }
+
+        .lan-sell-btn {
+          font-family: 'Lato', sans-serif; font-weight: 700; font-size: 12px;
+          letter-spacing: 0.06em; text-transform: uppercase;
+          padding: 9px 18px; border-radius: 6px;
+          background: ${GOLD}; color: ${NAVY}; border: none; cursor: pointer;
+          transition: background 0.18s; white-space: nowrap;
+        }
+        .lan-sell-btn:hover:not(:disabled) { background: ${GOLDD}; }
+        .lan-sell-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .lan-logout-btn {
+          display: flex; align-items: center; gap: 6px;
+          padding: 8px 12px; border-radius: 6px; font-size: 12px;
+          background: rgba(185,28,28,0.12); color: #ef4444;
+          border: 0.5px solid rgba(239,68,68,0.2); cursor: pointer;
+          transition: background 0.15s; font-family: 'Lato', sans-serif;
+        }
+        .lan-logout-btn:hover { background: rgba(185,28,28,0.22); }
+
+        .lan-search-wrap {
+          position: relative; flex: 1; max-width: 480px;
+        }
+        .lan-search-input {
+          width: 100%; padding: 9px 40px 9px 16px;
+          background: rgba(255,255,255,0.09); border: 0.5px solid rgba(184,150,62,0.3);
+          border-radius: 8px; font-size: 13px; color: ${CREAM};
+          font-family: 'Lato', sans-serif; outline: none;
+          transition: border-color 0.18s, background 0.18s;
+        }
+        .lan-search-input::placeholder { color: rgba(245,240,232,0.38); }
+        .lan-search-input:focus { border-color: ${GOLD}; background: rgba(255,255,255,0.13); }
+
+        .lan-tag-dropdown {
+          position: absolute; top: calc(100% + 8px); left: 0; right: 0;
+          background: #fff; border: 0.5px solid #e8e2d8;
+          box-shadow: 0 16px 48px rgba(13,34,68,0.16);
+          border-radius: 10px; z-index: 999; padding: 12px;
+          animation: dropIn 0.18s cubic-bezier(0.4,0,0.2,1);
+        }
+        .lan-tag-btn {
+          display: flex; align-items: flex-start; gap: 8px; padding: 10px;
+          border-radius: 7px; cursor: pointer; text-align: left; width: 100%;
+          background: none; border: none;
+          transition: background 0.15s;
+        }
+        .lan-tag-btn:hover { background: #f9f6f0; }
+
+        .lan-mobile-overlay {
+          position: fixed; inset: 0; background: #fff; z-index: 9999;
+          overflow-y: auto; font-family: 'Lato', sans-serif;
+          animation: slideInLeft 0.25s cubic-bezier(0.4,0,0.2,1);
+        }
+        @keyframes slideInLeft { from { transform: translateX(-100%); opacity: 0.6; } to { transform: translateX(0); opacity: 1; } }
+
+        .lan-mobile-link {
+          display: flex; align-items: center; gap: 12px;
+          padding: 13px 20px; border-radius: 8px; font-size: 14px;
+          color: ${NAVY}; text-decoration: none; font-weight: 500;
+          transition: background 0.15s; cursor: pointer;
+          background: none; border: none; width: 100%;
+        }
+        .lan-mobile-link:hover { background: #f9f6f0; }
+
+        .lan-divider-gold {
+          height: 1px; background: linear-gradient(90deg, transparent, ${GOLD}, transparent);
+          opacity: 0.35; margin: 8px 0;
+        }
+
+        .lan-topbar-ticker {
+          display: flex; align-items: center; gap: 6px;
+          font-size: 12px; font-family: 'Lato', sans-serif;
+          font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+          color: ${NAVY}; padding: 8px 16px; background: ${TOPBAR_BG};
+          justify-content: center; text-decoration: none;
+          border-bottom: 1px solid rgba(13,34,68,0.08);
+          transition: background 0.15s;
+        }
+        .lan-topbar-ticker:hover { background: #f0ebe0; }
+
+        .lan-ai-fab {
+          position: fixed; bottom: 96px; right: 20px; z-index: 9999;
+          display: flex; align-items: center; gap: 7px;
+          background: linear-gradient(135deg, #0ea5e9, #0284c7);
+          color: #fff; font-size: 13px; font-weight: 700;
+          font-family: 'Lato', sans-serif;
+          padding: 11px 18px; border-radius: 999px;
+          box-shadow: 0 6px 24px rgba(14,165,233,0.38);
+          text-decoration: none;
+          transition: transform 0.2s, box-shadow 0.2s;
+          animation: fabPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+        }
+        .lan-ai-fab:hover { transform: scale(1.06); box-shadow: 0 8px 32px rgba(14,165,233,0.5); }
+        @keyframes fabPop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      `}</style>
+
+      {/* ═══════════════════════════════════════════════════════════
+          TOP ANNOUNCEMENT BAR
+      ═══════════════════════════════════════════════════════════ */}
+      <Link href="/latest/documentations" className="lan-topbar-ticker">
+        <span style={{ color: GOLD }}>●</span>
+        Recently Published
+        <ChevronRight size={13} />
+      </Link>
+
+      {/* ═══════════════════════════════════════════════════════════
+          MAIN HEADER
+      ═══════════════════════════════════════════════════════════ */}
+      <header
+        style={{
+          background: NAVY,
+          borderBottom: `1px solid rgba(184,150,62,0.18)`,
+          position: "sticky",
+          top: 0,
+          zIndex: 500,
+          transition: "box-shadow 0.3s",
+          boxShadow: scrolled ? "0 4px 32px rgba(13,34,68,0.38)" : "none",
+        }}
+      >
+        <div
+          style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 20px" }}
+        >
           <div
-            className=" flex items-center justify-center gap-2 text-blue-950"
-            style={{ backgroundColor: "#f9f6f0" }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "16px",
+              height: "64px",
+            }}
           >
-            <h1 className=" font-bold text-lg mt-3">Recently Published...</h1>
-            <ChevronRight size={16} className="mt-3" />
-          </div>
-        </Link>
-        <div className="max-w-4xl mx-auto px-4 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            {/* hamburger */}
             <button
-              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg text-gray-50"
+              className="lan-nav-link"
+              style={{ padding: "8px", display: "none" }}
+              id="hamburger-btn"
               onClick={() => {
                 setShowMobileMenu(!showMobileMenu);
                 setShowMobileSearch(false);
               }}
+              aria-label="Menu"
             >
-              {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
+              {showMobileMenu ? <X size={22} /> : <Menu size={22} />}
             </button>
 
+            {/* ── BRAND ── */}
             <Link
               href="/home"
-              className="flex items-center gap-2 shrink-0 lg:-ml-10"
+              style={{ textDecoration: "none", flexShrink: 0 }}
             >
-              <div>
-                <h1
-                  className="text-4xl sm:text-3xl font-bold text-gray-50"
-                  style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
+              <div
+                style={{
+                  fontFamily: "'Playfair Display', Georgia, serif",
+                  lineHeight: 1.05,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "22px",
+                    fontWeight: 900,
+                    color: CREAM,
+                    letterSpacing: "-0.5px",
+                  }}
                 >
                   [LAN Library]
-                </h1>
-                <h2
-                  className="text-xs sm:text-base font-light"
-                  style={{ fontFamily: "'Lato', sans-serif" }}
+                </div>
+                <div
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 300,
+                    color: GOLD,
+                    letterSpacing: "0.15em",
+                    textTransform: "uppercase",
+                    fontFamily: "'Lato', sans-serif",
+                    marginTop: "1px",
+                  }}
                 >
-                  The Global Student Library 📚
-                </h2>
+                  The Global Student Library
+                </div>
               </div>
             </Link>
 
-            <div className="relative" ref={searchTagsRef}>
+            {/* ── DESKTOP SEARCH ── */}
+            <div
+              className="lan-search-wrap"
+              ref={searchTagsRef}
+              style={{ margin: "0 12px" }}
+            >
+              <input
+                className="lan-search-input"
+                type="text"
+                placeholder="Search 90M+ documents…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setShowSearchTags(true)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              />
               <button
-                onClick={() => {
-                  setShowMobileSearch(!showMobileSearch);
-                  setShowSearchTags(!showSearchTags);
-                  setShowMobileMenu(false);
+                onClick={handleSearch}
+                style={{
+                  position: "absolute",
+                  right: "10px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: GOLD,
+                  display: "flex",
                 }}
-                className="p-2 text-blue-950 rounded-lg cursor-pointer hover:bg-blue-950 hover:text-white"
               >
-                <Search size={22} className="text-white" />
+                <Search size={16} />
               </button>
 
-              {/* Search Tags Dropdown */}
+              {/* search tag dropdown */}
               {showSearchTags && (
-                <div className="absolute right-0 lg:left-0 top-full mt-20 max-lg:w-80 lg:w-150 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 p-4">
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="lan-tag-dropdown">
+                  <p
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      color: "#aaa",
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      marginBottom: "8px",
+                      paddingLeft: "10px",
+                    }}
+                  >
+                    Browse by type
+                  </p>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr 1fr",
+                      gap: "4px",
+                    }}
+                  >
                     {searchTags.map((tag) => {
                       const Icon = tag.icon;
                       return (
                         <button
                           key={tag.name}
+                          className="lan-tag-btn"
                           onClick={() => {
                             setSearchQuery(tag.name);
                             setShowSearchTags(false);
-                            setShowMobileSearch(true);
+                            handleSearch();
                           }}
-                          className="flex flex-col items-start p-3 rounded-lg hover:bg-gray-50 transition-colors text-left group"
                         >
-                          <div className="flex items-center gap-2 mb-1">
-                            <Icon
-                              size={16}
-                              className="text-blue-950 group-hover:text-blue-600"
-                            />
-                            <span className="font-semibold text-sm text-gray-900 group-hover:text-blue-600">
-                              {tag.name}
-                            </span>
+                          <div
+                            style={{
+                              width: "30px",
+                              height: "30px",
+                              borderRadius: "6px",
+                              background: "#f9f6f0",
+                              border: `0.5px solid #ede8df`,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Icon size={14} style={{ color: NAVY }} />
                           </div>
-                          <span className="text-xs text-gray-500 line-clamp-2">
-                            {tag.description}
-                          </span>
+                          <div>
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: NAVY,
+                              }}
+                            >
+                              {tag.name}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                color: "#888",
+                                marginTop: "1px",
+                              }}
+                            >
+                              {tag.description}
+                            </div>
+                          </div>
                         </button>
                       );
                     })}
@@ -421,697 +608,717 @@ useEffect(() => {
                 </div>
               )}
             </div>
-            <nav className="hidden lg:flex items-center gap-2 lg:gap-3 flex-shrink-0">
-              <Link
-                href="/my-books"
-                className="flex items-center gap-1 px-3 py-2 hover:bg-gray-100 hover:text-blue-950 rounded-lg text-sm text-gray-50"
-              >
-                <Book size={18} />
-                <span>My Books</span>
+
+            {/* ── DESKTOP NAV LINKS ── */}
+            <nav
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "2px",
+                marginLeft: "auto",
+              }}
+            >
+              <Link href="/my-books" className="lan-nav-link">
+                <Book size={15} /> My Books
               </Link>
-              <button
-                target="_blank"
-                onClick={handleMyAccountClick}
-                className="flex items-center gap-1 px-3 py-2 hover:bg-gray-100 hover:text-blue-950 rounded-lg text-sm text-gray-50"
-              >
-                <User size={18} />
-                <span>My Account</span>
+              <button className="lan-nav-link" onClick={handleMyAccountClick}>
+                <User size={15} /> Account
               </button>
-              <Link
-                href="/lecturers"
-                className="flex items-center gap-1 px-3 py-2 hover:bg-gray-100 hover:text-blue-950 rounded-lg text-sm text-gray-50"
-              >
-                <Crown size={18} />
-                <span>Lecturers</span>
+              <Link href="/lecturers" className="lan-nav-link">
+                <Crown size={15} /> Lecturers
               </Link>
-              <Link
-                href="/saved-my-book"
-                className="flex items-center gap-1 px-3 py-2 hover:bg-gray-100 hover:text-blue-950 rounded-lg text-sm text-gray-50"
-              >
-                <Bookmark size={18} />
-                <span>Saved</span>
+              <Link href="/saved-my-book" className="lan-nav-link">
+                <Bookmark size={15} /> Saved
               </Link>
 
+              {/* sell / upload CTA */}
               <button
+                className="lan-sell-btn"
                 onClick={HandleClick}
                 disabled={checkingSeller}
-                className="text-blue-950 hover:bg-blue-950 transition-colors cursor-pointer bg-white font-semibold px-4 py-2 hover:text-white rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                style={{ marginLeft: "6px" }}
               >
                 {checkingSeller ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    Loading...
-                  </>
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "12px",
+                        height: "12px",
+                        border: "2px solid rgba(13,34,68,0.3)",
+                        borderTopColor: NAVY,
+                        borderRadius: "50%",
+                        display: "inline-block",
+                        animation: "spin 0.7s linear infinite",
+                      }}
+                    />
+                    Loading…
+                  </span>
                 ) : isSeller ? (
-                  <>Upload</>
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "5px",
+                    }}
+                  >
+                    <Upload size={13} />
+                    Upload
+                  </span>
                 ) : (
-                  <>Become a Seller</>
+                  "Become a Seller"
                 )}
               </button>
-              {/* <Link
-                href="/register-school"
-                className="text-blue-950 hover:bg-blue-950 transition-colors bg-white font-semibold px-8 py-2 hover:text-white rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <School2Icon size={18} />
-                <span>Register School</span>
-              </Link> */}
+
               <button
+                className="lan-logout-btn"
                 onClick={handleLogout}
-                className="flex items-center gap-1 lg:gap-2 px-2 cursor-pointer lg:px-3 py-2 bg-red-800 text-white hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
+                style={{ marginLeft: "4px" }}
               >
-                <LogOut size={18} className="lg:w-5 lg:h-5" />
-                {/* <span className=" lg:inline">Logout</span> */}
+                <LogOut size={14} />
               </button>
             </nav>
-          </div>
 
-          {showMobileSearch && (
-            <div className="mt-3 animate-slideDown">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search PDF books..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  className="w-full text-gray-900 bg-white px-4 py-2 pr-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-950"
-                  autoFocus
-                />
-                <button
-                  onClick={handleSearch}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
-                >
-                  <Search size={20} />
-                </button>
-              </div>
-            </div>
-          )}
+            {/* mobile: search + hamburger shown via CSS on small screens */}
+          </div>
         </div>
 
-        {/* Desktop Categories Bar */}
-        <div className="hidden lg:block bg-gray-50 border-t border-gray-200 ">
-          <div className="max-w-7xl mx-auto px-4">
-            <div className="flex items-center gap-1">
-              <a
-                href="/docs"
-                target="_blank"
-                className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 whitespace-nowrap"
-              >
-                What is LAN Library?
-              </a>
+        {/* ── CATEGORY BAR ── */}
+        <div
+          style={{
+            background: CREAM,
+            borderTop: `1px solid rgba(13,34,68,0.1)`,
+          }}
+        >
+          <div
+            style={{
+              maxWidth: "1280px",
+              margin: "0 auto",
+              padding: "0 20px",
+              display: "flex",
+              alignItems: "center",
+              gap: "0",
+              overflowX: "auto",
+            }}
+          >
+            <Link
+              href="/docs"
+              target="_blank"
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                padding: "10px 14px",
+                color: "#888",
+                textDecoration: "none",
+                whiteSpace: "nowrap",
+                fontFamily: "'Lato', sans-serif",
+              }}
+            >
+              What is LAN?
+            </Link>
 
-              {/* Education Dropdown */}
+            {/* thin gold divider */}
+            <div
+              style={{
+                width: "1px",
+                height: "18px",
+                background: "rgba(184,150,62,0.3)",
+                flexShrink: 0,
+              }}
+            />
+
+            {/* category dropdowns */}
+            {NAV_CATS.map(({ key, label, href }) => (
               <div
-                className="relative group"
-                onMouseEnter={() => setActiveDropdown("education")}
-                onMouseLeave={() => setActiveDropdown(null)}
+                key={key}
+                style={{ position: "relative" }}
+                onMouseEnter={() => openDropdown(key)}
+                onMouseLeave={closeDropdown}
               >
-                <button className="px-4 py-3 text-sm text-blue-950 w-full hover:bg-gray-100 flex items-center gap-1 ">
-                  Education{" "}
+                <button
+                  className={`lan-cat-btn ${activeDropdown === key ? "active" : ""}`}
+                >
+                  {label}
                   <ChevronDown
-                    size={14}
-                    className={
-                      activeDropdown === "education" ? "rotate-180" : ""
-                    }
+                    size={11}
+                    style={{
+                      transition: "transform 0.2s",
+                      transform:
+                        activeDropdown === key ? "rotate(180deg)" : "none",
+                    }}
                   />
                 </button>
-                {activeDropdown === "education" &&
-                  menuCategories.education.books.length > 0 && (
-                    <div className="absolute top-full mx-auto z-50 bg-white text-blue-950">
-                      <div className="bg-white  p-6 mx-auto w-200 text-blue-950">
-                        <h3 className="text-lg font-bold text-gray-900">
-                          {menuCategories.education.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {menuCategories.education.description}
-                        </p>
-                      </div>
 
-                      <h4 className="font-semibold text-gray-900 mb-3 p-6">
-                        Documents recommended for you
-                      </h4>
-                      <div className="grid grid-cols-3 gap-4 p-6">
-                        {menuCategories.education.books.map((book) => (
-                          <Link
-                            key={book.id}
-                            href={`/book/preview?id=${book.id}`}
-                            onClick={() => setActiveDropdown(null)}
-                            className="bg-white border border-gray-200 rounded-lg overflow-hidden  transition-shadow"
-                          >
-                            <div className="p-3">
-                              <h5 className="font-semibold text-sm line-clamp-2 mb-1 break-words overflow-hidden">
-                                {book.title}
-                              </h5>
-                              <p className="text-xs text-gray-600">
-                                Added by {book.author}
-                              </p>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                      <Link
-                        href="/category/education"
-                        className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline p-6"
+                {activeDropdown === key && (
+                  <div
+                    className="lan-dropdown"
+                    onMouseEnter={() => openDropdown(key)}
+                    onMouseLeave={closeDropdown}
+                  >
+                    {/* dropdown header */}
+                    <div
+                      style={{
+                        padding: "20px 24px 16px",
+                        borderBottom: `1px solid #f0ebe0`,
+                        background: "#fdfaf6",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                          marginBottom: "6px",
+                        }}
                       >
-                        All Education Documents{" "}
-                        <ChevronRight size={14} className="inline" />
-                      </Link>
-                    </div>
-                  )}
-              </div>
-
-              <div
-                className="relative group"
-                onMouseEnter={() => setActiveDropdown("business")}
-                onMouseLeave={() => setActiveDropdown(null)}
-              >
-                <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
-                  Business{" "}
-                  <ChevronDown
-                    size={14}
-                    className={
-                      activeDropdown === "business" ? "rotate-180" : ""
-                    }
-                  />
-                </button>
-
-                {/* Remove the books.length check here */}
-                {activeDropdown === "business" && (
-                  <div className="absolute top-full mx-auto z-50 bg-white text-blue-950">
-                    <div className="bg-white  p-6 mx-auto w-200 text-blue-950">
-                      <h3 className="text-lg font-bold text-gray-900">
-                        {menuCategories.business.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {menuCategories.business.description}
-                      </p>
-                    </div>
-
-                    {/* Check length inside the dropdown */}
-                    {menuCategories.business.books.length > 0 ? (
-                      <>
-                        <h4 className="font-semibold text-gray-900 mb-3 p-6">
-                          Documents recommended for you
-                        </h4>
-                        <div className="grid grid-cols-3 gap-4 p-6">
-                          {menuCategories.business.books.map((book) => (
-                            <Link
-                              key={book.id}
-                              href={`/book/preview?id=${book.id}`}
-                              onClick={() => setActiveDropdown(null)}
-                              className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                            >
-                              <div className="p-3">
-                                <h5 className="font-semibold text-sm line-clamp-2 mb-1 break-words overflow-hidden">
-                                  {book.title}
-                                </h5>
-                                <p className="text-xs text-gray-600">
-                                  Added by {book.author}
-                                </p>
-                              </div>
-                            </Link>
-                          ))}
-                        </div>
-                        <Link
-                          href="/category/business"
-                          className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline p-6"
+                        <div
+                          style={{
+                            width: "3px",
+                            height: "20px",
+                            background: GOLD,
+                            borderRadius: "2px",
+                          }}
+                        />
+                        <h3
+                          style={{
+                            fontFamily: "'Playfair Display', serif",
+                            fontSize: "18px",
+                            fontWeight: 700,
+                            color: NAVY,
+                            margin: 0,
+                          }}
                         >
-                          All Business Documents{" "}
-                          <ChevronRight size={14} className="inline" />
-                        </Link>
-                      </>
-                    ) : (
-                      <p className="text-sm text-gray-500">
-                        No documents available in this category yet.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div
-                className="relative group"
-                onMouseEnter={() => setActiveDropdown("technology")}
-                onMouseLeave={() => setActiveDropdown(null)}
-              >
-                <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
-                  Technology{" "}
-                  <ChevronDown
-                    size={14}
-                    className={
-                      activeDropdown === "technology" ? "rotate-180" : ""
-                    }
-                  />
-                </button>
-
-                {/* Remove the books.length check here */}
-                {activeDropdown === "technology" && (
-                  <div className="absolute top-full mx-auto z-50 bg-white text-blue-950">
-                    <div className="bg-white  p-6 mx-auto w-200 text-blue-950">
-                      <h3 className="text-lg font-bold text-gray-900">
-                        {menuCategories.technology.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {menuCategories.technology.description}
-                      </p>
-                    </div>
-
-                    {/* Check length inside the dropdown */}
-                    {menuCategories.technology.books.length > 0 ? (
-                      <>
-                        <h4 className="font-semibold text-gray-900 mb-3 p-6">
-                          Documents recommended for you
-                        </h4>
-                        <div className="grid grid-cols-3 gap-4">
-                          {menuCategories.technology.books.map((book) => (
-                            <Link
-                              key={book.id}
-                              href={`/book/preview?id=${book.id}`}
-                              onClick={() => setActiveDropdown(null)}
-                              className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                            >
-                              <div className="p-3">
-                                <h5 className="font-semibold text-sm line-clamp-2 mb-1 break-words overflow-hidden">
-                                  {book.title}
-                                </h5>
-                                <p className="text-xs text-gray-600">
-                                  Added by {book.author}
-                                </p>
-                              </div>
-                            </Link>
-                          ))}
-                        </div>
-                        <Link
-                          href="/category/technology"
-                          className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline p-6"
-                        >
-                          All Technology Documents{" "}
-                          <ChevronRight size={14} className="inline" />
-                        </Link>
-                      </>
-                    ) : (
-                      <p className="text-sm text-gray-500 p-6">
-                        No documents available in this category yet.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div
-                className="relative group"
-                onMouseEnter={() => setActiveDropdown("science")}
-                onMouseLeave={() => setActiveDropdown(null)}
-              >
-                <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
-                  Science{" "}
-                  <ChevronDown
-                    size={14}
-                    className={activeDropdown === "science" ? "rotate-180" : ""}
-                  />
-                </button>
-
-                {/* Remove the books.length check here */}
-                {activeDropdown === "science" && (
-                  <div className="absolute top-full mx-auto z-50 bg-white text-blue-950">
-                    <div className="bg-white  p-6 mx-auto w-200 text-blue-950">
-                      <h3 className="text-lg font-bold text-gray-900">
-                        {menuCategories.science.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {menuCategories.science.description}
-                      </p>
-                    </div>
-
-                    {/* Check length inside the dropdown */}
-                    {menuCategories.science.books.length > 0 ? (
-                      <>
-                        <h4 className="font-semibold text-gray-900 mb-3 p-6">
-                          Documents recommended for you
-                        </h4>
-                        <div className="grid grid-cols-3 gap-4 p-6">
-                          {menuCategories.science.books.map((book) => (
-                            <Link
-                              key={book.id}
-                              href={`/book/preview?id=${book.id}`}
-                              onClick={() => setActiveDropdown(null)}
-                              className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                            >
-                              <div className="p-3">
-                                <h5 className="font-semibold text-sm line-clamp-2 mb-1 break-words overflow-hidden">
-                                  {book.title}
-                                </h5>
-                                <p className="text-xs text-gray-600">
-                                  Added by {book.author}
-                                </p>
-                              </div>
-                            </Link>
-                          ))}
-                        </div>
-                        <Link
-                          href="/category/science"
-                          className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline p-6"
-                        >
-                          All Science Documents{" "}
-                          <ChevronRight size={14} className="inline" />
-                        </Link>
-                      </>
-                    ) : (
-                      <p className="text-sm text-gray-500 p-6">
-                        No documents available in this category yet.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div
-                className="relative group"
-                onMouseEnter={() => setActiveDropdown("sex-education")}
-                onMouseLeave={() => setActiveDropdown(null)}
-              >
-                <button className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-1">
-                  Sex Education{" "}
-                  <ChevronDown
-                    size={14}
-                    className={
-                      activeDropdown === "sex-education" ? "rotate-180" : ""
-                    }
-                  />
-                </button>
-                {activeDropdown === "sex-education" && // ✅ Fixed here
-                  menuCategories.sexeducation.books.length > 0 && (
-                    <div className="absolute top-full mx-auto z-50 bg-white text-blue-950">
-                      <div className="bg-white  p-6 mx-auto w-200 text-blue-950">
-                        <h3 className="text-lg font-bold text-gray-900">
-                          {menuCategories.sexeducation.title}
+                          {menuCategories[key]?.title}
                         </h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {menuCategories.sexeducation.description}
-                        </p>
                       </div>
-
-                      <h4 className="font-semibold text-gray-900 mb-3 p-6">
-                        Documents recommended for you
-                      </h4>
-                      <div className="grid grid-cols-3 gap-4 p-6">
-                        {menuCategories.sexeducation.books.map((book) => (
-                          <Link
-                            key={book.id}
-                            href={`/book/preview?id=${book.id}`}
-                            onClick={() => setActiveDropdown(null)}
-                            className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                          >
-                            <div className="p-3">
-                              <h5 className="font-semibold text-sm line-clamp-2 mb-1 break-words overflow-hidden">
-                                {book.title}
-                              </h5>
-                              <p className="text-xs text-gray-600">
-                                Added by {book.author}
-                              </p>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                      <Link
-                        href="/category/sex-education"
-                        className="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline p-6"
+                      <p
+                        style={{
+                          fontSize: "12px",
+                          color: "#888",
+                          margin: "0 0 0 13px",
+                          fontFamily: "'Lato', sans-serif",
+                        }}
                       >
-                        All Sex Education Documents{" "}
-                        <ChevronRight size={14} className="inline" />
-                      </Link>
+                        {menuCategories[key]?.description}
+                      </p>
                     </div>
-                  )}
-              </div>
 
-              <Link
-                href="/documents"
-                className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 whitespace-nowrap"
-              >
-                All Documents
-              </Link>
-            </div>
+                    {menuCategories[key]?.books?.length > 0 ? (
+                      <>
+                        <div style={{ padding: "16px 24px 0" }}>
+                          <p
+                            style={{
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              color: GOLD,
+                              letterSpacing: "0.14em",
+                              textTransform: "uppercase",
+                              margin: "0 0 12px",
+                            }}
+                          >
+                            Recommended for you
+                          </p>
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(3, 1fr)",
+                              gap: "10px",
+                            }}
+                          >
+                            {menuCategories[key].books.map((book) => (
+                              <Link
+                                key={book.id}
+                                href={`/book/preview?id=${book.id}`}
+                                className="lan-book-card"
+                                onClick={() => setActiveDropdown(null)}
+                              >
+                                <h5
+                                  style={{
+                                    fontSize: "12px",
+                                    fontWeight: 700,
+                                    color: NAVY,
+                                    margin: "0 0 4px",
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {book.title}
+                                </h5>
+                                <p
+                                  style={{
+                                    fontSize: "11px",
+                                    color: "#888",
+                                    margin: 0,
+                                  }}
+                                >
+                                  by {book.author}
+                                </p>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                        <div style={{ padding: "14px 24px 16px" }}>
+                          <Link
+                            href={href || `/category/${key}`}
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: GOLD,
+                              textDecoration: "none",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              letterSpacing: "0.04em",
+                            }}
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            View all {label} documents{" "}
+                            <ChevronRight size={12} />
+                          </Link>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ padding: "24px", textAlign: "center" }}>
+                        <BookOpen
+                          size={28}
+                          style={{ color: "#ddd", margin: "0 auto 8px" }}
+                        />
+                        <p
+                          style={{
+                            fontSize: "12px",
+                            color: "#aaa",
+                            fontFamily: "'Lato', sans-serif",
+                          }}
+                        >
+                          No documents yet in this category.
+                        </p>
+                        <Link
+                          href="/upload-document"
+                          style={{
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            color: GOLD,
+                            textDecoration: "none",
+                          }}
+                        >
+                          Be the first to upload →
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            <div
+              style={{
+                width: "1px",
+                height: "18px",
+                background: "rgba(184,150,62,0.3)",
+                flexShrink: 0,
+              }}
+            />
+
+            <Link
+              href="/documents"
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                padding: "10px 14px",
+                color: "#555",
+                textDecoration: "none",
+                whiteSpace: "nowrap",
+                fontFamily: "'Lato', sans-serif",
+              }}
+            >
+              All Documents
+            </Link>
           </div>
         </div>
       </header>
 
-      {/* Mobile Menu */}
+      {/* ═══════════════════════════════════════════════════════════
+          MOBILE MENU OVERLAY
+      ═══════════════════════════════════════════════════════════ */}
       {showMobileMenu && (
-        <div className="fixed inset-0 bg-white z-50 lg:hidden overflow-y-auto text-blue-950 max-w-90">
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-6 ">
-              <Link
-                href="/home"
-                className="flex items-center gap-2 flex-shrink-0"
+        <div className="lan-mobile-overlay">
+          <div style={{ padding: "16px 20px" }}>
+            {/* header row */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "20px",
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: "'Playfair Display', serif",
+                  fontSize: "20px",
+                  fontWeight: 900,
+                  color: NAVY,
+                }}
               >
-                <div>
-                  <h1
-                    className="text-4xl sm:text-3xl font-bold text-blue-950"
-                    style={{
-                      fontFamily: "'Playfair Display', 'Georgia', serif",
-                    }}
-                  >
-                    [LAN Library]
-                  </h1>
-                  <h2
-                    className="text-xs sm:text-base font-light"
-                    style={{ fontFamily: "'Lato', sans-serif" }}
-                  >
-                    The Global Student Library 📚
-                  </h2>
+                [LAN Library]
+                <div
+                  style={{
+                    fontFamily: "'Lato', sans-serif",
+                    fontSize: "10px",
+                    color: GOLD,
+                    fontWeight: 300,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  The Global Student Library
                 </div>
-              </Link>
+              </div>
               <button
                 onClick={() => setShowMobileMenu(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                style={{
+                  padding: "8px",
+                  background: "#f9f6f0",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  color: NAVY,
+                }}
               >
-                <X size={24} />
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* mobile search */}
+            <div style={{ position: "relative", marginBottom: "20px" }}>
+              <input
+                type="text"
+                placeholder="Search documents…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                style={{
+                  width: "100%",
+                  padding: "11px 40px 11px 14px",
+                  border: `1px solid rgba(13,34,68,0.15)`,
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  fontFamily: "'Lato', sans-serif",
+                  outline: "none",
+                  color: NAVY,
+                  background: "#fdfaf6",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                onClick={handleSearch}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: GOLD,
+                }}
+              >
+                <Search size={17} />
               </button>
             </div>
 
             {mobileSubmenu === null ? (
-              <div className="space-y-5 text-blue-950">
+              <>
+                {/* primary CTA */}
                 <button
                   onClick={HandleClick}
                   disabled={checkingSeller}
-                  className="bg-blue-950 hover:bg-blue-800 transition-colors text-white font-semibold px-8 py-4 rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+                  style={{
+                    width: "100%",
+                    padding: "14px 20px",
+                    background: GOLD,
+                    color: NAVY,
+                    border: "none",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    fontFamily: "'Lato', sans-serif",
+                    cursor: "pointer",
+                    marginBottom: "20px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                  }}
                 >
                   {checkingSeller ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      Loading...
-                    </>
+                    "Loading…"
                   ) : isSeller ? (
                     <>
-                      <Upload size={20} />
+                      <Upload size={16} />
                       Upload Document
                     </>
                   ) : (
-                    <>Become a Seller</>
+                    "Become a Seller"
                   )}
                 </button>
-                {/* <Link
-                  href="/register-school"
-                  className="text-blue-950 hover:bg-blue-800 transition-colors bg-white font-semibold px-8 py-2 hover:text-white rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <School2Icon size={18} />
-                  <span>Register School</span>
-                </Link> */}
-                <Link
-                  href="/my-books"
-                  className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
-                >
-                  <Book size={18} />
-                  <span>My Books</span>
-                </Link>
-                <button
-                  target="_blank"
-                  onClick={handleMyAccountClick}
-                  className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
-                >
-                  <User size={18} />
-                  <span>My Account</span>
-                </button>
-                <Link
-                  href="/lecturers"
-                  className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
-                >
-                  <Crown size={16} />
-                  Lecturers
-                </Link>
 
-                <Link
-                  href="/saved-my-book"
-                  className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
-                >
-                  <Bookmark size={18} />
-                  <span>Saved</span>
-                </Link>
-                <Link
-                  href="/transfer"
-                  className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
-                >
-                  <Bookmark size={18} />
-                  <span>Transfer</span>
-                </Link>
-                <Link
-                  href="/recharge"
-                  className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
-                >
-                  <Bookmark size={18} />
-                  <span>Recharge</span>
-                </Link>
-                <Link
-                  href="/referrals"
-                  className="flex items-center gap-3 w-full px-4 py-1 hover:bg-gray-100 rounded-lg"
-                >
-                  <Bookmark size={18} />
-                  <span>Referral</span>
-                </Link>
-                <Link
-                  href="/lan/net/help-center"
-                  className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-100 rounded-lg"
-                >
-                  <HelpCircle size={20} />
-                  <span>FAQ and support</span>
-                </Link>
+                <div className="lan-divider-gold" />
 
-                <div className="border-t border-blue-950 my-4 pt-4">
-                  <a
-                    href="/docs"
-                    target="_blank"
-                    className="text-sm font-semibold text-gray-500 mb-2 px-4"
-                  >
-                    What is LAN Library?
-                  </a>
-
-                  {Object.keys(menuCategories).map((key) => (
-                    <button
-                      key={key}
-                      onClick={() => handleMobileMenuClick(key)}
-                      className="flex items-center justify-between w-full px-4 py-3 hover:bg-gray-100 rounded-lg"
-                    >
-                      <span>
-                        {menuCategories[key].title.replace(" Documents", "")}
-                      </span>
-                      <ChevronRight size={20} />
-                    </button>
-                  ))}
-
-                  <Link
-                    href="/documents"
-                    className="block px-4 py-3 hover:bg-gray-100 rounded-lg"
-                  >
-                    All Documents
-                  </Link>
+                {/* nav links */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "2px",
+                    marginBottom: "12px",
+                  }}
+                >
+                  {[
+                    { href: "/home", icon: Home, label: "Home" },
+                    { href: "/my-books", icon: Book, label: "My Books" },
+                    {
+                      fn: handleMyAccountClick,
+                      icon: User,
+                      label: "My Account",
+                    },
+                    { href: "/lecturers", icon: Crown, label: "Lecturers" },
+                    { href: "/saved-my-book", icon: Bookmark, label: "Saved" },
+                    { href: "/transfer", icon: Bookmark, label: "Transfer" },
+                    { href: "/referrals", icon: Bookmark, label: "Referral" },
+                    {
+                      href: "/lan/net/help-center",
+                      icon: HelpCircle,
+                      label: "Help & FAQ",
+                    },
+                  ].map(({ href, fn, icon: Icon, label }) =>
+                    href ? (
+                      <Link
+                        key={label}
+                        href={href}
+                        className="lan-mobile-link"
+                        onClick={() => setShowMobileMenu(false)}
+                      >
+                        <Icon size={17} style={{ color: GOLD }} /> {label}
+                      </Link>
+                    ) : (
+                      <button
+                        key={label}
+                        className="lan-mobile-link"
+                        onClick={() => {
+                          fn?.();
+                          setShowMobileMenu(false);
+                        }}
+                      >
+                        <Icon size={17} style={{ color: GOLD }} /> {label}
+                      </button>
+                    ),
+                  )}
                 </div>
+
+                <div className="lan-divider-gold" />
+
+                {/* categories */}
+                <p
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: GOLD,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    padding: "12px 0 6px",
+                    fontFamily: "'Lato', sans-serif",
+                  }}
+                >
+                  Categories
+                </p>
+                {Object.keys(menuCategories).map((key) => (
+                  <button
+                    key={key}
+                    className="lan-mobile-link"
+                    onClick={() => setMobileSubmenu(key)}
+                    style={{ justifyContent: "space-between" }}
+                  >
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                      }}
+                    >
+                      <BookOpen size={16} style={{ color: GOLD }} />
+                      {menuCategories[key].title.replace(" Documents", "")}
+                    </span>
+                    <ChevronRight size={15} style={{ color: "#ccc" }} />
+                  </button>
+                ))}
+                <Link
+                  href="/documents"
+                  className="lan-mobile-link"
+                  onClick={() => setShowMobileMenu(false)}
+                >
+                  <Book size={16} style={{ color: GOLD }} /> All Documents
+                </Link>
+
+                <div className="lan-divider-gold" />
+
+                {/* logout */}
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-1 mt-10 ml-auto lg:gap-2 px-5 bg-red-700 lg:px-3 py-2  text-white hover:bg-red-900/30 rounded-lg transition-colors text-sm lg:text-base"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "12px 20px",
+                    borderRadius: "8px",
+                    background: "rgba(239,68,68,0.08)",
+                    border: "0.5px solid rgba(239,68,68,0.2)",
+                    color: "#ef4444",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    fontFamily: "'Lato', sans-serif",
+                    cursor: "pointer",
+                    marginTop: "12px",
+                    width: "100%",
+                  }}
                 >
-                  <LogOut size={18} className="lg:w-5 lg:h-5" />
-                  <span>Logout</span>
+                  <LogOut size={16} /> Sign Out
                 </button>
-              </div>
+              </>
             ) : (
+              /* ── mobile sub-menu ── */
               <div>
                 <button
                   onClick={() => setMobileSubmenu(null)}
-                  className="flex items-center gap-2 mb-4 text-gray-700"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginBottom: "20px",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: NAVY,
+                    fontFamily: "'Lato', sans-serif",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                  }}
                 >
-                  <ChevronRight size={20} className="rotate-180" />
-                  <span>Back</span>
+                  <ChevronRight
+                    size={16}
+                    style={{ transform: "rotate(180deg)" }}
+                  />{" "}
+                  Back
                 </button>
 
-                <h2 className="text-xl font-bold text-gray-900 mb-2">
+                <h2
+                  style={{
+                    fontFamily: "'Playfair Display', serif",
+                    fontSize: "22px",
+                    fontWeight: 700,
+                    color: NAVY,
+                    marginBottom: "6px",
+                  }}
+                >
                   {menuCategories[mobileSubmenu]?.title}
                 </h2>
-                <p className="text-sm text-gray-600 mb-4">
+                <p
+                  style={{
+                    fontSize: "13px",
+                    color: "#888",
+                    marginBottom: "20px",
+                    fontFamily: "'Lato', sans-serif",
+                  }}
+                >
                   {menuCategories[mobileSubmenu]?.description}
                 </p>
 
-                <div className="space-y-3">
-                  {menuCategories[mobileSubmenu]?.books.map((book) => (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
+                  {menuCategories[mobileSubmenu]?.books?.map((book) => (
                     <Link
                       key={book.id}
                       href={`/book/preview?id=${book.id}`}
                       onClick={() => setShowMobileMenu(false)}
-                      className="flex gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:shadow-md"
+                      style={{
+                        padding: "12px 16px",
+                        border: `0.5px solid #ede8df`,
+                        borderRadius: "8px",
+                        background: "#fdfaf6",
+                        textDecoration: "none",
+                      }}
                     >
-                      <div className="flex-1">
-                        <h5 className="font-semibold text-sm line-clamp-2 mb-1 break-words overflow-hidden">
-                          {book.title}
-                        </h5>
-                        <p className="text-xs text-gray-600">
-                          by {book.author}
-                        </p>
-                      </div>
+                      <h5
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          color: NAVY,
+                          margin: "0 0 4px",
+                        }}
+                      >
+                        {book.title}
+                      </h5>
+                      <p style={{ fontSize: "12px", color: "#888", margin: 0 }}>
+                        by {book.author}
+                      </p>
                     </Link>
                   ))}
-                  <Link
-                    href={`/category/${mobileSubmenu}`}
-                    onClick={() => setShowMobileMenu(false)}
-                    className="block text-center text-blue-600 font-semibold py-2"
-                  >
-                    View All {menuCategories[mobileSubmenu]?.title} →
-                  </Link>
                 </div>
+
+                <Link
+                  href={`/category/${mobileSubmenu}`}
+                  onClick={() => setShowMobileMenu(false)}
+                  style={{
+                    display: "block",
+                    textAlign: "center",
+                    padding: "14px",
+                    marginTop: "20px",
+                    fontWeight: 700,
+                    color: GOLD,
+                    textDecoration: "none",
+                    fontFamily: "'Lato', sans-serif",
+                    fontSize: "13px",
+                    borderTop: `1px solid #ede8df`,
+                  }}
+                >
+                  View all {menuCategories[mobileSubmenu]?.title} →
+                </Link>
               </div>
             )}
           </div>
         </div>
       )}
 
-      <style jsx>{`
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-slideDown {
-          animation: slideDown 0.2s ease-out;
-        }
+      {/* ── Floating AI button ── */}
+      <Link href="/ai-chat" className="lan-ai-fab">
+        <Sparkles size={15} /> Ask AI
+      </Link>
 
-        @keyframes fabPop {
-          0% {
-            transform: scale(0.8);
-            opacity: 0;
-          }
-          70% {
-            transform: scale(1.08);
-          }
-          100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-        }
-        .fab-ai {
-          animation: fabPop 0.4s ease-out forwards;
-        }
-        .fab-ai:hover {
-          transform: scale(1.06);
-          box-shadow: 0 8px 25px rgba(14, 165, 233, 0.45);
-        }
-        .fab-ai:active {
-          transform: scale(0.97);
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        /* responsive: show hamburger on small, hide desktop nav */
+        @media (max-width: 900px) {
+          #hamburger-btn { display: flex !important; }
+          .lan-search-wrap { display: none !important; }
+          nav { display: none !important; }
         }
       `}</style>
-
-      {/* ── FLOATING AI BUTTON ── */}
-      <Link
-        href="/ai-chat"
-        className="fab-ai fixed bottom-30 right-5 z-[9999] flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white font-semibold px-4 py-3 rounded-full shadow-lg transition-all duration-200"
-        style={{ boxShadow: "0 4px 18px rgba(14, 165, 233, 0.35)" }}
-      >
-        <Sparkles size={18} />
-        <span className="text-sm">Ask AI</span>
-      </Link>
-      {/* ── END FLOATING AI BUTTON ── */}
     </>
   );
 }

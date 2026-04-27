@@ -1,20 +1,12 @@
 "use client"
-// MyBooksClient.jsx — Updated with full offline reading support.
-//
-// New features layered on top of the original:
-//  • "Save Offline" button on every book card (with download progress bar)
-//  • "Offline" tab showing only saved books
-//  • Online/offline status banner
-//  • When offline: opens books from IndexedDB via pdf.js canvas renderer
-//  • When online:  opens books from Google Drive/Firebase via iframe (unchanged)
-//  • pdf.js reader: page navigation, zoom, resume from last page
+// MyBooksClient.jsx — Full offline reading support + LAN design system
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     Globe, LogOut, User, ChevronDown, Download, Menu, FileText,
     Calendar, CreditCard, X, ExternalLink, ThumbsUp, Search, Lock,
     ArrowLeft, ZoomIn, ZoomOut, Maximize, WifiOff, Wifi, BookOpen,
-    HardDrive, Trash2, ChevronLeft, ChevronRight
+    HardDrive, Trash2, ChevronLeft, ChevronRight, ArrowRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -26,13 +18,33 @@ import Navbar from '@/components/NavBar';
 import { saveReadProgress, getReadProgress } from '@/lib/offlineDB';
 import { useOfflineBooks } from '@/hooks/useOfflineBooks';
 
-// ─── pdf.js is loaded dynamically to avoid SSR issues ────────────────────────
-// We use the CDN build. Add to your _document.js or layout.jsx:
-// <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-// <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+/* ─── LAN design tokens ─────────────────────────────────── */
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG    = "#f5f1ea";
 
-// ─── Offline PDF Reader Component ────────────────────────────────────────────
+const eyebrow = {
+    fontSize: "9px", fontWeight: 700, letterSpacing: "0.18em",
+    textTransform: "uppercase", color: GOLD, marginBottom: "4px",
+    fontFamily: "'Lato', sans-serif",
+};
 
+const navyBtn = (disabled) => ({
+    background: disabled ? "#aaa" : NAVY, color: "#fff",
+    padding: "11px 20px", border: "none", fontSize: "12px", fontWeight: 700,
+    cursor: disabled ? "not-allowed" : "pointer", fontFamily: "'Lato', sans-serif",
+    letterSpacing: "0.06em", display: "flex", alignItems: "center",
+    justifyContent: "center", gap: "8px", opacity: disabled ? 0.5 : 1,
+    transition: "background 0.18s", borderRadius: 0,
+});
+
+const sectionCard = {
+    background: "#fff", border: `0.5px solid #e5ddd0`, padding: "22px", marginBottom: "16px",
+};
+
+/* ─── Offline PDF Reader ─────────────────────────────────── */
 function OfflinePdfReader({ pdfObjectUrl, book, onClose }) {
     const canvasRef = useRef(null);
     const [pdfDoc, setPdfDoc] = useState(null);
@@ -42,75 +54,42 @@ function OfflinePdfReader({ pdfObjectUrl, book, onClose }) {
     const [rendering, setRendering] = useState(false);
     const renderTaskRef = useRef(null);
 
-    // ── Load PDF on mount ─────────────────────────────────────────────────────
     useEffect(() => {
         if (!pdfObjectUrl || typeof window === 'undefined') return;
-
         const pdfjsLib = window.pdfjsLib;
-        if (!pdfjsLib) {
-            console.error('pdf.js not loaded. Add the CDN script to your layout.');
-            return;
-        }
-
-        const loadPdf = async () => {
+        if (!pdfjsLib) { console.error('pdf.js not loaded'); return; }
+        const load = async () => {
             try {
-                const loadingTask = pdfjsLib.getDocument(pdfObjectUrl);
-                const pdf = await loadingTask.promise;
-                setPdfDoc(pdf);
-                setTotalPages(pdf.numPages);
-
-                // Resume from last saved page
-                const savedPage = await getReadProgress(String(book.id));
-                setCurrentPage(Math.min(savedPage, pdf.numPages));
-            } catch (err) {
-                console.error('[OfflinePdfReader] Failed to load PDF:', err);
-            }
+                const pdf = await pdfjsLib.getDocument(pdfObjectUrl).promise;
+                setPdfDoc(pdf); setTotalPages(pdf.numPages);
+                const saved = await getReadProgress(String(book.id));
+                setCurrentPage(Math.min(saved, pdf.numPages));
+            } catch (err) { console.error(err); }
         };
-
-        loadPdf();
+        load();
     }, [pdfObjectUrl, book.id]);
 
-    // ── Render current page whenever page or scale changes ───────────────────
     useEffect(() => {
         if (!pdfDoc || !canvasRef.current) return;
-
-        const renderPage = async () => {
-            // Cancel any in-flight render
-            if (renderTaskRef.current) {
-                try { await renderTaskRef.current.cancel(); } catch { }
-            }
-
+        const render = async () => {
+            if (renderTaskRef.current) { try { await renderTaskRef.current.cancel(); } catch { } }
             setRendering(true);
             try {
                 const page = await pdfDoc.getPage(currentPage);
                 const viewport = page.getViewport({ scale });
                 const canvas = canvasRef.current;
                 if (!canvas) return;
-
-                canvas.width = viewport.width;
-                canvas.height = viewport.height;
-
-                const ctx = canvas.getContext('2d');
-                const renderContext = { canvasContext: ctx, viewport };
-                renderTaskRef.current = page.render(renderContext);
+                canvas.width = viewport.width; canvas.height = viewport.height;
+                renderTaskRef.current = page.render({ canvasContext: canvas.getContext('2d'), viewport });
                 await renderTaskRef.current.promise;
-            } catch (err) {
-                if (err?.name !== 'RenderingCancelledException') {
-                    console.error('[OfflinePdfReader] Render error:', err);
-                }
-            } finally {
-                setRendering(false);
-            }
+            } catch (err) { if (err?.name !== 'RenderingCancelledException') console.error(err); }
+            finally { setRendering(false); }
         };
-
-        renderPage();
+        render();
     }, [pdfDoc, currentPage, scale]);
 
-    // ── Persist read progress whenever page changes ───────────────────────────
     useEffect(() => {
-        if (currentPage > 0 && book?.id) {
-            saveReadProgress(String(book.id), currentPage);
-        }
+        if (currentPage > 0 && book?.id) saveReadProgress(String(book.id), currentPage);
     }, [currentPage, book?.id]);
 
     const goToPrev = () => setCurrentPage(p => Math.max(1, p - 1));
@@ -118,194 +97,134 @@ function OfflinePdfReader({ pdfObjectUrl, book, onClose }) {
     const zoomIn = () => setScale(s => Math.min(3, +(s + 0.2).toFixed(1)));
     const zoomOut = () => setScale(s => Math.max(0.5, +(s - 0.2).toFixed(1)));
 
-    // Keyboard navigation
     useEffect(() => {
-        const handler = (e) => {
+        const h = (e) => {
             if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goToNext();
             if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') goToPrev();
         };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
+        window.addEventListener('keydown', h);
+        return () => window.removeEventListener('keydown', h);
     }, [totalPages]);
 
     return (
-        <div className="min-h-screen bg-gray-100 flex flex-col">
-            <Navbar />
-
-            {/* ── Reader toolbar ───────────────────────────────────────────── */}
-            <div className="bg-[#323639] text-white px-4 py-2 flex items-center justify-between shadow-lg sticky top-0 z-30">
-                <button
-                    onClick={onClose}
-                    className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors"
-                >
-                    <ArrowLeft size={18} />
-                    <span className="text-sm font-medium hidden sm:inline">Back to Library</span>
-                </button>
-
-                <div className="flex-1 text-center px-4">
-                    <p className="text-sm font-semibold truncate text-white">{book.title}</p>
-                    <div className="flex items-center justify-center gap-1 mt-0.5">
-                        <WifiOff size={11} className="text-amber-400" />
-                        <span className="text-[10px] text-amber-400 font-medium">Reading offline</span>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <button onClick={zoomOut} className="p-1.5 hover:bg-white/10 rounded" title="Zoom out">
-                        <ZoomOut size={16} />
+        <>
+            <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&display=swap'); @keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            <div style={{ minHeight: "100vh", background: "#1a1a1a", display: "flex", flexDirection: "column", fontFamily: "'Lato', sans-serif" }}>
+                <Navbar />
+                {/* Toolbar */}
+                <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `0.5px solid rgba(184,150,62,0.2)`, position: "sticky", top: 0, zIndex: 30 }}>
+                    <button onClick={onClose} style={{ display: "flex", alignItems: "center", gap: "8px", background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", fontFamily: "'Lato', sans-serif", fontSize: "12px" }}>
+                        <ArrowLeft size={16} /> Back to Library
                     </button>
-                    <span className="text-xs text-gray-400 w-10 text-center">{Math.round(scale * 100)}%</span>
-                    <button onClick={zoomIn} className="p-1.5 hover:bg-white/10 rounded" title="Zoom in">
-                        <ZoomIn size={16} />
-                    </button>
-                </div>
-            </div>
-
-            {/* ── Canvas area ──────────────────────────────────────────────── */}
-            <div className="flex-1 overflow-auto bg-gray-200 flex flex-col items-center py-4 px-2">
-                {!pdfDoc && (
-                    <div className="flex items-center justify-center h-64">
-                        <div className="text-center">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-950 mx-auto mb-3" />
-                            <p className="text-gray-600 text-sm">Loading offline document...</p>
+                    <div style={{ flex: 1, textAlign: "center", padding: "0 20px" }}>
+                        <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "14px", fontWeight: 700, color: "#fff", margin: 0 }}>{book.title}</p>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", marginTop: "2px" }}>
+                            <WifiOff size={10} style={{ color: GOLD }} />
+                            <span style={{ fontSize: "9px", color: GOLD, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Reading offline</span>
                         </div>
                     </div>
-                )}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <button onClick={zoomOut} style={{ background: "rgba(255,255,255,0.08)", border: `0.5px solid rgba(255,255,255,0.15)`, padding: "6px", cursor: "pointer", color: "#fff", display: "flex", alignItems: "center" }}><ZoomOut size={14} /></button>
+                        <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)", width: "40px", textAlign: "center" }}>{Math.round(scale * 100)}%</span>
+                        <button onClick={zoomIn} style={{ background: "rgba(255,255,255,0.08)", border: `0.5px solid rgba(255,255,255,0.15)`, padding: "6px", cursor: "pointer", color: "#fff", display: "flex", alignItems: "center" }}><ZoomIn size={14} /></button>
+                    </div>
+                </div>
 
-                <div className="relative shadow-2xl bg-white">
-                    {rendering && (
-                        <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-950" />
+                {/* Canvas */}
+                <div style={{ flex: 1, overflowY: "auto", background: "#2a2a2a", display: "flex", flexDirection: "column", alignItems: "center", padding: "24px 16px" }}>
+                    {!pdfDoc && (
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "200px" }}>
+                            <div style={{ width: "36px", height: "36px", border: `3px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: "12px" }} />
+                            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "13px" }}>Loading offline document…</p>
                         </div>
                     )}
-                    <canvas ref={canvasRef} className="block max-w-full" />
+                    <div style={{ position: "relative", boxShadow: "0 20px 60px rgba(0,0,0,0.6)", background: "#fff" }}>
+                        {rendering && (
+                            <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10 }}>
+                                <div style={{ width: "24px", height: "24px", border: `2px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                            </div>
+                        )}
+                        <canvas ref={canvasRef} style={{ display: "block", maxWidth: "100%" }} />
+                    </div>
                 </div>
-            </div>
 
-            {/* ── Page navigation bar ──────────────────────────────────────── */}
-            <div className="bg-white border-t shadow-lg sticky bottom-0 z-20">
-                <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
-                    <button
-                        onClick={goToPrev}
-                        disabled={currentPage <= 1}
-                        className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                        <ChevronLeft size={18} />
-                        Previous
+                {/* Nav bar */}
+                <div style={{ background: NAVY, borderTop: `0.5px solid rgba(184,150,62,0.2)`, padding: "12px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", bottom: 0, zIndex: 20 }}>
+                    <button onClick={goToPrev} disabled={currentPage <= 1} style={{ ...navyBtn(currentPage <= 1), background: currentPage <= 1 ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.1)", border: `0.5px solid rgba(255,255,255,0.15)`, width: "auto", padding: "8px 16px", fontSize: "11px" }}>
+                        <ChevronLeft size={14} /> Previous
                     </button>
-
-                    {/* Page progress indicator */}
-                    <div className="flex flex-col items-center gap-1">
-                        <span className="text-sm text-gray-700 font-medium">
-                            {currentPage} / {totalPages}
-                        </span>
-                        <div className="w-40 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-blue-950 rounded-full transition-all duration-300"
-                                style={{ width: totalPages ? `${(currentPage / totalPages) * 100}%` : '0%' }}
-                            />
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                        <span style={{ fontSize: "12px", color: "#fff", fontWeight: 700 }}>{currentPage} / {totalPages}</span>
+                        <div style={{ width: "120px", height: "2px", background: "rgba(255,255,255,0.1)" }}>
+                            <div style={{ height: "100%", background: GOLD, width: totalPages ? `${(currentPage / totalPages) * 100}%` : "0%", transition: "width 0.3s" }} />
                         </div>
                     </div>
-
-                    <button
-                        onClick={goToNext}
-                        disabled={currentPage >= totalPages}
-                        className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                        Next
-                        <ChevronRight size={18} />
+                    <button onClick={goToNext} disabled={currentPage >= totalPages} style={{ ...navyBtn(currentPage >= totalPages), background: currentPage >= totalPages ? "rgba(255,255,255,0.05)" : GOLD, color: currentPage >= totalPages ? "rgba(255,255,255,0.3)" : NAVY, border: "none", width: "auto", padding: "8px 16px", fontSize: "11px" }}>
+                        Next <ChevronRight size={14} />
                     </button>
                 </div>
             </div>
-        </div>
+        </>
     );
 }
 
-// ─── Save Offline Button ──────────────────────────────────────────────────────
-
+/* ─── Save Offline Button ────────────────────────────────── */
 function SaveOfflineButton({ book, isOffline: alreadySaved, downloadState, onSave, onRemove, isOnline }) {
     const { status, progress, error } = downloadState;
 
-    if (alreadySaved) {
-        return (
-            <button
-                onClick={(e) => { e.stopPropagation(); onRemove(book.id); }}
-                className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 border border-green-200 px-2.5 py-1.5 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all group"
-                title="Remove from offline storage"
-            >
-                <HardDrive size={13} className="group-hover:hidden" />
-                <Trash2 size={13} className="hidden group-hover:block" />
-                <span className="group-hover:hidden">Saved offline</span>
-                <span className="hidden group-hover:block">Remove</span>
-            </button>
-        );
-    }
+    if (alreadySaved) return (
+        <button onClick={(e) => { e.stopPropagation(); onRemove(book.id); }}
+            style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px", fontWeight: 700, color: "#16a34a", background: "rgba(22,163,74,0.06)", border: `0.5px solid rgba(22,163,74,0.3)`, padding: "5px 10px", cursor: "pointer", fontFamily: "'Lato', sans-serif", letterSpacing: "0.05em" }}
+            className="lan-offline-btn"
+            title="Remove from offline storage">
+            <HardDrive size={11} />
+            Saved Offline
+        </button>
+    );
 
-    if (status === 'downloading' || status === 'saving') {
-        return (
-            <div className="flex flex-col gap-1 w-full">
-                <div className="flex items-center gap-1.5 text-xs text-blue-700">
-                    <div className="animate-spin rounded-full h-3 w-3 border border-blue-700 border-t-transparent" />
-                    <span>{status === 'saving' ? 'Saving...' : `${progress}%`}</span>
-                </div>
-                <div className="h-1 bg-gray-200 rounded-full overflow-hidden w-full">
-                    <div
-                        className="h-full bg-blue-950 rounded-full transition-all duration-200"
-                        style={{ width: `${progress}%` }}
-                    />
-                </div>
+    if (status === 'downloading' || status === 'saving') return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px", color: NAVY }}>
+                <div style={{ width: "12px", height: "12px", border: `1.5px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                {status === 'saving' ? 'Saving…' : `${progress}%`}
             </div>
-        );
-    }
+            <div style={{ height: "2px", background: "#e5ddd0" }}>
+                <div style={{ height: "100%", background: GOLD, width: `${progress}%`, transition: "width 0.2s" }} />
+            </div>
+        </div>
+    );
 
-    if (status === 'done') {
-        return (
-            <span className="flex items-center gap-1.5 text-xs text-green-700 font-medium">
-                <ThumbsUp size={13} />
-                Saved!
-            </span>
-        );
-    }
+    if (status === 'done') return (
+        <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px", fontWeight: 700, color: "#16a34a" }}>
+            <ThumbsUp size={11} /> Saved!
+        </span>
+    );
 
-    if (status === 'error') {
-        return (
-            <button
-                onClick={(e) => { e.stopPropagation(); onSave(book); }}
-                className="flex items-center gap-1.5 text-xs text-red-600 border border-red-200 px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                title={error}
-            >
-                <Download size={13} />
-                Retry
-            </button>
-        );
-    }
+    if (status === 'error') return (
+        <button onClick={(e) => { e.stopPropagation(); onSave(book); }}
+            style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px", color: "#dc2626", border: `0.5px solid #fca5a5`, background: "#fff1f2", padding: "5px 10px", cursor: "pointer", fontFamily: "'Lato', sans-serif" }}
+            title={error}>
+            <Download size={11} /> Retry
+        </button>
+    );
 
-    if (!isOnline) {
-        return (
-            <span className="flex items-center gap-1.5 text-xs text-gray-400">
-                <WifiOff size={13} />
-                Need internet
-            </span>
-        );
-    }
+    if (!isOnline) return (
+        <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px", color: "#aaa" }}>
+            <WifiOff size={11} /> Need internet
+        </span>
+    );
 
     return (
-        <button
-            onClick={(e) => { e.stopPropagation(); onSave(book); }}
-            className="flex items-center gap-1.5 text-xs text-blue-800 border border-blue-200 bg-blue-50 px-2.5 py-1.5 rounded-lg hover:bg-blue-100 transition-colors"
-        >
-            <Download size={13} />
-            Save offline
+        <button onClick={(e) => { e.stopPropagation(); onSave(book); }}
+            style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px", fontWeight: 700, color: NAVY, border: `0.5px solid rgba(184,150,62,0.3)`, background: CREAM, padding: "5px 10px", cursor: "pointer", fontFamily: "'Lato', sans-serif", letterSpacing: "0.04em" }}>
+            <Download size={11} /> Save offline
         </button>
     );
 }
 
-// ─── Main Page Component ──────────────────────────────────────────────────────
-
+/* ─── Main Component ─────────────────────────────────────── */
 export default function MyBooksClient() {
     const router = useRouter();
-
-    // ── Core state (unchanged from original) ──────────────────────────────────
     const [purchasedBooks, setPurchasedBooks] = useState([]);
     const [selectedBook, setSelectedBook] = useState(null);
     const [showOverview, setShowOverview] = useState(false);
@@ -316,430 +235,184 @@ export default function MyBooksClient() {
     const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
     const [pdfUrl, setPdfUrl] = useState(null);
     const [loadingPdf, setLoadingPdf] = useState(false);
-
-    // ── New: offline state ─────────────────────────────────────────────────────
-    const [activeTab, setActiveTab] = useState('library'); // 'library' | 'offline'
-    const [offlinePdfObjectUrl, setOfflinePdfObjectUrl] = useState(null); // blob: URL for pdf.js
-
-    const {
-        isOnline,
-        offlineIds,
-        offlineBooks,
-        formattedStorageSize,
-        downloadForOffline,
-        removeOfflineBook,
-        getOfflinePdfUrl,
-        isBookOffline,
-        getDownloadState,
-    } = useOfflineBooks();
-
-    // ── Offline banner dismissed state ────────────────────────────────────────
+    const [activeTab, setActiveTab] = useState('library');
+    const [offlinePdfObjectUrl, setOfflinePdfObjectUrl] = useState(null);
     const [bannerDismissed, setBannerDismissed] = useState(false);
+    const [focusSearch, setFocusSearch] = useState(false);
 
-    // ─── Helpers (unchanged) ──────────────────────────────────────────────────
+    const { isOnline, offlineIds, offlineBooks, formattedStorageSize, downloadForOffline, removeOfflineBook, getOfflinePdfUrl, isBookOffline, getDownloadState } = useOfflineBooks();
 
     const getThumbnailUrl = (book) => {
         if (!book) return 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
         if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
-        if (book.embedUrl) {
-            const match = book.embedUrl.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})/);
-            if (match) return `https://drive.google.com/thumbnail?id=${match[1] || match[2]}&sz=w400`;
-        }
-        const pdfSource = book.pdfUrl || book.pdfLink;
-        if (pdfSource?.includes('drive.google.com')) {
-            const match = pdfSource.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})/);
-            if (match) return `https://drive.google.com/thumbnail?id=${match[1] || match[2]}&sz=w400`;
-        }
-        if (book.previewUrl) {
-            const match = book.previewUrl.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})/);
-            if (match) return `https://drive.google.com/thumbnail?id=${match[1] || match[2]}&sz=w400`;
-        }
+        if (book.embedUrl) { const m = book.embedUrl.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})/); if (m) return `https://drive.google.com/thumbnail?id=${m[1] || m[2]}&sz=w400`; }
+        const pdf = book.pdfUrl || book.pdfLink;
+        if (pdf?.includes('drive.google.com')) { const m = pdf.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})/); if (m) return `https://drive.google.com/thumbnail?id=${m[1] || m[2]}&sz=w400`; }
         return book.image || book.coverImage || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
     };
 
     const extractFileId = (url) => {
         if (!url) return null;
-        const match = url.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})|id=([^\&]+)/);
-        return match ? (match[1] || match[2] || match[3]) : null;
+        const m = url.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})|id=([^\&]+)/);
+        return m ? (m[1] || m[2] || m[3]) : null;
     };
 
-    // ─── Open book: smart routing between online iframe and offline pdf.js ────
     const handleOpenBook = async (book) => {
-        setLoadingPdf(true);
-        setSelectedBook(book);
-
-        // ── OFFLINE PATH: load from IndexedDB → pdf.js ────────────────────────
+        setLoadingPdf(true); setSelectedBook(book);
         if (!isOnline || isBookOffline(book.id)) {
             if (isBookOffline(book.id)) {
-                const objectUrl = await getOfflinePdfUrl(book.id);
-                if (objectUrl) {
-                    setOfflinePdfObjectUrl(objectUrl);
-                    setLoadingPdf(false);
-                    return;
-                }
+                const url = await getOfflinePdfUrl(book.id);
+                if (url) { setOfflinePdfObjectUrl(url); setLoadingPdf(false); return; }
             }
-            // Book not saved offline and we're offline
-            if (!isOnline) {
-                setLoadingPdf(false);
-                setPdfUrl(null);
-                setOfflinePdfObjectUrl(null);
-                return;
-            }
+            if (!isOnline) { setLoadingPdf(false); setPdfUrl(null); setOfflinePdfObjectUrl(null); return; }
         }
-
-        // ── ONLINE PATH: iframe (original behaviour) ──────────────────────────
         setOfflinePdfObjectUrl(null);
-
         let url = null;
-        if (book.embedUrl) {
-            url = book.embedUrl;
-        } else if (book.driveFileId) {
-            url = `https://drive.google.com/file/d/${book.driveFileId}/preview`;
-        } else if (book.pdfUrl) {
-            const fileId = extractFileId(book.pdfUrl);
-            url = fileId ? `https://drive.google.com/file/d/${fileId}/preview` : book.pdfUrl;
-        } else if (book.pdfLink) {
-            const fileId = extractFileId(book.pdfLink);
-            if (fileId) url = `https://drive.google.com/file/d/${fileId}/preview`;
-        } else if (book.previewUrl) {
-            const fileId = extractFileId(book.previewUrl);
-            if (fileId) url = `https://drive.google.com/file/d/${fileId}/preview`;
-        }
-
-        setPdfUrl(url);
-        setLoadingPdf(false);
-        setShowOverview(false);
-        setShowRelatedModal(false);
+        if (book.embedUrl) url = book.embedUrl;
+        else if (book.driveFileId) url = `https://drive.google.com/file/d/${book.driveFileId}/preview`;
+        else if (book.pdfUrl) { const id = extractFileId(book.pdfUrl); url = id ? `https://drive.google.com/file/d/${id}/preview` : book.pdfUrl; }
+        else if (book.pdfLink) { const id = extractFileId(book.pdfLink); if (id) url = `https://drive.google.com/file/d/${id}/preview`; }
+        else if (book.previewUrl) { const id = extractFileId(book.previewUrl); if (id) url = `https://drive.google.com/file/d/${id}/preview`; }
+        setPdfUrl(url); setLoadingPdf(false); setShowOverview(false); setShowRelatedModal(false);
     };
 
-    const handleCloseReader = () => {
-        setSelectedBook(null);
-        setPdfUrl(null);
-        setOfflinePdfObjectUrl(null);
-    };
+    const handleCloseReader = () => { setSelectedBook(null); setPdfUrl(null); setOfflinePdfObjectUrl(null); };
 
-    // ─── Fetch purchased books (unchanged) ────────────────────────────────────
     const fetchPurchasedBooks = async (userId) => {
         try {
             setLoading(true);
-            const userDocRef = doc(db, 'users', userId);
-            const userDoc = await getDoc(userDocRef);
-
+            const userDoc = await getDoc(doc(db, 'users', userId));
             if (userDoc.exists()) {
                 const userData = userDoc.data();
-                const purchasedBooksMap = userData.purchasedBooks || {};
-                const purchasedBooksArray = Object.values(purchasedBooksMap);
-
+                const purchasedBooksArray = Object.values(userData.purchasedBooks || {});
                 const seenTransactions = new Set();
-                const purchasedBooksFromDB = purchasedBooksArray.filter(book => {
+                const deduplicated = purchasedBooksArray.filter(book => {
                     if (book.transactionId) {
                         if (seenTransactions.has(book.transactionId)) return false;
-                        seenTransactions.add(book.transactionId);
-                        return true;
+                        seenTransactions.add(book.transactionId); return true;
                     }
-                    const bookId = book.bookId || book.firestoreId || book.id;
-                    const cleanId = bookId?.toString().replace('firestore-', '');
+                    const cleanId = (book.bookId || book.firestoreId || book.id)?.toString().replace('firestore-', '');
                     if (seenTransactions.has(cleanId)) return false;
-                    seenTransactions.add(cleanId);
-                    return true;
+                    seenTransactions.add(cleanId); return true;
                 });
-
                 const bookIds = new Set();
-                purchasedBooksFromDB.forEach(book => {
-                    if (book.id) bookIds.add(book.id);
-                    if (book.bookId) bookIds.add(book.bookId);
-                    if (book.firestoreId) bookIds.add(book.firestoreId);
-                });
+                deduplicated.forEach(b => { if (b.id) bookIds.add(b.id); if (b.bookId) bookIds.add(b.bookId); if (b.firestoreId) bookIds.add(b.firestoreId); });
                 setPurchasedBookIds(bookIds);
-
-                const enrichedBooks = await Promise.all(purchasedBooksFromDB.map(async (purchasedBook) => {
-                    const bookId = purchasedBook.bookId || purchasedBook.firestoreId || purchasedBook.id;
-                    let bookData = booksData.find(b =>
-                        b.id === bookId ||
-                        b.id === parseInt(bookId) ||
-                        b.id === bookId?.toString().replace('firestore-', '')
-                    );
-
+                const enriched = await Promise.all(deduplicated.map(async (pb) => {
+                    const bookId = pb.bookId || pb.firestoreId || pb.id;
+                    let bookData = booksData.find(b => b.id === bookId || b.id === parseInt(bookId) || b.id === bookId?.toString().replace('firestore-', ''));
                     if (!bookData && bookId) {
                         try {
                             const cleanId = bookId.toString().replace('firestore-', '');
-                            const bookDocRef = doc(db, 'advertMyBook', cleanId);
-                            const bookDoc = await getDoc(bookDocRef);
-                            if (bookDoc.exists()) {
-                                const fbBook = bookDoc.data();
-                                bookData = {
-                                    id: bookId,
-                                    title: fbBook.bookTitle || fbBook.title,
-                                    author: fbBook.author,
-                                    pages: fbBook.pages,
-                                    format: fbBook.format || 'PDF',
-                                    category: fbBook.category,
-                                    description: fbBook.description,
-                                    pdfUrl: fbBook.pdfUrl || fbBook.pdfLink,
-                                    driveFileId: fbBook.driveFileId,
-                                    embedUrl: fbBook.embedUrl,
-                                    previewUrl: fbBook.previewUrl,
-                                    coverImage: fbBook.coverImage,
-                                };
+                            const fbDoc = await getDoc(doc(db, 'advertMyBook', cleanId));
+                            if (fbDoc.exists()) {
+                                const fb = fbDoc.data();
+                                bookData = { id: bookId, title: fb.bookTitle || fb.title, author: fb.author, pages: fb.pages, format: fb.format || 'PDF', category: fb.category, description: fb.description, pdfUrl: fb.pdfUrl || fb.pdfLink, driveFileId: fb.driveFileId, embedUrl: fb.embedUrl, previewUrl: fb.previewUrl, coverImage: fb.coverImage };
                             }
-                        } catch (error) {
-                            console.error('Error fetching book from Firebase:', error);
-                        }
+                        } catch (e) { }
                     }
-
-                    if (bookData) {
-                        return {
-                            ...bookData,
-                            image: getThumbnailUrl(bookData),
-                            purchaseDate: purchasedBook.purchaseDate,
-                            transactionId: purchasedBook.transactionId,
-                            amount: purchasedBook.amount || bookData.price,
-                            sellerId: purchasedBook.sellerId,
-                            sellerName: purchasedBook.sellerName,
-                        };
-                    }
-
-                    return {
-                        id: bookId,
-                        title: purchasedBook.title,
-                        author: purchasedBook.author,
-                        image: getThumbnailUrl(purchasedBook),
-                        pdfUrl: purchasedBook.pdfUrl,
-                        embedUrl: purchasedBook.embedUrl,
-                        driveFileId: purchasedBook.driveFileId,
-                        purchaseDate: purchasedBook.purchaseDate,
-                        transactionId: purchasedBook.transactionId,
-                        amount: purchasedBook.amount,
-                        format: 'PDF',
-                        sellerId: purchasedBook.sellerId,
-                        sellerName: purchasedBook.sellerName,
-                    };
+                    if (bookData) return { ...bookData, image: getThumbnailUrl(bookData), purchaseDate: pb.purchaseDate, transactionId: pb.transactionId, amount: pb.amount || bookData.price, sellerId: pb.sellerId, sellerName: pb.sellerName };
+                    return { id: bookId, title: pb.title, author: pb.author, image: getThumbnailUrl(pb), pdfUrl: pb.pdfUrl, embedUrl: pb.embedUrl, driveFileId: pb.driveFileId, purchaseDate: pb.purchaseDate, transactionId: pb.transactionId, amount: pb.amount, format: 'PDF', sellerId: pb.sellerId, sellerName: pb.sellerName };
                 }));
-
-                setPurchasedBooks(enrichedBooks);
-            } else {
-                setPurchasedBooks([]);
-            }
-        } catch (error) {
-            console.error('Error fetching purchased books:', error);
-            setPurchasedBooks([]);
-        } finally {
-            setLoading(false);
-        }
+                setPurchasedBooks(enriched);
+            } else { setPurchasedBooks([]); }
+        } catch (e) { console.error(e); setPurchasedBooks([]); }
+        finally { setLoading(false); }
     };
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
-                await fetchPurchasedBooks(currentUser.uid);
-            } else {
-                router.push('/auth/signin');
-            }
+        const unsub = onAuthStateChanged(auth, async (u) => {
+            if (u) { setUser(u); await fetchPurchasedBooks(u.uid); }
+            else router.push('/auth/signin');
         });
-        return () => unsubscribe();
+        return () => unsub();
     }, [router]);
 
-    const filteredBooks = purchasedBooks.filter(book => {
+    const filteredBooks = purchasedBooks.filter(b => {
         if (!searchQuery) return true;
         const q = searchQuery.toLowerCase();
-        return (
-            book.title?.toLowerCase().includes(q) ||
-            book.author?.toLowerCase().includes(q) ||
-            book.category?.toLowerCase().includes(q) ||
-            book.description?.toLowerCase().includes(q)
-        );
+        return b.title?.toLowerCase().includes(q) || b.author?.toLowerCase().includes(q) || b.category?.toLowerCase().includes(q);
     });
 
-    const getRelatedBooks = (book) =>
-        booksData.filter(b => b.category === book.category && b.id !== book.id).slice(0, 10);
-
-    const isPurchased = (bookId) =>
-        purchasedBookIds.has(bookId) ||
-        purchasedBookIds.has(bookId.toString()) ||
-        purchasedBookIds.has(`firestore-${bookId}`);
-
-    const handlePurchaseRelatedBook = (book) => router.push(`/payment?bookId=${book.id}`);
-
+    const getRelatedBooks = (book) => booksData.filter(b => b.category === book.category && b.id !== book.id).slice(0, 10);
+    const isPurchased = (id) => purchasedBookIds.has(id) || purchasedBookIds.has(id.toString()) || purchasedBookIds.has(`firestore-${id}`);
     const handleDownload = (book) => {
-        let fileId = book.driveFileId || extractFileId(book.pdfUrl) || extractFileId(book.pdfLink);
-        if (fileId) {
-            window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
-        } else if (book.pdfUrl) {
-            window.open(book.pdfUrl, '_blank');
-        } else {
-            alert(`Download link for ${book.title} will be sent to ${user?.email}`);
-        }
+        const fileId = book.driveFileId || extractFileId(book.pdfUrl) || extractFileId(book.pdfLink);
+        if (fileId) window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
+        else if (book.pdfUrl) window.open(book.pdfUrl, '_blank');
+        else alert(`Download link for ${book.title} will be sent to ${user?.email}`);
     };
+    const formatDate = (d) => { if (!d) return 'N/A'; return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric', month: 'long', day: 'numeric'
-        });
-    };
-
-    // ─── Loading state (unchanged) ────────────────────────────────────────────
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-white flex items-center justify-center">
-                <div className="relative w-20 h-24 perspective-1000">
-                    <div className="book-flip-container">
-                        <div className="book-face book-front">
-                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-r-lg shadow-2xl relative overflow-hidden">
-                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-black/30"></div>
-                                <div className="absolute right-0 top-1 bottom-1 w-0.5 bg-white/20"></div>
-                                <div className="absolute right-1 top-2 bottom-2 w-0.5 bg-white/15"></div>
-                                <div className="absolute right-2 top-3 bottom-3 w-0.5 bg-white/10"></div>
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <svg className="w-10 h-10 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                    </svg>
-                                </div>
-                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent"></div>
-                            </div>
-                        </div>
-                        <div className="book-face book-back">
-                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-lg shadow-2xl flex items-center justify-center relative overflow-hidden">
-                                <div className="flex gap-0.5 text-white font-black text-2xl">
-                                    <span className="inline-block lan-letter" style={{ animationDelay: '0s' }}>L</span>
-                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.15s' }}>A</span>
-                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.3s' }}>N</span>
-                                </div>
-                                <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 via-transparent to-transparent"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
-                        <div className="w-1.5 h-1.5 bg-blue-950 rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
-                        <div className="w-1.5 h-1.5 bg-blue-800 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                    </div>
-                    <style jsx>{`
-                        .perspective-1000 { perspective: 1000px; }
-                        .book-flip-container { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; animation: bookFlip 3s ease-in-out infinite; }
-                        .book-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-                        .book-front { z-index: 2; }
-                        .book-back { transform: rotateY(180deg); }
-                        @keyframes bookFlip { 0%, 100% { transform: rotateY(0deg); } 25%, 75% { transform: rotateY(180deg); } }
-                        @keyframes lan-letter { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.1); } }
-                        .lan-letter { animation: lan-letter 0.6s ease-in-out infinite; }
-                    `}</style>
+    /* ─── Loading ─────────────────────────────────────────── */
+    if (loading) return (
+        <>
+            <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&display=swap'); @keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Lato', sans-serif" }}>
+                <div style={{ textAlign: "center" }}>
+                    <div style={{ width: "40px", height: "40px", border: `3px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+                    <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "15px", color: NAVY }}>Loading your library…</p>
                 </div>
             </div>
-        );
-    }
+        </>
+    );
 
-    // ─── Offline PDF Reader ───────────────────────────────────────────────────
-    if (selectedBook && offlinePdfObjectUrl) {
-        return (
-            <OfflinePdfReader
-                pdfObjectUrl={offlinePdfObjectUrl}
-                book={selectedBook}
-                onClose={handleCloseReader}
-            />
-        );
-    }
+    /* ─── Offline reader ──────────────────────────────────── */
+    if (selectedBook && offlinePdfObjectUrl) return <OfflinePdfReader pdfObjectUrl={offlinePdfObjectUrl} book={selectedBook} onClose={handleCloseReader} />;
 
-    // ─── Online iframe Reader (original, unchanged) ───────────────────────────
-    if (selectedBook) {
-        return (
-            <div className="min-h-screen bg-gray-100 flex flex-col">
+    /* ─── Online iframe reader ────────────────────────────── */
+    if (selectedBook) return (
+        <>
+            <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&display=swap'); @keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            <div style={{ minHeight: "100vh", background: "#f5f1ea", display: "flex", flexDirection: "column", fontFamily: "'Lato', sans-serif" }}>
                 <Navbar />
-                <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
-                    <button
-                        onClick={handleCloseReader}
-                        className="flex items-center gap-2 text-gray-700 hover:text-gray-900"
-                    >
-                        <ArrowLeft size={20} />
-                        <span className="font-medium">Back to Library</span>
+                {/* Reader top bar */}
+                <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `0.5px solid rgba(184,150,62,0.2)` }}>
+                    <button onClick={handleCloseReader} style={{ display: "flex", alignItems: "center", gap: "8px", background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", fontFamily: "'Lato', sans-serif", fontSize: "12px", letterSpacing: "0.04em" }}>
+                        <ArrowLeft size={16} /> Back to Library
                     </button>
-                    {/* Save offline button in reader bar */}
                     {isOnline && (
-                        <div className="flex items-center gap-3">
-                            <SaveOfflineButton
-                                book={selectedBook}
-                                isOffline={isBookOffline(selectedBook.id)}
-                                downloadState={getDownloadState(selectedBook.id)}
-                                onSave={downloadForOffline}
-                                onRemove={removeOfflineBook}
-                                isOnline={isOnline}
-                            />
-                        </div>
+                        <SaveOfflineButton book={selectedBook} isOffline={isBookOffline(selectedBook.id)} downloadState={getDownloadState(selectedBook.id)} onSave={downloadForOffline} onRemove={removeOfflineBook} isOnline={isOnline} />
                     )}
                 </div>
 
-                <div className="flex-1 bg-white relative">
+                <div style={{ flex: 1, background: "#fff", position: "relative" }}>
                     {loadingPdf ? (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-                            <div className="text-center">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-950 mx-auto mb-4"></div>
-                                <p className="text-gray-600">Loading document...</p>
+                        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: BG }}>
+                            <div style={{ textAlign: "center" }}>
+                                <div style={{ width: "36px", height: "36px", border: `3px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+                                <p style={{ fontFamily: "'Playfair Display', serif", color: NAVY, fontSize: "13px" }}>Loading document…</p>
                             </div>
                         </div>
                     ) : pdfUrl ? (
-                        <div className="w-full h-full relative overflow-hidden">
-                            <iframe
-                                src={pdfUrl}
-                                className="w-full h-full border-0"
-                                title={selectedBook.title}
-                                style={{ minHeight: 'calc(100vh - 200px)', backgroundColor: 'white' }}
-                                allow="autoplay"
-                            />
-                            <div
-                                className="absolute top-0 right-0 h-[56px] bg-[#323639] z-10 hidden md:flex items-center justify-end px-5 gap-3 select-none border-b border-white/5"
-                                style={{ width: '220px' }}
-                                onContextMenu={(e) => e.preventDefault()}
-                            >
-                                <div className="flex flex-col items-end leading-tight">
-                                    <span className="text-blue-400 text-[10px] font-bold uppercase tracking-wider">LAN Library</span>
-                                    <span className="text-gray-400 text-[9px] font-mono">
-                                        ID: {user?.uid?.substring(0, 8).toUpperCase() || 'USER-AUTH'}
-                                    </span>
+                        <div style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}>
+                            <iframe src={pdfUrl} style={{ width: "100%", minHeight: "calc(100vh - 200px)", border: "none", background: "#fff" }} title={selectedBook.title} allow="autoplay" />
+                            <div style={{ position: "absolute", top: 0, right: 0, height: "56px", background: "#323639", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "0 20px", gap: "10px", width: "220px", userSelect: "none" }} onContextMenu={(e) => e.preventDefault()}>
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                                    <span style={{ color: GOLD, fontSize: "9px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>LAN Library</span>
+                                    <span style={{ color: "rgba(255,255,255,0.3)", fontSize: "8px", fontFamily: "monospace" }}>ID: {user?.uid?.substring(0, 8).toUpperCase()}</span>
                                 </div>
-                                <div className="h-6 w-[1px] bg-gray-600/50 mx-1" />
-                                <Lock size={16} className="text-gray-400" />
+                                <Lock size={14} style={{ color: "rgba(255,255,255,0.3)" }} />
                             </div>
-                            <div
-                                className="absolute top-0 right-0 h-15 bg-[#323639] z-10 md:hidden flex items-center justify-end px-4 select-none"
-                                style={{ width: '120px' }}
-                                onContextMenu={(e) => e.preventDefault()}
-                            >
-                                <span className="text-gray-400 text-[9px] mr-2 font-bold uppercase">LAN Lib's</span>
-                            </div>
-                            <div className="absolute bottom-0 right-0 h-8 bg-[#323639] z-10 w-24 hidden md:block" />
+                            <div style={{ position: "absolute", bottom: 0, right: 0, height: "32px", background: "#323639", zIndex: 10, width: "96px" }} />
                         </div>
                     ) : (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-                            <div className="text-center bg-white p-8 rounded-lg shadow-lg max-w-md">
+                        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: BG }}>
+                            <div style={{ ...sectionCard, textAlign: "center", maxWidth: "420px", padding: "40px 32px" }}>
                                 {!isOnline ? (
                                     <>
-                                        <WifiOff className="w-16 h-16 mx-auto mb-4 text-amber-400" />
-                                        <h3 className="text-xl font-bold mb-2 text-gray-900">You are offline</h3>
-                                        <p className="text-gray-600 mb-4">
-                                            This book is not saved for offline reading.<br />
-                                            Connect to the internet and tap "Save offline" to read it anywhere.
-                                        </p>
-                                        <button
-                                            onClick={handleCloseReader}
-                                            className="w-full bg-gray-800 text-white px-6 py-3 rounded-lg hover:bg-gray-700 flex items-center justify-center gap-2"
-                                        >
-                                            <ArrowLeft size={20} />
-                                            Back to Library
-                                        </button>
+                                        <WifiOff size={40} style={{ color: GOLD, margin: "0 auto 16px" }} />
+                                        <p style={{ ...eyebrow, textAlign: "center" }}>Offline</p>
+                                        <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", fontWeight: 700, color: NAVY, marginBottom: "10px" }}>You are offline</h3>
+                                        <p style={{ fontSize: "13px", color: "#888", marginBottom: "20px", lineHeight: 1.7 }}>This book is not saved for offline reading. Connect to the internet to read it.</p>
+                                        <button onClick={handleCloseReader} style={{ ...navyBtn(false), width: "100%" }}><ArrowLeft size={14} /> Back to Library</button>
                                     </>
                                 ) : (
                                     <>
-                                        <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                                        <h3 className="text-xl font-bold mb-2 text-gray-900">{selectedBook.title}</h3>
-                                        <p className="text-gray-600 mb-4">Document preview not available</p>
-                                        <button
-                                            onClick={() => handleDownload(selectedBook)}
-                                            className="w-full bg-blue-950 text-white px-6 py-3 rounded-lg hover:bg-blue-900 flex items-center justify-center gap-2"
-                                        >
-                                            <Download size={20} />
-                                            Download PDF
-                                        </button>
+                                        <FileText size={40} style={{ color: "#ccc", margin: "0 auto 16px" }} />
+                                        <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", fontWeight: 700, color: NAVY, marginBottom: "10px" }}>{selectedBook.title}</h3>
+                                        <p style={{ fontSize: "13px", color: "#888", marginBottom: "20px" }}>Document preview not available</p>
+                                        <button onClick={() => handleDownload(selectedBook)} style={{ ...navyBtn(false), width: "100%" }}><Download size={14} /> Download PDF</button>
                                     </>
                                 )}
                             </div>
@@ -747,297 +420,244 @@ export default function MyBooksClient() {
                     )}
                 </div>
 
-                <div className="bg-white border-t shadow-lg">
-                    <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-                        <div className="flex items-center gap-6">
-                            <button onClick={() => setShowOverview(true)} className="flex items-center gap-2 text-gray-700 hover:text-gray-900">
-                                <FileText size={20} />
-                                <span className="font-medium hidden md:inline">Overview</span>
-                            </button>
-                            <button onClick={() => setShowRelatedModal(true)} className="flex items-center gap-2 text-gray-700 hover:text-gray-900">
-                                <FileText size={20} />
-                                <span className="font-medium hidden md:inline">Related documents</span>
-                            </button>
-                        </div>
-                        <div className="text-sm text-gray-600">
-                            <span className="font-medium">{selectedBook.pages || 'N/A'}</span> pages • {selectedBook.format || 'PDF'}
-                        </div>
+                {/* Bottom toolbar */}
+                <div style={{ background: "#fff", borderTop: `0.5px solid #e5ddd0`, padding: "12px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+                        <button onClick={() => setShowOverview(true)} style={{ display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", cursor: "pointer", color: NAVY, fontSize: "12px", fontWeight: 700, fontFamily: "'Lato', sans-serif", letterSpacing: "0.05em" }}>
+                            <FileText size={16} style={{ color: GOLD }} /> Overview
+                        </button>
+                        <button onClick={() => setShowRelatedModal(true)} style={{ display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", cursor: "pointer", color: NAVY, fontSize: "12px", fontWeight: 700, fontFamily: "'Lato', sans-serif", letterSpacing: "0.05em" }}>
+                            <BookOpen size={16} style={{ color: GOLD }} /> Related
+                        </button>
                     </div>
+                    <p style={{ fontSize: "11px", color: "#aaa" }}>{selectedBook.pages || 'N/A'} pages · {selectedBook.format || 'PDF'}</p>
                 </div>
 
-                {/* Overview panel (unchanged) */}
+                {/* Overview panel */}
                 {showOverview && (
                     <>
-                        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowOverview(false)} />
-                        <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl z-50 overflow-y-auto">
-                            <div className="p-6">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-2xl font-bold text-gray-900">Overview</h2>
-                                    <button onClick={() => setShowOverview(false)} className="text-gray-500 hover:text-gray-700"><X size={24} /></button>
+                        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 40,  }} onClick={() => setShowOverview(false)} />
+                        <div style={{ position: "fixed", inset: "0 0 0 auto", width: "380px", background: "#fff", zIndex: 50, overflowY: "auto", borderLeft: `0.5px solid #e5ddd0` }}>
+                            <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `0.5px solid rgba(184,150,62,0.2)` }}>
+                                <div className="mt-40">
+                                    <p style={{ ...eyebrow, marginBottom: "2px" }}>Book Info</p>
+                                    <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "16px", fontWeight: 700, color: "#fff", margin: 0 }}>Overview</p>
                                 </div>
-                                <img src={selectedBook.image || selectedBook.coverImage} alt={selectedBook.title} className="w-full h-64 object-cover rounded-lg mb-4" />
-                                <h3 className="text-xl font-bold mb-2 text-gray-900">{selectedBook.title}</h3>
-                                <p className="text-sm text-gray-600 mb-4">By <span className="underline">{selectedBook.author}</span></p>
+                                <button onClick={() => setShowOverview(false)} style={{ background: "none", border: `0.5px solid rgba(255,255,255,0.2)`, padding: "6px", cursor: "pointer", color: "rgba(255,255,255,0.5)", display: "flex" }}><X size={15} /></button>
+                            </div>
+                            <div style={{ padding: "24px" }}>
+                                <img src={selectedBook.image || selectedBook.coverImage} alt={selectedBook.title} style={{ width: "100%", height: "240px", objectFit: "cover", marginBottom: "16px", border: `0.5px solid #e5ddd0` }} />
+                                <p style={eyebrow}>Title</p>
+                                <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "18px", fontWeight: 700, color: NAVY, marginBottom: "4px" }}>{selectedBook.title}</h3>
+                                <p style={{ fontSize: "12px", color: "#aaa", marginBottom: "16px" }}>By {selectedBook.author}</p>
                                 {selectedBook.description && (
-                                    <><h3 className="font-bold mb-2 text-gray-900">Description</h3><p className="text-sm text-gray-600 mb-6">{selectedBook.description}</p></>
+                                    <>
+                                        <p style={eyebrow}>Description</p>
+                                        <p style={{ fontSize: "13px", color: "#666", lineHeight: 1.7, marginBottom: "16px" }}>{selectedBook.description}</p>
+                                    </>
                                 )}
-                                <h3 className="font-bold mb-2 text-gray-900">Purchase Details</h3>
-                                <div className="space-y-2 text-sm text-gray-600 mb-6">
-                                    <p>Date: {formatDate(selectedBook.purchaseDate)}</p>
-                                    <p>Amount: ₦ {selectedBook.amount?.toLocaleString() || 'N/A'}</p>
-                                    <p>Transaction: {selectedBook.transactionId || 'N/A'}</p>
+                                <div style={{ background: CREAM, border: `0.5px solid rgba(184,150,62,0.18)`, padding: "16px" }}>
+                                    {[["Purchase Date", formatDate(selectedBook.purchaseDate)], ["Amount", `₦${selectedBook.amount?.toLocaleString() || 'N/A'}`], ["Transaction", selectedBook.transactionId || 'N/A'], ["Category", selectedBook.category || 'General'], ["Format", `${selectedBook.format || 'PDF'} · ${selectedBook.pages || 'N/A'} pages`]].map(([k, v]) => (
+                                        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", padding: "6px 0", borderBottom: "0.5px solid rgba(184,150,62,0.12)" }}>
+                                            <span style={{ color: "#aaa" }}>{k}</span>
+                                            <span style={{ fontWeight: 700, color: NAVY, textAlign: "right", maxWidth: "60%", wordBreak: "break-all" }}>{v}</span>
+                                        </div>
+                                    ))}
                                 </div>
-                                <h3 className="font-bold mb-2 text-gray-900">Category</h3>
-                                <p className="text-sm text-gray-600 mb-6">{selectedBook.category || 'General'}</p>
-                                <h3 className="font-bold mb-2 text-gray-900">Format</h3>
-                                <p className="text-sm text-gray-600">{selectedBook.format || 'PDF'} • {selectedBook.pages || 'N/A'} pages</p>
                             </div>
                         </div>
                     </>
                 )}
 
-                {/* Related modal (unchanged) */}
+                {/* Related modal */}
                 {showRelatedModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden">
-                            <div className="p-6 border-b flex items-center justify-between">
-                                <h2 className="text-2xl font-bold text-gray-900">Related Documents</h2>
-                                <button onClick={() => setShowRelatedModal(false)} className="text-gray-500 hover:text-gray-700"><X size={24} /></button>
-                            </div>
-                            <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
-                                <div className="space-y-4">
-                                    {getRelatedBooks(selectedBook).length > 0 ? getRelatedBooks(selectedBook).map((relatedBook) => (
-                                        <div key={relatedBook.id} className="flex gap-4 p-4 hover:bg-gray-50 rounded-lg border border-gray-200">
-                                            <div className="relative flex-shrink-0">
-                                                <img src={relatedBook.image} alt={relatedBook.title} className="w-24 h-32 object-cover rounded shadow-md" />
-                                                {isPurchased(relatedBook.id) && (
-                                                    <span className="absolute bottom-1 left-1 bg-green-600 text-white text-xs px-1.5 py-0.5 rounded font-bold">Owned</span>
-                                                )}
-                                            </div>
-                                            <div className="flex-1">
-                                                <h4 className="font-semibold text-base mb-2 text-gray-900">{relatedBook.title}</h4>
-                                                <p className="text-sm text-gray-600 mb-2">By {relatedBook.author}</p>
-                                                {isPurchased(relatedBook.id) ? (
-                                                    <button onClick={() => { setShowRelatedModal(false); handleOpenBook(relatedBook); }} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-semibold">
-                                                        <ExternalLink size={16} className="inline mr-2" />Open Book
-                                                    </button>
-                                                ) : (
-                                                    <button onClick={() => handlePurchaseRelatedBook(relatedBook)} className="bg-blue-950 text-white px-4 py-2 rounded-lg hover:bg-blue-900 text-sm font-semibold">
-                                                        Purchase - ₦{relatedBook.price?.toLocaleString()}
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )) : (
-                                        <div className="text-center py-8 text-gray-500">
-                                            <FileText className="w-16 h-16 mx-auto mb-3 text-gray-400" />
-                                            <p>No related documents found</p>
-                                        </div>
-                                    )}
+                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "20px" }}>
+                        <div style={{ background: "#fff", width: "100%", maxWidth: "700px", maxHeight: "85vh", overflow: "hidden", border: `0.5px solid #e5ddd0` }}>
+                            <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `0.5px solid rgba(184,150,62,0.2)` }}>
+                                <div>
+                                    <p style={{ ...eyebrow, marginBottom: "2px" }}>Explore</p>
+                                    <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "16px", fontWeight: 700, color: "#fff", margin: 0 }}>Related Documents</p>
                                 </div>
+                                <button onClick={() => setShowRelatedModal(false)} style={{ background: "none", border: `0.5px solid rgba(255,255,255,0.2)`, padding: "6px", cursor: "pointer", color: "rgba(255,255,255,0.5)", display: "flex" }}><X size={15} /></button>
+                            </div>
+                            <div style={{ overflowY: "auto", maxHeight: "calc(85vh - 70px)", padding: "20px" }}>
+                                {getRelatedBooks(selectedBook).map(rb => (
+                                    <div key={rb.id} style={{ display: "flex", gap: "16px", padding: "14px 0", borderBottom: "0.5px solid #f0ebe0" }}>
+                                        <img src={rb.image} alt={rb.title} style={{ width: "80px", height: "110px", objectFit: "cover", flexShrink: 0, border: `0.5px solid #e5ddd0` }} />
+                                        <div style={{ flex: 1 }}>
+                                            <h4 style={{ fontFamily: "'Playfair Display', serif", fontSize: "15px", fontWeight: 700, color: NAVY, marginBottom: "4px" }}>{rb.title}</h4>
+                                            <p style={{ fontSize: "11px", color: "#aaa", marginBottom: "12px" }}>By {rb.author}</p>
+                                            {isPurchased(rb.id) ? (
+                                                <button onClick={() => { setShowRelatedModal(false); handleOpenBook(rb); }} style={{ ...navyBtn(false), width: "auto", padding: "8px 16px" }}><ExternalLink size={12} /> Open Book</button>
+                                            ) : (
+                                                <button onClick={() => router.push(`/payment?bookId=${rb.id}`)} style={{ ...navyBtn(false), width: "auto", padding: "8px 16px", background: GOLD, color: NAVY }}>Purchase · ₦{rb.price?.toLocaleString()}</button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
                 )}
             </div>
-        );
-    }
+        </>
+    );
 
-    // ─── Library / Offline tab view ───────────────────────────────────────────
+    /* ─── Library view ────────────────────────────────────── */
     const displayBooks = activeTab === 'offline' ? offlineBooks : filteredBooks;
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <Navbar />
+        <>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+                .lan-lib-root { font-family:'Lato',sans-serif; background:${BG}; min-height:100vh; }
+                .book-card-hover { transition:box-shadow 0.2s; }
+                .book-card-hover:hover { box-shadow:0 8px 32px rgba(13,34,68,0.12); }
+                .lan-offline-btn:hover { background:#fff1f2 !important; color:#dc2626 !important; border-color:#fca5a5 !important; }
+                @keyframes spin{to{transform:rotate(360deg)}}
+                @keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+                .anim{animation:slideUp 0.4s cubic-bezier(.4,0,.2,1) both}
+            `}</style>
+            <div className="lan-lib-root">
+                <Navbar />
 
-            {/* ── Offline banner ─────────────────────────────────────────────── */}
-            {!isOnline && !bannerDismissed && (
-                <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-amber-800 text-sm">
-                        <WifiOff size={16} className="flex-shrink-0" />
-                        <span>You are offline — only books saved to your device are available</span>
+                {/* Offline banner */}
+                {!isOnline && !bannerDismissed && (
+                    <div style={{ background: CREAM, borderBottom: `0.5px solid rgba(184,150,62,0.3)`, padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <WifiOff size={14} style={{ color: GOLD }} />
+                            <span style={{ fontSize: "12px", color: NAVY, fontWeight: 700 }}>You are offline — only books saved to your device are available</span>
+                        </div>
+                        <button onClick={() => setBannerDismissed(true)} style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", display: "flex" }}><X size={14} /></button>
                     </div>
-                    <button onClick={() => setBannerDismissed(true)} className="text-amber-600 hover:text-amber-800">
-                        <X size={16} />
-                    </button>
-                </div>
-            )}
+                )}
 
-            <main className="max-w-7xl mx-auto px-4 py-8">
+                <main style={{ maxWidth: "1100px", margin: "0 auto", padding: "0" }}>
 
-                {/* ── Header ──────────────────────────────────────────────────── */}
-                <div className="mb-6">
-                    <div className="flex items-center justify-between mb-1">
-                        <h2 className="text-3xl font-bold text-gray-900">My Books</h2>
-                        {/* Online/offline pill */}
-                        <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${isOnline ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                            {isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
-                            {isOnline ? 'Online' : 'Offline'}
+                    {/* Hero */}
+                    <section style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px),radial-gradient(rgba(255,255,255,0.025) 1px,transparent 1px)", backgroundSize: "28px 28px,14px 14px", backgroundPosition: "0 0,7px 7px", padding: "40px 24px 0" }}>
+                        <div style={{ maxWidth: "1060px", margin: "0 auto" }}>
+                            <p style={{ ...eyebrow, color: GOLDD }}>LAN Library</p>
+                            <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(28px,5vw,46px)", fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-1px", margin: "6px 0 10px" }}>
+                                My Books.<br /><em style={{ color: GOLD, fontStyle: "italic" }}>Your collection.</em>
+                            </h1>
+                            <p style={{ fontSize: "14px", color: "rgba(245,240,232,0.65)", maxWidth: "440px", lineHeight: 1.75, fontWeight: 300 }}>
+                                Access all your purchased books. Save them offline for uninterrupted reading anywhere.
+                            </p>
+                            {/* Stat strip */}
+                            <div style={{ borderTop: "0.5px solid rgba(184,150,62,0.2)", marginTop: "28px", display: "flex", flexWrap: "wrap" }}>
+                                {[[String(purchasedBooks.length), "Books Owned"], [String(offlineIds.size), "Saved Offline"], [isOnline ? "Online" : "Offline", "Status"], [formattedStorageSize || "0 KB", "Storage Used"]].map(([val, lbl]) => (
+                                    <div key={lbl} style={{ flex: "1 1 100px", padding: "18px 16px", borderRight: "0.5px solid rgba(184,150,62,0.12)" }}>
+                                        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: "#fff" }}>{val}</div>
+                                        <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", marginTop: "3px" }}>{lbl}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    <div style={{ padding: "28px 24px" }}>
+                        <div style={{ maxWidth: "1060px", margin: "0 auto" }}>
+
+                            {/* Tab bar + online pill */}
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
+                                <div style={{ display: "flex", background: "#fff", border: `0.5px solid #e5ddd0`, overflow: "hidden" }}>
+                                    {[{ id: 'library', label: 'My Library', count: purchasedBooks.length, icon: <BookOpen size={12} /> }, { id: 'offline', label: 'Saved Offline', count: offlineIds.size, icon: <HardDrive size={12} /> }].map(t => (
+                                        <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "11px 18px", border: "none", borderBottom: activeTab === t.id ? `2px solid ${NAVY}` : "2px solid transparent", background: activeTab === t.id ? CREAM : "transparent", color: activeTab === t.id ? NAVY : "#aaa", fontFamily: "'Lato', sans-serif", fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", transition: "all 0.15s" }}>
+                                            <span style={{ color: activeTab === t.id ? GOLD : "#ccc" }}>{t.icon}</span>
+                                            {t.label}
+                                            {t.count > 0 && <span style={{ background: activeTab === t.id ? NAVY : "#e5ddd0", color: activeTab === t.id ? "#fff" : "#888", fontSize: "9px", fontWeight: 700, padding: "1px 6px", minWidth: "20px", textAlign: "center" }}>{t.count}</span>}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px", fontWeight: 700, padding: "6px 12px", letterSpacing: "0.08em", textTransform: "uppercase", background: isOnline ? "rgba(22,163,74,0.06)" : "#fff1f2", color: isOnline ? "#16a34a" : "#dc2626", border: `0.5px solid ${isOnline ? "rgba(22,163,74,0.3)" : "#fca5a5"}` }}>
+                                    {isOnline ? <Wifi size={11} /> : <WifiOff size={11} />}
+                                    {isOnline ? "Online" : "Offline"}
+                                </div>
+                            </div>
+
+                            {/* Search (library only) */}
+                            {activeTab === 'library' && purchasedBooks.length > 0 && (
+                                <div style={{ marginBottom: "20px", position: "relative" }}>
+                                    <Search size={14} style={{ position: "absolute", left: "13px", top: "50%", transform: "translateY(-50%)", color: "#aaa" }} />
+                                    <input type="text" placeholder="Search by title, author or category…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                                        onFocus={() => setFocusSearch(true)} onBlur={() => setFocusSearch(false)}
+                                        style={{ width: "100%", padding: "11px 13px 11px 36px", border: `0.5px solid ${focusSearch ? GOLD : "#e5ddd0"}`, background: "#fff", fontSize: "13px", color: NAVY, fontFamily: "'Lato', sans-serif", outline: "none", boxSizing: "border-box", transition: "border-color 0.18s" }} />
+                                    {searchQuery && <button onClick={() => setSearchQuery('')} style={{ position: "absolute", right: "13px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#aaa", display: "flex" }}><X size={14} /></button>}
+                                </div>
+                            )}
+
+                            {/* Offline empty state */}
+                            {activeTab === 'offline' && offlineBooks.length === 0 && (
+                                <div style={{ ...sectionCard, textAlign: "center", padding: "60px 40px" }} className="anim">
+                                    <div style={{ width: "56px", height: "56px", border: `0.5px solid #e5ddd0`, background: CREAM, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                                        <HardDrive size={24} style={{ color: "#ccc" }} />
+                                    </div>
+                                    <p style={eyebrow}>Offline Storage</p>
+                                    <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: NAVY, marginBottom: "10px" }}>No books saved offline</h3>
+                                    <p style={{ fontSize: "13px", color: "#888", maxWidth: "360px", margin: "0 auto 20px", lineHeight: 1.7 }}>Tap "Save offline" on any book in your library to read without an internet connection.</p>
+                                    <button onClick={() => setActiveTab('library')} style={{ ...navyBtn(false), width: "auto", margin: "0 auto" }}><BookOpen size={13} /> Go to My Library</button>
+                                </div>
+                            )}
+
+                            {/* Library empty state */}
+                            {activeTab === 'library' && purchasedBooks.length === 0 && (
+                                <div style={{ ...sectionCard, textAlign: "center", padding: "60px 40px" }} className="anim">
+                                    <div style={{ width: "56px", height: "56px", border: `0.5px solid #e5ddd0`, background: CREAM, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                                        <FileText size={24} style={{ color: "#ccc" }} />
+                                    </div>
+                                    <p style={eyebrow}>Empty Library</p>
+                                    <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: NAVY, marginBottom: "10px" }}>No books yet</h3>
+                                    <p style={{ fontSize: "13px", color: "#888", marginBottom: "20px" }}>Browse our library to find your first book.</p>
+                                    <Link href="/documents" style={{ ...navyBtn(false), width: "auto", margin: "0 auto", textDecoration: "none" }}>Browse Books <ArrowRight size={13} /></Link>
+                                </div>
+                            )}
+
+                            {/* Book grid */}
+                            {displayBooks.length > 0 && (
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "16px" }} className="anim">
+                                    {displayBooks.map((book, idx) => {
+                                        const saved = isBookOffline(book.id);
+                                        const dlState = getDownloadState(book.id);
+                                        return (
+                                            <div key={book.id || book.transactionId || idx} style={{ background: "#fff", border: `0.5px solid #e5ddd0` }} className="book-card-hover">
+                                                <div style={{ position: "relative" }}>
+                                                    <img src={book.coverImage || book.image} alt={book.title} style={{ width: "100%", height: "200px", objectFit: "cover", display: "block", borderBottom: `0.5px solid #e5ddd0` }}
+                                                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }} />
+                                                    {/* Purchased badge */}
+                                                    <div style={{ position: "absolute", top: "10px", right: "10px", background: NAVY, color: "#fff", fontSize: "8px", fontWeight: 700, padding: "3px 8px", letterSpacing: "0.1em", textTransform: "uppercase" }}>Purchased</div>
+                                                    {/* Offline badge */}
+                                                    {saved && (
+                                                        <div style={{ position: "absolute", top: "10px", left: "10px", background: GOLD, color: NAVY, fontSize: "8px", fontWeight: 700, padding: "3px 8px", display: "flex", alignItems: "center", gap: "4px", letterSpacing: "0.08em" }}>
+                                                            <HardDrive size={9} /> Offline
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div style={{ padding: "16px" }}>
+                                                    <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "15px", fontWeight: 700, color: NAVY, marginBottom: "4px", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{book.title}</h3>
+                                                    <p style={{ fontSize: "11px", color: "#aaa", marginBottom: "10px" }}>{book.author}</p>
+                                                    <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", fontSize: "11px", color: "#666" }}>
+                                                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><Calendar size={11} style={{ color: GOLD }} /> {formatDate(book.purchaseDate)}</div>
+                                                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><CreditCard size={11} style={{ color: GOLD }} /> ₦{book.amount?.toLocaleString() || book.price?.toLocaleString() || 'N/A'}</div>
+                                                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><FileText size={11} style={{ color: GOLD }} /> {book.pages || 'N/A'} pages · {book.format || 'PDF'}</div>
+                                                    </div>
+                                                    <div style={{ marginBottom: "10px" }}>
+                                                        <SaveOfflineButton book={book} isOffline={saved} downloadState={dlState} onSave={downloadForOffline} onRemove={removeOfflineBook} isOnline={isOnline} />
+                                                    </div>
+                                                    <button onClick={() => handleOpenBook(book)} style={{ ...navyBtn(false), width: "100%", background: saved && !isOnline ? GOLD : NAVY, color: saved && !isOnline ? NAVY : "#fff" }}>
+                                                        <ExternalLink size={13} />
+                                                        {saved && !isOnline ? 'Read Offline' : 'Read Book'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
-                    <p className="text-gray-600">
-                        {purchasedBooks.length} {purchasedBooks.length === 1 ? 'book' : 'books'} purchased
-                        {offlineIds.size > 0 && (
-                            <span className="ml-2 text-green-700">• {offlineIds.size} saved offline ({formattedStorageSize})</span>
-                        )}
-                    </p>
-                </div>
-
-                {/* ── Tabs ────────────────────────────────────────────────────── */}
-                <div className="flex gap-0 mb-6 border-b border-gray-200">
-                    <button
-                        onClick={() => setActiveTab('library')}
-                        className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'library' ? 'border-blue-950 text-blue-950' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
-                        <span className="flex items-center gap-2">
-                            <BookOpen size={16} />
-                            My Library
-                            <span className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded-full">{purchasedBooks.length}</span>
-                        </span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('offline')}
-                        className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'offline' ? 'border-blue-950 text-blue-950' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
-                        <span className="flex items-center gap-2">
-                            <HardDrive size={16} />
-                            Saved Offline
-                            {offlineIds.size > 0 && (
-                                <span className="bg-green-100 text-green-700 text-xs px-1.5 py-0.5 rounded-full">{offlineIds.size}</span>
-                            )}
-                        </span>
-                    </button>
-                </div>
-
-                {/* ── Search (library tab only) ────────────────────────────────── */}
-                {activeTab === 'library' && purchasedBooks.length > 0 && (
-                    <div className="mb-6 relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                        <input
-                            type="text"
-                            placeholder="Search by title, author, or category..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full text-blue-950 pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 focus:border-transparent"
-                        />
-                        {searchQuery && (
-                            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                                <X size={20} />
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* ── Offline tab empty state ──────────────────────────────────── */}
-                {activeTab === 'offline' && offlineBooks.length === 0 && (
-                    <div className="bg-white rounded-lg shadow-sm p-12 text-center border border-gray-200">
-                        <HardDrive className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">No books saved offline</h3>
-                        <p className="text-gray-500 mb-4 max-w-sm mx-auto">
-                            Tap "Save offline" on any book in your library to read it without an internet connection — perfect for low-data situations.
-                        </p>
-                        <button
-                            onClick={() => setActiveTab('library')}
-                            className="inline-flex items-center gap-2 bg-blue-950 text-white px-5 py-2.5 rounded-lg hover:bg-blue-900 transition-colors text-sm font-medium"
-                        >
-                            <BookOpen size={16} />
-                            Go to My Library
-                        </button>
-                    </div>
-                )}
-
-                {/* ── Library empty state ──────────────────────────────────────── */}
-                {activeTab === 'library' && purchasedBooks.length === 0 && (
-                    <div className="bg-white rounded-lg shadow-lg p-12 text-center">
-                        <FileText className="w-20 h-20 mx-auto mb-4 text-gray-400" />
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">No Books Yet</h3>
-                        <p className="text-gray-600 mb-6">
-                            You haven't purchased any books yet. Browse our library to get started!
-                        </p>
-                        <Link href="/documents" className="inline-block bg-blue-950 text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors">
-                            Browse Books
-                        </Link>
-                    </div>
-                )}
-
-                {/* ── Book grid ────────────────────────────────────────────────── */}
-                {displayBooks.length > 0 && (
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-                        {displayBooks.map((book, index) => {
-                            const saved = isBookOffline(book.id);
-                            const dlState = getDownloadState(book.id);
-
-                            return (
-                                <div
-                                    key={book.id || book.transactionId || index}
-                                    className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
-                                >
-                                    <div className="relative">
-                                        <img
-                                            src={book.coverImage || book.image}
-                                            alt={book.title}
-                                            className="w-full h-40 md:h-64 object-cover"
-                                            onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                                        />
-                                        <span className="absolute top-3 right-3 bg-blue-950 text-white px-3 py-1 rounded-full text-xs font-bold">
-                                            Purchased
-                                        </span>
-                                        {saved && (
-                                            <span className="absolute top-3 left-3 bg-green-700 text-white px-2 py-1 rounded-full text-[10px] font-bold flex items-center gap-1">
-                                                <HardDrive size={10} />
-                                                Offline
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    <div className="p-3 md:p-6">
-                                        <h3 className="font-bold text-sm md:text-lg text-gray-900 mb-2 line-clamp-2">{book.title}</h3>
-                                        <p className="text-xs md:text-sm text-gray-600 mb-2 md:mb-3">{book.author}</p>
-
-                                        <div className="hidden md:block space-y-2 mb-4 text-sm">
-                                            <div className="flex items-center gap-2 text-gray-600">
-                                                <Calendar size={16} />
-                                                <span>Purchased: {formatDate(book.purchaseDate)}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-gray-600">
-                                                <CreditCard size={16} />
-                                                <span>₦ {book.amount?.toLocaleString() || book.price?.toLocaleString() || 'N/A'}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-gray-600">
-                                                <FileText size={16} />
-                                                <span>{book.pages || 'N/A'} pages • {book.format || 'PDF'}</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Save offline button */}
-                                        <div className="mb-3">
-                                            <SaveOfflineButton
-                                                book={book}
-                                                isOffline={saved}
-                                                downloadState={dlState}
-                                                onSave={downloadForOffline}
-                                                onRemove={removeOfflineBook}
-                                                isOnline={isOnline}
-                                            />
-                                        </div>
-
-                                        <button
-                                            onClick={() => handleOpenBook(book)}
-                                            className="w-full bg-blue-950 text-white py-2 md:py-3 rounded-lg hover:bg-blue-900 transition-colors flex items-center justify-center gap-2 font-semibold text-xs md:text-base"
-                                        >
-                                            <ExternalLink className="w-4 h-4 md:w-5 md:h-5" />
-                                            <span className="hidden md:inline">
-                                                {saved && !isOnline ? 'Read Offline' : 'Read Book'}
-                                            </span>
-                                            <span className="md:hidden">Read</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </main>
-        </div>
+                </main>
+            </div>
+        </>
     );
 }

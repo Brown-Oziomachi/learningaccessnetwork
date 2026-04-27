@@ -1,52 +1,137 @@
 import "./globals.css";
 import { Inter } from "next/font/google";
-import GoHomeButton from '@/components/GoHomeButton';
+import GoHomeButton from "@/components/GoHomeButton";
+import { BookOpen, Sparkles } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"] });
+
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
+const CREAM = "#f5f0e8";
 
 export default function GlobalNotFound() {
   return (
     <html lang="en" className={inter.className}>
-      <body className="min-h-screen bg-gray-100 flex items-center justify-center px-6">
+      <body
+        style={{
+          minHeight: "100vh",
+          background: NAVY,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+          color: "#fff",
+          fontFamily: "Lato, sans-serif",
+        }}
+      >
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 max-w-sm w-full text-center">
+        {/* Background pattern (same vibe as landing) */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: `
+              radial-gradient(rgba(184,150,62,0.07) 1px, transparent 1px),
+              radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)
+            `,
+            backgroundSize: "28px 28px, 14px 14px",
+            backgroundPosition: "0 0, 7px 7px",
+            zIndex: 0,
+          }}
+        />
+
+        {/* CARD */}
+        <div
+          style={{
+            position: "relative",
+            zIndex: 2,
+            background: "#fff",
+            border: "1px solid rgba(184,150,62,0.2)",
+            borderRadius: "16px",
+            padding: "40px 28px",
+            maxWidth: 420,
+            width: "100%",
+            textAlign: "center",
+            boxShadow: "0 30px 60px rgba(0,0,0,0.25)",
+          }}
+        >
+
+          {/* Badge */}
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "rgba(184,150,62,0.12)",
+              border: "1px solid rgba(184,150,62,0.25)",
+              borderRadius: 999,
+              padding: "6px 14px",
+              marginBottom: 20,
+            }}
+          >
+            <Sparkles size={12} style={{ color: GOLD }} />
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: ".14em",
+                textTransform: "uppercase",
+                color: GOLD,
+              }}
+            >
+              LAN Library
+            </span>
+          </div>
 
           {/* Icon */}
-          <div className="flex justify-center mb-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="56"
-              height="56"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#d1d5db"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              <line x1="11" y1="8" x2="11" y2="14" />
-              <line x1="8" y1="11" x2="14" y2="11" />
-            </svg>
+          <div
+            style={{
+              width: 72,
+              height: 72,
+              margin: "0 auto 18px",
+              borderRadius: "50%",
+              background: "rgba(184,150,62,0.12)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <BookOpen size={30} style={{ color: GOLD }} />
           </div>
 
           {/* Title */}
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
+          <h1
+            style={{
+              fontFamily: "Playfair Display, serif",
+              fontSize: 28,
+              fontWeight: 900,
+              color: NAVY,
+              marginBottom: 8,
+            }}
+          >
             Page Not Found
-          </h2>
+          </h1>
 
-          {/* Description */}
-          <p className="text-gray-500 text-sm mb-6">
-            The page you're looking for doesn't exist in LAN Library.
-            Head back home or visit the help center.
+          {/* Subtitle */}
+          <p
+            style={{
+              fontSize: 13,
+              color: "#888",
+              lineHeight: 1.7,
+              marginBottom: 28,
+            }}
+          >
+            The page you're looking for doesn’t exist in{" "}
+            <strong style={{ color: NAVY }}>LAN Library</strong>.
+            <br />
+            Try going back home or explore available resources.
           </p>
 
           {/* Button */}
-          <GoHomeButton />
-
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <GoHomeButton />
+          </div>
         </div>
-
       </body>
     </html>
   );

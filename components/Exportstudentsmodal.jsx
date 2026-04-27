@@ -1,81 +1,51 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  X,
-  Download,
-  Search,
-  ChevronDown,
-  BookOpen,
-  Users,
-  FileText,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-  BarChart2,
+  X, Download, Search, ChevronDown, BookOpen, Users,
+  FileText, CheckCircle, AlertCircle, Loader2, BarChart2,
 } from "lucide-react";
 import {
-  collection,
-  query,
-  where,
-  getDocs,
-  getDoc,
-  doc,
+  collection, query, where, getDocs, getDoc, doc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 
-// ─── CSV Export Helper ───────────────────────────────────────────────────────
+/* ─── colour tokens (match homepage) ─── */
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG    = "#f5f1ea";
+
+/* ─── CSV Export ─── */
 function exportToCSV(rows, fileName) {
   if (!rows.length) return;
-
-const headers = [
-    "Student Name",
-    "Email",
-    "Registration Number",
-    "Department",       
-    "Phone",
-    "Country",
-    "Document Title",
-    "Amount Paid (NGN)",
-    "Date of Purchase",
-    "Time of Purchase",
-    "Transaction ID",
-    "Status",
-];
-
+  const headers = [
+    "Student Name", "Email", "Registration Number", "Department",
+    "Phone", "Country", "Document Title", "Amount Paid (NGN)",
+    "Date of Purchase", "Time of Purchase", "Transaction ID", "Status",
+  ];
   const escape = (val) => {
     const str = val == null ? "" : String(val);
     return str.includes(",") || str.includes('"') || str.includes("\n")
       ? `"${str.replace(/"/g, '""')}"`
       : str;
   };
-
- const csvRows = [
-   headers.join(","),
-   ...rows.map((r) => {
-     const date =
-       r.createdAtDate instanceof Date
-         ? r.createdAtDate
-         : new Date(r.createdAtDate || Date.now());
-     return [
-       escape(r.buyerName || "—"),
-       escape(r.buyerEmail || "—"),
-       escape(r.studentRegNo || r.regNo || "—"),
-       escape(r.department || "—"), 
-       escape(r.buyerPhone || r.phone || "—"),
-       escape(r.buyerCountry || "—"),
-       escape(r.bookTitle || r.title || "—"),
-       escape(r.amount || 0),
-       escape(date.toLocaleDateString("en-NG")),
-       escape(date.toLocaleTimeString("en-NG")),
-       escape(r.id || "—"),
-       escape("Completed"),
-     ].join(",");
-   }),
- ];
-
-  const blob = new Blob([csvRows.join("\n")], {
-    type: "text/csv;charset=utf-8;",
-  });
+  const csvRows = [
+    headers.join(","),
+    ...rows.map((r) => {
+      const date = r.createdAtDate instanceof Date
+        ? r.createdAtDate : new Date(r.createdAtDate || Date.now());
+      return [
+        escape(r.buyerName || "—"), escape(r.buyerEmail || "—"),
+        escape(r.studentRegNo || r.regNo || "—"), escape(r.department || "—"),
+        escape(r.buyerPhone || r.phone || "—"), escape(r.buyerCountry || "—"),
+        escape(r.bookTitle || r.title || "—"), escape(r.amount || 0),
+        escape(date.toLocaleDateString("en-NG")), escape(date.toLocaleTimeString("en-NG")),
+        escape(r.id || "—"), escape("Completed"),
+      ].join(",");
+    }),
+  ];
+  const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -84,14 +54,11 @@ const headers = [
   URL.revokeObjectURL(url);
 }
 
-// ─── Main Modal ──────────────────────────────────────────────────────────────
-export default function ExportStudentsModal({
-  isOpen,
-  onClose,
-  sellerId,
-  sellerBooks = [],
-}) {
-  const [step, setStep] = useState("select"); // select | preview | done
+/* ════════════════════════════════════════════
+   MAIN MODAL
+════════════════════════════════════════════ */
+export default function ExportStudentsModal({ isOpen, onClose, sellerId, sellerBooks = [] }) {
+  const [step, setStep] = useState("select");
   const [selectedBook, setSelectedBook] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -100,519 +67,437 @@ export default function ExportStudentsModal({
   const [error, setError] = useState("");
   const [exportCount, setExportCount] = useState(0);
 
-  // Filter books by search
   const filteredBooks = sellerBooks.filter((b) =>
-    (b.title || b.bookTitle || "")
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase()),
+    (b.title || b.bookTitle || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
- const fetchStudents = useCallback(
-   async (book) => {
-     if (!book || !sellerId) return;
-     setLoading(true);
-     setError("");
-     try {
-       const rawId = (book.id || "").replace("firestore-", "");
-       const prefixedId = `firestore-${rawId}`;
-
-       // Query both ID formats — transactions may store either
-       const [snap1, snap2] = await Promise.all([
-         getDocs(
-           query(
-             collection(db, "transactions"),
-             where("sellerId", "==", sellerId),
-             where("bookId", "==", prefixedId),
-           ),
-         ),
-         getDocs(
-           query(
-             collection(db, "transactions"),
-             where("sellerId", "==", sellerId),
-             where("bookId", "==", rawId),
-           ),
-         ),
-       ]);
-
-       // Merge and deduplicate
-       const seen = new Set();
-       const allDocs = [...snap1.docs, ...snap2.docs].filter((d) => {
-         if (seen.has(d.id)) return false;
-         seen.add(d.id);
-         return true;
-       });
-
-       const rows = await Promise.all(
-         allDocs.map(async (docSnap) => {
-           const data = docSnap.data();
-           let buyerEmail = data.buyerEmail || null;
-           let buyerPhone = data.buyerPhone || null;
-           let buyerCountry = data.buyerCountry || null;
-           let studentRegNo = data.studentRegNo || data.regNo || null;
-
-           const buyerId = data.buyerId || data.userId || data.buyerUid || null;
-           if (buyerId && (!buyerEmail || !buyerCountry)) {
-             try {
-               const buyerDoc = await getDoc(doc(db, "users", buyerId));
-               if (buyerDoc.exists()) {
-                 const bd = buyerDoc.data();
-                 buyerEmail = buyerEmail || bd.email || null;
-                 buyerPhone = buyerPhone || bd.phone || bd.phoneNumber || null;
-                 buyerCountry = buyerCountry || bd.country || null;
-                 studentRegNo =
-                   studentRegNo || bd.regNo || bd.studentRegNo || null;
-               }
-             } catch (_) {}
-           }
-
-           return {
-             id: docSnap.id,
-             ...data,
-             buyerEmail,
-             buyerPhone,
-             buyerCountry,
-             studentRegNo,
-             createdAtDate:
-               data.createdAt?.toDate?.() ||
-               new Date(data.purchaseDate || Date.now()),
-           };
-         }),
-       );
-
-       rows.sort((a, b) => b.createdAtDate - a.createdAtDate);
-       setStudents(rows);
-       setStep("preview");
-     } catch (err) {
-       console.error(err);
-       setError("Failed to load students. Please try again.");
-     } finally {
-       setLoading(false);
-     }
-   },
-   [sellerId],
- );
+  const fetchStudents = useCallback(async (book) => {
+    if (!book || !sellerId) return;
+    setLoading(true); setError("");
+    try {
+      const rawId = (book.id || "").replace("firestore-", "");
+      const prefixedId = `firestore-${rawId}`;
+      const [snap1, snap2] = await Promise.all([
+        getDocs(query(collection(db, "transactions"), where("sellerId", "==", sellerId), where("bookId", "==", prefixedId))),
+        getDocs(query(collection(db, "transactions"), where("sellerId", "==", sellerId), where("bookId", "==", rawId))),
+      ]);
+      const seen = new Set();
+      const allDocs = [...snap1.docs, ...snap2.docs].filter((d) => {
+        if (seen.has(d.id)) return false; seen.add(d.id); return true;
+      });
+      const rows = await Promise.all(allDocs.map(async (docSnap) => {
+        const data = docSnap.data();
+        let buyerEmail = data.buyerEmail || null, buyerPhone = data.buyerPhone || null,
+          buyerCountry = data.buyerCountry || null, studentRegNo = data.studentRegNo || data.regNo || null;
+        const buyerId = data.buyerId || data.userId || data.buyerUid || null;
+        if (buyerId && (!buyerEmail || !buyerCountry)) {
+          try {
+            const buyerDoc = await getDoc(doc(db, "users", buyerId));
+            if (buyerDoc.exists()) {
+              const bd = buyerDoc.data();
+              buyerEmail = buyerEmail || bd.email || null;
+              buyerPhone = buyerPhone || bd.phone || bd.phoneNumber || null;
+              buyerCountry = buyerCountry || bd.country || null;
+              studentRegNo = studentRegNo || bd.regNo || bd.studentRegNo || null;
+            }
+          } catch (_) {}
+        }
+        return {
+          id: docSnap.id, ...data, buyerEmail, buyerPhone, buyerCountry, studentRegNo,
+          createdAtDate: data.createdAt?.toDate?.() || new Date(data.purchaseDate || Date.now()),
+        };
+      }));
+      rows.sort((a, b) => b.createdAtDate - a.createdAtDate);
+      setStudents(rows); setStep("preview");
+    } catch (err) {
+      console.error(err); setError("Failed to load students. Please try again.");
+    } finally { setLoading(false); }
+  }, [sellerId]);
 
   const handleSelectBook = (book) => {
-    setSelectedBook(book);
-    setDropdownOpen(false);
-    setSearchQuery("");
+    setSelectedBook(book); setDropdownOpen(false); setSearchQuery("");
   };
-
   const handleExport = () => {
     if (!students.length) return;
     exportToCSV(students, selectedBook?.title || "Document");
-    setExportCount(students.length);
-    setStep("done");
+    setExportCount(students.length); setStep("done");
   };
-
   const handleReset = () => {
-    setStep("select");
-    setSelectedBook(null);
-    setStudents([]);
-    setError("");
-    setSearchQuery("");
+    setStep("select"); setSelectedBook(null); setStudents([]); setError(""); setSearchQuery("");
   };
-
-  useEffect(() => {
-    if (!isOpen) {
-      setTimeout(handleReset, 300);
-    }
-  }, [isOpen]);
+  useEffect(() => { if (!isOpen) { setTimeout(handleReset, 300); } }, [isOpen]);
 
   if (!isOpen) return null;
 
+  const steps = ["Select Document", "Preview", "Download"];
+  const stepMap = { select: 0, preview: 1, done: 2 };
+  const currentStepIdx = stepMap[step];
+
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
-        {/* ── Header ── */}
-        <div className="bg-gradient-to-r from-blue-950 to-blue-800 px-6 py-5 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-              <FileText size={20} className="text-white" />
-            </div>
-            <div>
-              <p className="text-blue-300 text-[11px] font-medium uppercase tracking-widest">
-                Export
-              </p>
-              <p className="text-white font-bold text-lg leading-tight">
-                Student Purchase List
-              </p>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+        .exp-root { font-family: 'Lato', sans-serif; }
+        .exp-serif { font-family: 'Playfair Display', Georgia, serif; }
+        .exp-overlay {
+          position: fixed; inset: 0;
+          background: rgba(13,34,68,0.75);
+          backdrop-filter: blur(4px);
+          z-index: 100;
+          display: flex; align-items: flex-end;
+        }
+        @media (min-width: 640px) { .exp-overlay { align-items: center; padding: 16px; } }
+        .exp-modal {
+          background: ${BG};
+          width: 100%;
+          border-top: 2px solid rgba(184,150,62,0.4);
+          box-shadow: 0 -20px 60px rgba(13,34,68,0.3);
+          display: flex; flex-direction: column; max-height: 92vh; overflow: hidden;
+        }
+        @media (min-width: 640px) {
+          .exp-modal { max-width: 560px; border-top: none; border: 0.5px solid rgba(184,150,62,0.35); border-top: 2px solid ${GOLD}; box-shadow: 0 32px 80px rgba(13,34,68,0.3); }
+        }
+        .exp-header {
+          background: ${NAVY};
+          background-image: radial-gradient(rgba(184,150,62,0.06) 1px, transparent 1px);
+          background-size: 22px 22px;
+          padding: 24px;
+          flex-shrink: 0;
+        }
+        .exp-close {
+          width: 34px; height: 34px;
+          border: 0.5px solid rgba(184,150,62,0.3);
+          background: transparent;
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer; color: rgba(184,150,62,0.7);
+          transition: border-color 0.18s, color 0.18s;
+        }
+        .exp-close:hover { border-color: ${GOLD}; color: ${GOLD}; }
+        .exp-step-bar { display: flex; align-items: center; padding: 14px 24px; background: #fff; border-bottom: 0.5px solid #e5ddd0; flex-shrink: 0; }
+        .exp-body { flex: 1; overflow-y: auto; scrollbar-width: none; }
+        .exp-body::-webkit-scrollbar { display: none; }
+        .exp-footer { padding: 16px 24px 28px; border-top: 0.5px solid #e5ddd0; display: flex; gap: 10px; flex-shrink: 0; background: #fff; }
+        .exp-btn-primary {
+          flex: 1; padding: 13px;
+          background: ${NAVY}; color: #fff;
+          font-family: 'Lato', sans-serif; font-size: 12px; font-weight: 700;
+          letter-spacing: 0.08em; text-transform: uppercase;
+          border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px;
+          transition: background 0.18s;
+        }
+        .exp-btn-primary:hover:not(:disabled) { background: #162f5a; }
+        .exp-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+        .exp-btn-green {
+          flex: 1; padding: 13px;
+          background: #15803d; color: #fff;
+          font-family: 'Lato', sans-serif; font-size: 12px; font-weight: 700;
+          letter-spacing: 0.08em; text-transform: uppercase;
+          border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px;
+          transition: background 0.18s;
+        }
+        .exp-btn-green:hover:not(:disabled) { background: #166534; }
+        .exp-btn-green:disabled { opacity: 0.4; cursor: not-allowed; }
+        .exp-btn-ghost {
+          flex: 1; padding: 13px;
+          background: transparent; color: #777;
+          font-family: 'Lato', sans-serif; font-size: 12px; font-weight: 700;
+          letter-spacing: 0.06em; text-transform: uppercase;
+          border: 0.5px solid #e5ddd0; cursor: pointer;
+          transition: border-color 0.18s, color 0.18s;
+        }
+        .exp-btn-ghost:hover { border-color: #ccc; color: ${NAVY}; }
+        .exp-input {
+          width: 100%; padding: 10px 12px 10px 34px;
+          border: 0.5px solid #e5ddd0; background: #fff;
+          font-family: 'Lato', sans-serif; font-size: 13px; color: ${NAVY};
+          outline: none; box-sizing: border-box;
+          transition: border-color 0.18s;
+        }
+        .exp-input:focus { border-color: ${GOLD}; }
+        .exp-dropdown-btn {
+          width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+          padding: 12px 16px; background: #fff; border: 0.5px solid #e5ddd0; cursor: pointer;
+          transition: border-color 0.18s;
+        }
+        .exp-dropdown-btn:hover { border-color: ${GOLD}; }
+        .exp-dropdown-list {
+          position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 10;
+          background: #fff; border: 0.5px solid #e5ddd0; box-shadow: 0 16px 40px rgba(13,34,68,0.12);
+        }
+        .exp-dropdown-item {
+          width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+          background: transparent; border: none; cursor: pointer; text-align: left;
+          transition: background 0.15s;
+        }
+        .exp-dropdown-item:hover { background: ${CREAM}; }
+        .exp-student-row {
+          display: flex; align-items: center; gap: 12px;
+          background: #fff; border: 0.5px solid #e5ddd0; padding: 12px;
+        }
+        .exp-avatar {
+          width: 38px; height: 38px;
+          background: ${NAVY}; color: #fff;
+          display: flex; align-items: center; justify-content: center;
+          font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700;
+          flex-shrink: 0;
+        }
+        .exp-info-box {
+          background: #fff; border: 0.5px solid rgba(184,150,62,0.3);
+          border-left: 3px solid ${GOLD}; padding: 14px 16px;
+          display: flex; gap: 10px;
+        }
+      `}</style>
+
+      <div className="exp-overlay exp-root">
+        <div className="exp-modal">
+
+          {/* ── Header ── */}
+          <div className="exp-header">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '44px', height: '44px', border: `0.5px solid rgba(184,150,62,0.3)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FileText size={20} style={{ color: GOLD }} />
+                </div>
+                <div>
+                  <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(184,150,62,0.7)', marginBottom: '3px' }}>
+                    Export
+                  </p>
+                  <p className="exp-serif" style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>
+                    Student Purchase List
+                  </p>
+                </div>
+              </div>
+              <button className="exp-close" onClick={onClose}>
+                <X size={15} />
+              </button>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-blue-200 hover:text-white transition-all"
-          >
-            <X size={16} />
-          </button>
-        </div>
 
-        {/* ── Step Indicator ── */}
-        <div className="flex items-center px-6 py-3 bg-blue-950/5 border-b border-gray-100 flex-shrink-0">
-          {["Select Document", "Preview", "Download"].map((label, i) => {
-            const stepMap = { 0: "select", 1: "preview", 2: "done" };
-            const active = step === stepMap[i];
-            const past =
-              (i === 0 && (step === "preview" || step === "done")) ||
-              (i === 1 && step === "done");
-            return (
-              <React.Fragment key={label}>
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
-                      past
-                        ? "bg-green-500 text-white"
-                        : active
-                          ? "bg-blue-950 text-white"
-                          : "bg-gray-200 text-gray-400"
-                    }`}
-                  >
-                    {past ? "✓" : i + 1}
-                  </div>
-                  <span
-                    className={`text-[11px] font-semibold ${
-                      active
-                        ? "text-blue-950"
-                        : past
-                          ? "text-green-600"
-                          : "text-gray-400"
-                    }`}
-                  >
-                    {label}
-                  </span>
-                </div>
-                {i < 2 && <div className="flex-1 h-px bg-gray-200 mx-2" />}
-              </React.Fragment>
-            );
-          })}
-        </div>
-
-        {/* ── Body ── */}
-        <div className="flex-1 overflow-y-auto">
-          {/* STEP 1: Select */}
-          {step === "select" && (
-            <div className="p-6 space-y-5">
-              <div>
-                <p className="text-sm font-semibold text-blue-950 mb-1">
-                  Choose a document
-                </p>
-                <p className="text-xs text-gray-400">
-                  Select which document's buyer list you want to export as a CSV
-                  file.
-                </p>
-              </div>
-
-              {/* Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setDropdownOpen((o) => !o)}
-                  className="w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl border-2 border-gray-200 hover:border-blue-300 focus:border-blue-950 focus:outline-none transition-all bg-white"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <BookOpen
-                      size={18}
-                      className="text-blue-950 flex-shrink-0"
-                    />
-                    <span
-                      className={`text-sm font-medium truncate ${selectedBook ? "text-blue-950" : "text-gray-400"}`}
-                    >
-                      {selectedBook?.title ||
-                        selectedBook?.bookTitle ||
-                        "Select a document…"}
+          {/* ── Step Bar ── */}
+          <div className="exp-step-bar">
+            {steps.map((label, i) => {
+              const active = i === currentStepIdx;
+              const past = i < currentStepIdx;
+              return (
+                <React.Fragment key={label}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                    <div style={{
+                      width: '22px', height: '22px',
+                      background: past ? '#15803d' : active ? NAVY : 'rgba(13,34,68,0.08)',
+                      color: past || active ? '#fff' : '#bbb',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '10px', fontWeight: 700,
+                    }}>
+                      {past ? '✓' : i + 1}
+                    </div>
+                    <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: active ? NAVY : past ? '#15803d' : '#bbb' }}>
+                      {label}
                     </span>
                   </div>
-                  <ChevronDown
-                    size={16}
-                    className={`text-gray-400 flex-shrink-0 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
-                  />
-                </button>
+                  {i < 2 && <div style={{ flex: 1, height: '0.5px', background: '#e5ddd0', margin: '0 8px' }} />}
+                </React.Fragment>
+              );
+            })}
+          </div>
 
-                {dropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
-                    {/* Search inside dropdown */}
-                    <div className="p-2 border-b border-gray-100">
-                      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
-                        <Search size={14} className="text-gray-400" />
-                        <input
-                          autoFocus
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="Search documents…"
-                          className="flex-1 text-sm bg-transparent outline-none text-blue-950 placeholder-gray-400"
-                        />
+          {/* ── Body ── */}
+          <div className="exp-body">
+
+            {/* STEP 1: Select */}
+            {step === "select" && (
+              <div style={{ padding: '24px' }}>
+                <p className="exp-serif" style={{ fontSize: '20px', fontWeight: 700, color: NAVY, margin: '0 0 6px' }}>
+                  Choose a document
+                </p>
+                <p style={{ fontSize: '12px', color: '#999', marginBottom: '24px', fontWeight: 300 }}>
+                  Select which document's buyer list you want to export as a CSV file.
+                </p>
+
+                {/* Dropdown */}
+                <div style={{ position: 'relative', marginBottom: '20px' }}>
+                  <button className="exp-dropdown-btn" onClick={() => setDropdownOpen(o => !o)}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                      <BookOpen size={16} style={{ color: GOLD, flexShrink: 0 }} />
+                      <span style={{ fontSize: '13px', fontWeight: selectedBook ? 700 : 400, color: selectedBook ? NAVY : '#bbb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {selectedBook?.title || selectedBook?.bookTitle || "Select a document…"}
+                      </span>
+                    </div>
+                    <ChevronDown size={15} style={{ color: '#bbb', flexShrink: 0, transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                  </button>
+
+                  {dropdownOpen && (
+                    <div className="exp-dropdown-list">
+                      <div style={{ padding: '8px', borderBottom: '0.5px solid #e5ddd0' }}>
+                        <div style={{ position: 'relative' }}>
+                          <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#bbb' }} />
+                          <input autoFocus value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search documents…" className="exp-input" />
+                        </div>
+                      </div>
+                      <div style={{ maxHeight: '210px', overflowY: 'auto' }}>
+                        {filteredBooks.length === 0 ? (
+                          <div style={{ padding: '24px', textAlign: 'center', fontSize: '12px', color: '#bbb' }}>
+                            {sellerBooks.length === 0 ? "No uploaded documents found." : "No matching documents."}
+                          </div>
+                        ) : filteredBooks.map(book => (
+                          <button key={book.id} className="exp-dropdown-item" onClick={() => handleSelectBook(book)}>
+                            <div style={{ width: '34px', height: '34px', background: CREAM, border: `0.5px solid rgba(184,150,62,0.3)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <BookOpen size={14} style={{ color: GOLD }} />
+                            </div>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.title || book.bookTitle}</p>
+                              {book.price && <p style={{ fontSize: '11px', color: '#999', margin: '2px 0 0' }}>₦{Number(book.price).toLocaleString()}</p>}
+                            </div>
+                            {selectedBook?.id === book.id && <CheckCircle size={15} style={{ color: GOLD, flexShrink: 0 }} />}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                    <div className="max-h-52 overflow-y-auto">
-                      {filteredBooks.length === 0 ? (
-                        <div className="px-4 py-6 text-center text-sm text-gray-400">
-                          {sellerBooks.length === 0
-                            ? "No uploaded documents found."
-                            : "No matching documents."}
-                        </div>
-                      ) : (
-                        filteredBooks.map((book) => (
-                          <button
-                            key={book.id}
-                            onClick={() => handleSelectBook(book)}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                              <BookOpen size={14} className="text-blue-950" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-blue-950 truncate">
-                                {book.title || book.bookTitle}
-                              </p>
-                              {book.price && (
-                                <p className="text-xs text-gray-400">
-                                  ₦{Number(book.price).toLocaleString()}
-                                </p>
-                              )}
-                            </div>
-                            {selectedBook?.id === book.id && (
-                              <CheckCircle
-                                size={16}
-                                className="text-blue-950 ml-auto flex-shrink-0"
-                              />
-                            )}
-                          </button>
-                        ))
-                      )}
-                    </div>
+                  )}
+                </div>
+
+                {/* Info box */}
+                <div className="exp-info-box">
+                  <BarChart2 size={17} style={{ color: GOLD, flexShrink: 0, marginTop: '1px' }} />
+                  <div>
+                    <p style={{ fontSize: '11px', fontWeight: 700, color: NAVY, margin: '0 0 4px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                      What's included?
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#777', lineHeight: 1.6, margin: 0, fontWeight: 300 }}>
+                      Student name, email, registration number, department, phone, country, amount paid, purchase date & time, and a unique transaction ID.
+                    </p>
+                  </div>
+                </div>
+
+                {error && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2', border: '0.5px solid #fecaca', padding: '12px 14px', marginTop: '16px' }}>
+                    <AlertCircle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
+                    <p style={{ fontSize: '12px', color: '#dc2626', margin: 0 }}>{error}</p>
                   </div>
                 )}
               </div>
+            )}
 
-              {/* Info box */}
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
-                <BarChart2
-                  size={18}
-                  className="text-blue-600 flex-shrink-0 mt-0.5"
-                />
-                <div>
-                  <p className="text-xs font-semibold text-blue-900 mb-1">
-                    What's included in the export?
-                  </p>
-                  <p className="text-xs text-blue-700 leading-relaxed">
-                    Student name, email, registration number, department, phone,
-                    country, amount paid, purchase date &amp; time, and a unique
-                    transaction ID.
-                  </p>
-                </div>
-              </div>
-
-              {error && (
-                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
-                  <AlertCircle
-                    size={15}
-                    className="text-red-500 flex-shrink-0"
-                  />
-                  <p className="text-sm text-red-600">{error}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* STEP 2: Preview */}
-          {step === "preview" && (
-            <div className="p-6 space-y-4">
-              {/* Summary bar */}
-              <div className="flex items-center justify-between bg-blue-950 rounded-xl px-4 py-3">
-                <div>
-                  <p className="text-blue-300 text-[11px] font-semibold uppercase tracking-wider">
-                    Document
-                  </p>
-                  <p className="text-white font-bold text-sm truncate max-w-[220px]">
-                    {selectedBook?.title || selectedBook?.bookTitle}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-blue-300 text-[11px] font-semibold uppercase tracking-wider">
-                    Buyers
-                  </p>
-                  <p className="text-white font-bold text-sm">
-                    {students.length}
-                  </p>
-                </div>
-              </div>
-
-              {students.length === 0 ? (
-                <div className="text-center py-10">
-                  <Users size={40} className="mx-auto text-gray-300 mb-3" />
-                  <p className="font-semibold text-gray-500 mb-1">
-                    No purchases yet
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    No one has bought this document yet.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    Preview — first {Math.min(students.length, 5)} of{" "}
-                    {students.length}
-                  </p>
-                  <div className="space-y-2">
-                    {students.slice(0, 5).map((s, i) => (
-                      <div
-                        key={s.id || i}
-                        className="flex items-center gap-3 bg-gray-50 rounded-xl p-3"
-                      >
-                        {/* Avatar initials */}
-                        <div className="w-9 h-9 rounded-full bg-blue-950 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                          {(s.buyerName || "?").charAt(0).toUpperCase()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-blue-950 truncate">
-                            {s.buyerName || "Unknown"}
-                          </p>
-                          <p className="text-xs text-gray-400 truncate">
-                            {s.buyerEmail || "No email"}
-                          </p>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-sm font-bold text-green-600">
-                            ₦{(s.amount || 0).toLocaleString()}
-                          </p>
-                          <p className="text-[10px] text-gray-400">
-                            {s.createdAtDate?.toLocaleDateString("en-NG")}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                    {students.length > 5 && (
-                      <p className="text-center text-xs text-gray-400 py-1">
-                        +{students.length - 5} more rows in the export
-                      </p>
-                    )}
+            {/* STEP 2: Preview */}
+            {step === "preview" && (
+              <div style={{ padding: '24px' }}>
+                {/* Summary strip */}
+                <div style={{ background: NAVY, backgroundImage: 'radial-gradient(rgba(184,150,62,0.06) 1px, transparent 1px)', backgroundSize: '22px 22px', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <div>
+                    <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(184,150,62,0.7)', margin: '0 0 4px' }}>Document</p>
+                    <p className="exp-serif" style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: 0, maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {selectedBook?.title || selectedBook?.bookTitle}
+                    </p>
                   </div>
-
-                  {/* Totals */}
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    {[
-                      {
-                        label: "Total Revenue",
-                        value: `₦${students.reduce((s, t) => s + (t.amount || 0), 0).toLocaleString()}`,
-                        color: "text-blue-950",
-                      },
-                    ].map((stat) => (
-                      <div
-                        key={stat.label}
-                        className="bg-gray-50 rounded-xl p-3 text-center"
-                      >
-                        <p className="text-[10px] text-gray-400 mb-1">
-                          {stat.label}
-                        </p>
-                        <p className={`text-sm font-bold ${stat.color}`}>
-                          {stat.value}
-                        </p>
-                      </div>
-                    ))}
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(184,150,62,0.7)', margin: '0 0 4px' }}>Buyers</p>
+                    <p className="exp-serif" style={{ fontSize: '24px', fontWeight: 700, color: GOLD, margin: 0 }}>{students.length}</p>
                   </div>
-                </>
-              )}
-            </div>
-          )}
+                </div>
 
-          {/* STEP 3: Done */}
-          {step === "done" && (
-            <div className="p-6 text-center space-y-4">
-              <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto">
-                <CheckCircle size={40} className="text-green-500" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-blue-950 mb-1">
-                  Export Successful!
-                </p>
-                <p className="text-sm text-gray-500">
-                  Your CSV file with <strong>{exportCount}</strong> student
-                  {exportCount !== 1 ? "s" : ""} has been downloaded.
-                </p>
-              </div>
-              <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-left space-y-2">
-                <p className="text-xs font-semibold text-green-800">
-                  📂 File saved as:
-                </p>
-                <p className="text-xs font-mono text-green-700 break-all">
-                  {(selectedBook?.title || "Document").replace(/\s+/g, "_")}
-                  _Student_List.csv
-                </p>
-                <p className="text-xs text-green-600 mt-1">
-                  You can open this file in Microsoft Excel, Google Sheets, or
-                  any spreadsheet app.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── Footer Buttons ── */}
-        <div className="px-6 pb-8 pt-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
-          {step === "select" && (
-            <>
-              <button
-                onClick={onClose}
-                className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => fetchStudents(selectedBook)}
-                disabled={!selectedBook || loading}
-                className="flex-1 py-3 rounded-xl bg-blue-950 text-white text-sm font-bold hover:bg-blue-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Loading…
-                  </>
+                {students.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+                    <div style={{ width: '64px', height: '64px', border: `0.5px solid #e5ddd0`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                      <Users size={28} style={{ color: '#ccc' }} />
+                    </div>
+                    <p className="exp-serif" style={{ fontSize: '18px', color: NAVY, margin: '0 0 6px' }}>No purchases yet</p>
+                    <p style={{ fontSize: '12px', color: '#bbb' }}>No one has bought this document yet.</p>
+                  </div>
                 ) : (
                   <>
-                    Preview List
-                    <ChevronDown size={16} className="-rotate-90" />
+                    <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#bbb', marginBottom: '12px' }}>
+                      Preview — first {Math.min(students.length, 5)} of {students.length}
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
+                      {students.slice(0, 5).map((s, i) => (
+                        <div key={s.id || i} className="exp-student-row">
+                          <div className="exp-avatar">{(s.buyerName || "?").charAt(0).toUpperCase()}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {s.buyerName || "Unknown"}
+                            </p>
+                            <p style={{ fontSize: '11px', color: '#999', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {s.buyerEmail || "No email"}
+                            </p>
+                          </div>
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <p style={{ fontSize: '13px', fontWeight: 700, color: '#15803d', margin: '0 0 2px' }}>₦{(s.amount || 0).toLocaleString()}</p>
+                            <p style={{ fontSize: '10px', color: '#bbb', margin: 0 }}>{s.createdAtDate?.toLocaleDateString("en-NG")}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {students.length > 5 && (
+                        <p style={{ textAlign: 'center', fontSize: '11px', color: '#bbb', padding: '6px 0' }}>
+                          +{students.length - 5} more rows in the export
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Total revenue */}
+                    <div style={{ background: CREAM, border: `0.5px solid rgba(184,150,62,0.3)`, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#999', margin: 0 }}>Total Revenue</p>
+                      <p className="exp-serif" style={{ fontSize: '18px', fontWeight: 700, color: NAVY, margin: 0 }}>
+                        ₦{students.reduce((s, t) => s + (t.amount || 0), 0).toLocaleString()}
+                      </p>
+                    </div>
                   </>
                 )}
-              </button>
-            </>
-          )}
+              </div>
+            )}
 
-          {step === "preview" && (
-            <>
-              <button
-                onClick={handleReset}
-                className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-colors"
-              >
-                ← Back
-              </button>
-              <button
-                onClick={handleExport}
-                disabled={students.length === 0}
-                className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                <Download size={16} />
-                Download CSV
-              </button>
-            </>
-          )}
+            {/* STEP 3: Done */}
+            {step === "done" && (
+              <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+                {/* Icon */}
+                <div style={{ width: '72px', height: '72px', border: `0.5px solid rgba(184,150,62,0.35)`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', background: CREAM }}>
+                  <CheckCircle size={32} style={{ color: GOLD }} />
+                </div>
+                <p className="exp-serif" style={{ fontSize: '24px', fontWeight: 700, color: NAVY, margin: '0 0 8px' }}>Export Successful!</p>
+                <p style={{ fontSize: '13px', color: '#777', marginBottom: '28px', fontWeight: 300, lineHeight: 1.7 }}>
+                  Your CSV file with <strong style={{ color: NAVY }}>{exportCount}</strong> student{exportCount !== 1 ? "s" : ""} has been downloaded.
+                </p>
 
-          {step === "done" && (
-            <>
-              <button
-                onClick={handleReset}
-                className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-colors"
-              >
-                Export Another
-              </button>
-              <button
-                onClick={onClose}
-                className="flex-1 py-3 rounded-xl bg-blue-950 text-white text-sm font-bold hover:bg-blue-900 transition-colors"
-              >
-                Done
-              </button>
-            </>
-          )}
+                <div style={{ background: '#fff', border: `0.5px solid #e5ddd0`, borderLeft: `3px solid ${GOLD}`, padding: '16px 18px', textAlign: 'left' }}>
+                  <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: NAVY, margin: '0 0 6px' }}>
+                    📂 File saved as:
+                  </p>
+                  <p style={{ fontSize: '11px', fontFamily: 'monospace', color: '#555', margin: '0 0 8px', wordBreak: 'break-all' }}>
+                    {(selectedBook?.title || "Document").replace(/\s+/g, "_")}_Student_List.csv
+                  </p>
+                  <p style={{ fontSize: '11px', color: '#999', margin: 0, fontWeight: 300 }}>
+                    Open in Microsoft Excel, Google Sheets, or any spreadsheet app.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Footer ── */}
+          <div className="exp-footer">
+            {step === "select" && (
+              <>
+                <button className="exp-btn-ghost" onClick={onClose}>Cancel</button>
+                <button className="exp-btn-primary" onClick={() => fetchStudents(selectedBook)} disabled={!selectedBook || loading}>
+                  {loading ? <><Loader2 size={15} className="animate-spin" /> Loading…</> : <>Preview List <ChevronDown size={14} style={{ transform: 'rotate(-90deg)' }} /></>}
+                </button>
+              </>
+            )}
+            {step === "preview" && (
+              <>
+                <button className="exp-btn-ghost" onClick={handleReset}>← Back</button>
+                <button className="exp-btn-green" onClick={handleExport} disabled={students.length === 0}>
+                  <Download size={15} /> Download CSV
+                </button>
+              </>
+            )}
+            {step === "done" && (
+              <>
+                <button className="exp-btn-ghost" onClick={handleReset}>Export Another</button>
+                <button className="exp-btn-primary" onClick={onClose}>Done</button>
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

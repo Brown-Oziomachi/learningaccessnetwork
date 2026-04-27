@@ -1,29 +1,28 @@
-"use client"
-    'use client';
+"use client";
 
-    import React, { useState, useEffect } from 'react';
-    import { Gift, Users, Copy, Share2, Check, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2, Wallet } from 'lucide-react';
-    import Navbar from '@/components/NavBar';
-    import Footer from '@/components/FooterComp';
-    import { useAuth } from '@/hooks/useAuth';
-    import { onAuthStateChanged } from 'firebase/auth';
-    import {
-        doc,
-        getDoc,
-        updateDoc,
-        collection,
-        query,
-        where,
-        getDocs,
-        addDoc,
-        serverTimestamp,
-        increment,
-        setDoc,
-        runTransaction
-    } from 'firebase/firestore';
-    import { auth, db } from '@/lib/firebaseConfig';
+import React, { useState, useEffect } from 'react';
+import {
+    Gift, Users, Copy, Share2, Check, Eye, EyeOff,
+    Loader2, AlertCircle, CheckCircle2, Wallet,
+    ChevronRight, Sparkles, ArrowRight, TrendingUp, Star
+} from 'lucide-react';
+import Navbar from '@/components/NavBar';
+import Footer from '@/components/FooterComp';
+import { useAuth } from '@/hooks/useAuth';
+import { onAuthStateChanged } from 'firebase/auth';
+import {
+    doc, getDoc, updateDoc, collection, query,
+    where, getDocs, addDoc, serverTimestamp,
+    increment, runTransaction
+} from 'firebase/firestore';
+import { auth, db } from '@/lib/firebaseConfig';
 
-// Generates a short code like "browne634920" from a UID
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG    = "#f5f1ea";
+
 const generateShortCode = (uid) => {
     if (!uid) return '';
     const letters = uid.replace(/[^a-zA-Z]/g, '').slice(0, 5).toLowerCase();
@@ -31,477 +30,667 @@ const generateShortCode = (uid) => {
     return `${letters}${numbers}`;
 };
 
-    export default function ReferralClient() {
-        const { currentUser } = useAuth();
-        const [user, setUser] = useState(null);
-        const [copied, setCopied] = useState(false);
-        const [showBalance, setShowBalance] = useState(true);
-        const [loading, setLoading] = useState(true);
-        const [claiming, setClaiming] = useState(false);
-        const [claimSuccess, setClaimSuccess] = useState(false);
-        const [claimError, setClaimError] = useState('');
-        const [claimSuccessAmount, setClaimSuccessAmount] = useState(0);
+function StatCard({ icon, label, value, highlight }) {
+    return (
+        <div style={{
+            background: '#fff',
+            border: '0.5px solid #e5ddd0',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            position: 'relative',
+            overflow: 'hidden',
+            minWidth: 0   // ✅ FIX
+        }}>
+            {highlight && (
+                <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '2px',
+                    background: `linear-gradient(90deg, ${GOLD}, ${GOLDD})`
+                }} />
+            )}
 
-        const [referralStats, setReferralStats] = useState({
-            totalEarnings: 0,
-            pendingEarnings: 0,
-            totalReferrals: 0,
-            successfulReferrals: 0,
-            claimedEarnings: 0,
-            unclaimedEarnings: 0,
-        });
+            <div style={{
+                width: '36px',
+                height: '36px',
+                border: '0.5px solid #e5ddd0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: CREAM
+            }}>
+                {icon}
+            </div>
 
-        // Use UID as the referral code - unique and reliable
-        const rawUid = user?.uid || currentUser?.uid || '';
-        const shortCode = generateShortCode(rawUid);
-        const referralLink = shortCode && typeof window !== 'undefined'
-            ? `${window.location.origin}/auth/signup?referral_code=${shortCode}`            : '';
+            <p style={{
+                fontSize: '9px',
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: '#aaa',
+                margin: 0,
+                fontFamily: "'Lato',sans-serif"
+            }}>
+                {label}
+            </p>
 
-        // ── Fetch user & referral data from Firestore ──────────────────────────
-        useEffect(() => {
-            const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-                if (!firebaseUser) { setLoading(false); return; }
+            <p style={{
+                fontFamily: "'Playfair Display',serif",
+                fontSize: 'clamp(18px,4vw,24px)',
+                fontWeight: 700,
+                color: NAVY,
+                margin: 0,
+                lineHeight: 1
+            }}>
+                {value}
+            </p>
+        </div>
+    );
+}
 
-                try {
-                    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-                    if (userDoc.exists()) {
-                        const userData = userDoc.data();
-                        setUser({ uid: firebaseUser.uid, ...userData });
 
-                        // ✅ Save shortCode once if not already set
-                        if (!userData.referralCode) {
-                            const short = generateShortCode(firebaseUser.uid);
-                            await updateDoc(doc(db, 'users', firebaseUser.uid), {
-                                referralCode: short
-                            });
-                        }
+function ReferralCard({ step, title, desc, badge }) {
+    return (
+        <div style={{ flexShrink: 0, width: '180px' }} className="ref-book-card">
+            <div style={{ position: 'relative', marginBottom: '10px' }}>
+                <div style={{
+                    width: '100%', aspectRatio: '3/4',
+                    background: step === 1
+                        ? `linear-gradient(145deg, ${NAVY} 0%, #1a3a6e 100%)`
+                        : step === 2
+                        ? `linear-gradient(145deg, #1a3a6e 0%, #2a4a8e 100%)`
+                        : `linear-gradient(145deg, ${GOLD} 0%, ${GOLDD} 100%)`,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    justifyContent: 'center', padding: '16px',
+                    position: 'relative', overflow: 'hidden',
+                    boxShadow: '0 8px 24px rgba(13,34,68,0.18)',
+                }} className="ref-book-img">
+                    <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(255,255,255,0.06) 1px,transparent 1px)', backgroundSize: '14px 14px' }} />
+                    <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '64px', fontWeight: 900, color: step === 3 ? NAVY : 'rgba(255,255,255,0.1)', margin: 0, lineHeight: 1, position: 'absolute', bottom: '8px', right: '12px', userSelect: 'none' }}>{step}</p>
+                    <div style={{ width: '48px', height: '48px', background: step === 3 ? 'rgba(13,34,68,0.15)' : 'rgba(255,255,255,0.12)', border: `0.5px solid ${step === 3 ? 'rgba(13,34,68,0.2)' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
+                        {step === 1 && <Share2 size={20} color={GOLDD} />}
+                        {step === 2 && <Users size={20} color="rgba(255,255,255,0.8)" />}
+                        {step === 3 && <Wallet size={20} color={NAVY} />}
+                    </div>
+                    <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '13px', fontWeight: 700, color: step === 3 ? NAVY : '#fff', textAlign: 'center', lineHeight: 1.3, position: 'relative', zIndex: 1 }}>{title}</p>
+                    <div style={{ position: 'absolute', top: '8px', left: '8px', background: step === 3 ? NAVY : GOLD, color: step === 3 ? GOLDD : NAVY, fontSize: '9px', fontWeight: 700, padding: '2px 6px', fontFamily: "'Lato',sans-serif", letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: step === 3 ? GOLDD : NAVY, display: 'inline-block' }} />
+                        STEP {step}
+                    </div>
+                </div>
+            </div>
+            <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: '12px', fontWeight: 700, color: NAVY, margin: '0 0 3px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.35 }}>{title}</h4>
+            <p style={{ fontSize: '11px', color: '#888', margin: '0 0 4px', fontFamily: "'Lato',sans-serif", lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{desc}</p>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: GOLD, margin: 0, fontFamily: "'Lato',sans-serif" }}>{badge}</p>
+        </div>
+    );
+}
+
+export default function ReferralClient() {
+    const { currentUser } = useAuth();
+    const [user, setUser]               = useState(null);
+    const [copied, setCopied]           = useState(false);
+    const [showBalance, setShowBalance] = useState(true);
+    const [loading, setLoading]         = useState(true);
+    const [claiming, setClaiming]       = useState(false);
+    const [claimSuccess, setClaimSuccess]     = useState(false);
+    const [claimError, setClaimError]         = useState('');
+    const [claimSuccessAmount, setClaimSuccessAmount] = useState(0);
+
+    const [referralStats, setReferralStats] = useState({
+        totalEarnings: 0, pendingEarnings: 0,
+        totalReferrals: 0, successfulReferrals: 0,
+        claimedEarnings: 0, unclaimedEarnings: 0,
+    });
+
+    const rawUid      = user?.uid || currentUser?.uid || '';
+    const shortCode   = generateShortCode(rawUid);
+    const referralLink = shortCode && typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/signup?referral_code=${shortCode}` : '';
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            if (!firebaseUser) { setLoading(false); return; }
+            try {
+                const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    setUser({ uid: firebaseUser.uid, ...userData });
+                    if (!userData.referralCode) {
+                        await updateDoc(doc(db, 'users', firebaseUser.uid), { referralCode: generateShortCode(firebaseUser.uid) });
                     }
+                }
+                await fetchReferralStats(firebaseUser.uid);
+            } catch (err) { console.error(err); }
+            finally { setLoading(false); }
+        });
+        return () => unsubscribe();
+    }, []);
 
-                    await fetchReferralStats(firebaseUser.uid);
-                } catch (err) {
-                    console.error('Error fetching user:', err);
-                } finally {
-                    setLoading(false);
+    const fetchReferralStats = async (uid) => {
+        try {
+            const snap = await getDocs(query(collection(db, 'referrals'), where('referrerId', '==', uid)));
+            const referrals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const successful = referrals.filter(r => r.status === 'completed');
+            const totalEarnings = successful.reduce((s, r) => s + (r.reward || 500), 0);
+            const claimedEarnings = successful.filter(r => r.claimed).reduce((s, r) => s + (r.reward || 500), 0);
+            setReferralStats({
+                totalEarnings, claimedEarnings,
+                unclaimedEarnings: totalEarnings - claimedEarnings,
+                totalReferrals: referrals.length,
+                successfulReferrals: successful.length,
+                pendingEarnings: referrals.filter(r => r.status === 'pending').length * 500,
+            });
+        } catch (err) { console.error(err); }
+    };
+
+    const handleClaim = async () => {
+        if (referralStats.unclaimedEarnings <= 0) return;
+        setClaimError(''); setClaiming(true);
+        try {
+            const uid = user?.uid; if (!uid) throw new Error('Not authenticated');
+            const snap = await getDocs(query(collection(db, 'referrals'), where('referrerId', '==', uid), where('status', '==', 'completed'), where('claimed', '==', false)));
+            if (snap.empty) { setClaimError('No unclaimed rewards found.'); setClaiming(false); return; }
+            const claimAmount = referralStats.unclaimedEarnings;
+            await runTransaction(db, async (transaction) => {
+                const sellerRef = doc(db, 'sellers', uid);
+                const sellerDoc = await transaction.get(sellerRef);
+                snap.docs.forEach(d => transaction.update(d.ref, { claimed: true, claimedAt: serverTimestamp() }));
+                transaction.set(doc(collection(db, 'referralCredits')), { userId: uid, amount: claimAmount, referralCount: snap.docs.length, createdAt: serverTimestamp(), status: 'completed' });
+                if (sellerDoc.exists()) {
+                    transaction.update(sellerRef, { accountBalance: increment(claimAmount), totalEarnings: increment(claimAmount), referralEarnings: increment(claimAmount), updatedAt: serverTimestamp() });
+                } else {
+                    transaction.set(sellerRef, { sellerId: uid, sellerEmail: user?.email || '', sellerName: `${user?.firstName || ''} ${user?.surname || ''}`.trim(), accountBalance: claimAmount, totalEarnings: claimAmount, referralEarnings: claimAmount, booksSold: 0, totalWithdrawn: 0, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
                 }
             });
-            return () => unsubscribe();
-        }, []);
-        const fetchReferralStats = async (uid) => {
-            try {
-                // Get all referrals where this user is the referrer
-                const referralsQuery = query(
-                    collection(db, 'referrals'),
-                    where('referrerId', '==', uid)
-                );
-                const snap = await getDocs(referralsQuery);
-                const referrals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            await fetchReferralStats(uid);
+            setClaimSuccessAmount(claimAmount);
+            setClaimSuccess(true);
+            setTimeout(() => setClaimSuccess(false), 4000);
+        } catch (err) {
+            console.error(err);
+            setClaimError('Failed to claim reward. Please try again.');
+        } finally { setClaiming(false); }
+    };
 
-                const totalReferrals = referrals.length;
-                const successful = referrals.filter(r => r.status === 'completed');
-                const successfulReferrals = successful.length;
+    const handleCopy = async () => {
+        if (!referralLink) return;
+        await navigator.clipboard.writeText(referralLink);
+        setCopied(true); setTimeout(() => setCopied(false), 2000);
+    };
 
-                const totalEarnings = successful.reduce((sum, r) => sum + (r.reward || 500), 0);
-                const claimedEarnings = successful
-                .filter(r => r.claimed === true)
-                .reduce((sum, r) => sum + (r.reward || 500), 0);
-                const unclaimedEarnings = totalEarnings - claimedEarnings;
+    const handleShare = async () => {
+        const shareData = { title: 'Join LAN | The Global Student Library 📚', text: 'Join me on LAN Library and get ₦100 bonus! Access thousands of educational documents.', url: referralLink };
+        if (navigator.share) { try { await navigator.share(shareData); } catch { handleCopy(); } }
+        else { handleCopy(); }
+    };
 
-                const pending = referrals.filter(r => r.status === 'pending');
-                const pendingEarnings = pending.length * 500;
+    const displayName = user?.firstName || currentUser?.displayName?.split(' ')[0] || 'Friend';
 
-                setReferralStats({
-                    totalEarnings,
-                    pendingEarnings,
-                    totalReferrals,
-                    successfulReferrals,
-                    claimedEarnings,
-                    unclaimedEarnings,
-                });
-            } catch (err) {
-                console.error('Error fetching referral stats:', err);
-            }
-        };
+    if (loading) return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG }}>
+            <div style={{ textAlign: 'center' }}>
+                <div style={{ width: '48px', height: '48px', border: `3px solid ${GOLD}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 14px' }} />
+                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '16px', color: NAVY }}>Loading…</p>
+                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            </div>
+        </div>
+    );
 
-        const handleClaim = async () => {
-            if (referralStats.unclaimedEarnings <= 0) return;
-            setClaimError('');
-            setClaiming(true);
-            setReferralStats(prev => ({ ...prev, unclaimedEarnings: 0 }));
+    const steps = [
+        { step: 1, title: 'Share Your Link', desc: 'Copy your unique referral link and share via WhatsApp, email or social media.', badge: 'Start here' },
+        { step: 2, title: 'Friend Signs Up', desc: 'Your friend creates an account, verifies their email & makes a ₦1,000+ purchase.', badge: 'Qualifying action' },
+        { step: 3, title: 'Claim to Wallet', desc: 'You earn ₦500 and your friend gets ₦100 bonus. Claim instantly to your seller wallet.', badge: '₦500 per referral' },
+    ];
 
-            try {
-                const uid = user?.uid;
-                if (!uid) throw new Error('User not authenticated');
+    const requirements = [
+        'Friend must sign up using your referral link',
+        'Friend must verify their email address',
+        'Friend must make first purchase of ₦1,000+ within 30 days',
+        'Rewards credited within 24 hours after qualification',
+        'Claim anytime — funds go directly into your seller wallet',
+    ];
 
-                const referralsQuery = query(
-                    collection(db, 'referrals'),
-                    where('referrerId', '==', uid),
-                    where('status', '==', 'completed'),
-                    where('claimed', '==', false)
-                );
-                const snap = await getDocs(referralsQuery);
+    return (
+        <>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
 
-                if (snap.empty) {
-                    setClaimError('No unclaimed rewards found.');
-                    setClaiming(false);
-                    return;
+                *, *::before, *::after { box-sizing: border-box; }
+
+                .lan-root  { font-family:'Lato',sans-serif; background:${BG}; }
+                .lan-serif { font-family:'Playfair Display',Georgia,serif; }
+
+                .sbar-none { scrollbar-width:none; -ms-overflow-style:none; }
+                .sbar-none::-webkit-scrollbar { display:none; }
+
+                .ref-book-card:hover .ref-book-img {
+                    box-shadow:0 16px 40px rgba(13,34,68,0.22) !important;
+                    transform:translateY(-4px);
+                }
+                .ref-book-img { transition:box-shadow 0.25s, transform 0.25s; }
+
+                .gold-pill {
+                    display:inline-flex; align-items:center; gap:6px;
+                    background:rgba(184,150,62,0.14);
+                    border:1px solid rgba(184,150,62,0.3);
+                    border-radius:999px; padding:5px 14px;
                 }
 
-                const claimAmount = referralStats.unclaimedEarnings;
+                @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+                .anim-up { animation:slideUp 0.5s cubic-bezier(0.4,0,0.2,1) both; }
+                @keyframes spin { to{transform:rotate(360deg)} }
 
-                // ✅ Run transaction FIRST
-                await runTransaction(db, async (transaction) => {
-                    const sellerRef = doc(db, 'sellers', uid);
-                    const sellerDoc = await transaction.get(sellerRef);
+                /* ── Hero link bar ── */
+                .hero-link-bar {
+                    display:flex;
+                    flex-direction:column;
+                    gap:8px;
+                    max-width:680px;
+                }
+                .hero-link-bar-inner {
+                    display:flex;
+                    gap:8px;
+                    align-items:stretch;
+                }
+                .hero-link-display {
+                    flex:1;
+                    background:rgba(255,255,255,0.07);
+                    border:0.5px solid rgba(255,255,255,0.15);
+                    padding:12px 14px;
+                    min-width:0;
+                }
+                .hero-link-actions {
+                    display:flex;
+                    gap:8px;
+                    flex-shrink:0;
+                }
 
-                    snap.docs.forEach(refDoc => {
-                        transaction.update(refDoc.ref, {
-                            claimed: true,
-                            claimedAt: serverTimestamp(),
-                        });
-                    });
+                /* ── Two-col main layout ── */
+                .ref-main-grid {
+                    display:grid;
+                    grid-template-columns:1fr;
+                    gap:20px;
+                }
 
-                    const creditRef = doc(collection(db, 'referralCredits'));
-                    transaction.set(creditRef, {
-                        userId: uid,
-                        amount: claimAmount,
-                        referralCount: snap.docs.length,
-                        createdAt: serverTimestamp(),
-                        status: 'completed',
-                    });
+                /* ── Stats grid: 2-col always, text scales ── */
+                .ref-stats-grid {
+                    display:grid;
+                    grid-template-columns:repeat(2,1fr);
+                    gap:10px;
+                }
 
-                    if (sellerDoc.exists()) {
-                        transaction.update(sellerRef, {
-                            accountBalance: increment(claimAmount),
-                            totalEarnings: increment(claimAmount),
-                            referralEarnings: increment(claimAmount),
-                            updatedAt: serverTimestamp(),
-                        });
-                    } else {
-                        transaction.set(sellerRef, {
-                            sellerId: uid,
-                            sellerEmail: user?.email || '',
-                            sellerName: user?.displayName || `${user?.firstName || ''} ${user?.surname || ''}`.trim(),
-                            accountBalance: claimAmount,
-                            totalEarnings: claimAmount,
-                            referralEarnings: claimAmount,
-                            booksSold: 0,
-                            totalWithdrawn: 0,
-                            createdAt: serverTimestamp(),
-                            updatedAt: serverTimestamp(),
-                        });
+                /* ── Claim card inner ── */
+                .claim-card-inner {
+                    display:flex;
+                    flex-direction:column;
+                    gap:12px;
+                }
+                .claim-top-row {
+                    display:flex;
+                    align-items:flex-start;
+                    justify-content:space-between;
+                    gap:12px;
+                    flex-wrap:wrap;
+                }
+
+                /* ── CTA banner ── */
+                .cta-banner {
+                    display:flex;
+                    flex-direction:column;
+                    gap:16px;
+                    padding:28px 20px;
+                }
+
+                /* Desktop overrides */
+                @media(min-width:900px) {
+                    .ref-main-grid { grid-template-columns:2fr 1fr; }
+                    .hero-link-bar { flex-direction:row; }
+                    .hero-link-display { flex:1; }
+                    .hero-link-actions { flex-direction:row; }
+                    .cta-banner {
+                        flex-direction:row;
+                        align-items:center;
+                        justify-content:space-between;
+                        padding:40px 32px;
                     }
-                });
+                }
 
-                // ✅ THEN fetch updated stats & show success
-                await fetchReferralStats(uid);
-                setClaimSuccessAmount(claimAmount);
-                setClaimSuccess(true);
-                setTimeout(() => setClaimSuccess(false), 4000);
+                @media(min-width:640px) {
+                    .hero-link-bar-inner { flex-direction:row; }
+                }
+            `}</style>
 
-            } catch (err) {
-                console.error('Claim error:', err);
-                setClaimError('Failed to claim reward. Please try again.');
-            } finally {
-                setClaiming(false);
-            }
-        };
-
-        // ── Copy & Share ───────────────────────────────────────────────────────
-        const handleCopy = async () => {
-            if (!referralLink) return;
-            await navigator.clipboard.writeText(referralLink);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        };
-
-        const handleShare = async () => {
-            const shareData = {
-                title: 'Join LAN | The Global Student Library 📚',
-                text: 'Join me on LAN Library and get ₦100 bonus! Access thousands of educational documents.',
-                url: referralLink,
-            };
-            if (navigator.share) {
-                try { await navigator.share(shareData); } catch { handleCopy(); }
-            } else {
-                handleCopy();
-            }
-        };
-
-        const displayName = user?.firstName || currentUser?.displayName?.split(' ')[0] || 'Friend';
-
-        if (loading) {
-            return (
-                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                    <Loader2 className="animate-spin text-blue-950" size={40} />
-                </div>
-            );
-        }
-
-        return (
-            <div className="bg-gray-50 min-h-screen">
+            <div className="lan-root" style={{ minHeight: '100vh' }}>
                 <Navbar />
-                <div className="max-w-7xl mx-auto px-4 py-12">
 
-                    {/* Header */}
-                    <div className="mb-8">
-                        <h1 className="text-3xl md:text-4xl font-bold text-blue-900 mb-1">
-                            Hi, {displayName} 👋
+                {/* ══ HERO ══════════════════════════════════════════════════ */}
+                <section style={{
+                    background: NAVY,
+                    backgroundImage: 'radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)',
+                    backgroundSize: '28px 28px',
+                    padding: 'clamp(40px,6vw,60px) 20px 48px',
+                }}>
+                    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+                        <div className="anim-up gold-pill" style={{ marginBottom: '18px' }}>
+                            <Sparkles size={12} style={{ color: GOLD }} />
+                            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: GOLDD, fontFamily: "'Lato',sans-serif" }}>Referral Programme</span>
+                        </div>
+
+                        <h1 className="lan-serif anim-up" style={{
+                            fontSize: 'clamp(28px,6vw,56px)', fontWeight: 900,
+                            color: '#fff', lineHeight: 1.08,
+                            letterSpacing: '-0.5px', margin: '0 0 12px',
+                        }}>
+                            Hi, {displayName} 👋<br />
+                            <span style={{ color: GOLDD }}>Invite friends</span> &amp; earn ₦500
                         </h1>
-                        <p className="text-gray-500">Invite friends and grow your wallet</p>
+
+                        <p style={{
+                            fontSize: 'clamp(13px,2vw,15px)',
+                            color: 'rgba(245,240,232,0.65)',
+                            maxWidth: '540px', lineHeight: 1.75,
+                            fontWeight: 300, margin: '0 0 24px',
+                        }}>
+                            Share your unique link — each friend who signs up and makes a qualifying purchase earns you ₦500 straight to your wallet.
+                        </p>
+
+                        {/* Referral Link Bar */}
+                        <div className="hero-link-bar">
+                            <div className="hero-link-display">
+                                <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD, margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>Your Referral Link</p>
+                                <p style={{ fontFamily: 'monospace', fontSize: '12px', color: 'rgba(255,255,255,0.75)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {referralLink || 'Generating your link…'}
+                                </p>
+                            </div>
+                            <div className="hero-link-actions">
+                                <button onClick={handleCopy} disabled={!referralLink}
+                                    style={{ flex: 1, padding: '12px 18px', background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: referralLink ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap', transition: 'background 0.18s' }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.18)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                                >
+                                    {copied ? <><Check size={14} />Copied!</> : <><Copy size={14} />Copy Link</>}
+                                </button>
+                                <button onClick={handleShare} disabled={!referralLink}
+                                    style={{ flex: 1, padding: '12px 18px', background: GOLD, border: 'none', color: NAVY, fontSize: '12px', fontWeight: 700, cursor: referralLink ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap', transition: 'background 0.18s' }}
+                                    onMouseEnter={e => e.currentTarget.style.background = GOLDD}
+                                    onMouseLeave={e => e.currentTarget.style.background = GOLD}
+                                >
+                                    <Share2 size={14} />Share
+                                </button>
+                            </div>
+                        </div>
                     </div>
+                </section>
 
-                    {/* Success Banner */}
+                {/* ══ BREADCRUMB ════════════════════════════════════════════ */}
+                <div style={{ background: CREAM, borderBottom: '0.5px solid #e5ddd0', padding: '10px 20px' }}>
+                    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontFamily: "'Lato',sans-serif", flexWrap: 'wrap' }}>
+                        <a href="/" style={{ color: NAVY, fontWeight: 700, textDecoration: 'none' }}>Home</a>
+                        <ChevronRight size={11} style={{ color: '#bbb' }} />
+                        <a href="/my-account/seller-account" style={{ color: NAVY, fontWeight: 700, textDecoration: 'none' }}>My Account</a>
+                        <ChevronRight size={11} style={{ color: '#bbb' }} />
+                        <span style={{ color: '#aaa' }}>Referral Programme</span>
+                    </div>
+                </div>
+
+                {/* ══ MAIN CONTENT ══════════════════════════════════════════ */}
+                <main style={{ maxWidth: '1200px', margin: '0 auto', padding: 'clamp(32px,5vw,56px) 20px' }}>
+
+                    {/* Alerts */}
                     {claimSuccess && (
-                        <div className="mb-6 bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3">
-                            <CheckCircle2 className="text-green-600 flex-shrink-0" size={22} />
+                        <div style={{ marginBottom: '20px', background: '#f0fdf4', border: '0.5px solid #86efac', padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                            <CheckCircle2 size={18} style={{ color: '#16a34a', flexShrink: 0, marginTop: '1px' }} />
                             <div>
-                                <p className="font-semibold text-green-800">Reward Claimed! 🎉</p>
-                                <p className="text-sm text-green-700">
-                                    ₦{claimSuccessAmount.toLocaleString()} has been added to your seller wallet.
-                                </p>
+                                <p style={{ fontWeight: 700, color: '#15803d', margin: '0 0 2px', fontSize: '13px', fontFamily: "'Lato',sans-serif" }}>Reward Claimed! 🎉</p>
+                                <p style={{ fontSize: '12px', color: '#166534', margin: 0, fontFamily: "'Lato',sans-serif" }}>₦{claimSuccessAmount.toLocaleString()} has been added to your seller wallet.</p>
                             </div>
                         </div>
                     )}
-
-                    {/* Error Banner */}
                     {claimError && (
-                        <div className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
-                            <AlertCircle className="text-red-600 flex-shrink-0" size={22} />
-                            <p className="text-sm text-red-700">{claimError}</p>
+                        <div style={{ marginBottom: '20px', background: '#fef2f2', border: '0.5px solid #fecaca', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <AlertCircle size={18} style={{ color: '#ef4444', flexShrink: 0 }} />
+                            <p style={{ fontSize: '12px', color: '#dc2626', margin: 0, fontFamily: "'Lato',sans-serif" }}>{claimError}</p>
                         </div>
                     )}
 
-                    {/* Main Grid */}
-                    <div className="grid lg:grid-cols-2 gap-6 mb-8">
-                        {/* Referral Card */}
-                        <div className="bg-blue-950 text-white rounded-2xl p-8 shadow-sm">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-12 h-12 bg-blue-800 rounded-xl flex items-center justify-center">
-                                    <Users className="text-white" size={24} />
+                    {/* ── Two-col grid ── */}
+                    <div className="ref-main-grid">
+
+                        {/* ═══ LEFT COLUMN ═══ */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                            {/* Stats */}
+                            <div className="ref-stats-grid">
+                                <StatCard icon={<TrendingUp size={16} style={{ color: GOLD }} />} label="Total Earnings" value={showBalance ? `₦${referralStats.totalEarnings.toLocaleString()}` : '₦****'} highlight />
+                                <StatCard icon={<Users size={16} style={{ color: GOLD }} />} label="Total Referrals" value={referralStats.totalReferrals} />
+                                <StatCard icon={<CheckCircle2 size={16} style={{ color: GOLD }} />} label="Successful" value={referralStats.successfulReferrals} />
+                                <StatCard icon={<Wallet size={16} style={{ color: GOLD }} />} label="Claimed" value={`₦${referralStats.claimedEarnings.toLocaleString()}`} />
+                            </div>
+
+                            {/* Claim card */}
+                            <div style={{
+                                background: NAVY,
+                                backgroundImage: 'radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)',
+                                backgroundSize: '24px 24px',
+                                padding: 'clamp(20px,4vw,28px)',
+                                position: 'relative', overflow: 'hidden',
+                            }}>
+                                <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '100px', height: '100px', border: '0.5px solid rgba(184,150,62,0.15)', transform: 'rotate(45deg)' }} />
+
+                                <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: GOLD, margin: '0 0 8px', fontFamily: "'Lato',sans-serif" }}>Available Reward</p>
+
+                                <div className="claim-top-row">
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(28px,6vw,48px)', fontWeight: 700, color: '#fff', margin: 0, lineHeight: 1 }}>
+                                                {showBalance ? `₦${referralStats.unclaimedEarnings.toLocaleString()}` : '₦****'}
+                                            </p>
+                                            <button onClick={() => setShowBalance(!showBalance)}
+                                                style={{ width: '32px', height: '32px', border: '0.5px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
+                                                {showBalance ? <Eye size={15} /> : <EyeOff size={15} />}
+                                            </button>
+                                        </div>
+                                        <p style={{ fontSize: '11px', color: 'rgba(184,150,62,0.7)', marginTop: '5px', fontFamily: "'Lato',sans-serif" }}>Unclaimed rewards ready to transfer</p>
+                                        {referralStats.claimedEarnings > 0 && (
+                                            <p style={{ fontSize: '11px', color: '#86efac', marginTop: '3px', fontFamily: "'Lato',sans-serif" }}>✅ ₦{referralStats.claimedEarnings.toLocaleString()} already added to wallet</p>
+                                        )}
+                                    </div>
+
+                                    {referralStats.successfulReferrals > 0 && (
+                                        <div style={{ background: 'rgba(184,150,62,0.15)', border: '0.5px solid rgba(184,150,62,0.3)', padding: '10px 14px', flexShrink: 0 }}>
+                                            <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: GOLD, margin: '0 0 3px', fontFamily: "'Lato',sans-serif" }}>Friends Referred</p>
+                                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '26px', fontWeight: 700, color: '#fff', margin: 0 }}>{referralStats.successfulReferrals}</p>
+                                        </div>
+                                    )}
                                 </div>
-                                <h2 className="text-xl font-bold">Referral Program</h2>
+
+                                {referralStats.pendingEarnings > 0 && (
+                                    <div style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)', padding: '10px 14px', margin: '14px 0 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Loader2 size={13} style={{ color: GOLD, animation: 'spin 1.2s linear infinite' }} />
+                                        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                                            ₦{referralStats.pendingEarnings.toLocaleString()} pending — friends yet to qualify
+                                        </p>
+                                    </div>
+                                )}
+
+                                <button onClick={handleClaim}
+                                    disabled={claiming || referralStats.unclaimedEarnings <= 0}
+                                    style={{
+                                        width: '100%', padding: '14px 16px', marginTop: '16px',
+                                        background: referralStats.unclaimedEarnings > 0 ? GOLD : 'rgba(255,255,255,0.08)',
+                                        border: 'none',
+                                        color: referralStats.unclaimedEarnings > 0 ? NAVY : 'rgba(255,255,255,0.3)',
+                                        fontSize: '13px', fontWeight: 700,
+                                        cursor: referralStats.unclaimedEarnings > 0 && !claiming ? 'pointer' : 'not-allowed',
+                                        fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                        transition: 'background 0.18s',
+                                    }}
+                                    onMouseEnter={e => { if (referralStats.unclaimedEarnings > 0) e.currentTarget.style.background = GOLDD; }}
+                                    onMouseLeave={e => e.currentTarget.style.background = referralStats.unclaimedEarnings > 0 ? GOLD : 'rgba(255,255,255,0.08)'}
+                                >
+                                    {claiming
+                                        ? <><Loader2 size={15} style={{ animation: 'spin 0.8s linear infinite' }} />Claiming…</>
+                                        : referralStats.unclaimedEarnings > 0
+                                        ? <><Wallet size={15} />Claim ₦{referralStats.unclaimedEarnings.toLocaleString()} to Wallet</>
+                                        : <><Wallet size={15} />{referralStats.totalEarnings > 0 ? 'All rewards claimed' : 'No rewards yet'}</>
+                                    }
+                                </button>
                             </div>
-                            <h3 className="text-3xl md:text-4xl font-bold mb-4">
-                                Invite friends and earn ₦500
-                            </h3>
-                            <div className="space-y-3 text-blue-200">
-                                <p className="leading-relaxed">
-                                    Earn ₦500 for each friend who signs up using your link, verifies their email, and makes a purchase of ₦1,000 or more within 30 days.
-                                </p>
+
+                            {/* How It Works */}
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                                    <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, margin: 0, fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap' }}>How It Works</p>
+                                    <div style={{ height: '1px', flex: 1, background: 'rgba(184,150,62,0.2)' }} />
+                                    <span style={{ fontSize: '11px', color: '#aaa', fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap' }}>3 steps</span>
+                                </div>
+                                <div className="sbar-none" style={{ overflowX: 'auto', margin: '0 -4px', padding: '0 4px 8px' }}>
+                                    <div style={{ display: 'flex', gap: '14px', paddingBottom: '4px' }}>
+                                        {steps.map(s => <ReferralCard key={s.step} {...s} />)}
+                                    </div>
+                                </div>
                             </div>
-                            {referralStats.successfulReferrals > 0 && (
-                                <div className="mt-6 p-4 bg-blue-800/50 rounded-xl border border-blue-700">
-                                    <p className="text-sm text-green-300 font-medium">
-                                        🎉 You've successfully referred {referralStats.successfulReferrals}{' '}
-                                        {referralStats.successfulReferrals === 1 ? 'friend' : 'friends'}!
+
+                            {/* Requirements */}
+                            <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: 'clamp(16px,4vw,24px)' }}>
+                                <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: GOLD, marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Rules</p>
+                                <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(16px,3vw,20px)', fontWeight: 700, color: NAVY, margin: '0 0 16px' }}>Qualification Requirements</h3>
+                                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    {requirements.map((req, i) => (
+                                        <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                            <div style={{ width: '18px', height: '18px', background: CREAM, border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                                                <Check size={10} style={{ color: NAVY }} strokeWidth={3} />
+                                            </div>
+                                            <span style={{ fontSize: '13px', color: '#555', fontFamily: "'Lato',sans-serif", lineHeight: 1.6 }}>{req}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+
+                        {/* ═══ RIGHT COLUMN (sidebar) ═══ */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+
+                            {/* Referral code card */}
+                            <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: 'clamp(16px,4vw,24px)' }}>
+                                <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: GOLD, marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Share</p>
+                                <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(15px,3vw,18px)', fontWeight: 700, color: NAVY, margin: '0 0 14px' }}>Your Referral Link</h3>
+
+                                <div style={{ background: CREAM, border: '0.5px solid #e5ddd0', padding: '10px 12px', marginBottom: '10px' }}>
+                                    <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#aaa', margin: '0 0 3px', fontFamily: "'Lato',sans-serif" }}>Your code</p>
+                                    <p style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '15px', color: NAVY, margin: 0, letterSpacing: '0.08em' }}>{shortCode || '—'}</p>
+                                </div>
+
+                                <div style={{ background: '#f9f9f9', border: '0.5px solid #e5ddd0', padding: '10px 12px', marginBottom: '12px', overflow: 'hidden' }}>
+                                    <p style={{ fontFamily: 'monospace', fontSize: '11px', color: '#666', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {referralLink || 'Loading…'}
                                     </p>
                                 </div>
-                            )}
-                        </div>
 
-                        {/* Reward Card */}
-                        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-200">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
-                                    <Gift className="text-indigo-600" size={24} />
-                                </div>
-                                <h2 className="text-xl font-bold text-gray-900">Your Reward</h2>
-                            </div>
-
-                            <div className="mb-2">
-                                <div className="flex items-center gap-3 mb-1">
-                                    <h3 className="text-4xl md:text-5xl font-bold text-gray-900">
-                                        {showBalance
-                                            ? `₦${referralStats.totalEarnings.toLocaleString()}`
-                                            : '₦****'}
-                                    </h3>
-                                    <button
-                                        onClick={() => setShowBalance(!showBalance)}
-                                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button onClick={handleCopy} disabled={!referralLink}
+                                        style={{ flex: 1, padding: '11px 8px', border: `1.5px solid ${NAVY}`, background: '#fff', color: NAVY, fontSize: '11px', fontWeight: 700, cursor: referralLink ? 'pointer' : 'not-allowed', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'all 0.18s', opacity: referralLink ? 1 : 0.5 }}
+                                        onMouseEnter={e => { if (referralLink) { e.currentTarget.style.background = NAVY; e.currentTarget.style.color = '#fff'; } }}
+                                        onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = NAVY; }}
                                     >
-                                        {showBalance
-                                            ? <Eye size={20} className="text-gray-500" />
-                                            : <EyeOff size={20} className="text-gray-500" />}
+                                        {copied ? <><Check size={13} />Copied</> : <><Copy size={13} />Copy</>}
+                                    </button>
+                                    <button onClick={handleShare} disabled={!referralLink}
+                                        style={{ flex: 1, padding: '11px 8px', border: 'none', background: NAVY, color: '#fff', fontSize: '11px', fontWeight: 700, cursor: referralLink ? 'pointer' : 'not-allowed', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'background 0.18s', opacity: referralLink ? 1 : 0.5 }}
+                                        onMouseEnter={e => { if (referralLink) e.currentTarget.style.background = '#1a3a6e'; }}
+                                        onMouseLeave={e => e.currentTarget.style.background = NAVY}
+                                    >
+                                        <Share2 size={13} />Share
                                     </button>
                                 </div>
-                                <p className="text-gray-500 text-sm mb-1">Total referral earnings</p>
-                                {referralStats.claimedEarnings > 0 && (
-                                    <p className="text-xs text-green-600 font-medium">
-                                        ✅ ₦{referralStats.claimedEarnings.toLocaleString()} already added to wallet
-                                    </p>
-                                )}
                             </div>
 
-                            {/* Unclaimed amount highlight */}
-                            {referralStats.unclaimedEarnings > 0 && (
-                                <div className="my-4 bg-green-50 border border-green-200 rounded-xl p-3">
-                                    <p className="text-sm text-green-800 font-semibold">
-                                        💰 ₦{referralStats.unclaimedEarnings.toLocaleString()} ready to claim!
-                                    </p>
+                            {/* Earnings potential */}
+                            <div style={{
+                                background: NAVY,
+                                backgroundImage: 'radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)',
+                                backgroundSize: '20px 20px',
+                                padding: 'clamp(16px,4vw,24px)',
+                                position: 'relative', overflow: 'hidden',
+                            }}>
+                                <div style={{ position: 'absolute', bottom: '-20px', right: '-20px', width: '80px', height: '80px', border: '0.5px solid rgba(184,150,62,0.2)', transform: 'rotate(45deg)' }} />
+                                <div className="gold-pill" style={{ marginBottom: '12px' }}>
+                                    <Sparkles size={10} style={{ color: GOLD }} />
+                                    <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: GOLD, fontFamily: "'Lato',sans-serif" }}>Earnings Potential</span>
                                 </div>
-                            )}
-
-                            {/* Claim Button */}
-                            <button
-                                onClick={handleClaim}
-                                disabled={claiming || referralStats.unclaimedEarnings <= 0}
-                                className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all
-                                    ${referralStats.unclaimedEarnings > 0
-                                        ? 'bg-blue-950 text-white hover:bg-blue-900 cursor-pointer'
-                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
-                            >
-                                {claiming ? (
-                                    <>
-                                        <Loader2 size={20} className="animate-spin" />
-                                        Claiming...
-                                    </>
-                                ) : referralStats.unclaimedEarnings > 0 ? (
-                                    <>
-                                        <Wallet size={20} />
-                                        Claim ₦{referralStats.unclaimedEarnings.toLocaleString()} to Wallet
-                                    </>
-                                ) : (
-                                    <>
-                                        <Wallet size={20} />
-                                        {referralStats.totalEarnings > 0 ? 'All rewards claimed' : 'No rewards yet'}
-                                    </>
-                                )}
-                            </button>
-
-                            {referralStats.pendingEarnings > 0 && (
-                                <p className="text-xs text-gray-500 mt-3 text-center">
-                                    ⏳ ₦{referralStats.pendingEarnings.toLocaleString()} pending (friends yet to qualify)
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Referral Link Section */}
-                    <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-gray-200 mb-8">
-                        <p className="text-gray-700 font-semibold text-lg mb-4">Your Referral Link</p>
-                        <div className="flex flex-col md:flex-row gap-3">
-                            <div className="flex-1 bg-gray-50 rounded-xl px-5 py-4 border border-gray-200 overflow-hidden">
-                                <p className="text-gray-900 font-mono text-sm truncate">
-                                    {referralLink || 'Loading your link...'}
-                                </p>
-                            </div>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={handleCopy}
-                                    disabled={!referralLink}
-                                    className="px-5 py-4 bg-white border-2 border-blue-950 text-blue-950 rounded-xl font-semibold hover:bg-blue-50 transition-all flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
-                                >
-                                    {copied ? <><Check size={18} />Copied!</> : <><Copy size={18} />Copy</>}
-                                </button>
-                                <button
-                                    onClick={handleShare}
-                                    disabled={!referralLink}
-                                    className="px-5 py-4 bg-blue-950 text-white rounded-xl font-semibold hover:bg-blue-900 transition-all flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
-                                >
-                                    <Share2 size={18} />Share
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* How It Works */}
-                    <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-200 mb-8">
-                        <h3 className="text-2xl font-bold text-gray-900 mb-8">How it works</h3>
-                        <div className="grid md:grid-cols-3 gap-8">
-                            {[
-                                {
-                                    step: 1,
-                                    title: 'Share your link',
-                                    desc: 'Copy your unique referral link and share it via WhatsApp, email, or social media.',
-                                },
-                                {
-                                    step: 2,
-                                    title: 'Friend signs up',
-                                    desc: 'Your friend creates an account, verifies their email, and makes their first purchase of ₦1,000 or more.',
-                                },
-                                {
-                                    step: 3,
-                                    title: 'Claim to wallet',
-                                    desc: 'You earn ₦500 and your friend gets ₦100. Click "Claim to Wallet" and funds appear in your seller balance instantly.',
-                                },
-                            ].map(({ step, title, desc }) => (
-                                <div key={step}>
-                                    <div className="flex items-center gap-4 mb-4">
-                                        <div className="w-10 h-10 bg-blue-950 text-white rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0">
-                                            {step}
-                                        </div>
-                                        <h4 className="text-lg font-bold text-gray-900">{title}</h4>
-                                    </div>
-                                    <p className="text-gray-600 ml-14">{desc}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Stats & Requirements */}
-                    <div className="grid md:grid-cols-2 gap-6 mb-12">
-                        {/* Stats */}
-                        <div className="bg-gradient-to-br from-blue-950 to-indigo-900 rounded-2xl p-8">
-                            <h4 className="text-xl font-bold text-white mb-6">Your Referral Stats</h4>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-blue-200">Total referrals</span>
-                                    <span className="text-2xl font-bold text-white">{referralStats.totalReferrals}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-blue-200">Successful referrals</span>
-                                    <span className="text-2xl font-bold text-green-400">{referralStats.successfulReferrals}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-blue-200">Claimed to wallet</span>
-                                    <span className="text-2xl font-bold text-yellow-300">₦{referralStats.claimedEarnings.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between items-center pt-4 border-t border-blue-700">
-                                    <span className="text-blue-200">Total earned</span>
-                                    <span className="text-2xl font-bold text-white">₦{referralStats.totalEarnings.toLocaleString()}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Requirements */}
-                        <div className="bg-white rounded-2xl p-8 border border-gray-200">
-                            <h4 className="text-xl font-bold text-gray-900 mb-6">Requirements</h4>
-                            <ul className="space-y-3 text-gray-600">
+                                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(22px,4vw,28px)', fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>Up to ₦5,000,000</p>
+                                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '16px', fontFamily: "'Lato',sans-serif", lineHeight: 1.6 }}>No cap on earnings. Refer as many friends as you like.</p>
                                 {[
-                                    'Friend must sign up using your referral link',
-                                    'Friend must verify their email address',
-                                    'Friend must make first purchase of ₦1,000+ within 30 days',
-                                    'Rewards credited within 24 hours after qualification',
-                                    'Claim anytime — funds go directly into your seller wallet',
-                                ].map((req, i) => (
-                                    <li key={i} className="flex items-start gap-3">
-                                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <Check size={12} className="text-green-700" />
-                                        </div>
-                                        <span>{req}</span>
-                                    </li>
+                                    ['10 referrals', '₦5,000'],
+                                    ['50 referrals', '₦25,000'],
+                                    ['100 referrals', '₦50,000'],
+                                ].map(([k, v]) => (
+                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
+                                        <span style={{ color: 'rgba(255,255,255,0.5)', fontFamily: "'Lato',sans-serif" }}>{k}</span>
+                                        <span style={{ fontWeight: 700, color: GOLDD, fontFamily: "'Lato',sans-serif" }}>{v}</span>
+                                    </div>
                                 ))}
-                            </ul>
+                                <button onClick={handleShare} disabled={!referralLink}
+                                    style={{ width: '100%', marginTop: '14px', background: GOLD, color: NAVY, padding: '12px', border: 'none', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'background 0.18s', opacity: referralLink ? 1 : 0.5 }}
+                                    onMouseEnter={e => e.currentTarget.style.background = GOLDD}
+                                    onMouseLeave={e => e.currentTarget.style.background = GOLD}
+                                >
+                                    <Users size={14} />Invite Your Friends
+                                </button>
+                            </div>
+
+                            {/* Stats detail */}
+                            <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: 'clamp(16px,4vw,24px)' }}>
+                                <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: GOLD, marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Overview</p>
+                                <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(15px,3vw,18px)', fontWeight: 700, color: NAVY, margin: '0 0 14px' }}>Your Stats</h3>
+                                {[
+                                    ['Total referrals',   referralStats.totalReferrals],
+                                    ['Successful',        referralStats.successfulReferrals],
+                                    ['Claimed to wallet', `₦${referralStats.claimedEarnings.toLocaleString()}`],
+                                    ['Pending',           `₦${referralStats.pendingEarnings.toLocaleString()}`],
+                                    ['Total earned',      `₦${referralStats.totalEarnings.toLocaleString()}`],
+                                ].map(([k, v], i, arr) => (
+                                    <div key={k} style={{
+                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                        fontSize: '12px', padding: '8px 0',
+                                        borderBottom: i < arr.length - 1 ? '0.5px solid #f0ebe0' : 'none',
+                                        borderTop: i === arr.length - 1 ? '0.5px solid #e5ddd0' : 'none',
+                                        marginTop: i === arr.length - 1 ? '4px' : 0,
+                                        paddingTop: i === arr.length - 1 ? '12px' : '8px',
+                                    }}>
+                                        <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{k}</span>
+                                        <span style={{ fontWeight: 700, color: i === arr.length - 1 ? NAVY : '#555', fontFamily: "'Lato',sans-serif", fontSize: i === arr.length - 1 ? '14px' : '12px' }}>{v}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
-                    {/* CTA */}
-                    <div className="bg-blue-950 rounded-2xl p-8 md:p-12 text-center text-white">
-                        <h3 className="text-3xl md:text-4xl font-bold mb-4">Start earning today!</h3>
-                        <p className="text-lg text-blue-200 mb-8 max-w-2xl mx-auto">
-                            The more friends you refer, the more you earn. Rewards go straight into your wallet.
-                        </p>
-                        <button
-                            onClick={handleShare}
-                            disabled={!referralLink}
-                            className="bg-white text-blue-950 px-8 py-4 rounded-xl font-bold hover:bg-gray-100 transition-all inline-flex items-center gap-2 text-lg disabled:opacity-50"
+                    {/* CTA Banner */}
+                    <section style={{ background: CREAM, border: '0.5px solid #e5ddd0', marginTop: '20px' }} className="cta-banner">
+                        <div>
+                            <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: GOLD, marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Start Today</p>
+                            <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(18px,3vw,26px)', fontWeight: 700, color: NAVY, margin: '0 0 6px' }}>The more friends, the more you earn</h3>
+                            <p style={{ fontSize: '13px', color: '#888', margin: 0, fontFamily: "'Lato',sans-serif" }}>Rewards go straight into your seller wallet — no waiting, no minimum.</p>
+                        </div>
+                        <button onClick={handleShare} disabled={!referralLink}
+                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px 24px', background: NAVY, color: '#fff', fontSize: '13px', fontWeight: 700, border: 'none', cursor: referralLink ? 'pointer' : 'not-allowed', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em', transition: 'background 0.18s', opacity: referralLink ? 1 : 0.5, width: '100%', maxWidth: '260px', flexShrink: 0 }}
+                            onMouseEnter={e => { if (referralLink) e.currentTarget.style.background = '#1a3a6e'; }}
+                            onMouseLeave={e => e.currentTarget.style.background = NAVY}
                         >
-                            <Share2 size={24} />
-                            Share Now
+                            <Share2 size={15} /> Share Now <ArrowRight size={13} />
                         </button>
-                    </div>
-                </div>
+                    </section>
+                </main>
+
                 <Footer />
             </div>
-        );
-    }
+        </>
+    );
+}

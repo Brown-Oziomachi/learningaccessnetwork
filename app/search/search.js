@@ -2,17 +2,52 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { doc, getDoc, collection, query, where, getDocs, setDoc, increment } from "firebase/firestore";
+import {
+  doc, getDoc, collection, query, where,
+  getDocs, setDoc, increment
+} from "firebase/firestore";
 import { auth, db } from "@/lib/firebaseConfig";
 import { booksData } from "@/lib/booksData";
-import { FileText, X, Download, TrendingUp } from "lucide-react";
+import { FileText, X, TrendingUp, Search, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import Navbar from '@/components/NavBar';
+import Navbar from "@/components/NavBar";
 
+/* ─── colour tokens (match homepage) ─── */
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG    = "#f5f1ea";
+
+/* ─── helpers ─── */
+const getThumbnailUrl = (book) => {
+  if (!book) return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+  if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
+  if (book.embedUrl) {
+    const m = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
+    if (m) { const id = m[1] || m[2] || m[3]; if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`; }
+  }
+  if (book.pdfUrl?.includes("drive.google.com")) {
+    const m = book.pdfUrl.match(/[-\w]{25,}/);
+    if (m) return `https://drive.google.com/thumbnail?id=${m[0]}&sz=w400`;
+  }
+  return book.image || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+};
+
+const chunkArray = (arr, size) => {
+  const chunks = [];
+  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+  return chunks;
+};
+
+/* ════════════════════════════════════════
+   COMPONENT
+════════════════════════════════════════ */
 export default function SearchClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const q = searchParams.get("q")?.toLowerCase() || "";
+
   const [searchResults, setSearchResults] = useState([]);
   const [selectedBook, setSelectedBook] = useState(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
@@ -20,819 +55,413 @@ export default function SearchClient() {
   const [loading, setLoading] = useState(false);
   const [mostSearchedBooks, setMostSearchedBooks] = useState([]);
   const [showMostSearched, setShowMostSearched] = useState(false);
-  const [topSellers, setTopSellers] = useState([]);
-  // Helper function to get thumbnail from PDF
-  const getThumbnailUrl = (book) => {
-    if (!book) return 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
 
-    if (book.driveFileId) {
-      return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
-    }
-
-    if (book.embedUrl) {
-      const match = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
-      if (match) {
-        const fileId = match[1] || match[2] || match[3];
-        if (fileId) {
-          return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
-        }
-      }
-    }
-
-    if (book.pdfUrl && book.pdfUrl.includes('drive.google.com')) {
-      const match = book.pdfUrl.match(/[-\w]{25,}/);
-      if (match) {
-        return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
-      }
-    }
-
-    return book.image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-  };
-
-  // =========================
-  // TRACK SEARCH & UPDATE ANALYTICS
-  // =========================
+  /* ── track search ── */
   const trackSearch = async (searchQuery) => {
     if (!searchQuery || searchQuery.length < 2) return;
-
     try {
-      const searchDocRef = doc(db, "searchAnalytics", searchQuery);
-      await setDoc(
-        searchDocRef,
-        {
-          query: searchQuery,
-          count: increment(1),
-          lastSearched: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-    } catch (error) {
-      console.error("Error tracking search:", error);
-    }
+      await setDoc(doc(db, "searchAnalytics", searchQuery), {
+        query: searchQuery, count: increment(1), lastSearched: new Date().toISOString(),
+      }, { merge: true });
+    } catch {}
   };
 
-  // =========================
-  // FETCH MOST SEARCHED BOOKS
-  // =========================
+  /* ── most searched ── */
   const fetchMostSearchedBooks = async () => {
     try {
-      const analyticsQuery = query(collection(db, "searchAnalytics"));
-      const querySnapshot = await getDocs(analyticsQuery);
-
+      const snap = await getDocs(collection(db, "searchAnalytics"));
       const searches = [];
-      querySnapshot.forEach((doc) => {
-        searches.push({
-          query: doc.data().query,
-          count: doc.data().count,
-        });
-      });
-
-      // Sort by count and get top 10
+      snap.forEach(d => searches.push({ query: d.data().query, count: d.data().count }));
       searches.sort((a, b) => b.count - a.count);
-      const topSearches = searches.slice(0, 10);
-
-      // Find matching books
-      const matchedBooks = [];
-      for (const search of topSearches) {
-        const matchingBook = booksData.find(
-          book =>
-            book.title?.toLowerCase().includes(search.query) ||
-            book.author?.toLowerCase().includes(search.query)
+      const top = searches.slice(0, 10);
+      const matched = [];
+      for (const s of top) {
+        const book = booksData.find(b =>
+          b.title?.toLowerCase().includes(s.query) || b.author?.toLowerCase().includes(s.query)
         );
-
-        if (matchingBook && !matchedBooks.find(b => b.id === matchingBook.id)) {
-          matchedBooks.push({
-            ...matchingBook,
-            image: getThumbnailUrl(matchingBook),
-            searchCount: search.count,
-            source: 'platform'
-          });
+        if (book && !matched.find(m => m.id === book.id)) {
+          matched.push({ ...book, image: getThumbnailUrl(book), searchCount: s.count, source: "platform" });
         }
       }
-
-      setMostSearchedBooks(matchedBooks);
-    } catch (error) {
-      console.error("Error fetching most searched books:", error);
-    }
+      setMostSearchedBooks(matched);
+    } catch {}
   };
 
-  // =========================
-  // FETCH TOP SELLERS
-  // =========================
-  const fetchTopSellers = async () => {
-    try {
-      const usersSnapshot = await getDocs(collection(db, "users"));
-      const sellerMap = {};
-
-      usersSnapshot.docs.forEach(userDoc => {
-        const userData = userDoc.data();
-        const purchasedBooks = userData.purchasedBooks || {};
-
-        Object.values(purchasedBooks).forEach(purchase => {
-          const sellerId = purchase.sellerId;
-          const sellerName = purchase.sellerName || "Unknown Seller";
-
-          if (sellerId) {
-            if (!sellerMap[sellerId]) {
-              sellerMap[sellerId] = {
-                sellerId,
-                sellerName,
-                totalSold: 0,
-                totalEarnings: 0,
-                books: {}
-              };
-            }
-            sellerMap[sellerId].totalSold += 1;
-            sellerMap[sellerId].totalEarnings += purchase.amount || 0;
-
-            // Track individual book sales
-            const bookTitle = purchase.title || "Untitled";
-            if (!sellerMap[sellerId].books[bookTitle]) {
-              sellerMap[sellerId].books[bookTitle] = 0;
-            }
-            sellerMap[sellerId].books[bookTitle] += 1;
-          }
-        });
-      });
-
-      // Convert to array, sort by totalSold, take top 5
-      const sorted = Object.values(sellerMap)
-        .sort((a, b) => b.totalSold - a.totalSold)
-        .slice(0, 5)
-        .map(seller => ({
-          ...seller,
-          books: Object.entries(seller.books)
-            .sort((a, b) => b[1] - a[1]) // sort books by sales
-            .slice(0, 4) // top 4 books per seller
-        }));
-
-      setTopSellers(sorted);
-    } catch (error) {
-      console.error("Error fetching top sellers:", error);
-    }
-  };
-  // =========================
-  // FETCH PURCHASED BOOKS
-  // =========================
+  /* ── purchased books ── */
   useEffect(() => {
-    const fetchPurchasedBooks = async () => {
+    const fetch = async () => {
       try {
         const user = auth.currentUser;
-        if (user) {
-          const userDocRef = doc(db, "users", user.uid);
-          const userDoc = await getDoc(userDocRef);
-          if (userDoc.exists()) {
-            const purchased = userDoc.data().purchasedBooks || [];
-            setPurchasedBookIds(new Set(purchased.map(book => book.id)));
-          }
+        if (!user) return;
+        const ud = await getDoc(doc(db, "users", user.uid));
+        if (ud.exists()) {
+          const pb = ud.data().purchasedBooks || [];
+          setPurchasedBookIds(new Set(pb.map(b => b.id)));
         }
-      } catch (error) {
-        console.error("Error fetching purchased books:", error);
-      }
+      } catch {}
     };
-
-    fetchPurchasedBooks();
+    fetch();
     fetchMostSearchedBooks();
-    fetchTopSellers();
   }, []);
 
-  // =========================
-  // SEARCH LOGIC
-  // =========================
+  /* ── search logic ── */
   useEffect(() => {
     const performSearch = async () => {
-      if (!q) {
-        setSearchResults([]);
-        setShowMostSearched(true);
-        return;
-      }
-
-      setShowMostSearched(false);
-      setLoading(true);
-      console.log('🔍 Searching for:', q);
-
-      // Track the search
+      if (!q) { setSearchResults([]); setShowMostSearched(true); return; }
+      setShowMostSearched(false); setLoading(true);
       trackSearch(q);
-
       try {
-        // 1. Search in platform books
         const platformResults = booksData
-          .filter(book =>
-            book.title?.toLowerCase().includes(q) ||
-            book.author?.toLowerCase().includes(q) ||
-            book.category?.toLowerCase().includes(q)
+          .filter(b =>
+            b.title?.toLowerCase().includes(q) ||
+            b.author?.toLowerCase().includes(q) ||
+            b.category?.toLowerCase().includes(q)
           )
-          .map(book => ({
-            ...book,
-            image: getThumbnailUrl(book),
-            source: 'platform'
-          }));
+          .map(b => ({ ...b, image: getThumbnailUrl(b), source: "platform" }));
 
-        console.log('✅ Platform books found:', platformResults.length);
-
-        // 2. Search in Firestore books
         const firestoreResults = [];
-
         try {
-          const booksQuery = query(
-            collection(db, 'advertMyBook'),
-            where('status', '==', 'approved')
-          );
-
-          const querySnapshot = await getDocs(booksQuery);
-
-          querySnapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-
-            const bookTitle = (data.bookTitle || '').toLowerCase();
-            const author = (data.author || '').toLowerCase();
-            const category = (data.category || '').toLowerCase();
-
-            if (bookTitle.includes(q) || author.includes(q) || category.includes(q)) {
-              const bookData = {
-                id: `firestore-${docSnap.id}`,
-                firestoreId: docSnap.id,
-                title: data.bookTitle,
-                author: data.author,
-                category: data.category,
-                price: data.price,
-                pages: data.pages,
-                format: data.format || 'PDF',
-                description: data.description,
-                driveFileId: data.driveFileId,
-                pdfUrl: data.pdfUrl,
-                previewUrl: data.previewUrl,
-                embedUrl: data.embedUrl,
-                isFromFirestore: true,
-                source: 'firestore'
+          const snap = await getDocs(query(collection(db, "advertMyBook"), where("status", "==", "approved")));
+          snap.forEach(d => {
+            const data = d.data();
+            if (
+              (data.bookTitle || "").toLowerCase().includes(q) ||
+              (data.author || "").toLowerCase().includes(q) ||
+              (data.category || "").toLowerCase().includes(q)
+            ) {
+              const b = {
+                id: `firestore-${d.id}`, firestoreId: d.id,
+                title: data.bookTitle, author: data.author, category: data.category,
+                price: data.price, pages: data.pages, format: data.format || "PDF",
+                description: data.description, driveFileId: data.driveFileId,
+                pdfUrl: data.pdfUrl, previewUrl: data.previewUrl, embedUrl: data.embedUrl,
+                isFromFirestore: true, source: "firestore",
               };
-
-              bookData.image = getThumbnailUrl(bookData);
-              firestoreResults.push(bookData);
+              b.image = getThumbnailUrl(b);
+              firestoreResults.push(b);
             }
           });
+        } catch {}
 
-          console.log('✅ Firestore books found:', firestoreResults.length);
-        } catch (firestoreError) {
-          console.warn('⚠️ Could not search Firestore books:', firestoreError);
-        }
-
-        const allResults = [...platformResults, ...firestoreResults];
-        console.log('📊 Total results:', allResults.length);
-
-        setSearchResults(allResults);
-      } catch (error) {
-        console.error('❌ Search error:', error);
-        const platformResults = booksData
-          .filter(book =>
-            book.title?.toLowerCase().includes(q) ||
-            book.author?.toLowerCase().includes(q) ||
-            book.category?.toLowerCase().includes(q)
-          )
-          .map(book => ({
-            ...book,
-            image: getThumbnailUrl(book),
-            source: 'platform'
-          }));
-
-        setSearchResults(platformResults);
-      } finally {
-        setLoading(false);
-      }
+        setSearchResults([...platformResults, ...firestoreResults]);
+      } catch {
+        setSearchResults(booksData
+          .filter(b => b.title?.toLowerCase().includes(q) || b.author?.toLowerCase().includes(q))
+          .map(b => ({ ...b, image: getThumbnailUrl(b), source: "platform" }))
+        );
+      } finally { setLoading(false); }
     };
-
     performSearch();
   }, [q]);
 
-  // =========================
-  // PURCHASE / DOWNLOAD
-  // =========================
-  const handlePurchase = book => {
-    setSelectedBook(book);
-    setShowPurchaseModal(true);
-  };
-
+  const handlePurchase = (book) => { setSelectedBook(book); setShowPurchaseModal(true); };
   const handleProceedToPayment = () => {
     if (!selectedBook) return;
     setShowPurchaseModal(false);
-
-    const paymentBookId = selectedBook.source === 'firestore'
-      ? selectedBook.id
-      : selectedBook.id;
-
-    console.log('Navigating to payment with bookId:', paymentBookId);
-    router.push(`/payment?bookId=${paymentBookId}`);
+    router.push(`/payment?bookId=${selectedBook.id}`);
   };
+  const isPurchased = id => purchasedBookIds.has(id);
 
-  const handleDownload = book => {
-    if (book.pdfUrl) {
-      window.open(book.pdfUrl, '_blank');
-    } else if (book.embedUrl) {
-      window.open(book.embedUrl, '_blank');
-    } else {
-      alert(`Download link not available for ${book.title}`);
-    }
-  };
-
-  const isPurchased = bookId => purchasedBookIds.has(bookId);
-
-  // Split results into rows of 5 books each
-  const chunkArray = (array, size) => {
-    const chunks = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
-  };
-
-  // =========================
-  // RENDER
-  // =========================
-  return (
-    <>
-      <Navbar />
-      <div className="max-w-7xl mx-auto px-4 py-8 bg-white min-h-screen">
-        {showMostSearched ? (
-          // Show Most Searched Books
-          <div>
-            <div className="flex items-center gap-2 mb-6">
-              <TrendingUp className="w-6 h-6 text-blue-950" />
-              <h2 className="text-2xl font-bold text-blue-950">Most Searched Books</h2>
-            </div>
-
-            {mostSearchedBooks.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-600">No search data available yet.</p>
-              </div>
-            ) : (
-              <>
-                {/* Mobile/Tablet Carousel */}
-                <div className="lg:hidden space-y-4">
-                  {chunkArray(mostSearchedBooks, 5).map((row, rowIndex) => (
-                    <div key={rowIndex} className="overflow-x-auto pb-4">
-                      <div className="flex gap-3 snap-x snap-mandatory" style={{ minWidth: 'max-content' }}>
-                        {row.map(book => (
-                          <Link
-                            key={book.id}
-                            href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
-                            className="flex-none w-[140px] sm:w-[160px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow snap-start"
-                          >
-                            <div className="relative">
-                              <img
-                                src={getThumbnailUrl(book)}
-                                alt={book.title}
-                                className="w-full h-40 sm:h-48 object-cover bg-gray-200"
-                                onError={(e) => {
-                                  e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                                }}
-                              />
-                              <span className="absolute top-2 right-2 bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg flex items-center gap-1">
-                                <TrendingUp size={12} />
-                                {book.searchCount}
-                              </span>
-                              {isPurchased(book.id) && (
-                                <span className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
-                                  Owned
-                                </span>
-                              )}
-                            </div>
-                            <div className="p-2">
-                              <h4 className="font-semibold text-xs text-gray-900 mb-1 line-clamp-2">{book.title}</h4>
-                              <p className="text-xs text-gray-600 mb-1 line-clamp-1">{book.author}</p>
-                              <p className="text-sm font-bold text-blue-950">₦{book.price?.toLocaleString()}</p>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Desktop Grid */}
-                <div className="hidden lg:grid grid-cols-5 gap-4">
-                  {mostSearchedBooks.map(book => (
-                    <Link
-                      key={book.id}
-href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                      
-className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                    >
-                      <div className="relative">
-                        <img
-                          src={getThumbnailUrl(book)}
-                          alt={book.title}
-                          className="w-full h-48 object-cover bg-gray-200"
-                          onError={(e) => {
-                            e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                          }}
-                        />
-                        <span className="absolute top-2 right-2 bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg flex items-center gap-1">
-                          <TrendingUp size={12} />
-                          {book.searchCount}
-                        </span>
-                        {isPurchased(book.id) && (
-                          <span className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
-                            Owned
-                          </span>
-                        )}
-                      </div>
-                      <div className="p-3">
-                        <h4 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">{book.title}</h4>
-                        <p className="text-xs text-gray-600 mb-1 line-clamp-1">{book.author}</p>
-                        <p className="text-sm font-bold text-blue-950">₦{book.price?.toLocaleString()}</p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </>
-            )}
+  /* ── Book Card ── */
+  const BookCard = ({ book, showTrending = false }) => {
+    const owned = isPurchased(book.id);
+    return (
+      <Link
+        href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
+        style={{ textDecoration: "none", display: "block" }}
+      >
+        <div style={{ position: "relative", background: "#ede8df", overflow: "hidden" }}>
+          <img
+            src={getThumbnailUrl(book)}
+            alt={book.title}
+            style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", transition: "transform 0.5s cubic-bezier(0.4,0,0.2,1)" }}
+            className="book-thumb-img"
+            onError={e => { e.target.style.display = "none"; }}
+          />
+          {/* PDF badge */}
+          <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff", fontFamily: "'Lato', sans-serif" }}>
+            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
+            PDF
           </div>
-        ) : (
-          // Show Search Results
-          <>
-            <h2 className="text-2xl font-bold mb-6 text-blue-950">
-              Search Results for: "{q}"
-            </h2>
-
-            {loading && (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-950"></div>
-              </div>
-            )}
-
-            <style jsx>{`
-            .overflow-x-auto::-webkit-scrollbar { display: none; }
-            .overflow-x-auto { -ms-overflow-style: none; scrollbar-width: none; }
-            .snap-x { scroll-snap-type: x mandatory; }
-            .snap-start { scroll-snap-align: start; }
-          `}</style>
-
-            {!loading && searchResults.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-600 text-lg">No results found for "{q}"</p>
-                <Link href="/home" className="text-blue-950 hover:underline mt-4 inline-block">
-                  ← Back to Home
-                </Link>
-              </div>
-            ) : !loading && (
-              <>
-                {/* PURCHASED BOOKS */}
-                {searchResults.filter(book => isPurchased(book.id)).length > 0 && (
-                  <div className="mb-8">
-                    <h3 className="text-xl font-bold mb-4 text-blue-950">Purchased Books ({searchResults.filter(book => isPurchased(book.id)).length})</h3>
-
-                    {/* Mobile/Tablet Carousel */}
-                    {/* PURCHASED BOOKS - Mobile/Tablet Carousel */}
-                    <div className="lg:hidden space-y-4">
-                      {chunkArray(searchResults.filter(book => isPurchased(book.id)), 5).map((row, rowIndex) => (
-                        <div key={rowIndex} className="overflow-x-auto pb-4">
-                          <div className="flex gap-3 snap-x snap-mandatory" style={{ minWidth: 'max-content' }}>
-                            {row.map(book => (
-                              <Link
-                                key={book.id}
-                                href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                                className="flex-none w-[180px] sm:w-[200px] group snap-start"
-                              >
-                                <div className="relative mb-3">
-                                  <img
-                                    src={getThumbnailUrl(book)}
-                                    alt={book.title}
-                                    className="w-full h-[240px] sm:h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
-                                    onError={(e) => {
-                                      e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                                    }}
-                                  />
-                                  <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
-                                    Owned
-                                  </span>
-                                </div>
-                                <div>
-                                  <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                                    {book.title}
-                                  </h4>
-                                  <p className="text-gray-600 text-xs">{book.author}</p>
-                                </div>
-                              </Link>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* PURCHASED BOOKS - Desktop Grid */}
-                    <div className="hidden lg:grid grid-cols-5 gap-4">
-                      {searchResults
-                        .filter(book => isPurchased(book.id))
-                        .map(book => (
-                          <Link
-                            key={book.id}
-                            href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
-                            className="group"
-                          >
-                            <div className="relative mb-3">
-                              <img
-                                src={getThumbnailUrl(book)}
-                                alt={book.title}
-                                className="w-full h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
-                                onError={(e) => {
-                                  e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                                }}
-                              />
-                              <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
-                                Owned
-                              </span>
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                                {book.title}
-                              </h4>
-                              <p className="text-gray-600 text-xs">{book.author}</p>
-                            </div>
-                          </Link>
-                        ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* OTHER BOOKS */}
-                {searchResults.filter(book => !isPurchased(book.id)).length > 0 && (
-                  <div>
-                    <h3 className="text-xl font-bold mb-4 text-blue-950">
-                      {searchResults.filter(book => isPurchased(book.id)).length > 0 ? "Other Books" : "All Results"} ({searchResults.filter(book => !isPurchased(book.id)).length})
-                    </h3>
-
-                    {/* Mobile/Tablet Carousel */}
-                    {/* OTHER BOOKS - Mobile/Tablet Carousel */}
-                    <div className="lg:hidden space-y-4">
-                      {chunkArray(searchResults.filter(book => !isPurchased(book.id)), 5).map((row, rowIndex) => (
-                        <div key={rowIndex} className="overflow-x-auto pb-4">
-                          <div className="flex gap-3 snap-x snap-mandatory" style={{ minWidth: 'max-content' }}>
-                            {row.map(book => (
-                              <Link
-                                key={book.id}
-href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                                
-className="flex-none w-[180px] sm:w-[200px] group snap-start"
-                              >
-                                <div className="relative mb-3">
-                                  <img
-                                    src={getThumbnailUrl(book)}
-                                    alt={book.title}
-                                    className="w-full h-[240px] sm:h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
-                                    onError={(e) => {
-                                      e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                                    }}
-                                  />
-                                  {book.isFromFirestore && (
-                                    <span className="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">
-                                      Upload
-                                    </span>
-                                  )}
-                                </div>
-                                <div>
-                                  <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                                    {book.title}
-                                  </h4>
-                                  <p className="text-gray-600 text-xs">{book.author}</p>
-                                </div>
-                              </Link>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* OTHER BOOKS - Desktop Grid */}
-                    <div className="hidden lg:grid grid-cols-5 gap-4">
-                      {searchResults
-                        .filter(book => !isPurchased(book.id))
-                        .map(book => (
-                          <Link
-                            key={book.id}
-                            href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                            className="group"
-                          >
-                            <div className="relative mb-3">
-                              <img
-                                src={getThumbnailUrl(book)}
-                                alt={book.title}
-                                className="w-full h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
-                                onError={(e) => {
-                                  e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                                }}
-                              />
-                              {book.isFromFirestore && (
-                                <span className="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">
-                                  Upload
-                                </span>
-                              )}
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                                {book.title}
-                              </h4>
-                              <p className="text-gray-600 text-xs">{book.author}</p>
-                            </div>
-                          </Link>
-                        ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* MOST SEARCHED BOOKS - Mobile/Tablet */}
-                <div className="lg:hidden space-y-4">
-                  {chunkArray(mostSearchedBooks, 5).map((row, rowIndex) => (
-                    <div key={rowIndex} className="overflow-x-auto pb-4">
-                      <div className="flex gap-3 snap-x snap-mandatory" style={{ minWidth: 'max-content' }}>
-                        {row.map(book => (
-                          <Link
-                            key={book.id}
-                            href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                            className="flex-none w-[180px] sm:w-[200px] group snap-start"
-                          >
-                            <div className="relative mb-3">
-                              <img
-                                src={getThumbnailUrl(book)}
-                                alt={book.title}
-                                className="w-full h-[240px] sm:h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
-                                onError={(e) => {
-                                  e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                                }}
-                              />
-                              <span className="absolute top-2 right-2 bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
-                                <TrendingUp size={12} />
-                                {book.searchCount}
-                              </span>
-                              {isPurchased(book.id) && (
-                                <span className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
-                                  Owned
-                                </span>
-                              )}
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                                {book.title}
-                              </h4>
-                              <p className="text-gray-600 text-xs">{book.author}</p>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* MOST SEARCHED BOOKS - Desktop Grid */}
-                <div className="hidden lg:grid grid-cols-5 gap-4">
-                  {mostSearchedBooks.map(book => (
-                    <Link
-                      key={book.id}
-href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}                      
-className="group"
-                    >
-                      <div className="relative mb-3">
-                        <img
-                          src={getThumbnailUrl(book)}
-                          alt={book.title}
-                          className="w-full h-[280px] object-cover rounded shadow-md group-hover:shadow-xl transition-shadow"
-                          onError={(e) => {
-                            e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                          }}
-                        />
-                        <span className="absolute top-2 right-2 bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
-                          <TrendingUp size={12} />
-                          {book.searchCount}
-                        </span>
-                        {isPurchased(book.id) && (
-                          <span className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
-                            Owned
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                          {book.title}
-                        </h4>
-                        <p className="text-gray-600 text-xs">{book.author}</p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        )}
-
-        {/* TOP SELLERS TAGS */}
-        {topSellers.length > 0 && (
-          <div className="mt-10 mb-4">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="w-5 h-5 text-orange-600" />
-              <h3 className="text-lg font-bold text-blue-950">Top Selling Authors</h3>
+          {owned && (
+            <span style={{ position: "absolute", top: "8px", right: "8px", background: "#15803d", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 8px", fontFamily: "'Lato', sans-serif" }}>OWNED</span>
+          )}
+          {!owned && book.isFromFirestore && (
+            <span style={{ position: "absolute", top: "8px", right: "8px", background: GOLD, color: NAVY, fontSize: "9px", fontWeight: 700, padding: "3px 8px", fontFamily: "'Lato', sans-serif" }}>UPLOAD</span>
+          )}
+          {showTrending && book.searchCount && (
+            <div style={{ position: "absolute", bottom: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: "#ea580c", padding: "3px 8px", fontSize: "9px", fontWeight: 700, color: "#fff", fontFamily: "'Lato', sans-serif" }}>
+              <TrendingUp size={10} /> {book.searchCount}
             </div>
+          )}
+        </div>
+        <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0", background: "#fff" }}>
+          <h4 style={{ fontFamily: "'Playfair Display', serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>
+            {book.title}
+          </h4>
+          <p style={{ fontSize: "11px", color: "#888", margin: "0 0 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato', sans-serif" }}>
+            {book.author}
+          </p>
+          {book.price && (
+            <p style={{ fontSize: "12px", fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato', sans-serif" }}>
+              ₦{Number(book.price).toLocaleString()}
+            </p>
+          )}
+        </div>
+      </Link>
+    );
+  };
 
-            <div className="flex flex-wrap gap-3">
-              {topSellers.map((seller, index) => (
-                <Link
-                  key={seller.sellerId}
-                  href={`/seller-profile?sellerId=${seller.sellerId}`}
-                  className={`relative border rounded-xl p-4 shadow-sm transition-shadow hover:shadow-md cursor-pointer w-full sm:w-[calc(50%-8px)] lg:w-[calc(33.333%-8px)] block ${index === 0
-                      ? 'bg-amber-50 border-amber-300'
-                      : index === 1
-                        ? 'bg-gray-50 border-gray-300'
-                        : index === 2
-                          ? 'bg-orange-50 border-orange-200'
-                          : 'bg-white border-gray-200'
-                    }`}
-                >
-                  {/* Rank Badge */}
-                  <div className={`absolute -top-3 -left-3 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white shadow-md ${index === 0 ? 'bg-amber-500' :
-                      index === 1 ? 'bg-gray-400' :
-                        index === 2 ? 'bg-orange-400' :
-                          'bg-blue-950'
-                    }`}>
-                    #{index + 1}
-                  </div>
+  /* ── Book Grid Section ── */
+  const BookSection = ({ title, books, showTrending = false, count }) => (
+    <div style={{ marginBottom: "48px" }}>
+      {/* Section header */}
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+        <div style={{ width: "4px", height: "28px", background: GOLD }} />
+        <div>
+          <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, margin: "0 0 2px", fontFamily: "'Lato', sans-serif" }}>
+            {showTrending ? "Most Popular" : title}
+          </p>
+          <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: NAVY, margin: 0 }}>
+            {title}
+            {count !== undefined && (
+              <span style={{ fontSize: "14px", fontWeight: 400, color: "#bbb", marginLeft: "8px", fontFamily: "'Lato', sans-serif" }}>({count})</span>
+            )}
+          </h3>
+        </div>
+      </div>
 
-                  {/* Seller Header */}
-                  <div className="flex items-center justify-between mb-3 mt-1">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-blue-950 flex items-center justify-center">
-                        <span className="text-white text-xs font-bold">
-                          {seller.sellerName?.charAt(0)?.toUpperCase() || '?'}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="font-bold text-blue-950 text-sm">{seller.sellerName}</p>
-                        <p className="text-xs text-gray-500">{seller.totalSold} books sold</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded-full">
-                      ₦{seller.totalEarnings?.toLocaleString()}
-                    </span>
-                  </div>
-
-                  {/* Book Tags */}
-                  <div className="flex flex-wrap gap-1.5">
-                    {seller.books.map(([bookTitle, soldCount], bookIndex) => (
-                      <span
-                        key={bookIndex}
-                        className="inline-flex items-center gap-1 bg-blue-950 text-white text-xs px-2.5 py-1 rounded-full font-medium"
-                      >
-                        <span className="truncate max-w-[100px]">{bookTitle}</span>
-                        <span className="bg-white/20 text-white text-xs px-1.5 py-0.5 rounded-full font-bold">
-                          {soldCount}
-                        </span>
-                      </span>
-                    ))}
-                  </div>
-                </Link>
+      {/* Mobile carousel */}
+      <div className="lg:hidden space-y-4">
+        {chunkArray(books, 5).map((row, ri) => (
+          <div key={ri} style={{ overflowX: "auto", paddingBottom: "12px" }} className="sbar-none">
+            <div style={{ display: "flex", gap: "10px", minWidth: "max-content" }}>
+              {row.map(book => (
+                <div key={book.id} style={{ flexShrink: 0, width: "150px" }}>
+                  <BookCard book={book} showTrending={showTrending} />
+                </div>
               ))}
             </div>
           </div>
-        )}
+        ))}
+      </div>
 
-        {/* PURCHASE MODAL */}
-        {showPurchaseModal && selectedBook && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-md w-full p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Purchase PDF Book</h3>
-                <button onClick={() => setShowPurchaseModal(false)}>
-                  <X size={24} className="text-gray-600 hover:text-gray-900" />
-                </button>
+      {/* Desktop grid */}
+      <div className="hidden lg:grid" style={{ display: "none", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "16px" }}>
+        {books.map(book => <BookCard key={book.id} book={book} showTrending={showTrending} />)}
+      </div>
+      <div className="lg-grid-override" style={{ display: "none" }}>
+        {books.map(book => <BookCard key={book.id} book={book} showTrending={showTrending} />)}
+      </div>
+    </div>
+  );
+
+  /* ─────────────────── RENDER ─────────────────── */
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+        .search-root { font-family: 'Lato', sans-serif; background: ${BG}; min-height: 100vh; }
+        .sbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+        .sbar-none::-webkit-scrollbar { display: none; }
+        .book-thumb-img { transition: transform 0.5s cubic-bezier(0.4,0,0.2,1); }
+        .book-thumb-wrapper:hover .book-thumb-img { transform: scale(1.06); }
+        @media (min-width: 1024px) {
+          .lg-grid-override { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+          .hidden.lg\\:grid { display: none !important; }
+        }
+        .purchase-modal-overlay {
+          position: fixed; inset: 0; background: rgba(13,34,68,0.82); backdrop-filter: blur(4px);
+          display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px;
+        }
+        .purchase-modal {
+          background: ${BG};
+          border: 0.5px solid rgba(184,150,62,0.35);
+          border-top: 2px solid ${GOLD};
+          max-width: 440px; width: 100%;
+          box-shadow: 0 32px 80px rgba(13,34,68,0.3);
+        }
+        .purchase-btn {
+          width: 100%; padding: 14px;
+          background: ${NAVY}; color: #fff;
+          font-family: 'Lato', sans-serif; font-size: 13px; font-weight: 700;
+          letter-spacing: 0.08em; text-transform: uppercase;
+          border: none; cursor: pointer;
+          transition: background 0.18s;
+        }
+        .purchase-btn:hover { background: #162f5a; }
+        .search-hero {
+          background-color: ${NAVY};
+          background-image: radial-gradient(rgba(184,150,62,0.06) 1px, transparent 1px);
+          background-size: 22px 22px;
+          padding: 48px 24px;
+        }
+        .spinner {
+          width: 36px; height: 36px;
+          border: 2px solid rgba(13,34,68,0.1);
+          border-top-color: ${GOLD};
+          border-radius: 50%;
+          animation: spin 0.7s linear infinite;
+          margin: 0 auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
+
+      <div className="search-root">
+        <Navbar />
+
+        {/* ── Search Hero ── */}
+        <div className="search-hero">
+          <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+            {q ? (
+              <>
+                <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", marginBottom: "10px", fontFamily: "'Lato', sans-serif" }}>
+                  Search Results
+                </p>
+                <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(28px, 5vw, 46px)", fontWeight: 700, color: "#fff", margin: "0 0 8px", lineHeight: 1.08 }}>
+                  Results for{" "}
+                  <span style={{ color: GOLD, fontStyle: "italic" }}>"{q}"</span>
+                </h1>
+                {!loading && (
+                  <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.5)", margin: 0, fontWeight: 300 }}>
+                    {searchResults.length} document{searchResults.length !== 1 ? "s" : ""} found
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", marginBottom: "10px", fontFamily: "'Lato', sans-serif" }}>
+                  Trending
+                </p>
+                <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(28px, 5vw, 46px)", fontWeight: 700, color: "#fff", margin: "0 0 8px", lineHeight: 1.08 }}>
+                  Most Searched{" "}
+                  <span style={{ color: GOLD, fontStyle: "italic" }}>Documents</span>
+                </h1>
+                <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.5)", margin: 0, fontWeight: 300 }}>
+                  What students across Africa are looking for
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ── Content ── */}
+        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "48px 24px" }}>
+
+          {/* Loading spinner */}
+          {loading && (
+            <div style={{ textAlign: "center", padding: "80px 24px" }}>
+              <div className="spinner" />
+              <p style={{ fontSize: "12px", color: "#bbb", marginTop: "16px", fontWeight: 300 }}>Searching documents…</p>
+            </div>
+          )}
+
+          {/* Most searched */}
+          {!loading && showMostSearched && (
+            mostSearchedBooks.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "80px 24px" }}>
+                <div style={{ width: "64px", height: "64px", border: `0.5px solid #e5ddd0`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                  <Search size={28} style={{ color: "#ccc" }} />
+                </div>
+                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", color: NAVY, margin: "0 0 6px" }}>No search data yet</p>
+                <p style={{ fontSize: "12px", color: "#bbb" }}>Be the first to search for something!</p>
               </div>
+            ) : (
+              <BookSection title="Most Searched Books" books={mostSearchedBooks} showTrending={true} />
+            )
+          )}
 
-              <div className="mb-4">
-                <img
-                  src={getThumbnailUrl(selectedBook)}
-                  alt={selectedBook.title}
-                  className="w-full h-48 object-cover rounded-lg mb-4 bg-gray-200"
-                  onError={(e) => {
-                    e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                  }}
+          {/* No results */}
+          {!loading && !showMostSearched && searchResults.length === 0 && (
+            <div style={{ textAlign: "center", padding: "80px 24px" }}>
+              <div style={{ width: "64px", height: "64px", border: `0.5px solid #e5ddd0`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                <FileText size={28} style={{ color: "#ccc" }} />
+              </div>
+              <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", color: NAVY, margin: "0 0 8px" }}>No results found</p>
+              <p style={{ fontSize: "13px", color: "#bbb", marginBottom: "24px", fontWeight: 300 }}>
+                No documents matched "{q}". Try a different search.
+              </p>
+              <Link href="/home" style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "12px 24px", background: NAVY, color: "#fff", fontSize: "12px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato', sans-serif" }}>
+                ← Back to Home
+              </Link>
+            </div>
+          )}
+
+          {/* Results */}
+          {!loading && !showMostSearched && searchResults.length > 0 && (
+            <>
+              {/* Purchased */}
+              {searchResults.filter(b => isPurchased(b.id)).length > 0 && (
+                <BookSection
+                  title="Purchased Documents"
+                  books={searchResults.filter(b => isPurchased(b.id))}
+                  count={searchResults.filter(b => isPurchased(b.id)).length}
                 />
-                <h4 className="font-bold text-lg text-blue-950">{selectedBook.title}</h4>
-                <p className="text-gray-600">{selectedBook.author}</p>
-                <p className="text-2xl font-bold text-blue-950 mt-2">₦ {selectedBook.price?.toLocaleString()}</p>
+              )}
+
+              {/* Other results */}
+              {searchResults.filter(b => !isPurchased(b.id)).length > 0 && (
+                <BookSection
+                  title={searchResults.filter(b => isPurchased(b.id)).length > 0 ? "Other Documents" : "All Results"}
+                  books={searchResults.filter(b => !isPurchased(b.id))}
+                  count={searchResults.filter(b => !isPurchased(b.id)).length}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── Purchase Modal ── */}
+      {showPurchaseModal && selectedBook && (
+        <div className="purchase-modal-overlay">
+          <div className="purchase-modal">
+            {/* Header */}
+            <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px, transparent 1px)", backgroundSize: "22px 22px", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "18px", fontWeight: 700, color: "#fff", margin: 0 }}>Purchase Document</p>
+              <button onClick={() => setShowPurchaseModal(false)} style={{ width: "32px", height: "32px", border: "0.5px solid rgba(184,150,62,0.3)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "rgba(184,150,62,0.7)" }}>
+                <X size={15} />
+              </button>
+            </div>
+
+            <div style={{ padding: "24px" }}>
+              <img
+                src={getThumbnailUrl(selectedBook)}
+                alt={selectedBook.title}
+                style={{ width: "100%", height: "200px", objectFit: "cover", marginBottom: "20px", display: "block" }}
+                onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
+              />
+
+              <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>{selectedBook.title}</p>
+              <p style={{ fontSize: "13px", color: "#888", margin: "0 0 16px", fontWeight: 300 }}>{selectedBook.author}</p>
+
+              <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "20px" }}>
+                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "28px", fontWeight: 700, color: NAVY, margin: 0 }}>
+                  ₦{Number(selectedBook.price)?.toLocaleString()}
+                </p>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: GOLD, letterSpacing: "0.1em", textTransform: "uppercase" }}>NGN</span>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <div className="flex items-start gap-3">
-                  <FileText className="w-5 h-5 text-blue-950 mt-1" />
-                  <div className="text-sm text-blue-950">
-                    <p className="font-semibold mb-1">Instant PDF Access</p>
-                    <p>After payment, the PDF will be sent to: <strong>{auth.currentUser?.email || 'your email'}</strong></p>
-                    <p className="mt-2">You can also download it from "My Books" section anytime.</p>
-                  </div>
+              {/* Info */}
+              <div style={{ background: CREAM, border: `0.5px solid rgba(184,150,62,0.3)`, borderLeft: `3px solid ${GOLD}`, padding: "14px 16px", marginBottom: "20px", display: "flex", gap: "10px" }}>
+                <FileText size={16} style={{ color: GOLD, flexShrink: 0, marginTop: "1px" }} />
+                <div>
+                  <p style={{ fontSize: "11px", fontWeight: 700, color: NAVY, margin: "0 0 4px", letterSpacing: "0.06em", textTransform: "uppercase" }}>Instant PDF Access</p>
+                  <p style={{ fontSize: "12px", color: "#777", margin: 0, lineHeight: 1.6, fontWeight: 300 }}>
+                    After payment, the PDF will be sent to{" "}
+                    <strong style={{ color: NAVY }}>{auth.currentUser?.email || "your email"}</strong>.
+                    Also available in "My Books" anytime.
+                  </p>
                 </div>
               </div>
 
-              <button
-                onClick={handleProceedToPayment}
-                className="w-full bg-blue-950 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors font-semibold"
-              >
-                Proceed to Payment
+              <button className="purchase-btn" onClick={handleProceedToPayment}>
+                Proceed to Payment <ArrowRight size={14} style={{ display: "inline", marginLeft: "4px" }} />
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }

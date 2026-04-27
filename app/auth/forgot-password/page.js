@@ -3,9 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertCircle, CheckCircle, Mail, ArrowRight, Shield, Clock } from 'lucide-react';
-import AuthLayout from '@/components/auth/AuthLayout';
+import { AlertCircle, CheckCircle, Mail, ArrowRight, Clock, ArrowLeft } from 'lucide-react';
 import { resetPassword } from '@/lib/auth/authHelpers';
+
+const NAVY = "#0d2244";
+const GOLD  = "#b8963e";
+const BG    = "#f5f1ea";
+const CREAM = "#f5f0e8";
 
 export default function ForgotPasswordPage() {
     const router = useRouter();
@@ -15,191 +19,201 @@ export default function ForgotPasswordPage() {
     const [error, setError] = useState('');
 
     const handleReset = async () => {
-        // Basic email validation
-        if (!email.trim()) {
-            setError('Please enter your email address');
-            return;
-        }
-
+        if (!email.trim()) { setError('Please enter your email address'); return; }
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            setError('Please enter a valid email address');
-            return;
-        }
+        if (!emailRegex.test(email)) { setError('Please enter a valid email address'); return; }
 
-        setLoading(true);
-        setError('');
-
+        setLoading(true); setError('');
         try {
-            console.log('🔐 Attempting password reset for:', email);
-            console.log('🌍 Current origin:', window.location.origin);
-            
             const result = await resetPassword(email.toLowerCase().trim());
-
-            console.log('📧 Reset password result:', result);
-
             if (result.success) {
-                console.log('✅ Password reset email sent successfully');
                 setSuccess(true);
             } else {
-                console.error('❌ Password reset failed:', result.error);
-                
-                // Handle specific Firebase errors
-                if (result.error?.code === 'auth/user-not-found') {
-                    setError('No account found with this email address. Please check and try again.');
-                } else if (result.error?.code === 'auth/invalid-email') {
-                    setError('Invalid email address format.');
-                } else if (result.error?.code === 'auth/too-many-requests') {
-                    setError('Too many attempts. Please try again later.');
-                } else if (result.error?.code === 'auth/unauthorized-continue-uri') {
-                    setError('Configuration error. Please contact support.');
-                    console.error('⚠️ Unauthorized domain. Check Firebase Authorized Domains settings.');
-                } else if (result.error?.code === 'auth/invalid-continue-uri') {
-                    setError('Configuration error. Please contact support.');
-                    console.error('⚠️ Invalid continue URL. Check Firebase settings.');
-                } else {
-                    setError(`Failed to send reset email: ${result.error?.message || 'Unknown error'}`);
-                }
+                const code = result.error?.code || '';
+                if (code === 'auth/user-not-found') setError('No account found with this email address.');
+                else if (code === 'auth/invalid-email') setError('Invalid email address format.');
+                else if (code === 'auth/too-many-requests') setError('Too many attempts. Please try again later.');
+                else setError(`Failed to send reset email: ${result.error?.message || 'Unknown error'}`);
             }
-        } catch (err) {
-            console.error('💥 Unexpected error during password reset:', err);
-            setError('An unexpected error occurred. Please try again or contact support.');
-        } finally {
-            setLoading(false);
-        }
+        } catch { setError('An unexpected error occurred. Please try again.'); }
+        finally { setLoading(false); }
     };
 
-    if (success) {
-        return (
-            <AuthLayout showBack={false}>
-                <div className="flex-1 flex flex-col items-center justify-center px-4">
-                        <div className="flex items-center gap-2 text-blue-950 px-10 py-3 rounded-xl mb-10">
-                            <h1
-                                className="text-4xl max-md:text-3xl lg:text-6xl font-bold text-blue-950"
-                                style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
-                            >
-                                [LAN Library]
-                                <p className="text-xs sm:text-base font-light" style={{ fontFamily: "'Lato', sans-serif" }}>
-                                    The Global Student Library 📚
-                                </p>
+    return (
+        <>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+                .lan-serif { font-family: 'Playfair Display', Georgia, serif; }
+                .lan-body  { font-family: 'Lato', sans-serif; }
+                .hero-bg {
+                    background-color: ${NAVY};
+                    background-image:
+                        radial-gradient(rgba(184,150,62,0.06) 1px, transparent 1px),
+                        radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+                    background-size: 28px 28px, 14px 14px;
+                    background-position: 0 0, 7px 7px;
+                }
+                .lan-input {
+                    width: 100%; padding: 13px 16px;
+                    background: #fff; border: 0.5px solid #e5ddd0;
+                    font-family: 'Lato', sans-serif; font-size: 13px; color: ${NAVY};
+                    outline: none; transition: border-color 0.15s;
+                    box-sizing: border-box;
+                }
+                .lan-input:focus { border-color: ${GOLD}; }
+                .lan-input::placeholder { color: #bbb; }
+                .btn-primary {
+                    padding: 13px 32px; background: ${NAVY}; color: #fff;
+                    border: none; font-family: 'Lato', sans-serif; font-size: 13px;
+                    font-weight: 700; letter-spacing: 0.04em; cursor: pointer;
+                    transition: background 0.15s; display: inline-flex; align-items: center; gap: 8px;
+                }
+                .btn-primary:hover:not(:disabled) { background: #162d57; }
+                .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+                .btn-primary-full {
+                    width: 100%; padding: 14px; background: ${NAVY}; color: #fff;
+                    border: none; font-family: 'Lato', sans-serif; font-size: 13px;
+                    font-weight: 700; letter-spacing: 0.04em; cursor: pointer;
+                    transition: background 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px;
+                    box-sizing: border-box;
+                }
+                .btn-primary-full:hover { background: #162d57; }
+                @keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+                .anim-up { animation: slideUp 0.5s cubic-bezier(0.4,0,0.2,1) both; }
+                .anim-up2 { animation: slideUp 0.5s 0.12s cubic-bezier(0.4,0,0.2,1) both; }
+                @keyframes spin { to { transform: rotate(360deg); } }
+
+                .fp-card { width: 100%; max-width: 460px; background: #fff; border: 0.5px solid #e5ddd0; padding: 42px 40px; }
+
+                @media (max-width: 600px) {
+                    .fp-card { padding: 32px 20px; border: none; }
+                    .fp-main { padding: 28px 16px 48px !important; }
+                    header { padding: 14px 20px !important; }
+                    .fp-breadcrumb { padding: 10px 16px !important; }
+                }
+            `}</style>
+
+            <div className="lan-body" style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column" }}>
+
+                {/* ── Header ── */}
+                <header className="hero-bg" style={{ padding: "18px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span className="lan-serif" style={{ fontSize: 20, fontWeight: 900, color: "#fff", letterSpacing: -0.5 }}>
+                        [LAN <span style={{ color: GOLD, fontStyle: "italic" }}>Library</span>]
+                    </span>
+                    <Link href="/auth/signin" style={{ color: GOLD, textDecoration: "none", fontSize: 12, fontWeight: 700, display: "flex", gap: 6, alignItems: "center" }}>
+                        <ArrowLeft size={14} /> Back to Sign In
+                    </Link>
+                </header>
+
+                {/* ── Breadcrumb ── */}
+                <div className="fp-breadcrumb" style={{ background: "#fff", borderBottom: "0.5px solid #e5ddd0", padding: "10px 32px" }}>
+                    <div style={{ maxWidth: 1000, margin: "0 auto", fontSize: 12, color: "#888" }}>
+                        Home › Sign In › <span style={{ color: NAVY, fontWeight: 700 }}>Reset Password</span>
+                    </div>
+                </div>
+
+                {/* ── Main ── */}
+                <main className="fp-main" style={{ flex: 1, maxWidth: 1000, margin: "0 auto", width: "100%", padding: "60px 24px", display: "flex", justifyContent: "center", boxSizing: "border-box" }}>
+
+                    {!success ? (
+                        /* ── REQUEST FORM ── */
+                        <div className="fp-card anim-up">
+                            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, marginBottom: 8 }}>Account Recovery</p>
+                            <h1 className="lan-serif" style={{ fontSize: 28, fontWeight: 700, color: NAVY, marginBottom: 6 }}>
+                                Let's get you back in
                             </h1>
-                        </div>
-                    <div className="text-center max-w-lg">
-                        {/* Success Icon */}
-                        <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <CheckCircle className="w-14 h-14 text-green-600" />
-                        </div>
+                            <div style={{ width: 36, height: 3, background: GOLD, marginBottom: 20 }} />
 
-                        {/* Title */}
-                        <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                            Check your email
-                        </h2>
-
-                        {/* Email Display */}
-                        <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5 mb-6">
-                            <div className="flex items-center gap-3 justify-center mb-3">
-                                <Mail className="w-6 h-6 text-blue-600" />
-                                <p className="text-gray-900 font-bold text-lg">{email}</p>
-                            </div>
-                            <p className="text-sm text-gray-700">
-                                We've sent a password reset link to this email address
+                            <p style={{ fontSize: 13, color: "#888", lineHeight: 1.7, marginBottom: 28 }}>
+                                Enter the email associated with your account and we'll send you password reset instructions.
                             </p>
+
+                            <input
+                                className="lan-input"
+                                type="email"
+                                placeholder="Email address"
+                                value={email}
+                                onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleReset(); }}
+                                style={{ marginBottom: error ? 12 : 24 }}
+                            />
+
+                            {error && (
+                                <div style={{ background: "#fef2f2", border: "0.5px solid #fecaca", padding: "12px 16px", display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 24 }}>
+                                    <AlertCircle size={15} color="#dc2626" style={{ flexShrink: 0, marginTop: 1 }} />
+                                    <p style={{ fontSize: 12, color: "#991b1b" }}>{error}</p>
+                                </div>
+                            )}
+
+                            <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                                <button className="btn-primary" onClick={handleReset} disabled={loading || !email.trim()}>
+                                    {loading
+                                        ? <><span style={{ width: 12, height: 12, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} /> Sending…</>
+                                        : "Send reset link"
+                                    }
+                                </button>
+                                <Link href="/auth/signin" style={{ fontSize: 12, color: NAVY, fontWeight: 700, textDecoration: "none" }}>
+                                    Back to sign in
+                                </Link>
+                            </div>
                         </div>
 
-                       
+                    ) : (
+                        /* ── SUCCESS STATE ── */
+                        <div className="fp-card anim-up" style={{ textAlign: "center" }}>
+                            <div style={{ width: 72, height: 72, background: "#f0fdf4", border: "0.5px solid #bbf7d0", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
+                                <CheckCircle size={36} color="#16a34a" />
+                            </div>
 
-                        {/* Important Notes */}
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">
-                            <div className="flex items-start gap-3">
-                                <Clock className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                                <div className="text-sm text-yellow-800">
-                                    <p className="font-semibold mb-1">Important:</p>
-                                    <ul className="list-disc list-inside space-y-1">
+                            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, marginBottom: 8 }}>Email Sent</p>
+                            <h2 className="lan-serif" style={{ fontSize: 26, fontWeight: 700, color: NAVY, marginBottom: 6 }}>Check your inbox</h2>
+                            <div style={{ width: 36, height: 3, background: GOLD, margin: "0 auto 20px" }} />
+
+                            {/* Email badge */}
+                            <div style={{ background: CREAM, border: "0.5px solid #e5ddd0", padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, marginBottom: 20, textAlign: "left" }}>
+                                <Mail size={18} color={NAVY} style={{ flexShrink: 0 }} />
+                                <div>
+                                    <p style={{ fontSize: 10, color: "#888", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>Reset link sent to</p>
+                                    <p style={{ fontSize: 13, color: NAVY, fontWeight: 700 }}>{email}</p>
+                                </div>
+                            </div>
+
+                            {/* Notes */}
+                            <div style={{ background: "#fffbeb", border: "0.5px solid #fde68a", padding: "14px 16px", display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 24, textAlign: "left" }}>
+                                <Clock size={14} color="#92400e" style={{ flexShrink: 0, marginTop: 2 }} />
+                                <div>
+                                    <p style={{ fontSize: 11, fontWeight: 700, color: "#92400e", marginBottom: 6 }}>Important</p>
+                                    <ul style={{ fontSize: 11, color: "#92400e", paddingLeft: 14, margin: 0, lineHeight: 1.8 }}>
                                         <li>The reset link expires in <strong>1 hour</strong></li>
-                                        <li>Check your spam/junk folder if you don't see it</li>
+                                        <li>Check your spam/junk folder if needed</li>
                                         <li>The link can only be used once</li>
                                     </ul>
                                 </div>
                             </div>
+
+                            <p style={{ fontSize: 12, color: "#888", marginBottom: 20 }}>
+                                Didn't receive it?{' '}
+                                <button onClick={() => { setSuccess(false); setEmail(''); }} style={{ color: NAVY, fontWeight: 700, background: "none", border: "none", cursor: "pointer", fontSize: 12, padding: 0 }}>
+                                    Send again
+                                </button>
+                            </p>
+
+                            <Link href="/auth/signin" style={{ textDecoration: "none" }}>
+                                <button className="btn-primary-full">
+                                    Return to Sign In <ArrowRight size={14} />
+                                </button>
+                            </Link>
                         </div>
+                    )}
+                </main>
 
-                        {/* Didn't receive email */}
-                        <p className="text-sm text-gray-600 mb-6">
-                            Didn't receive the email?{' '}
-                            <button
-                                onClick={() => {
-                                    setSuccess(false);
-                                    setEmail('');
-                                }}
-                                className="text-blue-950 font-bold hover:underline"
-                            >
-                                Send again
-                            </button>
-                        </p>
-
-                        {/* Return to Sign In */}
-                        <Link href="/auth/signin">
-                            <button className="w-full bg-blue-950 text-white px-8 py-4 rounded-full font-semibold hover:bg-blue-900 transition-colors flex items-center justify-center gap-2">
-                                Return to Sign In
-                                <ArrowRight className="w-5 h-5" />
-                            </button>
-                        </Link>
-                    </div>
-                </div>
-            </AuthLayout>
-        );
-    }
-
-    return (
-        <AuthLayout backPath="/auth/signin">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Let’s get you back in
-            </h1>
-            <p className="text-gray-600 mb-8">
-                Enter the email associated with your account and we’ll send you password reset instructions
-            </p>
-
-            <div className="mb-2">
-                <input
-                    type="email"
-                    placeholder="Email address"
-                    value={email}
-                    onChange={(e) => {
-                        setEmail(e.target.value);
-                        setError('');
-                    }}
-                    onKeyPress={(e) => {
-                        if (e.key === 'Enter') handleReset();
-                    }}
-                    className="w-full px-4 py-4 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-950 text-gray-900"
-                />
+                {/* ── Footer ── */}
+                <footer className="hero-bg" style={{ padding: "18px", textAlign: "center" }}>
+                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
+                        © {new Date().getFullYear()} LAN Library
+                    </p>
+                </footer>
             </div>
-
-            {error && (
-                <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-red-800 text-sm">Failed to send reset email: network-request-failed.
-</p>
-                </div>
-            )}
-
-            <div className="mb-8"></div>
-
-            <button
-                onClick={handleReset}
-                disabled={loading || !email.trim()}
-                className="max-md:w-full lg:w-1/4 mx-auto bg-blue-950 text-white py-3 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-auto disabled:opacity-70 disabled:cursor-not-allowed enabled:cursor-pointer"
-            >
-                {loading ? 'Sending...' : 'Send reset link'}
-            </button>
-
-            <div className="py-8">
-                <Link href="/auth/signin">
-                    <button className="text-blue-950 hover:underline font-medium">
-                        Back to sign in
-                    </button>
-                </Link>
-            </div>
-        </AuthLayout>
+        </>
     );
 }

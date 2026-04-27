@@ -3,717 +3,466 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  collection,
-  getDocs,
-  doc,
-  getDoc,
-  setDoc,
-  deleteDoc,
-  query,
-  where,
-  updateDoc,
-  increment,
+  collection, getDocs, doc, getDoc, setDoc, deleteDoc,
+  query, where, updateDoc, increment,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebaseConfig";
 import {
-  ArrowLeft,
-  Search,
-  X,
-  ShoppingBag,
-  BookOpen,
-  GraduationCap,
-  UserPlus,
-  UserCheck,
-  Users,
-  MapPin,
-  Building2,
-  Grid3X3,
-  LayoutList,
-  Star,
+  ArrowLeft, Search, X, ShoppingBag, BookOpen, GraduationCap,
+  UserPlus, UserCheck, Users, Building2, Grid3X3, LayoutList,
+  Star, Sparkles, TrendingUp, ChevronRight, BookMarked,
 } from "lucide-react";
 import Link from "next/link";
 import Navbar from "@/components/NavBar";
 
-// ─── THUMBNAIL ────────────────────────────────────────────
+/* ─── design tokens ─────────────────────────────────────── */
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG    = "#f5f1ea";
+
+/* ─── thumbnail ─────────────────────────────────────────── */
 const getThumbnailUrl = (book) => {
-  if (!book)
-    return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-  if (book.driveFileId)
-    return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
+  if (!book) return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+  if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
   if (book.embedUrl) {
-    const m = book.embedUrl.match(
-      /\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/,
-    );
-    if (m) {
-      const id = m[1] || m[2] || m[3];
-      if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`;
-    }
+    const m = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
+    if (m) { const id = m[1]||m[2]||m[3]; if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`; }
   }
   if (book.pdfUrl?.includes("drive.google.com")) {
     const m = book.pdfUrl.match(/[-\w]{25,}/);
     if (m) return `https://drive.google.com/thumbnail?id=${m[0]}&sz=w400`;
   }
-  return (
-    book.image ||
-    "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"
-  );
+  return book.image || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
 };
 
 const isLecturer = (title) => {
   const t = (title || "").toLowerCase();
-  return (
-    t === "lecturer" ||
-    t === "dr." ||
-    t === "prof." ||
-    t === "professor" ||
-    t === "mrs" ||
-    t === "mr"
-  );
+  return ["lecturer","dr.","prof.","professor","mrs","mr"].includes(t);
 };
 
-// ─── BOOK CARD ────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════
+   BOOK CARD — editorial cover style
+═══════════════════════════════════════════════════════════ */
 function BookCard({ book, isPurchased, view }) {
   const href = `/book/preview?id=${String(book.id).replace("firestore-", "")}`;
+  const owned = isPurchased(book.id);
 
   if (view === "list") {
     return (
-      <Link
-        href={href}
-        className="flex items-center gap-4 bg-white rounded-xl border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all p-3 group"
-      >
-        <img
-          src={book.image}
-          alt={book.title}
-          className="w-14 h-20 object-cover rounded-lg flex-shrink-0"
-          onError={(e) => {
-            e.target.src =
-              "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-          }}
-        />
-        <div className="flex-1 min-w-0">
-          <h4 className="font-bold text-sm text-gray-900 line-clamp-1 group-hover:text-blue-700 transition-colors">
-            {book.title}
-          </h4>
-          <p className="text-xs text-gray-400 capitalize mt-0.5">
-            {book.category}
-          </p>
-          <div className="flex items-center gap-2 mt-1.5">
-            {isPurchased(book.id) && (
-              <span className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-semibold">
-                Owned
-              </span>
-            )}
-            {book.soldCount > 0 && (
-              <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
-                <ShoppingBag size={9} />
-                {book.soldCount} sold
-              </span>
-            )}
+      <Link href={href} style={{ display:"flex", alignItems:"center", gap:"14px", background:"#fff", border:`0.5px solid #e5ddd0`, padding:"12px 14px", textDecoration:"none", transition:"border-color .18s, box-shadow .18s" }}
+        className="book-list-row">
+        <img src={book.image} alt={book.title}
+          style={{ width:"44px", height:"60px", objectFit:"cover", flexShrink:0, display:"block" }}
+          onError={e => { e.target.src="https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }} />
+        <div style={{ flex:1, minWidth:0 }}>
+          <h4 style={{ fontFamily:"'Playfair Display',serif", fontSize:"13px", fontWeight:700, color:NAVY, margin:"0 0 3px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{book.title}</h4>
+          <p style={{ fontSize:"11px", color:"#aaa", margin:"0 0 5px", textTransform:"capitalize", fontFamily:"'Lato',sans-serif" }}>{book.category}</p>
+          <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+            {owned && <span style={{ fontSize:"9px", fontWeight:700, background:"#dcfce7", color:"#15803d", padding:"2px 7px", fontFamily:"'Lato',sans-serif", letterSpacing:".06em", textTransform:"uppercase" }}>Owned</span>}
+            {book.soldCount > 0 && <span style={{ fontSize:"10px", color:"#aaa", display:"flex", alignItems:"center", gap:"3px", fontFamily:"'Lato',sans-serif" }}><ShoppingBag size={9}/>{book.soldCount} sold</span>}
           </div>
         </div>
-        <div className="text-right flex-shrink-0">
-          <p className="font-bold text-blue-950">
-            ₦{book.price?.toLocaleString()}
-          </p>
+        <div style={{ flexShrink:0, textAlign:"right" }}>
+          <p style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"14px", color:NAVY, margin:0 }}>₦{book.price?.toLocaleString()}</p>
         </div>
       </Link>
     );
   }
 
   return (
-    <Link
-      href={href}
-      className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-lg hover:border-blue-200 transition-all duration-200"
-    >
-      <div className="relative">
-        <img
-          src={book.image}
-          alt={book.title}
-          className="w-full aspect-[2/3] object-cover group-hover:scale-105 transition-transform duration-300"
-          onError={(e) => {
-            e.target.src =
-              "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-          }}
-        />
-        {isPurchased(book.id) && (
-          <span className="absolute top-2 left-2 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
-            Owned
-          </span>
-        )}
+    <Link href={href} style={{ textDecoration:"none", display:"block", background:"#fff", border:`0.5px solid #e5ddd0`, transition:"transform .22s, box-shadow .22s, border-color .22s" }} className="book-grid-card">
+      <div style={{ position:"relative" }}>
+        <img src={book.image} alt={book.title}
+          style={{ width:"100%", aspectRatio:"2/3", objectFit:"cover", display:"block", transition:"transform .5s cubic-bezier(.4,0,.2,1)" }}
+          className="book-grid-img"
+          onError={e => { e.target.src="https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }} />
+        {/* PDF badge */}
+        <div style={{ position:"absolute", top:"8px", left:"8px", background:NAVY, color:"#fff", fontSize:"9px", fontWeight:700, padding:"3px 7px", fontFamily:"'Lato',sans-serif", letterSpacing:".06em", display:"flex", alignItems:"center", gap:"4px" }}>
+          <span style={{ width:"5px", height:"5px", borderRadius:"50%", background:"#22c55e", display:"inline-block" }}/>PDF
+        </div>
+        {owned && <span style={{ position:"absolute", top:"8px", right:"8px", background:"#16a34a", color:"#fff", fontSize:"9px", fontWeight:700, padding:"3px 7px", fontFamily:"'Lato',sans-serif" }}>OWNED</span>}
         {book.soldCount > 0 && (
-          <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-lg flex items-center gap-1">
-            <ShoppingBag size={9} />
-            {book.soldCount}
+          <span style={{ position:"absolute", bottom:"8px", right:"8px", background:"rgba(13,34,68,.85)", color:"#fff", fontSize:"9px", padding:"3px 7px", fontFamily:"'Lato',sans-serif", display:"flex", alignItems:"center", gap:"3px" }}>
+            <ShoppingBag size={8}/>{book.soldCount}
           </span>
         )}
       </div>
-      <div className="p-3">
-        <h4 className="font-bold text-xs text-gray-900 line-clamp-2 group-hover:text-blue-700 transition-colors leading-snug">
-          {book.title}
-        </h4>
-        <p className="text-[10px] text-gray-400 capitalize mt-0.5">
-          {book.category}
-        </p>
-        <p className="font-bold text-sm text-blue-950 mt-1.5">
-          ₦{book.price?.toLocaleString()}
-        </p>
+      <div style={{ padding:"10px 10px 12px", borderTop:`0.5px solid #f0ebe0` }}>
+        <h4 style={{ fontFamily:"'Playfair Display',serif", fontSize:"12px", fontWeight:700, color:NAVY, margin:"0 0 3px", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden", lineHeight:1.35 }}>{book.title}</h4>
+        <p style={{ fontSize:"10px", color:"#aaa", margin:"0 0 6px", textTransform:"capitalize", fontFamily:"'Lato',sans-serif" }}>{book.category}</p>
+        <p style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"13px", color:NAVY, margin:0 }}>₦{book.price?.toLocaleString()}</p>
       </div>
     </Link>
   );
 }
 
-// ─── MAIN ─────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════
+   MAIN
+═══════════════════════════════════════════════════════════ */
 export default function SellerProfileClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const sellerId = searchParams.get("sellerId");
 
-  const [seller, setSeller] = useState(null);
-  const [sellerPhoto, setSellerPhoto] = useState(null);
-  const [sellerBooks, setSellerBooks] = useState([]);
-  const [filteredBooks, setFilteredBooks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followerCount, setFollowerCount] = useState(0);
-  const [activeTab, setActiveTab] = useState("materials");
-  const [view, setView] = useState("grid");
-  const [followLoading, setFollowLoading] = useState(false);
+  const [seller, setSeller]             = useState(null);
+  const [sellerPhoto, setSellerPhoto]   = useState(null);
+  const [sellerBooks, setSellerBooks]   = useState([]);
+  const [filteredBooks, setFiltered]    = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [searchQuery, setSearch]        = useState("");
+  const [selectedCategory, setCategory]= useState("all");
+  const [purchasedBookIds, setPurchased]= useState(new Set());
+  const [isFollowing, setFollowing]     = useState(false);
+  const [followerCount, setFollowers]   = useState(0);
+  const [activeTab, setActiveTab]       = useState("materials");
+  const [view, setView]                 = useState("grid");
+  const [followLoading, setFollowLoad]  = useState(false);
+  const [stats, setStats]               = useState({ totalSold:0, totalEarnings:0, totalBooks:0 });
   const user = auth.currentUser;
-  const [stats, setStats] = useState({
-    totalSold: 0,
-    totalEarnings: 0,
-    totalBooks: 0,
-  });
 
-  // ─── FOLLOW CHECK ─────────────────────────────────────────
+  /* follow check */
   useEffect(() => {
     const check = async () => {
       if (!user || !sellerId) return;
-      const followDoc = await getDoc(
-        doc(db, "follows", `${user.uid}_${sellerId}`),
-      );
-      setIsFollowing(followDoc.exists());
-      const q = query(
-        collection(db, "follows"),
-        where("lecturerId", "==", sellerId),
-      );
-      const snap = await getDocs(q);
-      setFollowerCount(snap.size);
+      const fd = await getDoc(doc(db, "follows", `${user.uid}_${sellerId}`));
+      setFollowing(fd.exists());
+      const q = query(collection(db, "follows"), where("lecturerId","==",sellerId));
+      setFollowers((await getDocs(q)).size);
     };
     check();
   }, [user, sellerId]);
 
-  // ─── TOGGLE FOLLOW ────────────────────────────────────────
+  /* toggle follow */
   const toggleFollow = async () => {
-    if (!user) {
-      alert("Please sign in to follow");
-      return;
-    }
+    if (!user) { alert("Please sign in to follow"); return; }
     if (followLoading) return;
-    setFollowLoading(true);
-    const followId = `${user.uid}_${sellerId}`;
-    const followRef = doc(db, "follows", followId);
-    const sellerRef = doc(db, "sellers", sellerId);
+    setFollowLoad(true);
+    const followRef = doc(db,"follows",`${user.uid}_${sellerId}`);
+    const sellerRef = doc(db,"sellers",sellerId);
     try {
       if (isFollowing) {
         await deleteDoc(followRef);
-        try {
-          await updateDoc(sellerRef, { followersCount: increment(-1) });
-        } catch (e) {}
-        setIsFollowing(false);
-        setFollowerCount((p) => Math.max(0, p - 1));
+        try { await updateDoc(sellerRef,{followersCount:increment(-1)}); } catch {}
+        setFollowing(false); setFollowers(p=>Math.max(0,p-1));
       } else {
-        await setDoc(followRef, {
-          followerId: user.uid,
-          lecturerId: sellerId,
-          lecturerName: seller?.sellerName || "",
-          createdAt: new Date(),
-        });
-        try {
-          await updateDoc(sellerRef, { followersCount: increment(1) });
-        } catch (e) {
-          await setDoc(sellerRef, { followersCount: 1 }, { merge: true });
-        }
-        setIsFollowing(true);
-        setFollowerCount((p) => p + 1);
+        await setDoc(followRef,{followerId:user.uid,lecturerId:sellerId,lecturerName:seller?.sellerName||"",createdAt:new Date()});
+        try { await updateDoc(sellerRef,{followersCount:increment(1)}); } catch { await setDoc(sellerRef,{followersCount:1},{merge:true}); }
+        setFollowing(true); setFollowers(p=>p+1);
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setFollowLoading(false);
-    }
+    } catch(err){console.error(err);} finally{setFollowLoad(false);}
   };
 
-  // ─── FETCH DATA ───────────────────────────────────────────
-  useEffect(() => {
-    const fetchSellerData = async () => {
-      if (!sellerId) {
-        router.push("/");
-        return;
-      }
-      try {
+  /* fetch data */
+  useEffect(()=>{
+    const fetchSellerData=async()=>{
+      if(!sellerId){router.push("/");return;}
+      try{
         setLoading(true);
-        let sellerName = "Unknown",
-          sellerTitle = "",
-          sellerDept = "",
-          sellerUni = "",
-          photo = null;
-
-        const sellerDoc = await getDoc(doc(db, "sellers", sellerId));
-        if (sellerDoc.exists()) {
-          const d = sellerDoc.data();
-          sellerName = d.sellerName || d.displayName || sellerName;
-          sellerTitle = d.title || "";
-          sellerDept = d.department || "";
-          sellerUni = d.university || "";
-        }
-        const userDoc = await getDoc(doc(db, "users", sellerId));
-        if (userDoc.exists()) {
-          const ud = userDoc.data();
-          if (!sellerName || sellerName === "Unknown")
-            sellerName =
-              ud.displayName ||
-              `${ud.firstName || ""} ${ud.surname || ""}`.trim() ||
-              sellerName;
-          photo = ud.photoBase64 || ud.photoURL || ud.profilePicture || null;
-          if (!sellerDept) sellerDept = ud.department || "";
-          if (!sellerUni) sellerUni = ud.university || "";
-        }
+        let sellerName="Unknown",sellerTitle="",sellerDept="",sellerUni="",photo=null;
+        const sd=await getDoc(doc(db,"sellers",sellerId));
+        if(sd.exists()){const d=sd.data();sellerName=d.sellerName||d.displayName||sellerName;sellerTitle=d.title||"";sellerDept=d.department||"";sellerUni=d.university||"";}
+        const ud=await getDoc(doc(db,"users",sellerId));
+        if(ud.exists()){const u=ud.data();if(!sellerName||sellerName==="Unknown")sellerName=u.displayName||`${u.firstName||""} ${u.surname||""}`.trim()||sellerName;photo=u.photoBase64||u.photoURL||u.profilePicture||null;if(!sellerDept)sellerDept=u.department||"";if(!sellerUni)sellerUni=u.university||"";}
         setSellerPhoto(photo);
-
-        const advertSnap = await getDocs(collection(db, "advertMyBook"));
-        const uploadedBooks = [];
-        advertSnap.forEach((ds) => {
-          const data = ds.data();
-          if (
-            (data.userId === sellerId || data.sellerId === sellerId) &&
-            data.status === "approved"
-          ) {
-            const book = {
-              id: `firestore-${ds.id}`,
-              firestoreId: ds.id,
-              title: data.bookTitle || data.title,
-              author: data.author || "Unknown",
-              category: (data.category || "General").toLowerCase(),
-              price: Number(data.price) || 0,
-              pages: data.pages || 0,
-              format: data.format || "PDF",
-              description: data.description || "",
-              driveFileId: data.driveFileId,
-              pdfUrl: data.pdfUrl || data.pdfLink,
-              embedUrl: data.embedUrl,
-              status: data.status || "pending",
-              isFromFirestore: true,
-            };
-            book.image = getThumbnailUrl(book);
-            uploadedBooks.push(book);
+        const advertSnap=await getDocs(collection(db,"advertMyBook"));
+        const books=[];
+        advertSnap.forEach(ds=>{
+          const data=ds.data();
+          if((data.userId===sellerId||data.sellerId===sellerId)&&data.status==="approved"){
+            const b={id:`firestore-${ds.id}`,firestoreId:ds.id,title:data.bookTitle||data.title,author:data.author||"Unknown",category:(data.category||"General").toLowerCase(),price:Number(data.price)||0,pages:data.pages||0,format:data.format||"PDF",description:data.description||"",driveFileId:data.driveFileId,pdfUrl:data.pdfUrl||data.pdfLink,embedUrl:data.embedUrl,status:data.status||"pending",isFromFirestore:true};
+            b.image=getThumbnailUrl(b);books.push(b);
           }
         });
-
-        let totalSold = 0,
-          totalEarnings = 0;
-        const bookSalesMap = {};
-        const usersSnap = await getDocs(collection(db, "users"));
-        usersSnap.docs.forEach((ud) => {
-          const purchased = ud.data().purchasedBooks || {};
-          Object.values(purchased).forEach((p) => {
-            if (p.sellerId === sellerId) {
-              totalSold++;
-              totalEarnings += p.amount || 0;
-              const title = p.title || "Untitled";
-              bookSalesMap[title] = (bookSalesMap[title] || 0) + 1;
-            }
-          });
-        });
-        uploadedBooks.forEach((b) => {
-          b.soldCount = bookSalesMap[b.title] || 0;
-        });
-
-        const currentUser = auth.currentUser;
-        if (currentUser) {
-          const myDoc = await getDoc(doc(db, "users", currentUser.uid));
-          if (myDoc.exists()) {
-            const myPurchased = myDoc.data().purchasedBooks || {};
-            const ids = new Set();
-            Object.values(myPurchased).forEach((p) => {
-              const id = p.bookId || p.id || p.firestoreId;
-              if (id) {
-                ids.add(id);
-                ids.add(`firestore-${id}`);
-              }
-            });
-            setPurchasedBookIds(ids);
-          }
-        }
-
-        setSeller({ sellerId, sellerName, sellerTitle, sellerDept, sellerUni });
-        setSellerBooks(uploadedBooks);
-        setFilteredBooks(uploadedBooks);
-        setStats({
-          totalSold,
-          totalEarnings,
-          totalBooks: uploadedBooks.length,
-        });
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+        let totalSold=0,totalEarnings=0;const salesMap={};
+        const usersSnap=await getDocs(collection(db,"users"));
+        usersSnap.docs.forEach(ud=>{Object.values(ud.data().purchasedBooks||{}).forEach(p=>{if(p.sellerId===sellerId){totalSold++;totalEarnings+=p.amount||0;const t=p.title||"Untitled";salesMap[t]=(salesMap[t]||0)+1;}});});
+        books.forEach(b=>{b.soldCount=salesMap[b.title]||0;});
+        const cu=auth.currentUser;
+        if(cu){const md=await getDoc(doc(db,"users",cu.uid));if(md.exists()){const ids=new Set();Object.values(md.data().purchasedBooks||{}).forEach(p=>{const id=p.bookId||p.id||p.firestoreId;if(id){ids.add(id);ids.add(`firestore-${id}`);}});setPurchased(ids);}}
+        setSeller({sellerId,sellerName,sellerTitle,sellerDept,sellerUni});
+        setSellerBooks(books);setFiltered(books);
+        setStats({totalSold,totalEarnings,totalBooks:books.length});
+      }catch(err){console.error(err);}finally{setLoading(false);}
     };
     fetchSellerData();
-  }, [sellerId, router]);
+  },[sellerId,router]);
 
-  // ─── FILTER ───────────────────────────────────────────────
-  useEffect(() => {
-    const q = searchQuery.toLowerCase();
-    setFilteredBooks(
-      sellerBooks.filter((b) => {
-        const matchSearch =
-          !q ||
-          b.title?.toLowerCase().includes(q) ||
-          b.category?.toLowerCase().includes(q);
-        const matchCat =
-          selectedCategory === "all" || b.category === selectedCategory;
-        return matchSearch && matchCat;
-      }),
-    );
-  }, [searchQuery, selectedCategory, sellerBooks]);
+  /* filter */
+  useEffect(()=>{
+    const q=searchQuery.toLowerCase();
+    setFiltered(sellerBooks.filter(b=>{
+      const ms=!q||b.title?.toLowerCase().includes(q)||b.category?.toLowerCase().includes(q);
+      const mc=selectedCategory==="all"||b.category===selectedCategory;
+      return ms&&mc;
+    }));
+  },[searchQuery,selectedCategory,sellerBooks]);
 
-  const categories = [
-    { value: "all", label: "All" },
-    ...Array.from(new Set(sellerBooks.map((b) => b.category)))
-      .filter(Boolean)
-      .map((c) => ({
-        value: c,
-        label: c.charAt(0).toUpperCase() + c.slice(1),
-      })),
-  ];
+  const categories=[{value:"all",label:"All"},...Array.from(new Set(sellerBooks.map(b=>b.category))).filter(Boolean).map(c=>({value:c,label:c.charAt(0).toUpperCase()+c.slice(1)}))];
+  const isPurchased=id=>purchasedBookIds.has(id)||purchasedBookIds.has(String(id));
+  const lecturerMode=isLecturer(seller?.sellerTitle);
+  const displayTitle=seller?(lecturerMode?`${seller.sellerTitle} ${seller.sellerName}`:seller.sellerName):"Profile";
 
-  const isPurchased = (id) =>
-    purchasedBookIds.has(id) || purchasedBookIds.has(String(id));
-  const lecturerMode = isLecturer(seller?.sellerTitle);
-  const displayTitle = seller
-    ? lecturerMode
-      ? `${seller.sellerTitle} ${seller.sellerName}`
-      : seller.sellerName
-    : "Profile";
+  /* global styles */
+  const S = () => (
+    <style>{`
+      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+      .lan-root  { font-family:'Lato',sans-serif; background:${BG}; }
+      .lan-serif { font-family:'Playfair Display',Georgia,serif; }
+      .sbar-none { scrollbar-width:none; -ms-overflow-style:none; }
+      .sbar-none::-webkit-scrollbar { display:none; }
+      .book-list-row:hover  { border-color:${GOLD}!important; box-shadow:0 4px 16px rgba(13,34,68,.08); }
+      .book-grid-card:hover { transform:translateY(-4px); box-shadow:0 12px 32px rgba(13,34,68,.12); border-color:${GOLD}!important; }
+      .book-grid-card:hover .book-grid-img { transform:scale(1.05); }
+      .lan-tab { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:10px 22px; border:none; border-bottom:2px solid transparent; cursor:pointer; font-family:'Lato',sans-serif; background:transparent; transition:all .18s; }
+      .lan-tab-active  { color:${GOLD}; border-bottom-color:${GOLD}; }
+      .lan-tab-inactive{ color:#888; }
+      .lan-tab-inactive:hover { color:${NAVY}; }
+      .search-input { font-family:'Lato',sans-serif; font-size:13px; outline:none; background:${BG}; border:0.5px solid #e5ddd0; color:${NAVY}; width:100%; padding:9px 12px 9px 34px; box-sizing:border-box; }
+      .search-input:focus  { border-color:${GOLD}; }
+      .search-input::placeholder { color:#aaa; }
+      .cat-pill { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:5px 14px; border:0.5px solid #e5ddd0; cursor:pointer; font-family:'Lato',sans-serif; transition:all .15s; background:transparent; }
+      .cat-pill.active { background:${NAVY}; color:#fff; border-color:${NAVY}; }
+      .cat-pill:not(.active):hover { border-color:${NAVY}; color:${NAVY}; }
+      .view-btn { width:34px; height:34px; display:flex; align-items:center; justify-content:center; border:0.5px solid #e5ddd0; background:transparent; cursor:pointer; transition:all .15s; }
+      .view-btn.active { background:${NAVY}; border-color:${NAVY}; color:#fff; }
+      .view-btn:not(.active):hover { border-color:${NAVY}; }
+      .follow-btn { display:flex; align-items:center; gap:6px; padding:10px 22px; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-family:'Lato',sans-serif; border:none; cursor:pointer; transition:all .18s; }
+      .follow-btn.following { background:${GOLD};; color:${NAVY}; }
+      .follow-btn.following:hover  { background:${GOLDD}; }
+      .follow-btn.not-following { background:${GOLD}; color:${NAVY}; }
+      .follow-btn.not-following:hover { background:${GOLDD}; }
+      .stat-row:not(:last-child) { border-bottom:0.5px solid #f0ebe0; }
+      @keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+      .anim-up { animation:slideUp .5s cubic-bezier(.4,0,.2,1) both; }
+    `}</style>
+  );
 
-  // ─── LOADING ──────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100">
-        <Navbar />
-        <div className="max-w-2xl mx-auto pt-8 px-4 space-y-4 animate-pulse">
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-            <div className="h-48 bg-gray-200" />
-            <div className="px-4 pb-6 pt-16 relative">
-              <div className="absolute -top-12 left-4 w-24 h-24 rounded-full bg-gray-300 border-4 border-white" />
-              <div className="h-5 bg-gray-200 rounded w-40 mb-2" />
-              <div className="h-3 bg-gray-100 rounded w-56" />
-            </div>
+  /* loading */
+  if (loading) return (
+    <div className="lan-root" style={{ minHeight:"100vh" }}>
+      <S/>
+      <Navbar/>
+      <div style={{ background:NAVY, height:"240px", position:"relative", overflow:"hidden",
+        backgroundImage:`radial-gradient(rgba(184,150,62,.07) 1px,transparent 1px)`, backgroundSize:"28px 28px" }}>
+        <div style={{ position:"absolute", bottom:"20px", left:"24px", display:"flex", flexDirection:"column", gap:"8px" }}>
+          <div style={{ width:"80px", height:"80px", borderRadius:"50%", background:"rgba(255,255,255,.12)" }}/>
+        </div>
+      </div>
+      <div style={{ maxWidth:"1100px", margin:"0 auto", padding:"24px", display:"grid", gridTemplateColumns:"280px 1fr", gap:"20px" }}>
+        {[1,2].map(i=>(
+          <div key={i} style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"24px" }}>
+            {[80,60,40].map(w=>(
+              <div key={w} style={{ height:"12px", background:"#f0ebe0", marginBottom:"12px", width:`${w}%`, animation:"pulse 1.5s infinite" }}/>
+            ))}
           </div>
-        </div>
+        ))}
       </div>
-    );
-  }
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}`}</style>
+    </div>
+  );
 
-  if (!seller) {
-    return (
-      <div className="min-h-screen bg-gray-100">
-        <Navbar />
-        <div className="flex flex-col items-center justify-center py-32 text-center px-4">
-          <BookOpen size={56} className="text-gray-300 mb-4" />
-          <h2 className="text-xl font-bold text-gray-800 mb-2">
-            Profile Not Found
-          </h2>
-          <button
-            onClick={() => router.push("/")}
-            className="mt-4 bg-blue-950 text-white px-6 py-2.5 rounded-xl text-sm font-bold"
-          >
-            Go Home
-          </button>
+  if (!seller) return (
+    <div className="lan-root" style={{ minHeight:"100vh" }}>
+      <S/><Navbar/>
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"80px 24px", textAlign:"center" }}>
+        <div style={{ width:"64px", height:"64px", border:`2px solid #e5ddd0`, transform:"rotate(45deg)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px" }}>
+          <BookOpen size={24} style={{ color:"#e5ddd0", transform:"rotate(-45deg)" }}/>
         </div>
+        <h2 className="lan-serif" style={{ fontSize:"24px", color:NAVY, marginBottom:"8px" }}>Profile Not Found</h2>
+        <button onClick={()=>router.push("/")}
+          style={{ marginTop:"16px", background:NAVY, color:"#fff", padding:"10px 24px", border:"none", cursor:"pointer", fontSize:"12px", fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'Lato',sans-serif" }}>
+          Go Home
+        </button>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // ─── RENDER ───────────────────────────────────────────────
   return (
-    <div className="min-h-screen " style={{ backgroundColor: "#f9f6f0" }}>
-      <Navbar />
+    <div className="lan-root" style={{ minHeight:"100vh" }}>
+      <S/>
+      <Navbar/>
 
-      {/* ── PAGE TITLE BAR ── */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-[1100px] mx-auto px-4 h-12 flex items-center gap-3">
-          <button
-            onClick={() => router.back()}
-            className="text-gray-500 hover:text-blue-950 transition-colors"
-          >
-            <ArrowLeft size={20} />
+      {/* ── STICKY BACK BAR ── */}
+      <div style={{ background:"#fff", borderBottom:`0.5px solid #e5ddd0`, position:"sticky", top:0, zIndex:40 }}>
+        <div style={{ maxWidth:"1100px", margin:"0 auto", padding:"0 24px", height:"48px", display:"flex", alignItems:"center", gap:"12px" }}>
+          <button onClick={()=>router.back()} style={{ background:"none", border:"none", cursor:"pointer", color:"#888", display:"flex", alignItems:"center" }}>
+            <ArrowLeft size={18}/>
           </button>
           <div>
-            <p className="text-[13px] font-bold text-gray-900 leading-tight">
-              {displayTitle}
-            </p>
-            <p className="text-[11px] text-gray-400 leading-tight">
-              {stats.totalBooks} materials
-            </p>
+            <p style={{ fontSize:"13px", fontWeight:700, color:NAVY, margin:0, fontFamily:"'Playfair Display',serif" }}>{displayTitle}</p>
+            <p style={{ fontSize:"10px", color:"#aaa", margin:0, fontFamily:"'Lato',sans-serif" }}>{stats.totalBooks} materials · {followerCount} followers</p>
           </div>
         </div>
       </div>
 
-      <div className="max-w-[1100px] mx-auto pb-16">
-        <div className="bg-white shadow-sm rounded-b-2xl overflow-visible mb-4">
-          {/* Cover Photo */}
-          <div className="relative h-[200px] sm:h-[280px] md:h-[340px] bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 overflow-hidden">
-            {/* Decorative pattern */}
-            <div
-              className="absolute inset-0 "
-              style={{
-                backgroundImage:
-                  "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
-                backgroundSize: "60px 60px",
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-            {/* LAN watermark */}
-            {/* <img src="lanlog.png" className="h-full  w-full object-cover" /> */}
-            <div className="absolute bottom-4 right-5 text-white/10 font-black text-8xl max-md:text-6xl select-none pointer-events-none">
-              LAN Library
-            </div>
-            {lecturerMode && (
-              <div className="absolute top-4 left-4 flex items-center gap-2 bg-white/15 backdrop-blur border border-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-full">
-                <GraduationCap size={13} />
-                {seller.sellerTitle}
-              </div>
-            )}
+      {/* ══════════════════════════════════════════════════════
+          PROFILE HERO — navy dot-grid
+      ══════════════════════════════════════════════════════ */}
+      <div style={{
+        backgroundColor:NAVY,
+        backgroundImage:`radial-gradient(rgba(184,150,62,.07) 1px,transparent 1px),radial-gradient(rgba(255,255,255,.03) 1px,transparent 1px)`,
+        backgroundSize:"28px 28px, 14px 14px",
+        backgroundPosition:"0 0, 7px 7px",
+        position:"relative", overflow:"hidden",
+      }}>
+        {/* LAN watermark */}
+        <div style={{ position:"absolute", bottom:"-10px", right:"20px", fontSize:"100px", fontFamily:"'Playfair Display',serif", fontWeight:900, color:"rgba(255,255,255,.04)", pointerEvents:"none", userSelect:"none" }}>LAN</div>
+
+        {/* Title badge */}
+        {lecturerMode && (
+          <div style={{ position:"absolute", top:"16px", left:"24px", display:"inline-flex", alignItems:"center", gap:"7px", background:"rgba(184,150,62,.14)", border:`1px solid rgba(184,150,62,.3)`, borderRadius:"999px", padding:"6px 14px" }}>
+            <GraduationCap size={11} style={{ color:GOLD }}/>
+            <span style={{ fontSize:"10px", fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:GOLDD, fontFamily:"'Lato',sans-serif" }}>{seller.sellerTitle}</span>
           </div>
+        )}
 
-          {/* Avatar + Name row */}
-          <div className="px-4 sm:px-6 pb-0 relative">
-            {/* Avatar — overlaps cover */}
-            <div className="absolute -top-[52px] left-4 sm:left-6">
-              <div className="relative w-[100px] h-[100px] sm:w-[140px] sm:h-[140px]">
-                {sellerPhoto ? (
-                  <img
-                    src={sellerPhoto}
-                    alt={seller.sellerName}
-                    className="w-full h-full rounded-full object-cover border-4 border-white shadow-xl"
-                  />
-                ) : (
-                  <div className="w-full h-full rounded-full border-4 border-white shadow-xl bg-gradient-to-br from-blue-900 to-indigo-700 flex items-center justify-center">
-                    {lecturerMode ? (
-                      <GraduationCap size={48} className="text-white/80" />
-                    ) : (
-                      <span className="text-white text-4xl font-black">
-                        {seller.sellerName?.charAt(0)?.toUpperCase() || "?"}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
+        <div style={{ maxWidth:"1100px", margin:"0 auto", padding:"60px 24px 0" }}>
+          {/* Avatar row */}
+          <div style={{ display:"flex", alignItems:"flex-end", gap:"20px", flexWrap:"wrap" }}>
+            {/* Avatar */}
+            <div style={{ width:"110px", height:"110px", flexShrink:0, position:"relative", bottom:"-28px" }}>
+              {sellerPhoto ? (
+                <img src={sellerPhoto} alt={seller.sellerName}
+                  style={{ width:"100%", height:"100%", borderRadius:"50%", objectFit:"cover", border:`3px solid ${GOLD}`, display:"block" }}/>
+              ) : (
+                <div style={{ width:"100%", height:"100%", borderRadius:"50%", border:`3px solid ${GOLD}`, background:"rgba(255,255,255,.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  {lecturerMode
+                    ? <GraduationCap size={40} style={{ color:GOLD }}/>
+                    : <span style={{ color:GOLD, fontSize:"36px", fontFamily:"'Playfair Display',serif", fontWeight:900 }}>{seller.sellerName?.charAt(0)?.toUpperCase()||"?"}</span>}
+                </div>
+              )}
             </div>
 
-            {/* Name + actions — right of avatar */}
-            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between pt-2 sm:pt-0 ml-[116px] sm:ml-[160px] min-h-[60px] sm:min-h-[80px] gap-3 sm:gap-4">
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black text-gray-900 leading-tight">
-                  {displayTitle}
-                </h1>
-                <p className="text-sm text-gray-500 font-medium">
-                  {stats.totalBooks} materials · {followerCount} followers
-                </p>
-              </div>
-              <div className="flex items-center gap-2 pb-2">
-                <button
-                  onClick={toggleFollow}
-                  disabled={followLoading}
-                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all ${
-                    isFollowing
-                      ? "bg-gray-300 text-gray-700 hover:bg-gray-200"
-                      : "bg-blue-950 text-white hover:bg-blue-700"
-                  }`}
-                >
-                  {isFollowing ? (
-                    <UserCheck size={16} />
-                  ) : (
-                    <UserPlus size={16} />
-                  )}
-                  {isFollowing ? "Following" : "Follow"}
-                </button>
-              </div>
+            {/* Name + meta */}
+            <div style={{ paddingBottom:"32px", flex:1 }}>
+              <h1 className="lan-serif anim-up" style={{ fontSize:"clamp(22px,4vw,38px)", fontWeight:900, color:"#fff", margin:"0 0 6px", lineHeight:1.05 }}>
+                {displayTitle}
+                {seller.sellerTitle && !lecturerMode && <span style={{ color:GOLD, fontStyle:"italic" }}> ·</span>}
+              </h1>
+              <p style={{ fontSize:"13px", color:"rgba(245,240,232,.6)", margin:0, fontFamily:"'Lato',sans-serif", fontWeight:300 }}>
+                {stats.totalBooks} materials &nbsp;·&nbsp; {followerCount} followers
+              </p>
+            </div>
+
+            {/* Follow button */}
+            <div style={{ paddingBottom:"32px" }}>
+              <button onClick={toggleFollow} disabled={followLoading}
+                className={`follow-btn ${isFollowing?"following":"not-following"}`}>
+                {isFollowing ? <UserCheck size={13}/> : <UserPlus size={13}/>}
+                {isFollowing ? "Following" : "Follow"}
+              </button>
             </div>
           </div>
 
-          {/* Divider */}
-          <div className="mx-4 sm:mx-6 mt-4 border-t border-gray-200" />
-
-          {/* Tab navigation */}
-          <div
-            className="flex overflow-x-auto px-4 sm:px-6 gap-0"
-            style={{ scrollbarWidth: "none" }}
-          >
+          {/* stat strip */}
+          <div style={{ borderTop:`0.5px solid rgba(184,150,62,.15)`, display:"flex", flexWrap:"wrap", marginTop:"28px" }}>
             {[
-              { id: "materials", label: lecturerMode ? "Materials" : "Books" },
-              { id: "about", label: "About" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`relative flex-none px-4 py-3 text-[13px] font-bold transition-colors ${
-                  activeTab === tab.id
-                    ? "text-blue-600 border-b-[3px] border-blue-600"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg"
-                }`}
-              >
+              { val:stats.totalBooks,  label:"Materials" },
+              { val:stats.totalSold,   label:"Sold"      },
+              { val:followerCount,     label:"Followers" },
+            ].map(({val,label})=>(
+              <div key={label} style={{ flex:"1 1 100px", padding:"16px 20px 0", borderRight:`0.5px solid rgba(184,150,62,.1)` }}>
+                <div className="lan-serif" style={{ fontSize:"22px", fontWeight:700, color:"#fff" }}>{val}</div>
+                <div style={{ fontSize:"10px", fontWeight:700, letterSpacing:".1em", textTransform:"uppercase", color:"rgba(184,150,62,.7)", marginTop:"2px", fontFamily:"'Lato',sans-serif" }}>{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tabs */}
+          <div className="sbar-none" style={{ display:"flex", marginTop:"20px", gap:"0", borderTop:`0.5px solid rgba(184,150,62,.15)`, paddingTop:"4px" }}>
+            {[{id:"materials",label:lecturerMode?"Materials":"Books"},{id:"about",label:"About"}].map(tab=>(
+              <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
+                className={`lan-tab ${activeTab===tab.id?"lan-tab-active":"lan-tab-inactive"}`}>
                 {tab.label}
               </button>
             ))}
           </div>
         </div>
+      </div>
 
-        {/* ══ CONTENT AREA ════════════════════════════════════════════════════ */}
-        <div className="px-4 sm:px-0 grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
-          {/* LEFT SIDEBAR */}
-          <div className="space-y-4">
+      {/* ══════════════════════════════════════════════════════
+          CONTENT
+      ══════════════════════════════════════════════════════ */}
+      <div style={{ maxWidth:"1100px", margin:"0 auto", padding:"32px 24px 80px" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"260px 1fr", gap:"24px", alignItems:"start" }}>
+
+          {/* ── LEFT SIDEBAR ── */}
+          <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
             {/* About card */}
-            <div className="bg-white rounded-2xl shadow-sm p-5">
-              <h3 className="text-base font-bold text-gray-900 mb-4">About</h3>
-              <div className="space-y-3 text-sm text-gray-600">
+            <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"24px" }}>
+              <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLD, marginBottom:"14px", fontFamily:"'Lato',sans-serif" }}>About</p>
+              <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
                 {seller.sellerTitle && (
-                  <div className="flex items-center gap-3">
-                    <GraduationCap
-                      size={18}
-                      className="text-gray-400 flex-shrink-0"
-                    />
-                    <span>
-                      <strong className="text-gray-800">
-                        {seller.sellerTitle}
-                      </strong>
-                    </span>
+                  <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                    <GraduationCap size={14} style={{ color:GOLD, flexShrink:0 }}/>
+                    <span style={{ fontSize:"13px", color:NAVY, fontFamily:"'Lato',sans-serif", fontWeight:700 }}>{seller.sellerTitle}</span>
                   </div>
                 )}
                 {seller.sellerDept && (
-                  <div className="flex items-center gap-3">
-                    <BookOpen
-                      size={18}
-                      className="text-gray-400 flex-shrink-0"
-                    />
-                    <span>{seller.sellerDept}</span>
+                  <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                    <BookMarked size={14} style={{ color:GOLD, flexShrink:0 }}/>
+                    <span style={{ fontSize:"13px", color:"#666", fontFamily:"'Lato',sans-serif" }}>{seller.sellerDept}</span>
                   </div>
                 )}
                 {seller.sellerUni && (
-                  <div className="flex items-center gap-3">
-                    <Building2
-                      size={18}
-                      className="text-gray-400 flex-shrink-0"
-                    />
-                    <span>{seller.sellerUni}</span>
+                  <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                    <Building2 size={14} style={{ color:GOLD, flexShrink:0 }}/>
+                    <span style={{ fontSize:"13px", color:"#666", fontFamily:"'Lato',sans-serif" }}>{seller.sellerUni}</span>
                   </div>
                 )}
-                {!seller.sellerDept && !seller.sellerUni && (
-                  <p className="text-gray-400 text-xs">
-                    No additional info provided.
-                  </p>
+                {!seller.sellerDept && !seller.sellerUni && !seller.sellerTitle && (
+                  <p style={{ fontSize:"12px", color:"#bbb", fontFamily:"'Lato',sans-serif" }}>No additional info provided.</p>
                 )}
               </div>
             </div>
 
             {/* Stats card */}
-            <div className="bg-white rounded-2xl shadow-sm p-5">
-              <h3 className="text-base font-bold text-gray-900 mb-4">Stats</h3>
-              <div className="space-y-3">
+            <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"24px" }}>
+              <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLD, marginBottom:"14px", fontFamily:"'Lato',sans-serif" }}>Stats</p>
+              <div style={{ display:"flex", flexDirection:"column" }}>
                 {[
-                  {
-                    label: "Total Materials",
-                    value: stats.totalBooks,
-                    icon: BookOpen,
-                  },
-                  {
-                    label: "Total Sold",
-                    value: stats.totalSold,
-                    icon: ShoppingBag,
-                  },
-                  { label: "Followers", value: followerCount, icon: Users },
-                ].map(({ label, value, icon: Icon }) => (
-                  <div
-                    key={label}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Icon size={16} className="text-gray-400" />
-                      {label}
+                  { label:"Total Materials", value:stats.totalBooks,  Icon:BookOpen   },
+                  { label:"Total Sold",      value:stats.totalSold,   Icon:ShoppingBag },
+                  { label:"Followers",       value:followerCount,     Icon:Users      },
+                ].map(({label,value,Icon})=>(
+                  <div key={label} className="stat-row" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"13px", color:"#666", fontFamily:"'Lato',sans-serif" }}>
+                      <Icon size={13} style={{ color:GOLD }}/>{label}
                     </div>
-                    <span className="font-bold text-gray-900 text-sm">
-                      {value}
-                    </span>
+                    <span style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, color:NAVY, fontSize:"14px" }}>{value}</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* MAIN FEED */}
-          {activeTab === "materials" && (
-            <div className="space-y-4">
-              {/* Search + filter bar */}
-              <div className="bg-white rounded-2xl shadow-sm p-4">
-                <div className="flex gap-3 mb-3">
-                  <div className="relative flex-1">
-                    <Search
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                      size={15}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Search materials..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-9 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors text-gray-900"
-                    />
+          {/* ── MAIN FEED ── */}
+          {activeTab==="materials" && (
+            <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
+              {/* Search + filter */}
+              <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"16px 20px" }}>               
+                <div style={{ display:"flex", gap:"10px", marginBottom:"12px" }}>
+                  <div style={{ flex:1, position:"relative" }}>
+                    <Search size={13} style={{ position:"absolute", left:"12px", top:"50%", transform:"translateY(-50%)", color:"#bbb" }}/>
+                    <input type="text" placeholder="Search materials…" value={searchQuery} onChange={e=>setSearch(e.target.value)} className="search-input"/>
                     {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery("")}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <X size={14} />
+                      <button onClick={()=>setSearch("")} style={{ position:"absolute", right:"10px", top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:"#aaa" }}>
+                        <X size={13}/>
                       </button>
                     )}
                   </div>
-                  <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
-                    <button
-                      onClick={() => setView("grid")}
-                      className={`p-2 rounded-lg transition-colors ${view === "grid" ? "bg-white shadow-sm text-blue-600" : "text-gray-500"}`}
-                    >
-                      <Grid3X3 size={16} />
-                    </button>
-                    <button
-                      onClick={() => setView("list")}
-                      className={`p-2 rounded-lg transition-colors ${view === "list" ? "bg-white shadow-sm text-blue-600" : "text-gray-500"}`}
-                    >
-                      <LayoutList size={16} />
-                    </button>
+                  {/* View toggle */}
+                  <div style={{ display:"flex", gap:"0" }}>
+                    <button onClick={()=>setView("grid")} className={`view-btn ${view==="grid"?"active":""}`}><Grid3X3 size={14}/></button>
+                    <button onClick={()=>setView("list")} className={`view-btn ${view==="list"?"active":""}`}><LayoutList size={14}/></button>
                   </div>
                 </div>
-
                 {/* Category pills */}
-                <div
-                  className="flex gap-2 overflow-x-auto pb-1"
-                  style={{ scrollbarWidth: "none" }}
-                >
-                  {categories.map((cat) => (
-                    <button
-                      key={cat.value}
-                      onClick={() => setSelectedCategory(cat.value)}
-                      className={`flex-none px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-                        selectedCategory === cat.value
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
+                <div className="sbar-none" style={{ display:"flex", gap:"6px", overflowX:"auto" }}>
+                  {categories.map(cat=>(
+                    <button key={cat.value} onClick={()=>setCategory(cat.value)} className={`cat-pill${selectedCategory===cat.value?" active":""}`}>
                       {cat.label}
                     </button>
                   ))}
@@ -721,124 +470,63 @@ export default function SellerProfileClient() {
               </div>
 
               {/* Results */}
-              <div className="bg-white rounded-2xl shadow-sm p-4">
-                <p className="text-xs text-gray-400 mb-4 font-medium">
-                  {filteredBooks.length}{" "}
-                  {filteredBooks.length === 1 ? "result" : "results"}
+            <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"20px" }}>                
+                <p style={{ fontSize:"10px", color:"#aaa", marginBottom:"16px", fontFamily:"'Lato',sans-serif", fontWeight:700, letterSpacing:".08em", textTransform:"uppercase" }}>
+                  {filteredBooks.length} result{filteredBooks.length!==1?"s":""}
                 </p>
 
-                {filteredBooks.length === 0 ? (
-                  <div className="text-center py-16">
-                    <BookOpen
-                      size={48}
-                      className="mx-auto text-gray-200 mb-3"
-                    />
-                    <p className="text-gray-400 text-sm font-medium">
-                      {searchQuery || selectedCategory !== "all"
-                        ? "No results. Clear your filters."
-                        : "No materials uploaded yet."}
+                {filteredBooks.length===0 ? (
+                  <div style={{ textAlign:"center", padding:"64px 24px" }}>
+                    <div style={{ width:"56px", height:"56px", border:`2px solid #e5ddd0`, transform:"rotate(45deg)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
+                      <BookOpen size={20} style={{ color:"#e5ddd0", transform:"rotate(-45deg)" }}/>
+                    </div>
+                    <h3 className="lan-serif" style={{ fontSize:"18px", color:NAVY, marginBottom:"6px" }}>No results</h3>
+                    <p style={{ fontSize:"12px", color:"#bbb", fontFamily:"'Lato',sans-serif" }}>
+                      {searchQuery||selectedCategory!=="all"?"Clear your filters to see all materials.":"No materials uploaded yet."}
                     </p>
-                    {(searchQuery || selectedCategory !== "all") && (
-                      <button
-                        onClick={() => {
-                          setSearchQuery("");
-                          setSelectedCategory("all");
-                        }}
-                        className="mt-3 text-blue-600 text-sm font-bold"
-                      >
+                    {(searchQuery||selectedCategory!=="all")&&(
+                      <button onClick={()=>{setSearch("");setCategory("all");}}
+                        style={{ marginTop:"12px", background:"none", border:`0.5px solid ${NAVY}`, color:NAVY, padding:"7px 18px", cursor:"pointer", fontSize:"11px", fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'Lato',sans-serif" }}>
                         Clear filters
                       </button>
                     )}
                   </div>
-                ) : view === "list" ? (
-                  <div className="space-y-2">
-                    {filteredBooks.map((book) => (
-                      <BookCard
-                        key={book.id}
-                        book={book}
-                        isPurchased={isPurchased}
-                        view="list"
-                      />
-                    ))}
+                ) : view==="list" ? (
+                  <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                    {filteredBooks.map(book=><BookCard key={book.id} book={book} isPurchased={isPurchased} view="list"/>)}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {filteredBooks.map((book) => (
-                      <BookCard
-                        key={book.id}
-                        book={book}
-                        isPurchased={isPurchased}
-                        view="grid"
-                      />
-                    ))}
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))", gap:"14px" }}>
+                    {filteredBooks.map(book=><BookCard key={book.id} book={book} isPurchased={isPurchased} view="grid"/>)}
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* ABOUT TAB */}
-          {activeTab === "about" && (
-            <div className="bg-white rounded-2xl shadow-sm p-6 space-y-5">
-              <h3 className="text-base font-bold text-gray-900">
+          {/* ── ABOUT TAB ── */}
+          {activeTab==="about" && (
+            <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"32px" }}>              
+              <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLD, marginBottom:"20px", fontFamily:"'Lato',sans-serif" }}>
                 About {displayTitle}
-              </h3>
-              <div className="space-y-4 text-sm text-gray-700">
-                {seller.sellerTitle && (
-                  <div className="flex items-start gap-3 border-b border-gray-50 pb-4">
-                    <GraduationCap
-                      size={20}
-                      className="text-blue-500 flex-shrink-0 mt-0.5"
-                    />
+              </p>
+              <div style={{ display:"flex", flexDirection:"column", gap:"0" }}>
+                {[
+                  {label:"Title", value:seller.sellerTitle, Icon:GraduationCap},
+                  {label:"Department", value:seller.sellerDept, Icon:BookMarked},
+                  {label:"University", value:seller.sellerUni, Icon:Building2},
+                ].filter(r=>r.value).map(({label,value,Icon})=>(
+                  <div key={label} style={{ display:"flex", alignItems:"flex-start", gap:"14px", padding:"18px 0", borderBottom:`0.5px solid #f0ebe0` }}>
+                    <Icon size={16} style={{ color:GOLD, flexShrink:0, marginTop:"2px" }}/>
                     <div>
-                      <p className="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-1">
-                        Title
-                      </p>
-                      <p className="font-bold text-gray-900">
-                        {seller.sellerTitle}
-                      </p>
+                      <p style={{ fontSize:"9px", fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:"#aaa", margin:"0 0 4px", fontFamily:"'Lato',sans-serif" }}>{label}</p>
+                      <p style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:"15px", color:NAVY, margin:0 }}>{value}</p>
                     </div>
                   </div>
+                ))}
+                {!seller.sellerDept&&!seller.sellerUni&&!seller.sellerTitle&&(
+                  <p style={{ fontSize:"13px", color:"#bbb", fontFamily:"'Lato',sans-serif" }}>No profile information added yet.</p>
                 )}
-                {seller.sellerDept && (
-                  <div className="flex items-start gap-3 border-b border-gray-50 pb-4">
-                    <BookOpen
-                      size={20}
-                      className="text-blue-500 flex-shrink-0 mt-0.5"
-                    />
-                    <div>
-                      <p className="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-1">
-                        Department
-                      </p>
-                      <p className="font-bold text-gray-900">
-                        {seller.sellerDept}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {seller.sellerUni && (
-                  <div className="flex items-start gap-3">
-                    <Building2
-                      size={20}
-                      className="text-blue-500 flex-shrink-0 mt-0.5"
-                    />
-                    <div>
-                      <p className="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-1">
-                        University
-                      </p>
-                      <p className="font-bold text-gray-900">
-                        {seller.sellerUni}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {!seller.sellerDept &&
-                  !seller.sellerUni &&
-                  !seller.sellerTitle && (
-                    <p className="text-gray-400">
-                      No profile information added yet.
-                    </p>
-                  )}
               </div>
             </div>
           )}

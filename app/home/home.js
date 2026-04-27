@@ -1,190 +1,89 @@
-"use client"
-import React, { useState, useEffect } from 'react';
-import { FileText, Monitor, Upload, ChevronLeft, ShoppingBag, Smartphone, Globe, ArrowRight, ChevronRight, BookOpen } from 'lucide-react';
-import Link from 'next/link';
-import { onAuthStateChanged } from 'firebase/auth';
+"use client";
+import React, { useState, useEffect } from "react";
+import {
+    FileText, Monitor, Upload, ShoppingBag, Smartphone,
+    ArrowRight, ChevronRight, BookOpen, GraduationCap,
+    Building2, Book, Search, Star, TrendingUp, Users,
+    Award, BookMarked, Layers, FileQuestion, Sparkles,
+} from "lucide-react";
+import Link from "next/link";
+import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
-import HomeLoading from './loading';
-import MobileCategoriesCarousel from '@/components/MobileCategoriesCarousel';
-import InstitutionalLibraryPage from '@/components/InstitutionalLib';
-import Footer from '@/components/FooterComp';
-import Navbar from '@/components/NavBar';
-import { auth, db } from '@/lib/firebaseConfig';
+import {
+    doc, getDoc, collection, query, orderBy,
+    limit, getDocs, where,
+} from "firebase/firestore";
+import HomeLoading from "./loading";
+import Footer from "@/components/FooterComp";
+import Navbar from "@/components/NavBar";
+import { auth, db } from "@/lib/firebaseConfig";
 
+/* ─── colour tokens ─────────────────────────────────────────── */
+const NAVY = "#0d2244";
+const GOLD = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG = "#f5f1ea";        // warm parchment page bg
+
+/* ─── data ───────────────────────────────────────────────────── */
 const documentTypes = [
-    { name: 'Textbook', slug: 'textbook', image: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400', description: 'Standard educational books' },
-    { name: 'Lecture Note', slug: 'lecture-note', image: 'https://images.unsplash.com/photo-1517842645767-c639042777db?w=400', description: 'Summarized class materials' },
-    { name: 'Past Question', slug: 'past-question', image: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=400', description: 'Previous exam papers' },
-    { name: 'Thesis', slug: 'thesis', image: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400', description: 'Academic research papers' },
-    { name: 'Summary', slug: 'summary', image: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=400', description: 'Quick study breakdowns' },
-    { name: 'Syllabus', slug: 'syllabus', image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400', description: 'Course requirements' },
-    { name: 'Course Outline', slug: 'course-outline', image: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=400', description: 'Topic distributions' },
-    { name: 'Assignment', slug: 'assignment', image: 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=400', description: 'Practice tasks and projects' },
-    { name: 'Project', slug: 'project', image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400', description: 'Detailed student projects' },
-
-    // NEW CATEGORIES
-    { name: 'Lab Manual', slug: 'lab-manual', image: 'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=400', description: 'Practical guides and lab reports' },
-    { name: 'Handwritten Notes', slug: 'handwritten-notes', image: 'https://images.unsplash.com/photo-1503467913725-8484b65b0715?w=400', description: 'Authentic student class notes' },
-    { name: 'Exam Revision', slug: 'exam-revision', image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400', description: 'Highly focused exam prep materials' },
-    { name: 'Scholarship Guide', slug: 'scholarship-guide', image: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=400', description: 'Funding and application tips' },
-    { name: 'Research Proposal', slug: 'research-proposal', image: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=400', description: 'Initial project outlines and methodology' },
-    { name: 'Seminar Paper', slug: 'seminar-paper', image: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=400', description: 'Presentations for departmental seminars' },
-
-    // PRACTICAL & TECHNICAL
-    { name: 'Technical Drawing', slug: 'technical-drawing', image: 'https://images.unsplash.com/photo-1503387762-592dec58ef4e?w=400', description: 'Engineering and architectural designs' },
-
-    // STUDY AIDS
-    { name: 'Case Study', slug: 'case-study', image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=400', description: 'Analysis of real-world scenarios (Law/Business)' },
-
-    // ADMINISTRATIVE & CAREER
-    { name: 'Internship Report', slug: 'internship-report', image: 'https://images.unsplash.com/photo-1521791136064-7986c2959d99?w=400', description: 'SIWES or industrial training documentation' },
-    { name: 'Clearance Guide', slug: 'clearance-guide', image: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400', description: 'Step-by-step for graduation clearance' }
+    { name: "Textbook", slug: "textbook", image: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400", description: "Standard educational books" },
+    { name: "Lecture Note", slug: "lecture-note", image: "https://images.unsplash.com/photo-1517842645767-c639042777db?w=400", description: "Summarized class materials" },
+    { name: "Past Question", slug: "past-question", image: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=400", description: "Previous exam papers" },
+    { name: "Thesis", slug: "thesis", image: "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400", description: "Academic research papers" },
+    { name: "Summary", slug: "summary", image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=400", description: "Quick study breakdowns" },
+    { name: "Syllabus", slug: "syllabus", image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400", description: "Course requirements" },
+    { name: "Course Outline", slug: "course-outline", image: "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=400", description: "Topic distributions" },
+    { name: "Assignment", slug: "assignment", image: "https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=400", description: "Practice tasks and projects" },
+    { name: "Project", slug: "project", image: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400", description: "Detailed student projects" },
+    { name: "Lab Manual", slug: "lab-manual", image: "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=400", description: "Practical guides and lab reports" },
+    { name: "Handwritten Notes", slug: "handwritten-notes", image: "https://images.unsplash.com/photo-1503467913725-8484b65b0715?w=400", description: "Authentic student class notes" },
+    { name: "Exam Revision", slug: "exam-revision", image: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400", description: "Highly focused exam prep materials" },
 ];
 
-// Category data
 const categories = [
-    {
-        name: 'Education',
-        subcategories: 8,
-        image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400',
-        description: 'Academic resources and learning materials'
-    },
-    {
-        name: 'Personal Development',
-        subcategories: 12,
-        image: 'https://images.unsplash.com/photo-1516397281156-ca07cf9746fc?w=400',
-        description: 'Self-improvement and personal growth'
-    },
-    {
-        name: 'Business',
-        subcategories: 10,
-        image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400',
-        description: 'Management, finance, and entrepreneurship'
-    },
-    {
-        name: 'Technology',
-        subcategories: 7,
-        image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400',
-        description: 'Programming, IT, and digital innovation'
-    },
-    {
-        name: 'Science',
-        subcategories: 9,
-        image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400',
-        description: 'Research, discoveries, and exploration'
-    },
-    {
-        name: 'Literature',
-        subcategories: 15,
-        image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400',
-        description: 'Classic and contemporary literary works'
-    },
-    {
-        name: 'Health & Fitness',
-        subcategories: 6,
-        image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=400',
-        description: 'Medical, fitness, and mental health'
-    },
-    {
-        name: 'History',
-        subcategories: 6,
-        image: 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=400',
-        description: 'Historical events and civilizations'
-    },
-    {
-        name: 'Arts & Culture',
-        subcategories: 5,
-        image: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=400',
-        description: 'Creative expression and cultural studies'
-    },
-    {
-        name: 'Relationship',
-        subcategories: 6,
-        image: 'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=400',
-        description: 'Love, marriage, dating, communication, and personal connections'
-    },
-    {
-        name: 'Self-Help',
-        subcategories: 8,
-        image: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400',
-        description: 'Personal empowerment and life guidance'
-    },
-    {
-        name: 'Finance',
-        subcategories: 7,
-        image: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=400',
-        description: 'Money management and investment strategies'
-    },
-    {
-        name: 'Marketing',
-        subcategories: 5,
-        image: 'https://images.unsplash.com/photo-1533750349088-cd871a92f312?w=400',
-        description: 'Branding, advertising, and promotion'
-    },
-    {
-        name: 'Programming',
-        subcategories: 10,
-        image: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=400',
-        description: 'Coding, software development, and algorithms'
-    },
-    {
-        name: 'Psychology',
-        subcategories: 8,
-        image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-        description: 'Human behavior and mental processes'
-    },
-    {
-        name: 'Fiction',
-        subcategories: 20,
-        image: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400',
-        description: 'Novels, stories, and imaginative narratives'
-    },
-    {
-        name: 'Non-Fiction',
-        subcategories: 18,
-        image: 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=400',
-        description: 'Real-world facts and true stories'
-    },
-    {
-        name: 'Philosophy',
-        subcategories: 6,
-        image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400',
-        description: 'Wisdom, ethics, and existential questions'
-    },
-    {
-        name: 'Travel',
-        subcategories: 7,
-        image: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400',
-        description: 'Destinations, culture, and adventure'
-    },
-    {
-        name: 'Cooking',
-        subcategories: 9,
-        image: 'https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=400',
-        description: 'Recipes, culinary techniques, and food culture'
-    },
-    {
-        name: 'Religion & Spirituality',
-        subcategories: 8,
-        image: 'https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?w=400',
-        description: 'Faith, beliefs, and spiritual practices'
-    },
-    {
-        name: 'Sex Education',
-        subcategories: 4,
-        image: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=400',
-        description: 'Sexual health, relationships, and wellness'
-    },
-    {
-        name: 'Social Media',
-        subcategories: 4,
-        image: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=400',
-        description: 'Growing Your media account, marketing on socia media'
-    }
+    { name: "Education", image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400", description: "Academic resources and learning materials", sub: 8 },
+    { name: "Business", image: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400", description: "Management, finance, and entrepreneurship", sub: 10 },
+    { name: "Technology", image: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400", description: "Programming, IT, and digital innovation", sub: 7 },
+    { name: "Science", image: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400", description: "Research, discoveries, and exploration", sub: 9 },
+    { name: "Personal Development", image: "https://images.unsplash.com/photo-1516397281156-ca07cf9746fc?w=400", description: "Self-improvement and personal growth", sub: 12 },
+    { name: "Literature", image: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400", description: "Classic and contemporary literary works", sub: 15 },
+    { name: "Health & Fitness", image: "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=400", description: "Medical, fitness, and mental health", sub: 6 },
+    { name: "Finance", image: "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=400", description: "Money management and investment strategies", sub: 7 },
+    { name: "Programming", image: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=400", description: "Coding, software development, and algorithms", sub: 10 },
+    { name: "Psychology", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400", description: "Human behaviour and mental processes", sub: 8 },
+    { name: "Philosophy", image: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400", description: "Wisdom, ethics, and existential questions", sub: 6 },
+    { name: "Religion & Spirituality", image: "https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?w=400", description: "Faith, beliefs, and spiritual practices", sub: 8 },
 ];
 
+const trendingAcademicAreas = [
+    { id: "universities", name: "Universities", slug: "university", icon: GraduationCap, description: "Undergraduate and postgraduate academic resources across all disciplines" },
+    { id: "islamic", name: "Islamic Institutions", slug: "islamic-institutions", icon: Building2, description: "Quranic studies, Islamic jurisprudence, and Islamic education" },
+    { id: "christian", name: "Christian Institutions", slug: "christian-institutions", icon: Book, description: "Biblical studies, theology, and Christian education materials" },
+    { id: "secondary", name: "Secondary School", slug: "secondary-school", icon: BookOpen, description: "Complete curriculum materials for SS1, SS2, and SS3 students" },
+    { id: "waec", name: "WAEC / NECO / JAMB", slug: "exam-prep", icon: FileQuestion, description: "Past questions and preparation materials for major examinations" },
+    { id: "polytechnic", name: "Polytechnics", slug: "polytechnic", icon: Award, description: "ND and HND technical and vocational education resources" },
+    { id: "postgraduate", name: "Postgraduate Studies", slug: "postgraduate", icon: BookMarked, description: "Masters, PhD and research materials across all disciplines" },
+    { id: "professional", name: "Professional Certs", slug: "professional-cert", icon: Star, description: "ICAN, ACCA, CFA, PMP and other professional qualifications" },
+];
 
+/* ─── helper ─────────────────────────────────────────────────── */
+const getThumbnailUrl = (book) => {
+    if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
+    if (book.embedUrl) {
+        const m = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
+        if (m) { const id = m[1] || m[2] || m[3]; if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`; }
+    }
+    if (book.pdfUrl?.includes("drive.google.com")) {
+        const m = book.pdfUrl.match(/[-\w]{25,}/);
+        if (m) return `https://drive.google.com/thumbnail?id=${m[0]}&sz=w400`;
+    }
+    return book.image || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+};
+
+/* ════════════════════════════════════════════════════════════════
+   COMPONENT
+════════════════════════════════════════════════════════════════ */
 export default function HomeClient() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -193,696 +92,669 @@ export default function HomeClient() {
     const [isSeller, setIsSeller] = useState(false);
     const [checkingSeller, setCheckingSeller] = useState(true);
     const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
-    const router = useRouter();
-    const [searchQuery, setSearchQuery] = useState("");
-    const [currentSlide, setCurrentSlide] = useState(0);
-    const [activeTab, setActiveTab] = useState('subjects');
-    const [selectedCategory, setSelectedCategory] = useState('all');
+    const [activeTab, setActiveTab] = useState("subjects");
     const [bookSalesCount, setBookSalesCount] = useState({});
+    const [browseSearch, setBrowseSearch] = useState("");
+    const router = useRouter();
 
-    // Now this will work because subjectCategories is already defined above
-    const currentCategories = activeTab === 'subjects' ? categories : documentTypes;
-   
+    const filteredCategories = categories.filter(c =>
+        c.name.toLowerCase().includes(browseSearch.toLowerCase()) ||
+        c.description.toLowerCase().includes(browseSearch.toLowerCase())
+    );
+    const filteredDocTypes = documentTypes.filter(d =>
+        d.name.toLowerCase().includes(browseSearch.toLowerCase()) ||
+        d.description.toLowerCase().includes(browseSearch.toLowerCase())
+    );
 
-    const featuredContent = [
-        {
-            title: "University Excellence: Your Gateway to Higher Education",
-            description: "Discover comprehensive resources for undergraduate and postgraduate studies across all disciplines",
-            timeAgo: "2 weeks ago",
-            author: "Academic Team",
-            image: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=1200&q=80',
-            link: "/institutional/category/university",
-        },
-       
-        {
-            title: "Secondary School Success: Build Your Future Today",
-            description: "Complete curriculum materials for SS1, SS2, and SS3 students across all subjects",
-            timeAgo: "1 week ago",
-            author: "Secondary Education Team",
-            image: "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=1200&q=80",
-            link: "/institutional/category/secondary-school",
-        },
-        {
-            title: "Primary Education: Foundation for Lifelong Learning",
-            description: "Age-appropriate learning materials for primary 1 through primary 6 students",
-            timeAgo: "2 weeks ago",
-            author: "Primary Education Team",
-            image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1200&q=80",
-            link: "/institutional/category/primary-school",
-        },
-        {
-            title: "WAEC/NECO/JAMB Success: Your Path to Excellence",
-            description: "Access past questions, study guides, and preparation materials for exam success",
-            timeAgo: "3 days ago",
-            author: "Exam Prep Team",
-            image: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&q=80",
-            link: "/institutional/category/exam-prep",
-        },
-        {
-            title: "Polytechnic Education: Technical Skills for Tomorrow",
-            description: "Technical and vocational education resources for ND and HND programs",
-            timeAgo: "1 week ago",
-            author: "Polytechnic Team",
-            image: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=1200&q=80",
-            link: "/institutional/category/polytechnic",
-        },
-      
-    ];
-
-  
-     // Fetch sales count for all books
-useEffect(() => {
-    const fetchBookSales = async () => {
-        try {
-            const usersSnapshot = await getDocs(collection(db, "users"));
-            const salesMap = {};
-
-            usersSnapshot.docs.forEach(userDoc => {
-                const userData = userDoc.data();
-                const purchasedBooks = userData.purchasedBooks || {};
-
-                Object.values(purchasedBooks).forEach(purchase => {
-                    const bookId = purchase.bookId || purchase.id || purchase.firestoreId;
-                    if (bookId) {
-                        salesMap[bookId] = (salesMap[bookId] || 0) + 1;
-                        // Also track firestore- prefixed version
-                        salesMap[`firestore-${bookId}`] = (salesMap[`firestore-${bookId}`] || 0) + 1;
-                    }
+    /* sales */
+    useEffect(() => {
+        const fetchSales = async () => {
+            try {
+                const snap = await getDocs(collection(db, "users"));
+                const map = {};
+                snap.docs.forEach(u => {
+                    Object.values(u.data().purchasedBooks || {}).forEach(p => {
+                        const id = p.bookId || p.id || p.firestoreId;
+                        if (id) { map[id] = (map[id] || 0) + 1; map[`firestore-${id}`] = (map[`firestore-${id}`] || 0) + 1; }
+                    });
                 });
-            });
-
-            setBookSalesCount(salesMap);
-        } catch (error) {
-            console.error("Error fetching sales count:", error);
-        }
-    };
-
-    fetchBookSales();
-}, []);
-
-    // Add this at the very top of your HomeClient component
-    useEffect(() => {
-        const originalPush = router.push;
-        const originalReplace = router.replace;
-
-        router.push = (...args) => {
-            console.log("🔴 ROUTER.PUSH CALLED:", args[0]);
-            console.trace(); // Shows you WHERE the redirect is coming from
-            return originalPush(...args);
+                setBookSalesCount(map);
+            } catch { }
         };
-
-        router.replace = (...args) => {
-            console.log("🟡 ROUTER.REPLACE CALLED:", args[0]);
-            console.trace();
-            return originalReplace(...args);
-        };
-
-        return () => {
-            router.push = originalPush;
-            router.replace = originalReplace;
-        };
-    }, [router]);
-
-    // ✅ Fetch Trending 4 books from Firebase
-    useEffect(() => {
-        const fetchLatestBooks = async () => {
-            try {
-                setLoadingBooks(true);
-
-                // Fetch more books so we have enough to sort by sales
-                const advertBooksRef = collection(db, 'advertMyBook');
-                const q = query(
-                    advertBooksRef,
-                    where('status', '==', 'approved'),
-                    orderBy('createdAt', 'desc'),
-                    limit(40) // fetch 40 so sorting by sales gives meaningful results
-                );
-
-                const snapshot = await getDocs(q);
-
-                if (!snapshot.empty) {
-                    const latestBooks = [];
-
-                    snapshot.forEach((doc) => {
-                        const data = doc.data();
-                        if (data.bookTitle && data.price) {
-                            const bookData = {
-                                id: `firestore-${doc.id}`,
-                                firestoreId: doc.id,
-                                title: data.bookTitle,
-                                author: data.author || 'Unknown Author',
-                                category: (data.category || 'education').toLowerCase(),
-                                price: Number(data.price) || 0,
-                                pages: data.pages || 100,
-                                format: 'PDF',
-                                country: data.country || "Unknown",
-                                description: data.description || `Discover ${data.bookTitle}`,
-                                driveFileId: data.driveFileId,
-                                pdfUrl: data.pdfUrl,
-                                embedUrl: data.embedUrl,
-                                isFromFirestore: true,
-                                createdAt: data.createdAt,
-                                rating: data.rating || 4.5,
-                                reviews: data.reviews || 0,
-                            };
-                            bookData.image = getThumbnailUrl(bookData);
-                            latestBooks.push(bookData);
-                        }
-                    });
-
-                    // Sort by sales count descending — most sold appears first
-                    // bookSalesCount may not be ready yet so we re-sort after sales load too
-                    latestBooks.sort((a, b) => {
-                        const salesA = bookSalesCount[a.id] || bookSalesCount[a.firestoreId] || 0;
-                        const salesB = bookSalesCount[b.id] || bookSalesCount[b.firestoreId] || 0;
-                        return salesB - salesA;
-                    });
-
-                    setAllBooks(latestBooks);
-                } else {
-                    setAllBooks([]);
-                }
-            } catch (error) {
-                console.error('Error fetching latest books:', error);
-                setAllBooks([]);
-            } finally {
-                setLoadingBooks(false);
-            }
-        };
-
-        fetchLatestBooks();
-    }, [bookSalesCount]); // ← re-runs once bookSalesCount is loaded so sort is accurate
-
-
-    // ✅ Thumbnail helper function
-    const getThumbnailUrl = (book) => {
-        if (book.driveFileId) {
-            return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
-        }
-
-        if (book.embedUrl) {
-            const match = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
-            if (match) {
-                const fileId = match[1] || match[2] || match[3];
-                if (fileId) {
-                    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
-                }
-            }
-        }
-
-        if (book.pdfUrl && book.pdfUrl.includes('drive.google.com')) {
-            const match = book.pdfUrl.match(/[-\w]{25,}/);
-            if (match) {
-                return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
-            }
-        }
-
-        return book.image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-    };
-
-    // Fetch purchased books
-    useEffect(() => {
-        const fetchPurchasedBooks = async () => {
-            try {
-                const currentUser = auth.currentUser;
-                if (currentUser) {
-                    const userDocRef = doc(db, 'users', currentUser.uid);
-                    const userDoc = await getDoc(userDocRef);
-
-                    if (userDoc.exists()) {
-                        const userData = userDoc.data();
-                        const purchasedBooksData = userData.purchasedBooks || {};
-
-                        let purchasedArray = [];
-                        if (Array.isArray(purchasedBooksData)) {
-                            purchasedArray = purchasedBooksData;
-                        } else if (typeof purchasedBooksData === 'object') {
-                            purchasedArray = Object.values(purchasedBooksData);
-                        }
-
-                        const bookIds = new Set(
-                            purchasedArray
-                                .map(book => book.id || book.bookId || book.firestoreId)
-                                .filter(Boolean)
-                        );
-
-                        setPurchasedBookIds(bookIds);
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching purchased books:', error);
-            }
-        };
-
-        if (user) {
-            fetchPurchasedBooks();
-        }
-    }, [user]);
-
-    const isPurchased = (bookId) => {
-        return (
-            purchasedBookIds.has(bookId) ||
-            purchasedBookIds.has(String(bookId)) ||
-            purchasedBookIds.has(`firestore-${bookId}`) ||
-            purchasedBookIds.has(bookId.toString().replace('firestore-', ''))
-        );
-    };
-
-    const nextSlide = () => {
-        setCurrentSlide((prev) => (prev + 1) % featuredContent.length);
-    };
-
-    const displayBooks = allBooks;
-
-    const prevSlide = () => {
-        setCurrentSlide((prev) => (prev - 1 + featuredContent.length) % featuredContent.length);
-    };
-
-
-    // Auto-advance carousel
-    useEffect(() => {
-        const timer = setInterval(() => {
-            nextSlide();
-        }, 5000);
-        return () => clearInterval(timer);
-    }, [currentSlide]);
-
-    // Check seller status
-    // Check seller status
-    const checkSellerStatus = async (userId) => {
-        try {
-            setCheckingSeller(true);
-            const userDocRef = doc(db, 'users', userId);
-            const userDoc = await getDoc(userDocRef);
-
-            if (userDoc.exists()) {
-                const userData = userDoc.data();
-                const isUserSeller = userData.isSeller === true;
-                setIsSeller(isUserSeller);
-            } else {
-                setIsSeller(false);
-            }
-        } catch (error) {
-            console.error("Error checking seller status:", error);
-            setIsSeller(false);
-        } finally {
-            setCheckingSeller(false);
-        }
-    };
-    
-    // Auth state listener - NO REDIRECTS
-   // Auth state listener - FORCE NO REDIRECTS
-useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-        if (currentUser) {
-            setUser(currentUser);
-            await checkSellerStatus(currentUser.uid);
-        } else {
-            setUser(null);
-            setIsSeller(false);
-            setCheckingSeller(false);
-        }
-        setLoading(false);
-    });
-
-    return () => unsubscribe();
-}, []);
-  
-    // Handle upload button click
-    // Handle upload button click
-    const HandleClick = () => {
-        if (!user) {
-            // ✅ Redirect to signin if not logged in
-            router.push('/auth/signin');
-            return;
-        }
-
-        if (isSeller) {
-            router.push('/upload-document');
-        } else {
-            router.push('/become-seller');
-        }
-    };
-
-    // Loading timer
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setLoading(false);
-        }, 1000);
-
-        return () => clearTimeout(timer);
+        fetchSales();
     }, []);
 
-    if (loading) {
-        return <HomeLoading />;
-    }
+    /* books */
+    useEffect(() => {
+        const fetchBooks = async () => {
+            try {
+                setLoadingBooks(true);
+                const q = query(collection(db, "advertMyBook"), where("status", "==", "approved"), orderBy("createdAt", "desc"), limit(40));
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                    const books = [];
+                    snap.forEach(d => {
+                        const data = d.data();
+                        if (data.bookTitle && data.price) {
+                            const b = {
+                                id: `firestore-${d.id}`, firestoreId: d.id,
+                                title: data.bookTitle, author: data.author || "Unknown",
+                                category: (data.category || "education").toLowerCase(),
+                                price: Number(data.price) || 0,
+                                driveFileId: data.driveFileId, pdfUrl: data.pdfUrl, embedUrl: data.embedUrl,
+                                isFromFirestore: true, createdAt: data.createdAt,
+                            };
+                            b.image = getThumbnailUrl(b);
+                            books.push(b);
+                        }
+                    });
+                    books.sort((a, b) => (bookSalesCount[b.id] || 0) - (bookSalesCount[a.id] || 0));
+                    setAllBooks(books);
+                } else setAllBooks([]);
+            } catch { setAllBooks([]); }
+            finally { setLoadingBooks(false); }
+        };
+        fetchBooks();
+    }, [bookSalesCount]);
+
+    /* purchased */
+    useEffect(() => {
+        const fetchPurchased = async () => {
+            try {
+                const cu = auth.currentUser;
+                if (!cu) return;
+                const ud = await getDoc(doc(db, "users", cu.uid));
+                if (ud.exists()) {
+                    const pb = ud.data().purchasedBooks || {};
+                    const arr = Array.isArray(pb) ? pb : Object.values(pb);
+                    setPurchasedBookIds(new Set(arr.map(b => b.id || b.bookId || b.firestoreId).filter(Boolean)));
+                }
+            } catch { }
+        };
+        if (user) fetchPurchased();
+    }, [user]);
+
+    const isPurchased = id =>
+        purchasedBookIds.has(id) || purchasedBookIds.has(`firestore-${id}`) ||
+        purchasedBookIds.has(String(id).replace("firestore-", ""));
+
+    /* auth */
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, async cu => {
+            if (cu) {
+                setUser(cu);
+                try {
+                    setCheckingSeller(true);
+                    const ud = await getDoc(doc(db, "users", cu.uid));
+                    setIsSeller(ud.exists() ? ud.data().isSeller === true : false);
+                } catch { setIsSeller(false); }
+                finally { setCheckingSeller(false); }
+            } else {
+                setUser(null); setIsSeller(false); setCheckingSeller(false);
+            }
+            setLoading(false);
+        });
+        const t = setTimeout(() => setLoading(false), 1200);
+        return () => { unsub(); clearTimeout(t); };
+    }, []);
+
+    const HandleClick = () => {
+        if (!user) { router.push("/auth/signin"); return; }
+        router.push(isSeller ? "/upload-document" : "/become-seller");
+    };
+
+    if (loading) return <HomeLoading />;
 
     return (
-        <div className="min-h-screen" style={{ backgroundColor: "#f9f6f0" }}>
-            <Navbar />
+        <>
+            <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
 
-            {/* Featured Content Carousel */}
-            <div className="relative w-full h-[400px] md:h-[600px] overflow-hidden bg-gray-900">
-                {featuredContent.map((content, index) => (
-                    <a
-                        key={index}
-                        // href={content.link}
-                        className={`absolute inset-0 transition-opacity duration-700 cursor-pointer group ${index === currentSlide ? "opacity-100" : "opacity-0 pointer-events-none"
-                            }`}
-                    >
-                        <div className="absolute inset-0">
-                            <img
-                                src={content.image}
-                                alt={content.title}
-                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/30 group-hover:from-black/85 group-hover:via-black/55 transition-all duration-300"></div>
+        .lan-root { font-family: 'Lato', sans-serif; background: ${BG}; }
+        .lan-serif { font-family: 'Playfair Display', Georgia, serif; }
+
+        /* hero */
+        .hero-bg {
+          background-color: ${NAVY};
+          background-image:
+            radial-gradient(rgba(184,150,62,0.06) 1px, transparent 1px),
+            radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+          background-size: 28px 28px, 14px 14px;
+          background-position: 0 0, 7px 7px;
+        }
+
+        /* trending section */
+        .trending-bg {
+          background-color: ${CREAM};
+          background-image: radial-gradient(rgba(13,34,68,0.05) 1px, transparent 1px);
+          background-size: 22px 22px;
+        }
+
+        /* trend card */
+        .trend-card {
+          background: #fff;
+          border: 0.5px solid #e5ddd0;
+          transition: transform 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s, border-color 0.25s;
+          text-decoration: none; display: block;
+        }
+        .trend-card:hover { transform: translateY(-6px); box-shadow: 0 20px 48px rgba(13,34,68,0.12); border-color: ${GOLD}; }
+
+        /* browse card */
+        .browse-card {
+          border: 0.5px solid #e5ddd0; overflow: hidden;
+          background: #fff; text-decoration: none; display: block;
+          transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+        }
+        .browse-card:hover { transform: translateY(-5px); box-shadow: 0 16px 40px rgba(13,34,68,0.12); border-color: ${GOLD}; }
+        .browse-card:hover .browse-img { transform: scale(1.07); }
+        .browse-img { transition: transform 0.6s cubic-bezier(0.4,0,0.2,1); }
+
+        /* doc card */
+        .doc-card {
+          border: 0.5px solid #e5ddd0; overflow: hidden; background: #fff; cursor: pointer;
+          transition: transform 0.22s, box-shadow 0.22s, border-color 0.22s;
+        }
+        .doc-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(13,34,68,0.12); border-color: ${GOLD}; }
+        .doc-card:hover .doc-img { transform: scale(1.08); }
+        .doc-img { transition: transform 0.5s cubic-bezier(0.4,0,0.2,1); }
+
+        /* tabs */
+        .lan-tab {
+          font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+          padding: 10px 22px; border: none; cursor: pointer;
+          transition: background 0.18s, color 0.18s; font-family: 'Lato', sans-serif;
+        }
+        .lan-tab-active  { background: ${NAVY}; color: #fff; }
+        .lan-tab-inactive { background: rgba(13,34,68,0.06); color: #777; }
+        .lan-tab-inactive:hover { background: rgba(13,34,68,0.1); color: ${NAVY}; }
+
+        /* sbar hide */
+        .sbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+        .sbar-none::-webkit-scrollbar { display: none; }
+
+        /* book grid hover */
+        .book-thumb { transition: box-shadow 0.2s; }
+        .book-thumb:hover { box-shadow: 0 8px 28px rgba(13,34,68,0.18); }
+
+        /* gold line divider */
+        .gold-line { display: flex; align-items: center; gap: 14px; }
+        .gold-line::before, .gold-line::after { content:""; flex:1; height:1px; background: rgba(184,150,62,0.3); }
+
+        /* crest cta bg */
+        .crest-bg {
+          background-color: ${NAVY};
+          background-image:
+            repeating-linear-gradient(45deg, transparent, transparent 12px, rgba(255,255,255,0.018) 12px, rgba(255,255,255,0.018) 13px),
+            repeating-linear-gradient(-45deg, transparent, transparent 12px, rgba(255,255,255,0.018) 12px, rgba(255,255,255,0.018) 13px);
+        }
+
+        @keyframes slideUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+        .anim-up { animation: slideUp 0.6s cubic-bezier(0.4,0,0.2,1) both; }
+        .anim-up-2 { animation: slideUp 0.6s 0.12s cubic-bezier(0.4,0,0.2,1) both; }
+        .anim-up-3 { animation: slideUp 0.6s 0.24s cubic-bezier(0.4,0,0.2,1) both; }
+      `}</style>
+
+            <div className="lan-root min-h-screen">
+                <Navbar />
+
+                {/* ══════════════════════════════════════════════════════════
+            HERO — navy dot-grid
+        ══════════════════════════════════════════════════════════ */}
+                <section className="hero-bg" style={{ padding: "80px 24px 72px" }}>
+                    <div style={{ maxWidth: "900px", margin: "0 auto" }} className="max-md:hidden">
+                        {/* eyebrow */}
+                        <div className="anim-up" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(184,150,62,0.14)", border: `1px solid rgba(184,150,62,0.3)`, borderRadius: "999px", padding: "7px 16px", marginBottom: "28px" }}>
+                            <Sparkles size={13} style={{ color: GOLD }} />
+                            <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: GOLDD }}>Africa's #1 Student Library</span>
                         </div>
 
-                        <div className="relative h-full flex items-center justify-center">
-                            <div className="max-w-4xl mx-auto px-4 text-center text-white">
-                                <h1 className="text-2xl md:text-5xl font-bold mb-4 md:mb-6 leading-tight group-hover:scale-105 transition-transform duration-300">
-                                    {content.title}
-                                </h1>
-                                <p className="text-sm md:text-xl text-gray-200 mb-6 md:mb-8">
-                                    {content.description}
+                        <h1 className="lan-serif anim-up-2" style={{ fontSize: "clamp(42px, 7vw, 78px)", fontWeight: 900, color: "#fff", lineHeight: 1.02, letterSpacing: "-1.5px", margin: "0 0 24px" }}>
+                            Every document<br />
+                            <span style={{ color: GOLD, fontStyle: "italic" }}>your campus needs.</span>
+                        </h1>
+
+                        <p className="anim-up-3" style={{ fontSize: "17px", color: "rgba(245,240,232,0.72)", maxWidth: "580px", lineHeight: 1.75, margin: "0 0 40px", fontWeight: 300 }}>
+                            From primary school to PhD — 90 million academic documents,
+                            past questions, and lecture notes. All in one place, for every African scholar.
+                        </p>
+
+                        {/* CTA buttons */}
+                     
+
+                    </div>
+                        {/* stats strip */}
+                        <div style={{ borderTop: "0.5px solid rgba(184,150,62,0.2)", paddingTop: "0", display: "flex", flexWrap: "wrap" }}>
+                            {[
+                                { val: "90M+", label: "Documents" },
+                                { val: "2.4M+", label: "Learners" },
+                                { val: "12+", label: "Institutions" },
+                                { val: "Free", label: "Basic Access" },
+                            ].map(({ val, label }) => (
+                                <div key={label} style={{ flex: "1 1 120px", padding: "24px 20px 0", borderRight: "0.5px solid rgba(184,150,62,0.12)" }}>
+                                    <div className="lan-serif" style={{ fontSize: "28px", fontWeight: 700, color: "#fff" }}>{val}</div>
+                                    <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", marginTop: "4px" }}>{label}</div>
+                                </div>
+                            ))}
+                        </div>
+                </section>
+
+                {/* ══════════════════════════════════════════════════════════
+            TRENDING ACADEMIC AREAS
+        ══════════════════════════════════════════════════════════ */}
+                <section className="trending-bg" style={{ padding: "72px 24px" }}>
+                    <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+                        {/* header */}
+                        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "40px" }}>
+                            <div>
+                                <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: "8px", fontFamily: "'Lato', sans-serif" }}>
+                                    Popular This Term
                                 </p>
-                                <div className="flex items-center justify-center gap-3 text-xs md:text-sm text-gray-300 mb-6">
-                                    <span>{content.timeAgo}</span>
-                                    <span>•</span>
-                                    <span>by {content.author}</span>
-                                </div>
-                                <div className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm px-6 py-3 rounded-full border border-white/30 transition-all duration-300 group-hover:border-white/50">
-                                    <span className="font-semibold">Explore Category</span>
-                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                </div>
+                                <h2 className="lan-serif" style={{ fontSize: "clamp(26px, 4vw, 40px)", fontWeight: 700, color: NAVY, margin: 0 }}>
+                                    Trending Academic Areas
+                                </h2>
                             </div>
+                            <Link href="/browse-resources"
+                                style={{ display: "none", alignItems: "center", gap: "5px", fontSize: "12px", fontWeight: 700, color: NAVY, textDecoration: "none", letterSpacing: "0.04em" }}
+                                className="show-md"
+                            >
+                                View All <ArrowRight size={13} />
+                            </Link>
                         </div>
-                    </a>
-                ))}
 
-                <button
-                    onClick={prevSlide}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center transition-all"
-                    aria-label="Previous slide"
-                >
-                    <ChevronLeft className="w-6 h-6 md:w-8 md:h-8 text-white" />
-                </button>
-                <button
-                    onClick={nextSlide}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center transition-all"
-                    aria-label="Next slide"
-                >
-                    <ChevronRight className="w-6 h-6 md:w-8 md:h-8 text-white" />
-                </button>
-
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
-                    {featuredContent.map((_, index) => (
-                        <button
-                            key={index}
-                            onClick={() => setCurrentSlide(index)}
-                            className={`w-2 h-2 rounded-full transition-all ${index === currentSlide
-                                ? "bg-white w-8"
-                                : "bg-white/50 hover:bg-white/75"
-                                }`}
-                            aria-label={`Go to slide ${index + 1}`}
-                        />
-                    ))}
-                </div>
-            </div>
-
-            {/* Hero Section */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 py-16 shadow-2xl">
-                <div className="max-w-7xl mx-auto px-4">
-                    <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 mb-6">
-                        "You've seen the notes, now master the course.
-                    </h1>
-                    <p className="text-lg md:text-xl text-gray-700 max-w-4xl">
-                        Make sense of complex topics with resources on every subject, shared by top students and educators across the network."
-                    </p>
-                </div>
-            </div>
-
-
-            {/* Books Grid or No Results */}
-            {displayBooks.length === 0 ? (
-                <div className="bg-white rounded-lg shadow-lg p-12 text-center">
-                    <FileText className="w-20 h-20 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">No Books Found</h3>
-                    <p className="text-gray-600 mb-6">
-                        This is a network problem. </p>
-                    <p className="text-gray-600 mb-6 text-2xl font-bold">
-                    You can read our docs why waiting for network connection</p>
-                    <a href="docs"
-                        className="bg-blue-950 cursor-pointer text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors"
-                    >
-                        LAN Docs
-                    </a>
-                </div>
-            ) : (
-                <>
-                    {/* Featured Books Carousel */}
-                    <div className="px-4 py-8 lg:px- mx-auto max-w-7xl">
-                        <h1 className="text-4xl lg:text-5xl font-black mb-10 text-black">Documents</h1>
-                        <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-8">Get started with the community's uploads</h3>
-
-                        {/* Mobile: 2 per row (Grid) | Desktop: Horizontal scroll */}
-                        <div className="relative">
-                            {/* Mobile Grid (2 columns) */}
-                                <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-                                    {displayBooks.slice(0, 6).map((book) => {
-                                        const soldCount = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
-
-                                        // Badge logic: highest sold = "Trending", others = "New"
-                                        const topSoldThreshold = displayBooks.slice(0, 6).reduce((max, b) => {
-                                            const s = bookSalesCount[b.id] || bookSalesCount[b.firestoreId] || 0;
-                                            return Math.max(max, s);
-                                        }, 0);
-
-                                        const isTrending = soldCount > 0 && soldCount === topSoldThreshold;
-
-                                        return (
-                                            <Link
-                                                key={book.id}
-                                                href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
-                                                className="group"
-                                            >
-                                                <div className="relative mb-3">
-                                                    <img
-                                                        src={book.image}
-                                                        alt={book.title}
-                                                        className="w-full object-cover group-hover:shadow-xl transition-shadow"
-                                                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                                                    />
-                                                    {isPurchased(book.id) && (
-                                                        <span className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 text-xs font-bold">Owned</span>
-                                                    )}
-                                                    {/* Trending badge for highest sold, New for others */}
-                                                    {isTrending ? (
-                                                        <span className="absolute top-2 left-2 bg-orange-500 text-white px-2 py-1 text-xs font-bold">
-                                                            🔥 Trending
-                                                        </span>
-                                                    ) : book.isFromFirestore && (
-                                                        <span className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 text-xs font-bold">New</span>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                                                        {book.title}
-                                                    </h4>
-                                                    <p className="text-gray-600 text-xs">{book.author}</p>
-                                                </div>
-                                                <p className="text-gray-500 text-xs lg:text-sm flex items-center gap-1 mt-1">
-                                                    <ShoppingBag size={12} />
-                                                    {soldCount} sold
-                                                </p>
-                                               
-                                            </Link>
-                                        );
-                                    })}
-                                </div>
-
-                            {/* Desktop Horizontal Scroll */}
-                            <div className=" relative -mx-4 lg:mx-0">
-                                <div className="overflow-x-auto overflow-y-hidden scrollbar-hide px-4 lg:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                    <style jsx>{`
-                    div::-webkit-scrollbar {
-                        display: none;
-                    }
-                `}</style>
-                                        
-                                        {/* Section Heading & Tabs */}
-                                        <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-6 py-20">
-                                            <div>
-                                                <h3 className="text-3xl font-bold text-gray-900">Explore Library</h3>
-                                                <p className="text-gray-600 mt-2">Find materials by Departments or resources</p>
-                                            </div>
-
-                                            {/* Modern Tab Switcher */}
-                                            <div className="flex bg-gray-200 p-1 w-full md:w-auto">
-                                                <button
-                                                    onClick={() => setActiveTab('subjects')}
-                                                    className={`flex-1 md:flex-none px-6 py-2  font-semibold transition-all ${activeTab === 'subjects' ? 'bg-white text-blue-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                                                        }`}
-                                                >
-                                                    Departments
-                                                </button>
-                                                <button
-                                                    onClick={() => setActiveTab('documents')}
-                                                    className={`flex-1 md:flex-none px-6 py-2 font-semibold transition-all ${activeTab === 'documents' ? 'bg-white text-blue-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                                                        }`}
-                                                >
-                                                    Resources
-                                                </button>
-                                            </div>
+                        {/* scrollable cards */}
+                        <div className="sbar-none" style={{ display: "flex", gap: "16px", overflowX: "auto", paddingBottom: "12px", margin: "0 -4px", padding: "0 4px 12px" }}>
+                            {trendingAcademicAreas.map(area => {
+                                const Icon = area.icon;
+                                return (
+                                    <a key={area.id} href={`/institutional/category/${area.slug}`} className="trend-card" style={{ flexShrink: 0, width: "230px", padding: "24px 20px" }}>
+                                        {/* icon box */}
+                                        <div style={{ width: "46px", height: "46px", border: `0.5px solid #e5ddd0`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "16px" }}>
+                                            <Icon size={20} style={{ color: NAVY }} strokeWidth={1.5} />
                                         </div>
-
-                                        {/* The Grid */}
-                                        {/* The Grid - Show Categories when Subjects tab, Document Types when Documents tab */}
-                                        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-                                            {activeTab === 'subjects' ? (
-                                                // Show full categories array when Subjects tab is active
-                                                categories.map((category, index) => (
-                                                        <a
-                                                            key={index}
-                                                            href={`/category/${category.name.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')}`}
-                                                            className="group bg-white border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300"
-                                                        >
-                                                            <div className="p-6 bg-gray-100">
-                                                                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                                                                    {category.name}
-                                                                </h3>
-                                                                {/* <p className="text-sm text-gray-600 mb-4">
-                                            {category.subcategories} categories
-                                        </p> */}
-
-
-                                                            </div>
-
-                                                            <div className="relative h-48 overflow-hidden">
-                                                                <img
-                                                                    src={category.image}
-                                                                    alt={category.name}
-                                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                                                                />
-                                                            </div>
-                                                        </a>
-                                                ))
-                                        ) : (
-                                    // Show document types when Documents tab is active
-                                    documentTypes.map((doc, index) => (
-                                        <div
-                                            key={index}
-                                            onClick={() => {
-                                                // Navigate to document type page
-                                                const slug = doc.name.toLowerCase().replace(/ /g, '-');
-                                                router.push(`/document-type/${slug}`);
-                                            }}
-                                            className={`group cursor-pointer bg-white overflow-hidden shadow-sm hover:shadow-xl transition-all border-2`}
-                                        >
-                                            <div className="h-32 md:h-40 overflow-hidden relative">
-                                                <img
-                                                    src={doc.image}
-                                                    alt={doc.name}
-                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                                />
-                                                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors" />
-                                            </div>
-                                            <div className="p-4">
-                                                <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{doc.name}</h3>
-                                                <p className="text-xs text-gray-500 line-clamp-1 mt-1">{doc.description}</p>
-                                            </div>
+                                        <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "14px", fontWeight: 700, color: NAVY, margin: "0 0 8px", lineHeight: 1.25 }}>{area.name}</h3>
+                                        <p style={{ fontSize: "12px", color: "#888", lineHeight: 1.6, margin: "0 0 18px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{area.description}</p>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                                            <TrendingUp size={11} style={{ color: GOLD }} />
+                                            <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: GOLD }}>Trending</span>
                                         </div>
-                                        ))
-                                    )}
-                                    </div>
-                                        {/* Reset Filter Button (Visible only when filtering) */}
-                                       {selectedCategory && (
-    <div className="mt-12 flex justify-center">
-        {activeTab === 'subjects' ? (
-            <a
-                href="/documents"
-                className="inline-flex items-center text-blue-950 font-semibold text-lg hover:underline"
-            >
-                Explore all of our categories
-                <ChevronRight className="w-5 h-5 ml-1" />
-            </a>
-        ) : (
-            <a
-                href="/resources"
-                className="inline-flex items-center text-blue-950 font-semibold text-lg hover:underline"
-            >
-                Explore all student resources
-                <ChevronRight className="w-5 h-5 ml-1" />
-            </a>
-        )}
-    </div>
-                                        )}
-                                        </div>
-                            </div>
+                                    </a>
+                                );
+                            })}
                         </div>
-                        </div>
-                        
-                    {/* Categories Section */}
-                   
-                    {/* Upload Section */}
-                    <div className="bg-neutral-100 py-16">
-                        <div className="max-w-5xl mx-auto px-4 text-center">
-                            <h2 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-6">
-                                Share the wealth <span className="text-gray-700">[of knowledge]</span>.
-                            </h2>
 
-                            <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-12">
-                                Turn your books into income. Upload your work, reach a global audience{" "}
-                                <span className="font-medium text-gray-900">[90M+]</span>, and earn whenever
-                                readers discover and purchase your content.
-                            </p>
-
-                            <div className="bg-white rounded-xl shadow-lg py-16 flex flex-col items-center justify-center">
-                                <div className="flex items-center gap-8 mb-8 text-gray-800">
-                                    <Monitor size={64} strokeWidth={1.5} />
-                                    <Upload size={48} strokeWidth={2} />
-                                    <Smartphone size={56} strokeWidth={1.5} />
-                                </div>
-
-                                <button
-                                    onClick={HandleClick}
-                                    disabled={checkingSeller}
-                                    className="bg-blue-950 hover:bg-blue-800 transition-colors text-white font-semibold px-8 py-4 rounded-lg shadow-md text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                >
-                                    {checkingSeller ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                            Loading...
-                                        </>
-                                    ) : isSeller ? (
-                                        <>
-                                            <Upload size={20} />
-                                            Upload Document
-                                        </>
-                                    ) : (
-                                        <>
-                                            Become a Seller
-                                        </>
-                                    )}
-                                </button>
-
-                                {!checkingSeller && isSeller && (
-                                    <p className="text-sm text-green-600 mt-3 flex items-center gap-1">
-                                        <span className="w-2 h-2 bg-green-600 rounded-full"></span>
-                                        You're a verified seller
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                        <div>
-                            <InstitutionalLibraryPage />
+                        <div style={{ marginTop: "24px", textAlign: "center" }}>
+                            <Link href="/browse-resources" style={{ fontSize: "12px", fontWeight: 700, color: NAVY, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                View All Institutions <ArrowRight size={13} />
+                            </Link>
                         </div>
                     </div>
-                    {/* Footer */}
-                    <Footer />
-                </>
-            )}
-        </div>
+                </section>
+
+                {/* ══════════════════════════════════════════════════════════
+            LATEST DOCUMENTS GRID
+        ══════════════════════════════════════════════════════════ */}
+                <section style={{ background: "#fff", padding: "72px 24px" }}>
+                    <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+                        <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: "8px", fontFamily: "'Lato', sans-serif" }}>
+                            Community Uploads
+                        </p>
+                        <h2 className="lan-serif" style={{ fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 700, color: NAVY, margin: "0 0 6px" }}>
+                            Newest Documents
+                        </h2>
+                        <p style={{ fontSize: "14px", color: "#888", marginBottom: "36px", fontWeight: 300 }}>
+                            Fresh uploads from students and educators across Africa
+                        </p>
+
+                        {allBooks.length === 0 ? (
+                            <div style={{ background: BG, border: `0.5px solid #e5ddd0`, padding: "64px 24px", textAlign: "center" }}>
+                                <FileText style={{ width: "48px", height: "48px", color: "#ddd", margin: "0 auto 12px" }} />
+                                <h3 className="lan-serif" style={{ fontSize: "22px", color: NAVY, marginBottom: "8px" }}>No Books Found</h3>
+                                <p style={{ fontSize: "13px", color: "#aaa", marginBottom: "20px" }}>This is a network problem. You can read our docs while waiting.</p>
+                                <Link href="/docs" style={{ display: "inline-block", padding: "10px 24px", background: NAVY, color: "#fff", fontSize: "13px", fontWeight: 700, textDecoration: "none" }}>
+                                    LAN Docs
+                                </Link>
+                            </div>
+                        ) : (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "20px" }}>
+                                {allBooks.slice(0, 12).map(book => {
+                                    const soldCount = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
+                                    const topSold = allBooks.slice(0, 12).reduce((m, b) => Math.max(m, bookSalesCount[b.id] || 0), 0);
+                                    const isTrending = soldCount > 0 && soldCount === topSold;
+                                    const owned = isPurchased(book.id);
+                                    return (
+                                        <Link key={book.id}
+                                            href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
+                                            style={{ textDecoration: "none", display: "block", background: "#fff" }}
+                                        >
+                                            {/* ── Cover ── */}
+                                            <div style={{ position: "relative", background: "#ede8df" }}>
+                                                <img
+                                                    src={book.image}
+                                                    alt={book.title}
+                                                    style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", transition: "box-shadow 0.2s" }}
+                                                    onError={e => {
+                                                        e.target.style.display = "none";
+                                                        e.target.nextSibling.style.display = "flex";
+                                                    }}
+                                                    className="book-thumb"
+                                                />
+                                                {/* fallback placeholder */}
+                                                <div style={{ display: "none", width: "100%", aspectRatio: "3/4", alignItems: "center", justifyContent: "center", background: "#ede8df" }}>
+                                                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5">
+                                                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                                                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                                                    </svg>
+                                                </div>
+
+                                                {/* ● LIVE badge */}
+                                                <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontFamily: "'Lato',sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff" }}>
+                                                    <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />
+                                                    PDF
+                                                </div>
+
+                                                {/* Owned badge */}
+                                                {owned && (
+                                                    <span style={{ position: "absolute", top: "8px", right: "8px", background: "#16a34a", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>OWNED</span>
+                                                )}
+
+                                                {/* Trending badge (replaces NEW when trending) */}
+                                                {!owned && isTrending && (
+                                                    <span style={{ position: "absolute", bottom: "8px", left: "8px", background: "#ea580c", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>🔥 Trending</span>
+                                                )}
+                                            </div>
+
+                                            {/* ── Meta ── */}
+                                            <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0" }}>
+                                                <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>
+                                                    {book.title}
+                                                </h4>
+                                                <p style={{ fontSize: "11px", color: NAVY, margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato',sans-serif" }}>
+                                                    {book.author}
+                                                </p>
+                                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "wrap" }}>
+                                                    
+                                                    {book.category && !owned && (
+                                                        <span style={{ display: "inline-block", background: CREAM, border: `0.5px solid rgba(184,150,62,0.3)`, color: GOLD, fontSize: "8px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 7px", fontFamily: "'Lato',sans-serif", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                            {book.category}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {soldCount > 0 && (
+                                                    <p style={{ fontSize: "10px", color: NAVY, margin: "5px 0 0", display: "flex", alignItems: "center", gap: "4px", fontFamily: "'Lato',sans-serif" }}>
+                                                        <ShoppingBag size={9} /> {soldCount} sold
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+                {/* ══════════════════════════════════════════════════════════
+            BROWSE THE LIBRARY
+        ══════════════════════════════════════════════════════════ */}
+                <section style={{ background: BG, padding: "80px 24px" }}>
+                    <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
+                        {/* header */}
+                        <div style={{ textAlign: "center", marginBottom: "48px" }}>
+                            <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: "10px", fontFamily: "'Lato', sans-serif" }}>
+                                Explore the Full Collection
+                            </p>
+                            <h2 className="lan-serif" style={{ fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>
+                                Browse the Library
+                            </h2>
+                            {/* gold diamond divider */}
+                            <div className="gold-line" style={{ maxWidth: "300px", margin: "0 auto 16px" }}>
+                                <div style={{ width: "8px", height: "8px", background: GOLD, transform: "rotate(45deg)", flexShrink: 0 }} />
+                            </div>
+                            <p style={{ fontSize: "14px", color: "#888", maxWidth: "520px", margin: "0 auto", lineHeight: 1.7, fontWeight: 300 }}>
+                                Explore our comprehensive collection tailored to every academic level and discipline
+                            </p>
+                        </div>
+
+                        {/* search + tabs */}
+                        <div style={{ background: "#fff", border: `0.5px solid #e5ddd0`, padding: "16px 20px", marginBottom: "32px", display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
+                            <div style={{ flex: 1, minWidth: "220px", position: "relative" }}>
+                                <Search size={14} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#bbb" }} />
+                                <input
+                                    type="text"
+                                    value={browseSearch}
+                                    onChange={e => setBrowseSearch(e.target.value)}
+                                    placeholder={activeTab === "subjects" ? "Search departments…" : "Search resource types…"}
+                                    style={{ width: "100%", padding: "9px 12px 9px 34px", border: `0.5px solid #e5ddd0`, borderRadius: "6px", fontSize: "13px", fontFamily: "'Lato', sans-serif", outline: "none", color: NAVY, boxSizing: "border-box" }}
+                                />
+                            </div>
+                            <div style={{ display: "flex", gap: "4px" }}>
+                                {[{ key: "subjects", label: "Departments" }, { key: "documents", label: "Resources" }].map(({ key, label }) => (
+                                    <button key={key} className={`lan-tab ${activeTab === key ? "lan-tab-active" : "lan-tab-inactive"}`}
+                                        onClick={() => { setActiveTab(key); setBrowseSearch(""); }}
+                                    >{label}</button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* departments grid */}
+                        {activeTab === "subjects" && (
+                            <>
+                                {filteredCategories.length === 0 ? (
+                                    <div style={{ textAlign: "center", padding: "64px 24px", background: "#fff", border: `0.5px solid #e5ddd0` }}>
+                                        <BookOpen size={36} style={{ color: "#e5ddd0", margin: "0 auto 12px" }} />
+                                        <h3 className="lan-serif" style={{ fontSize: "20px", color: NAVY, marginBottom: "6px" }}>No Departments Found</h3>
+                                        <p style={{ fontSize: "13px", color: "#bbb" }}>Try a different search term</p>
+                                    </div>
+                                ) : (
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "18px" }}>
+                                        {filteredCategories.map((cat, i) => (
+                                            <a key={i} href={`/category/${cat.name.toLowerCase().replace(/ & /g, "-").replace(/ /g, "-")}`} className="browse-card">
+                                                <div style={{ height: "180px", overflow: "hidden", position: "relative" }}>
+                                                    <img src={cat.image} alt={cat.name} className="browse-img" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                    <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to top, rgba(13,34,68,0.9) 0%, rgba(13,34,68,0.4) 55%, transparent 100%)` }} />
+                                                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "16px" }}>
+                                                        <h3 className="lan-serif" style={{ fontSize: "17px", fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>{cat.name}</h3>
+                                                        <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", gap: "4px" }}>
+                                                            <Layers size={9} /> {cat.sub} subcategories
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div style={{ padding: "16px" }}>
+                                                    <p style={{ fontSize: "12px", color: "#888", lineHeight: 1.6, margin: "0 0 14px" }}>{cat.description}</p>
+                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: `0.5px solid #f0ebe0`, paddingTop: "12px" }}>
+                                                        <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: NAVY }}>Browse Resources</span>
+                                                        <div style={{ width: "28px", height: "28px", border: `0.5px solid rgba(13,34,68,0.15)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                            <ArrowRight size={12} style={{ color: NAVY }} />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                        ))}
+                                    </div>
+                                )}
+                                <div style={{ textAlign: "center", marginTop: "32px" }}>
+                                    <Link href="/documents" style={{ fontSize: "13px", fontWeight: 700, color: NAVY, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                        Explore all categories <ChevronRight size={14} />
+                                    </Link>
+                                </div>
+                            </>
+                        )}
+
+                        {/* resources grid */}
+                        {activeTab === "documents" && (
+                            <>
+                                {filteredDocTypes.length === 0 ? (
+                                    <div style={{ textAlign: "center", padding: "64px 24px", background: "#fff", border: `0.5px solid #e5ddd0` }}>
+                                        <BookOpen size={36} style={{ color: "#e5ddd0", margin: "0 auto 12px" }} />
+                                        <h3 className="lan-serif" style={{ fontSize: "20px", color: NAVY, marginBottom: "6px" }}>No Resource Types Found</h3>
+                                        <p style={{ fontSize: "13px", color: "#bbb" }}>Try a different search term</p>
+                                    </div>
+                                ) : (
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "14px" }}>
+                                        {filteredDocTypes.map((dt, i) => (
+                                            <div key={i} className="doc-card" onClick={() => router.push(`/document-type/${dt.slug}`)}>
+                                                <div style={{ height: "120px", overflow: "hidden", position: "relative" }}>
+                                                    <img src={dt.image} alt={dt.name} className="doc-img" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(13,34,68,0.6), transparent 55%)" }} />
+                                                </div>
+                                                <div style={{ padding: "14px" }}>
+                                                    <h3 className="lan-serif" style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 5px" }}>{dt.name}</h3>
+                                                    <p style={{ fontSize: "11px", color: "#888", margin: "0 0 12px", lineHeight: 1.5 }}>{dt.description}</p>
+                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: `0.5px solid #f0ebe0`, paddingTop: "10px" }}>
+                                                        <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: GOLD }}>View All</span>
+                                                        <ArrowRight size={12} style={{ color: NAVY }} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <div style={{ textAlign: "center", marginTop: "32px" }}>
+                                    <Link href="/resources" style={{ fontSize: "13px", fontWeight: 700, color: NAVY, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                        Explore all student resources <ChevronRight size={14} />
+                                    </Link>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </section>
+
+                {/* ══════════════════════════════════════════════════════════
+            EDUCATOR NOTICE BOARD
+        ══════════════════════════════════════════════════════════ */}
+                <section style={{ background: "#fff", borderTop: `1px solid #e5ddd0`, borderBottom: `1px solid #e5ddd0`, padding: "64px 24px" }}>
+                    <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", flexWrap: "wrap", gap: "40px", alignItems: "center" }}>
+                        {/* crest icon */}
+                        <div style={{ textAlign: "center", flexShrink: 0 }}>
+                            <div style={{ width: "72px", height: "72px", margin: "0 auto 12px", border: `2px solid ${NAVY}`, transform: "rotate(45deg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <GraduationCap size={28} style={{ color: NAVY, transform: "rotate(-45deg)" }} />
+                            </div>
+                            <p className="lan-serif" style={{ fontSize: "11px", color: "#bbb", fontStyle: "italic" }}>Est. LAN Library</p>
+                        </div>
+
+                        <div style={{ width: "1px", height: "80px", background: "#e5ddd0", flexShrink: 0 }} />
+
+                        <div style={{ flex: 1, minWidth: "240px" }}>
+                            <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, marginBottom: "10px", fontFamily: "'Lato', sans-serif" }}>
+                                Notice to All Scholars
+                            </p>
+                            <h3 className="lan-serif" style={{ fontSize: "clamp(20px, 3vw, 30px)", fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>
+                                Are you an Educator or Institution?
+                            </h3>
+                            <p style={{ fontSize: "14px", color: "#777", lineHeight: 1.75, maxWidth: "520px", fontWeight: 300 }}>
+                                Join thousands of educators contributing to Africa's largest digital academic library.
+                                Upload course materials, past questions, and research papers to reach millions of students.
+                            </p>
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0 }}>
+                            <button onClick={HandleClick} disabled={checkingSeller}
+                                style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 24px", background: NAVY, color: "#fff", fontSize: "13px", fontWeight: 700, fontFamily: "'Lato', sans-serif", border: "none", cursor: "pointer", letterSpacing: "0.04em" }}
+                            >
+                                {checkingSeller
+                                    ? <><span style={{ width: "12px", height: "12px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />Loading…</>
+                                    : isSeller ? <><Upload size={14} />Upload Materials</> : "Become a Seller"
+                                }
+                            </button>
+                            <Link href="/documents"
+                                style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 24px", border: `0.5px solid ${NAVY}`, color: NAVY, fontSize: "13px", fontWeight: 700, fontFamily: "'Lato', sans-serif", textDecoration: "none", letterSpacing: "0.04em", transition: "background 0.15s" }}
+                                onMouseEnter={e => e.currentTarget.style.background = "rgba(13,34,68,0.05)"}
+                                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                            >
+                                <Search size={14} /> Browse Library
+                            </Link>
+                        </div>
+                    </div>
+                </section>
+
+                {/* ══════════════════════════════════════════════════════════
+            SHARE THE WEALTH
+        ══════════════════════════════════════════════════════════ */}
+                <section style={{ background: BG, padding: "72px 24px" }}>
+                    <div style={{ maxWidth: "900px", margin: "0 auto", textAlign: "center" }}>
+                        <h2 className="lan-serif" style={{ fontSize: "clamp(30px, 5vw, 52px)", fontWeight: 900, color: NAVY, margin: "0 0 16px", lineHeight: 1.08 }}>
+                            Share the wealth{" "}
+                            <span style={{ color: "#999", fontWeight: 400, fontStyle: "italic" }}>[of knowledge].</span>
+                        </h2>
+                        <p style={{ fontSize: "16px", color: "#777", maxWidth: "600px", margin: "0 auto 48px", lineHeight: 1.75, fontWeight: 300 }}>
+                            Turn your books into income. Upload your work, reach a global audience{" "}
+                            <strong style={{ color: NAVY }}>[90M+]</strong>, and earn whenever readers discover your content.
+                        </p>
+
+                        <div style={{ background: "#fff", border: `0.5px solid #e5ddd0`, padding: "60px 24px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                            {/* device icons */}
+                            <div style={{ display: "flex", alignItems: "center", gap: "28px", marginBottom: "36px", color: "#ccc" }}>
+                                <Monitor size={56} strokeWidth={1.2} />
+                                <Upload size={36} strokeWidth={2} style={{ color: GOLD }} />
+                                <Smartphone size={48} strokeWidth={1.2} />
+                            </div>
+
+                            <button
+                                onClick={HandleClick}
+                                disabled={checkingSeller}
+                                style={{ display: "flex", alignItems: "center", gap: "8px", padding: "15px 36px", background: GOLD, color: NAVY, fontSize: "15px", fontWeight: 700, fontFamily: "'Lato', sans-serif", border: "none", cursor: "pointer", letterSpacing: "0.04em", transition: "background 0.18s" }}
+                                onMouseEnter={e => e.currentTarget.style.background = GOLDD}
+                                onMouseLeave={e => e.currentTarget.style.background = GOLD}
+                            >
+                                {checkingSeller
+                                    ? "Loading…"
+                                    : isSeller ? <><Upload size={16} />Upload Document</> : "Become a Seller"
+                                }
+                            </button>
+
+                            {!checkingSeller && isSeller && (
+                                <p style={{ fontSize: "12px", color: "#16a34a", marginTop: "14px", display: "flex", alignItems: "center", gap: "5px" }}>
+                                    <span style={{ width: "7px", height: "7px", background: "#16a34a", borderRadius: "50%", display: "inline-block" }} />
+                                    You're a verified seller
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </section>
+
+                {/* ══════════════════════════════════════════════════════════
+            CTA BANNER
+        ══════════════════════════════════════════════════════════ */}
+                <section className="crest-bg" style={{ padding: "80px 24px", textAlign: "center" }}>
+                    {/* gold star divider */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", marginBottom: "28px" }}>
+                        <div style={{ height: "1px", width: "60px", background: "rgba(184,150,62,0.4)" }} />
+                        <Star size={14} style={{ color: GOLD, fill: GOLD }} />
+                        <div style={{ height: "1px", width: "60px", background: "rgba(184,150,62,0.4)" }} />
+                    </div>
+
+                    <h2 className="lan-serif" style={{ fontSize: "clamp(28px, 5vw, 52px)", fontWeight: 700, color: "#fff", margin: "0 0 16px" }}>
+                        Ready to Excel in Your Studies?
+                    </h2>
+                    <p style={{ fontSize: "15px", color: "rgba(255,255,255,0.5)", maxWidth: "500px", margin: "0 auto 40px", lineHeight: 1.75, fontWeight: 300 }}>
+                        Access premium academic resources and join a community of over 2.4 million learners
+                        dedicated to educational excellence across Nigeria and beyond.
+                    </p>
+
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", justifyContent: "center" }}>
+                        <Link href="/documents"
+                            style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "14px 28px", background: GOLD, color: NAVY, fontSize: "13px", fontWeight: 700, textDecoration: "none", fontFamily: "'Lato', sans-serif", letterSpacing: "0.04em", transition: "background 0.18s" }}
+                            onMouseEnter={e => e.currentTarget.style.background = GOLDD}
+                            onMouseLeave={e => e.currentTarget.style.background = GOLD}
+                        >
+                            <Search size={14} /> Browse All Documents
+                        </Link>
+                        <Link href="/upload-document"
+                            style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "14px 28px", border: "0.5px solid rgba(255,255,255,0.2)", color: CREAM, fontSize: "13px", fontWeight: 700, textDecoration: "none", fontFamily: "'Lato', sans-serif", letterSpacing: "0.04em", transition: "background 0.18s" }}
+                            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.07)"}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                        >
+                            <Upload size={14} /> Contribute Resources
+                        </Link>
+                    </div>
+                </section>
+
+                <Footer />
+
+                <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+        `}</style>
+            </div>
+        </>
     );
 }

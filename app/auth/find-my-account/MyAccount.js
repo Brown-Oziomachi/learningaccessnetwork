@@ -1,12 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, AlertCircle, Search, User, Mail, Eye, EyeOff, Lock, Phone } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Search, Mail, Eye, EyeOff, Lock, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebaseConfig';
-import { onAuthStateChanged } from "firebase/auth";
+import Link from 'next/link';
+
+const NAVY = "#0d2244";
+const GOLD  = "#b8963e";
+const BG    = "#f5f1ea";
+const CREAM = "#f5f0e8";
 
 export default function FindAccountClient() {
     const router = useRouter();
@@ -21,84 +25,43 @@ export default function FindAccountClient() {
     const [showSuspendedModal, setShowSuspendedModal] = useState(false);
     const [showPendingModal, setShowPendingModal] = useState(false);
 
-    // Only masked safe data from API
     const [maskedEmail, setMaskedEmail] = useState('');
     const [maskedPhone, setMaskedPhone] = useState('');
     const [actualEmail, setActualEmail] = useState('');
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                router.replace("/home");
-            } else {
-                setCheckingAuth(false);
-            }
+            if (user) router.replace("/home");
+            else setCheckingAuth(false);
         });
         return () => unsubscribe();
     }, [router]);
 
-    // STEP 1: Search via backend API
     const handleSearch = async () => {
-        if (!searchInput.trim()) {
-            setError('Please enter your email or mobile number');
-            return;
-        }
-
-        setLoading(true);
-        setError('');
-
+        if (!searchInput.trim()) { setError('Please enter your email or mobile number'); return; }
+        setLoading(true); setError('');
         try {
             const res = await fetch('/api/find-account', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ searchTerm: searchInput.trim() }),
             });
-
             const data = await res.json();
-
-            if (!res.ok) {
-                setError(data.error || 'Something went wrong. Please try again.');
-                return;
-            }
-
-            if (!data.found) {
-                setError('No account found. Please check and try again.');
-                return;
-            }
-
-            if (data.accountStatus === 'suspended') {
-                setShowSuspendedModal(true);
-                return;
-            }
-
-            if (data.accountStatus === 'pending') {
-                setShowPendingModal(true);
-                return;
-            }
-
+            if (!res.ok) { setError(data.error || 'Something went wrong.'); return; }
+            if (!data.found) { setError('No account found. Please check and try again.'); return; }
+            if (data.accountStatus === 'suspended') { setShowSuspendedModal(true); return; }
+            if (data.accountStatus === 'pending') { setShowPendingModal(true); return; }
             setMaskedEmail(data.maskedEmail);
             setMaskedPhone(data.maskedPhone);
             setActualEmail(data.email);
             setStep('confirm');
-
-        } catch (err) {
-            console.error('Search error:', err);
-            setError('Something went wrong. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+        } catch { setError('Something went wrong. Please try again.'); }
+        finally { setLoading(false); }
     };
 
-    // STEP 3: Login
     const handleLogin = async () => {
-        if (!password.trim()) {
-            setError('Enter your password');
-            return;
-        }
-
-        setLoading(true);
-        setError('');
-
+        if (!password.trim()) { setError('Enter your password'); return; }
+        setLoading(true); setError('');
         try {
             await signInWithEmailAndPassword(auth, actualEmail, password);
             router.push('/home');
@@ -106,332 +69,304 @@ export default function FindAccountClient() {
             switch (err.code) {
                 case 'auth/invalid-credential':
                 case 'auth/wrong-password':
-                case 'auth/user-not-found':
-                    setError('Incorrect email or password. Please try again.');
-                    break;
-                case 'auth/too-many-requests':
-                    setError('Too many failed login attempts. Please try again later or reset your password.');
-                    break;
-                case 'auth/user-disabled':
-                    setError('This account has been disabled. Please contact support.');
-                    break;
-                case 'auth/invalid-email':
-                    setError('Invalid email address format.');
-                    break;
-                default:
-                    setError('Failed to sign in. Please try again later.');
+                case 'auth/user-not-found': setError('Incorrect email or password. Please try again.'); break;
+                case 'auth/too-many-requests': setError('Too many failed login attempts. Please try again later or reset your password.'); break;
+                case 'auth/user-disabled': setError('This account has been disabled. Please contact support.'); break;
+                default: setError('Failed to sign in. Please try again later.');
             }
-        } finally {
-            setLoading(false);
-        }
+        } finally { setLoading(false); }
     };
 
     const resetFlow = () => {
-        setStep('search');
-        setSearchInput('');
-        setPassword('');
-        setError('');
-        setMaskedEmail('');
-        setMaskedPhone('');
-        setActualEmail('');
+        setStep('search'); setSearchInput(''); setPassword(''); setError('');
+        setMaskedEmail(''); setMaskedPhone(''); setActualEmail('');
     };
 
-    if (checkingAuth) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-950" />
-            </div>
-        );
-    }
+    const stepTitles = { search: 'Find your account', confirm: 'Is this you?', password: 'Enter your password' };
+    const stepSubtitles = {
+        search: 'Enter your mobile number or email address.',
+        confirm: 'We found an account matching your details.',
+        password: `Signing in with ${maskedEmail}`,
+    };
+
+    if (checkingAuth) return (
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: BG }}>
+            <div style={{ width: 36, height: 36, border: `3px solid rgba(13,34,68,0.1)`, borderTopColor: NAVY, borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+    );
 
     return (
-        <div className="min-h-screen bg-white flex flex-col">
-            <div className="p-4">
-                <button
-                    onClick={() => step === 'search' ? router.back() : resetFlow()}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                    <ArrowLeft size={24} className="text-gray-900" />
-                </button>
+        <>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+                .lan-serif { font-family: 'Playfair Display', Georgia, serif; }
+                .lan-body  { font-family: 'Lato', sans-serif; }
+                .hero-bg {
+                    background-color: ${NAVY};
+                    background-image:
+                        radial-gradient(rgba(184,150,62,0.06) 1px, transparent 1px),
+                        radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+                    background-size: 28px 28px, 14px 14px;
+                    background-position: 0 0, 7px 7px;
+                }
+                .lan-input {
+                    width: 100%; padding: 13px 16px 13px 44px;
+                    background: #fff; border: 0.5px solid #e5ddd0;
+                    font-family: 'Lato', sans-serif; font-size: 13px; color: ${NAVY};
+                    outline: none; transition: border-color 0.15s; box-sizing: border-box;
+                }
+                .lan-input:focus { border-color: ${GOLD}; }
+                .lan-input::placeholder { color: #bbb; }
+                .lan-input-plain {
+                    width: 100%; padding: 13px 44px 13px 44px;
+                    background: #fff; border: 0.5px solid #e5ddd0;
+                    font-family: 'Lato', sans-serif; font-size: 13px; color: ${NAVY};
+                    outline: none; transition: border-color 0.15s; box-sizing: border-box;
+                }
+                .lan-input-plain:focus { border-color: ${GOLD}; }
+                .lan-input-plain::placeholder { color: #bbb; }
+                .btn-primary {
+                    width: 100%; padding: 14px; background: ${NAVY}; color: #fff;
+                    border: none; font-family: 'Lato', sans-serif; font-size: 13px;
+                    font-weight: 700; letter-spacing: 0.04em; cursor: pointer;
+                    transition: background 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px;
+                    box-sizing: border-box;
+                }
+                .btn-primary:hover:not(:disabled) { background: #162d57; }
+                .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+                .btn-outline {
+                    width: 100%; padding: 14px; background: transparent; color: ${NAVY};
+                    border: 0.5px solid ${NAVY}; font-family: 'Lato', sans-serif; font-size: 13px;
+                    font-weight: 700; letter-spacing: 0.04em; cursor: pointer;
+                    transition: background 0.15s; box-sizing: border-box;
+                }
+                .btn-outline:hover { background: rgba(13,34,68,0.05); }
+                @keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+                .anim-up { animation: slideUp 0.45s cubic-bezier(0.4,0,0.2,1) both; }
+                @keyframes spin { to { transform: rotate(360deg); } }
+
+                .fa-card { width: 100%; max-width: 480px; background: #fff; border: 0.5px solid #e5ddd0; padding: 42px 40px; }
+
+                @media (max-width: 600px) {
+                    .fa-card { padding: 32px 20px; border: none; }
+                    .fa-main { padding: 28px 16px 48px !important; }
+                    header { padding: 14px 20px !important; }
+                    .fa-breadcrumb { padding: 10px 16px !important; }
+                }
+            `}</style>
+
+            <div className="lan-body" style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column" }}>
+
+                {/* ── Header ── */}
+                <header className="hero-bg" style={{ padding: "18px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span className="lan-serif" style={{ fontSize: 20, fontWeight: 900, color: "#fff", letterSpacing: -0.5 }}>
+                        [LAN <span style={{ color: GOLD, fontStyle: "italic" }}>Library</span>]
+                    </span>
+                    <button
+                        onClick={() => step === 'search' ? router.back() : resetFlow()}
+                        style={{ color: GOLD, background: "none", border: "none", fontSize: 12, fontWeight: 700, display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}
+                    >
+                        <ArrowLeft size={14} /> Back
+                    </button>
+                </header>
+
+                {/* ── Breadcrumb ── */}
+                <div className="fa-breadcrumb" style={{ background: "#fff", borderBottom: "0.5px solid #e5ddd0", padding: "10px 32px" }}>
+                    <div style={{ maxWidth: 1000, margin: "0 auto", fontSize: 12, color: "#888" }}>
+                        Home › Sign In › <span style={{ color: NAVY, fontWeight: 700 }}>Find Account</span>
+                    </div>
+                </div>
+
+                {/* ── Main ── */}
+                <main className="fa-main" style={{ flex: 1, maxWidth: 1000, margin: "0 auto", width: "100%", padding: "60px 24px", display: "flex", justifyContent: "center", boxSizing: "border-box" }}>
+                    <div className="fa-card anim-up" key={step}>
+
+                        {/* Label */}
+                        <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, marginBottom: 8 }}>
+                            {step === 'search' ? 'Account Lookup' : step === 'confirm' ? 'Confirm Identity' : 'Secure Login'}
+                        </p>
+                        <h1 className="lan-serif" style={{ fontSize: 26, fontWeight: 700, color: NAVY, marginBottom: 6 }}>
+                            {stepTitles[step]}
+                        </h1>
+                        <div style={{ width: 36, height: 3, background: GOLD, marginBottom: 18 }} />
+                        <p style={{ fontSize: 13, color: "#888", lineHeight: 1.7, marginBottom: 24 }}>
+                            {stepSubtitles[step]}
+                        </p>
+
+                        {/* ── STEP 1: SEARCH ── */}
+                        {step === 'search' && (
+                            <>
+                                <div style={{ position: "relative", marginBottom: error ? 12 : 20 }}>
+                                    <Search size={15} color="#bbb" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                                    <input
+                                        className="lan-input"
+                                        type="text"
+                                        placeholder="Mobile number or email address"
+                                        value={searchInput}
+                                        onChange={e => { setSearchInput(e.target.value); setError(''); }}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                                    />
+                                    {loading && (
+                                        <div style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, border: "2px solid rgba(13,34,68,0.15)", borderTopColor: NAVY, borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                                    )}
+                                </div>
+                                {error && <ErrorBox message={error} />}
+                                <button className="btn-primary" onClick={handleSearch} disabled={loading || !searchInput.trim()}>
+                                    {loading ? <Spinner /> : "Continue"}
+                                </button>
+                            </>
+                        )}
+
+                        {/* ── STEP 2: CONFIRM ── */}
+                        {step === 'confirm' && (
+                            <>
+                                <div style={{ background: CREAM, border: "0.5px solid #e5ddd0", padding: "20px", marginBottom: 20 }}>
+                                    {maskedEmail && (
+                                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: maskedPhone ? 12 : 0 }}>
+                                            <div style={{ width: 36, height: 36, background: `rgba(13,34,68,0.07)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                                <Mail size={16} color={NAVY} />
+                                            </div>
+                                            <div>
+                                                <p style={{ fontSize: 10, color: "#888", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>Email</p>
+                                                <p style={{ fontSize: 13, color: NAVY, fontWeight: 700 }}>{maskedEmail}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {maskedPhone && (
+                                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                            <div style={{ width: 36, height: 36, background: `rgba(13,34,68,0.07)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                                <Phone size={16} color={NAVY} />
+                                            </div>
+                                            <div>
+                                                <p style={{ fontSize: 10, color: "#888", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>Phone</p>
+                                                <p style={{ fontSize: 13, color: NAVY, fontWeight: 700 }}>{maskedPhone}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <button className="btn-primary" onClick={() => setStep('password')} style={{ marginBottom: 10 }}>
+                                    Yes, continue
+                                </button>
+                                <button className="btn-outline" onClick={resetFlow}>
+                                    No, try again
+                                </button>
+                            </>
+                        )}
+
+                        {/* ── STEP 3: PASSWORD ── */}
+                        {step === 'password' && (
+                            <>
+                                <div style={{ position: "relative", marginBottom: error ? 12 : 20 }}>
+                                    <Lock size={15} color="#bbb" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                                    <input
+                                        className="lan-input-plain"
+                                        type={showPassword ? 'text' : 'password'}
+                                        placeholder="Enter your password"
+                                        value={password}
+                                        onChange={e => { setPassword(e.target.value); setError(''); }}
+                                        autoFocus
+                                        onKeyDown={(e) => { if (e.key === 'Enter') handleLogin(); }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(v => !v)}
+                                        style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#bbb", display: "flex" }}
+                                    >
+                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                                {error && <ErrorBox message={error} />}
+                                <button className="btn-primary" onClick={handleLogin} disabled={loading || !password.trim()} style={{ marginBottom: 16 }}>
+                                    {loading ? <Spinner /> : "Sign In"}
+                                </button>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                    <button onClick={resetFlow} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: NAVY, fontWeight: 700, textAlign: "left", padding: 0 }}>
+                                        ← Not you? Use a different account
+                                    </button>
+                                    <button onClick={() => router.push('/auth/forgot-password')} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#888", textAlign: "left", padding: 0 }}>
+                                        Forgot password?
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </main>
+
+                {/* ── Footer ── */}
+                <footer className="hero-bg" style={{ padding: "18px", textAlign: "center" }}>
+                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
+                        © {new Date().getFullYear()} LAN Library
+                    </p>
+                </footer>
             </div>
 
-            <motion.div
-                key={step}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex-1 px-6 pt-4"
-            >
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    {step === 'search' && 'Find your account'}
-                    {step === 'confirm' && 'Is this you?'}
-                    {step === 'password' && 'Enter your password'}
-                </h1>
+            {/* ── Suspended Modal ── */}
+            {showSuspendedModal && <StatusModal
+                color="#dc2626"
+                title="Account Suspended"
+                subtitle="Your access has been restricted"
+                body="This account has been suspended due to a violation of our Terms of Service or Community Guidelines."
+                points={["You cannot log in to this account", "Your listings are not visible to others", "Pending transactions may be on hold"]}
+                onClose={() => { setShowSuspendedModal(false); resetFlow(); }}
+            />}
 
-                {/* ── STEP 1: SEARCH ── */}
-                {step === 'search' && (
-                    <>
-                        <p className="text-gray-600 mb-8">
-                            Enter your mobile number or email address.
-                        </p>
+            {/* ── Pending Modal ── */}
+            {showPendingModal && <StatusModal
+                color="#d97706"
+                title="Account Under Review"
+                subtitle="We're verifying your account"
+                body="Your account is currently under review. This usually takes 24–48 hours."
+                points={["You cannot log in yet", "We may contact you for more information", "You'll be notified once approved"]}
+                onClose={() => { setShowPendingModal(false); resetFlow(); }}
+            />}
+        </>
+    );
+}
 
-                        <div className="relative mb-4">
-                            <div className="relative">
-                                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                                <input
-                                    type="text"
-                                    placeholder="Mobile number or email address"
-                                    value={searchInput}
-                                    onChange={e => {
-                                        setSearchInput(e.target.value);
-                                        setError('');
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleSearch();
-                                    }}
-                                    className="w-full border border-gray-300 pl-12 pr-12 py-4 rounded-lg focus:outline-none focus:border-blue-950 text-gray-900"
-                                />
-                                {loading && (
-                                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-950"></div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+/* ── Sub-components ── */
 
-                        {error && (
-                            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                                <p className="text-red-800 text-sm">{error}</p>
-                            </div>
-                        )}
+function ErrorBox({ message }) {
+    return (
+        <div style={{ background: "#fef2f2", border: "0.5px solid #fecaca", padding: "12px 16px", display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 16 }}>
+            <AlertCircle size={15} color="#dc2626" style={{ flexShrink: 0, marginTop: 1 }} />
+            <p style={{ fontSize: 12, color: "#991b1b", margin: 0 }}>{message}</p>
+        </div>
+    );
+}
 
-                        <button
-                            onClick={handleSearch}
-                            disabled={loading || !searchInput.trim()}
-                            className="w-full lg:w-1/4 bg-blue-950 text-white py-3 rounded-full font-semibold hover:bg-blue-900 transition-colors disabled:opacity-50"
-                        >
-                            {loading ? 'Searching...' : 'Continue'}
-                        </button>
-                    </>
-                )}
+function Spinner() {
+    return <span style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />;
+}
 
-                {/* ── STEP 2: CONFIRM ── */}
-                {step === 'confirm' && (
-                    <>
-                        <p className="text-gray-600 mb-8">
-                            We found an account matching your details.
-                        </p>
-
-                        <div className="border border-gray-200 rounded-2xl p-5 mb-6 bg-gray-50">
-                            {maskedEmail && (
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                        <Mail className="w-5 h-5 text-blue-700" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500 font-medium">Email</p>
-                                        <p className="text-gray-900 font-semibold">{maskedEmail}</p>
-                                    </div>
-                                </div>
-                            )}
-                            {maskedPhone && (
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                        <Phone className="w-5 h-5 text-blue-700" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500 font-medium">Phone</p>
-                                        <p className="text-gray-900 font-semibold">{maskedPhone}</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <button
-                            onClick={() => setStep('password')}
-                            className="w-full lg:w-1/4 bg-blue-950 text-white py-3 rounded-full font-semibold hover:bg-blue-900 transition-colors mb-3"
-                        >
-                            Yes, continue
-                        </button>
-
-                        <button
-                            onClick={resetFlow}
-                            className="w-full lg:w-1/4 border-2 border-gray-200 text-gray-700 py-3 rounded-full font-semibold hover:bg-gray-50 transition-colors block"
-                        >
-                            No, try again
-                        </button>
-                    </>
-                )}
-
-                {/* ── STEP 3: PASSWORD ── */}
-                {step === 'password' && (
-                    <>
-                        <p className="text-gray-600 mb-8">
-                            Signing in with <span className="font-semibold text-gray-800">{maskedEmail}</span>
-                        </p>
-
-                        <div className="relative mb-4">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                            <input
-                                type={showPassword ? 'text' : 'password'}
-                                placeholder="Enter your password"
-                                value={password}
-                                onChange={e => {
-                                    setPassword(e.target.value);
-                                    setError('');
-                                }}
-                                autoFocus
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleLogin();
-                                }}
-                                className="w-full border border-gray-300 pl-12 pr-12 py-4 rounded-lg focus:outline-none focus:border-blue-950 text-gray-900"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(v => !v)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                            >
-                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                            </button>
-                        </div>
-
-                        {error && (
-                            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                                <p className="text-red-800 text-sm">{error}</p>
-                            </div>
-                        )}
-
-                        <button
-                            onClick={handleLogin}
-                            disabled={loading || !password.trim()}
-                            className="w-full lg:w-1/4 bg-blue-950 text-white py-3 rounded-full font-semibold hover:bg-blue-900 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                        >
-                            {loading ? (
-                                <>
-                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                    Signing in...
-                                </>
-                            ) : (
-                                'Sign in'
-                            )}
-                        </button>
-
-                        <div className="mt-6 space-y-3">
-                            <button
-                                onClick={resetFlow}
-                                className="text-blue-950 hover:underline font-medium block"
-                            >
-                                ← Not you? Use a different account
-                            </button>
-                            <button
-                                onClick={() => router.push('/auth/forgot-password')}
-                                className="text-gray-600 hover:underline text-sm block"
-                            >
-                                Forgot password?
-                            </button>
-                        </div>
-                    </>
-                )}
-            </motion.div>
-
-            {/* Suspended Modal */}
-            {showSuspendedModal && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden"
-                    >
-                        <div className="bg-red-600 px-6 py-8 text-center">
-                            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <AlertCircle className="w-9 h-9 text-white" />
-                            </div>
-                            <h3 className="text-2xl font-black text-white mb-1">Account Suspended</h3>
-                            <p className="text-red-100 text-sm">Your access has been restricted</p>
-                        </div>
-                        <div className="p-6">
-                            <p className="text-gray-700 text-center mb-4 leading-relaxed">
-                                This account has been <span className="font-bold text-red-600">suspended</span> due to a violation of our Terms of Service or Community Guidelines.
-                            </p>
-                            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-                                <p className="text-sm text-red-800 font-semibold mb-1">What this means:</p>
-                                <ul className="text-sm text-red-700 space-y-1 list-disc list-inside">
-                                    <li>You cannot log in to this account</li>
-                                    <li>Your listings are not visible to others</li>
-                                    <li>Pending transactions may be on hold</li>
-                                </ul>
-                            </div>
-                            <p className="text-sm text-gray-600 text-center mb-6">
-                                If you believe this is a mistake, please contact our support team.
-                            </p>
-                            <div className="flex flex-col gap-3">
-                                <a
-                                    href="mailto:support@lanlibrary.com"
-                                    className="w-full bg-red-600 text-white font-bold py-3 rounded-xl text-center hover:bg-red-700 transition-colors"
-                                >
-                                    Contact Support
-                                </a>
-                                <button
-                                    onClick={() => { setShowSuspendedModal(false); resetFlow(); }}
-                                    className="w-full border-2 border-gray-200 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors"
-                                >
-                                    Go Back
-                                </button>
-                            </div>
-                        </div>
-                    </motion.div>
+function StatusModal({ color, title, subtitle, body, points, onClose }) {
+    const NAVY = "#0d2244";
+    return (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+            <div style={{ background: "#fff", maxWidth: 420, width: "100%", overflow: "hidden" }}>
+                <div style={{ background: color, padding: "32px 24px", textAlign: "center" }}>
+                    <div style={{ width: 56, height: 56, background: "rgba(255,255,255,0.15)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                        <AlertCircle size={28} color="#fff" />
+                    </div>
+                    <h3 style={{ color: "#fff", fontSize: 20, fontWeight: 900, fontFamily: "'Playfair Display', serif", marginBottom: 4 }}>{title}</h3>
+                    <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 12 }}>{subtitle}</p>
                 </div>
-            )}
-
-            {/* Pending Modal */}
-            {showPendingModal && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden"
-                    >
-                        <div className="bg-yellow-500 px-6 py-8 text-center">
-                            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <AlertCircle className="w-9 h-9 text-white" />
-                            </div>
-                            <h3 className="text-2xl font-black text-white mb-1">Account Under Review</h3>
-                            <p className="text-yellow-100 text-sm">We're verifying your account</p>
-                        </div>
-                        <div className="p-6">
-                            <p className="text-gray-700 text-center mb-4 leading-relaxed">
-                                Your account is currently <span className="font-bold text-yellow-600">under review</span>. This usually takes 24–48 hours.
-                            </p>
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
-                                <p className="text-sm text-yellow-800 font-semibold mb-1">While under review:</p>
-                                <ul className="text-sm text-yellow-700 space-y-1 list-disc list-inside">
-                                    <li>You cannot log in yet</li>
-                                    <li>We may contact you for more information</li>
-                                    <li>You'll be notified once approved</li>
-                                </ul>
-                            </div>
-                            <p className="text-sm text-gray-600 text-center mb-6">
-                                Need help? Reach out to our support team.
-                            </p>
-                            <div className="flex flex-col gap-3">
-                                <a
-                                    href="mailto:support@lanlibrary.com"
-                                    className="w-full bg-yellow-500 text-white font-bold py-3 rounded-xl text-center hover:bg-yellow-600 transition-colors"
-                                >
-                                    Contact Support
-                                </a>
-                                <button
-                                    onClick={() => { setShowPendingModal(false); resetFlow(); }}
-                                    className="w-full border-2 border-gray-200 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors"
-                                >
-                                    Go Back
-                                </button>
-                            </div>
-                        </div>
-                    </motion.div>
+                <div style={{ padding: "24px" }}>
+                    <p style={{ fontSize: 13, color: "#555", marginBottom: 16, lineHeight: 1.7 }}>{body}</p>
+                    <div style={{ background: "#fef2f2", border: "0.5px solid #fecaca", padding: "14px 16px", marginBottom: 20 }}>
+                        <p style={{ fontSize: 11, fontWeight: 700, color: "#991b1b", marginBottom: 6 }}>What this means:</p>
+                        <ul style={{ fontSize: 11, color: "#991b1b", paddingLeft: 16, margin: 0, lineHeight: 1.8 }}>
+                            {points.map(p => <li key={p}>{p}</li>)}
+                        </ul>
+                    </div>
+                    <a href="mailto:support@lanlibrary.com" style={{ display: "block", width: "100%", background: color, color: "#fff", textAlign: "center", padding: 14, fontWeight: 700, fontSize: 13, textDecoration: "none", marginBottom: 10, boxSizing: "border-box" }}>
+                        Contact Support
+                    </a>
+                    <button onClick={onClose} style={{ width: "100%", background: "transparent", border: "0.5px solid #e5ddd0", color: NAVY, padding: 14, fontWeight: 700, fontSize: 13, cursor: "pointer", boxSizing: "border-box" }}>
+                        Go Back
+                    </button>
                 </div>
-            )}
+            </div>
         </div>
     );
 }

@@ -479,6 +479,97 @@ export const articlesP1 = {
     ]
   },
 
+  'signing-in': {
+  category: 'Getting Started',
+  title: 'Signing in to your account',
+  readTime: '3 min read',
+  lastUpdated: 'December 15, 2025',
+  tags: ['Login', 'Account', 'Sign In'],
+  content: [
+    {
+      type: 'intro',
+      text: 'Signing in to your Learning Access Network account gives you access to your personal library, purchased books, and account features. Follow the steps below to log in securely.'
+    },
+    {
+      type: 'heading',
+      text: 'Sign In Options'
+    },
+    {
+      type: 'paragraph',
+      text: 'You can sign in using your email and password or through Google Sign In for a faster experience.'
+    },
+    {
+      type: 'heading',
+      text: 'Continue with Email'
+    },
+    {
+      type: 'paragraph',
+      text: 'To sign in using your email address, follow these steps:'
+    },
+    {
+      type: 'steps',
+      items: [
+        'Click the "Sign In" button at the top right of the page',
+        'Select "Continue with Email"',
+        'Enter your registered email address in the email field',
+        'Enter your password in the password field',
+        'Click the "Sign In" button to access your account'
+      ]
+    },
+    {
+      type: 'heading',
+      text: 'Email Field'
+    },
+    {
+      type: 'paragraph',
+      text: 'Make sure you enter the correct email address you used during account registration. The email field is not case-sensitive, but it must match your registered account.'
+    },
+    {
+      type: 'heading',
+      text: 'Password Field'
+    },
+    {
+      type: 'paragraph',
+      text: 'Enter your password exactly as you created it. Passwords are case-sensitive, so ensure that your caps lock is off and there are no extra spaces.'
+    },
+    {
+      type: 'heading',
+      text: 'Using Google Sign In'
+    },
+    {
+      type: 'steps',
+      items: [
+        'Click "Continue with Google"',
+        'Select your Google account',
+        'Grant permission if prompted',
+        'You will be signed in automatically and redirected to your dashboard'
+      ]
+    },
+    {
+      type: 'heading',
+      text: 'Troubleshooting Sign In Issues'
+    },
+    {
+      type: 'list',
+      items: [
+        'Check that your email and password are correct',
+        'Ensure your internet connection is stable',
+        'Try resetting your password if you forgot it',
+        'Clear your browser cache and cookies',
+        'Try signing in from a different browser or device'
+      ]
+    },
+    {
+      type: 'note',
+      text: 'Tip: For faster access in the future, use Google Sign In or save your login details securely in your browser.'
+    }
+  ],
+  relatedArticles: [
+    { title: 'Creating Your Account', slug: 'creating-your-account' },
+    { title: 'Changing Your Password', slug: 'changing-password' }
+  ]
+},
+
   'payment-methods': {
     category: 'Payments & Pricing',
     title: 'Accepted Payment Methods',

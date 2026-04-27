@@ -1,12 +1,19 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Book, Edit, Trash2, Eye, DollarSign, Download, Plus, Search, Filter, MoreVertical, TrendingUp, AlertCircle, CheckCircle, X, Upload, BookOpen } from "lucide-react";
+import { Book, Trash2, Eye, Plus, Search, Filter, TrendingUp, AlertCircle, CheckCircle, X, Upload, BookOpen, ChevronRight, ShoppingBag, DollarSign, Globe } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
-import { collection, query, where, getDocs, doc, getDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, deleteDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
+
+/* ─── colour tokens (matches seller page) ───────────────────── */
+const NAVY = "#0d2244";
+const GOLD = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG = "#f5f1ea";
 
 export default function MyPostedBooksClient() {
     const [user, setUser] = useState(null);
@@ -22,43 +29,32 @@ export default function MyPostedBooksClient() {
     const [bookSalesCount, setBookSalesCount] = useState({});
     const router = useRouter();
 
-    // Fetch sales count for all books
     useEffect(() => {
         const fetchBookSales = async () => {
             try {
                 const usersSnapshot = await getDocs(collection(db, "users"));
                 const salesMap = {};
-
                 usersSnapshot.docs.forEach(userDoc => {
                     const userData = userDoc.data();
                     const purchasedBooks = userData.purchasedBooks || {};
-
                     Object.values(purchasedBooks).forEach(purchase => {
                         const bookId = purchase.bookId || purchase.id || purchase.firestoreId;
                         if (bookId) {
                             salesMap[bookId] = (salesMap[bookId] || 0) + 1;
-                            // Also track firestore- prefixed version
                             salesMap[`firestore-${bookId}`] = (salesMap[`firestore-${bookId}`] || 0) + 1;
                         }
                     });
                 });
-
                 setBookSalesCount(salesMap);
-            } catch (error) {
-                console.error("Error fetching sales count:", error);
-            }
+            } catch (error) { console.error("Error fetching sales count:", error); }
         };
-
         fetchBookSales();
     }, []);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                await fetchUserAndBooks(currentUser.uid);
-            } else {
-                router.push('/auth/signin');
-            }
+            if (currentUser) { await fetchUserAndBooks(currentUser.uid); }
+            else { router.push('/auth/signin'); }
         });
         return () => unsubscribe();
     }, [router]);
@@ -66,30 +62,15 @@ export default function MyPostedBooksClient() {
     const fetchUserAndBooks = async (uid) => {
         try {
             setLoading(true);
-
-            // Fetch user data
             const userDoc = await getDoc(doc(db, "users", uid));
             if (userDoc.exists()) {
                 const userData = userDoc.data();
-
-                if (!userData.isSeller) {
-                    router.push('/my-account');
-                    return;
-                }
-
-                setUser({
-                    uid,
-                    ...userData
-                });
-
-                // Fetch seller's posted books
+                if (!userData.isSeller) { router.push('/my-account'); return; }
+                setUser({ uid, ...userData });
                 await fetchPostedBooks(uid, userData.email);
             }
-        } catch (error) {
-            console.error("Error fetching user data:", error);
-        } finally {
-            setLoading(false);
-        }
+        } catch (error) { console.error("Error fetching user data:", error); }
+        finally { setLoading(false); }
     };
 
     const fetchPostedBooks = async (uid, email) => {
@@ -97,700 +78,426 @@ export default function MyPostedBooksClient() {
             const advertBooksRef = collection(db, "advertMyBook");
             const q = query(advertBooksRef, where("userId", "==", uid));
             const snapshot = await getDocs(q);
-
             if (snapshot.empty) {
-                // Try querying by email as fallback
                 const emailQuery = query(advertBooksRef, where("userEmail", "==", email));
                 const emailSnapshot = await getDocs(emailQuery);
-
                 if (!emailSnapshot.empty) {
-                    const books = emailSnapshot.docs.map(doc => ({
-                        id: doc.id,
-                        firestoreId: doc.id,
-                        ...doc.data(),
-                        uploadedAt: doc.data().createdAt?.toDate?.() || new Date()
-                    }));
-                    setPostedBooks(books);
-                    setFilteredBooks(books);
-                    return;
+                    const books = emailSnapshot.docs.map(d => ({ id: d.id, firestoreId: d.id, ...d.data(), uploadedAt: d.data().createdAt?.toDate?.() || new Date() }));
+                    setPostedBooks(books); setFilteredBooks(books); return;
                 }
             }
-
-            const books = snapshot.docs.map(doc => ({
-                id: doc.id,
-                firestoreId: doc.id,
-                ...doc.data(),
-                uploadedAt: doc.data().createdAt?.toDate?.() || new Date()
-            }));
-
-            setPostedBooks(books);
-            setFilteredBooks(books);
-            console.log(`✅ Loaded ${books.length} posted books`);
-        } catch (error) {
-            console.error("Error fetching posted books:", error);
-            setPostedBooks([]);
-            setFilteredBooks([]);
-        }
+            const books = snapshot.docs.map(d => ({ id: d.id, firestoreId: d.id, ...d.data(), uploadedAt: d.data().createdAt?.toDate?.() || new Date() }));
+            setPostedBooks(books); setFilteredBooks(books);
+        } catch (error) { console.error("Error fetching posted books:", error); setPostedBooks([]); setFilteredBooks([]); }
     };
 
-    // Get sales count for a specific book
-    const getBookSalesCount = (book) => {
-        return (
-            bookSalesCount[book.id] ||
-            bookSalesCount[book.firestoreId] ||
-            bookSalesCount[`firestore-${book.id}`] ||
-            bookSalesCount[`firestore-${book.firestoreId}`] ||
-            0
-        );
-    };
+    const getBookSalesCount = (book) => bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || bookSalesCount[`firestore-${book.id}`] || bookSalesCount[`firestore-${book.firestoreId}`] || 0;
+    const getBookTotalSales = (book) => getBookSalesCount(book) * (Number(book.price) || 0);
 
-    // Calculate total sales revenue for a book
-    const getBookTotalSales = (book) => {
-        const salesCount = getBookSalesCount(book);
-        const price = Number(book.price) || 0;
-        return salesCount * price;
-    };
-
-    // Calculate overall statistics
-    const calculateStats = () => {
-        const totalRevenue = postedBooks.reduce((sum, book) => {
-            return sum + getBookTotalSales(book);
-        }, 0);
-
-        const totalCopiesSold = postedBooks.reduce((sum, book) => {
-            return sum + getBookSalesCount(book);
-        }, 0);
-
-        return {
-            totalRevenue,
-            totalCopiesSold
-        };
-    };
-
+    const calculateStats = () => ({
+        totalRevenue: postedBooks.reduce((sum, b) => sum + getBookTotalSales(b), 0),
+        totalCopiesSold: postedBooks.reduce((sum, b) => sum + getBookSalesCount(b), 0),
+        approved: postedBooks.filter(b => b.status === 'approved').length,
+        pending: postedBooks.filter(b => b.status === 'pending').length,
+    });
     const stats = calculateStats();
 
-    // Filter and search books
     useEffect(() => {
         let filtered = [...postedBooks];
-
-        // Apply search filter
-        if (searchQuery.trim()) {
-            filtered = filtered.filter(book =>
-                book.bookTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                book.author?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                book.category?.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-        }
-
-        // Apply status filter
-        if (filterStatus !== "all") {
-            filtered = filtered.filter(book => book.status === filterStatus);
-        }
-
+        if (searchQuery.trim()) filtered = filtered.filter(b => b.bookTitle?.toLowerCase().includes(searchQuery.toLowerCase()) || b.author?.toLowerCase().includes(searchQuery.toLowerCase()) || b.category?.toLowerCase().includes(searchQuery.toLowerCase()));
+        if (filterStatus !== "all") filtered = filtered.filter(b => b.status === filterStatus);
         setFilteredBooks(filtered);
     }, [searchQuery, filterStatus, postedBooks]);
 
     const handleDeleteBook = async () => {
         if (!selectedBook) return;
-
         try {
             setDeleting(true);
             await deleteDoc(doc(db, "advertMyBook", selectedBook.id));
-
-            // Update local state
-            setPostedBooks(prev => prev.filter(book => book.id !== selectedBook.id));
-            setFilteredBooks(prev => prev.filter(book => book.id !== selectedBook.id));
-
-            setShowDeleteModal(false);
-            setSelectedBook(null);
+            setPostedBooks(prev => prev.filter(b => b.id !== selectedBook.id));
+            setFilteredBooks(prev => prev.filter(b => b.id !== selectedBook.id));
+            setShowDeleteModal(false); setSelectedBook(null);
             alert("Book deleted successfully!");
-        } catch (error) {
-            console.error("Error deleting book:", error);
-            alert("Failed to delete book. Please try again.");
-        } finally {
-            setDeleting(false);
-        }
+        } catch (error) { console.error("Error deleting book:", error); alert("Failed to delete book. Please try again."); }
+        finally { setDeleting(false); }
     };
 
     const getThumbnailUrl = (book) => {
-        if (book.driveFileId) {
-            return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
-        }
-        if (book.embedUrl) {
-            const match = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
-            if (match) {
-                const fileId = match[1] || match[2] || match[3];
-                if (fileId) {
-                    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
-                }
-            }
-        }
-        if (book.pdfUrl && book.pdfUrl.includes('drive.google.com')) {
-            const match = book.pdfUrl.match(/[-\w]{25,}/);
-            if (match) {
-                return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
-            }
-        }
+        if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
+        if (book.embedUrl) { const match = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/); if (match) { const fileId = match[1] || match[2] || match[3]; if (fileId) return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`; } }
+        if (book.pdfUrl && book.pdfUrl.includes('drive.google.com')) { const match = book.pdfUrl.match(/[-\w]{25,}/); if (match) return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`; }
         return 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
     };
 
-    const getStatusBadge = (status) => {
+    const getStatusConfig = (status) => {
         switch (status) {
-            case 'approved':
-                return <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-semibold">Approved</span>;
-            case 'pending':
-                return <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-semibold">Pending</span>;
-            case 'rejected':
-                return <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full font-semibold">Rejected</span>;
-            default:
-                return <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-semibold">Active</span>;
+            case 'approved': return { label: 'Approved', bg: '#f0fdf4', color: '#16a34a', border: '#86efac' };
+            case 'pending': return { label: 'Pending', bg: '#fffbeb', color: '#d97706', border: '#fde68a' };
+            case 'rejected': return { label: 'Rejected', bg: '#fef2f2', color: '#dc2626', border: '#fecaca' };
+            default: return { label: 'Active', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' };
         }
     };
 
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="relative w-20 h-24 perspective-1000">
-                    {/* Book Container */}
-                    <div className="book-flip-container">
-                        {/* Front Cover - Book */}
-                        <div className="book-face book-front">
-                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-r-lg shadow-2xl relative overflow-hidden">
-                                {/* Book spine shadow */}
-                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-black/30"></div>
-
-                                {/* Book pages effect */}
-                                <div className="absolute right-0 top-1 bottom-1 w-0.5 bg-white/20"></div>
-                                <div className="absolute right-1 top-2 bottom-2 w-0.5 bg-white/15"></div>
-                                <div className="absolute right-2 top-3 bottom-3 w-0.5 bg-white/10"></div>
-
-                                {/* Book icon */}
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <svg className="w-10 h-10 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                    </svg>
-                                </div>
-
-                                {/* Shine effect */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent"></div>
-                            </div>
-                        </div>
-
-                        {/* Back Cover - LAN */}
-                        <div className="book-face book-back">
-                            <div className="w-full h-full bg-gradient-to-br from-blue-950 via-blue-800 to-blue-700 rounded-lg shadow-2xl flex items-center justify-center relative overflow-hidden">
-                                {/* LAN Text */}
-                                <div className="flex gap-0.5 text-white font-black text-2xl">
-                                    <span className="inline-block lan-letter" style={{ animationDelay: '0s' }}>L</span>
-                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.15s' }}>A</span>
-                                    <span className="inline-block lan-letter" style={{ animationDelay: '0.3s' }}>N</span>
-                                </div>
-
-                                {/* Glow effect */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 via-transparent to-transparent"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Loading dots */}
-                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
-                        <div className="w-1.5 h-1.5 bg-blue-950 rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
-                        <div className="w-1.5 h-1.5 bg-blue-800 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                    </div>
-
-                    <style jsx>{`
-    .perspective-1000 {
-      perspective: 1000px;
-    }
-    
-    .book-flip-container {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      transform-style: preserve-3d;
-      animation: bookFlip 3s ease-in-out infinite;
-    }
-    
-    .book-face {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
-    }
-    
-    .book-front {
-      z-index: 2;
-    }
-    
-    .book-back {
-      transform: rotateY(180deg);
-    }
-    
-    @keyframes bookFlip {
-      0%, 100% {
-        transform: rotateY(0deg);
-      }
-      25%, 75% {
-        transform: rotateY(180deg);
-      }
-    }
-    
-    @keyframes lan-letter {
-      0%, 100% {
-        transform: translateY(0) scale(1);
-      }
-      50% {
-        transform: translateY(-4px) scale(1.1);
-      }
-    }
-    
-    .lan-letter {
-      animation: lan-letter 0.6s ease-in-out infinite;
-    }
-  `}</style>
-                </div>
+    /* ── Loading state (matches seller page) ── */
+    if (loading) return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG }}>
+            <div style={{ textAlign: 'center' }}>
+                <div style={{ width: '56px', height: '56px', border: `3px solid ${GOLD}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '18px', color: NAVY }}>Loading your documents…</p>
+                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
-        );
-    }
+        </div>
+    );
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <Navbar />
+        <>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+                .lan-root { font-family:'Lato',sans-serif; background:${BG}; }
+                .lan-serif { font-family:'Playfair Display',Georgia,serif; }
+                .book-row { display:flex; align-items:center; justify-content:space-between; padding:16px; border:0.5px solid #e5ddd0; background:#fff; margin-bottom:6px; transition:background 0.15s,border-color 0.15s; cursor:pointer; }
+                .book-row:hover { background:${CREAM}; border-color:${GOLD}; }
+                .action-btn { width:34px; height:34px; border:0.5px solid #e5ddd0; display:flex; align-items:center; justify-content:center; background:${CREAM}; cursor:pointer; transition:all 0.15s; }
+                .action-btn:hover { border-color:${GOLD}; }
+                .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:50; display:flex; align-items:center; justify-flex-start; flex-direction:column; overflow-y:auto; }
+                .modal-inner { background:#fff; width:100%; min-height:100vh; max-width:640px; margin:0 auto; }
+                @media(min-width:640px){ .modal-inner { min-height:auto; margin:40px auto; } }
+                .gold-pill { display:inline-flex; align-items:center; gap:6px; background:rgba(184,150,62,0.12); border:0.5px solid rgba(184,150,62,0.3); padding:5px 12px; border-radius:999px; }
+                @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+                .anim-up { animation:slideUp 0.45s cubic-bezier(0.4,0,0.2,1) both; }
+                @keyframes pulse2 { 0%,100%{opacity:1} 50%{opacity:0.4} }
+                .pulse-dot { animation:pulse2 2s infinite; }
+                .sbar-none { scrollbar-width:none; -ms-overflow-style:none; }
+                .sbar-none::-webkit-scrollbar { display:none; }
+                .lg-hide { display:flex; }
+                @media(min-width:1024px){ .lg-hide { display:none !important; } }
+            `}</style>
 
-            {/* Header */}
-            <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-4 py-6">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="lan-root" style={{ minHeight: '100vh' }}>
+                <Navbar />
+
+                <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 16px' }}>
+
+                    {/* ── Header Bar ── */}
+                    <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '20px 24px', marginBottom: '24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                         <div>
-                            <h1 className="text-3xl font-bold text-blue-950">My Posted Books</h1>
-                            <p className="text-gray-600 mt-1">Manage all your uploaded documents</p>
+                            <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: GOLD, marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Seller Dashboard</p>
+                            <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(22px,4vw,30px)', fontWeight: 700, color: NAVY, margin: 0 }}>My Posted Documents</h1>
                         </div>
                         <Link href="/upload-document">
-                            <button className="bg-blue-950 text-white px-6 py-3 rounded-xl font-semibold flex items-center gap-2 hover:bg-blue-900 transition-colors">
-                                <Plus size={20} />
-                                Upload New Document
+                            <button style={{ display: 'flex', alignItems: 'center', gap: '8px', background: NAVY, color: '#fff', padding: '12px 20px', border: 'none', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em', transition: 'background 0.18s' }}
+                                onMouseEnter={e => e.currentTarget.style.background = '#1a3a6e'}
+                                onMouseLeave={e => e.currentTarget.style.background = NAVY}>
+                                <Plus size={16} /> Upload New Document
                             </button>
                         </Link>
                     </div>
-                </div>
-            </div>
 
-            {/* Stats Section */}
-            <div className="max-w-7xl mx-auto px-4 py-6">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
-                    <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
-                        <div className="flex items-center gap-2 lg:gap-3">
-                            <div className="bg-blue-100 p-2 lg:p-3 rounded-lg">
-                                <Book className="text-blue-950" size={20} />
+                    {/* ── Stats Cards ── */}
+                    <div className="anim-up" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '12px', marginBottom: '24px' }}>
+                        <style>{`@media(min-width:640px){.stats-grid{grid-template-columns:repeat(4,1fr) !important;}}`}</style>
+                        {[
+                            { label: 'Total Documents', val: postedBooks.length, icon: <Book size={18} style={{ color: GOLD }} /> },
+                            { label: 'Approved', val: stats.approved, icon: <CheckCircle size={18} style={{ color: GOLD }} /> },
+                            { label: 'Copies Sold', val: stats.totalCopiesSold, icon: <ShoppingBag size={18} style={{ color: GOLD }} /> },
+                            { label: 'Total Revenue', val: `₦${stats.totalRevenue.toLocaleString()}`, icon: <TrendingUp size={18} style={{ color: GOLD }} /> },
+                        ].map(({ label, val, icon }, i) => (
+                            <div key={i} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '20px' }}>
+                                <div style={{ width: '40px', height: '40px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px', background: CREAM }}>{icon}</div>
+                                <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#aaa', margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>{label}</p>
+                                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '24px', fontWeight: 700, color: NAVY, margin: 0 }}>{val}</p>
                             </div>
-                            <div>
-                                <p className="text-xs lg:text-sm text-gray-600">Total Books</p>
-                                <p className="text-lg lg:text-2xl font-bold text-blue-950">{postedBooks.length}</p>
-                            </div>
-                        </div>
+                        ))}
                     </div>
-                    <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
-                        <div className="flex items-center gap-2 lg:gap-3">
-                            <div className="bg-green-100 p-2 lg:p-3 rounded-lg">
-                                <CheckCircle className="text-green-600" size={20} />
-                            </div>
-                            <div>
-                                <p className="text-xs lg:text-sm text-gray-600">Approved</p>
-                                <p className="text-lg lg:text-2xl font-bold text-green-600">
-                                    {postedBooks.filter(b => b.status === 'approved').length}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
-                        <div className="flex items-center gap-2 lg:gap-3">
-                            <div className="bg-yellow-100 p-2 lg:p-3 rounded-lg">
-                                <AlertCircle className="text-yellow-600" size={20} />
-                            </div>
-                            <div>
-                                <p className="text-xs lg:text-sm text-gray-600">Copies Sold</p>
-                                <p className="text-lg lg:text-2xl font-bold text-yellow-600">
-                                    {stats.totalCopiesSold}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
-                        <div className="flex items-center gap-2 lg:gap-3">
-                            <div className="bg-purple-100 p-2 lg:p-3 rounded-lg">
-                                <TrendingUp className="text-purple-600" size={20} />
-                            </div>
-                            <div>
-                                <p className="text-xs lg:text-sm text-gray-600">Total Revenue</p>
-                                <p className="text-lg lg:text-2xl font-bold text-purple-600">
-                                    ₦{stats.totalRevenue.toLocaleString()}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                {/* Search and Filter */}
-                <div className="bg-white rounded-xl p-4 mb-6 shadow-sm">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                            <input
-                                type="text"
-                                placeholder="Search by title, author, or category..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-blue-950"
-                            />
+                    {/* ── Search & Filter ── */}
+                    <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '20px 24px', marginBottom: '20px', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+                        <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
+                            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#aaa' }} />
+                            <input type="text" placeholder="Search by title, author or category…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                                style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '11px 12px 11px 36px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box', background: CREAM }} />
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Filter size={20} className="text-gray-600" />
-                            <select
-                                value={filterStatus}
-                                onChange={(e) => setFilterStatus(e.target.value)}
-                                className="px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-blue-950 bg-white"
-                            >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Filter size={14} style={{ color: '#aaa' }} />
+                            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+                                style={{ border: '0.5px solid #e5ddd0', padding: '11px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", background: '#fff', cursor: 'pointer' }}>
                                 <option value="all">All Status</option>
                                 <option value="approved">Approved</option>
                                 <option value="pending">Pending</option>
                                 <option value="rejected">Rejected</option>
                             </select>
                         </div>
-                    </div>
-                </div>
-
-                {/* Books Grid/List */}
-                {filteredBooks.length === 0 ? (
-                    <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                        <Book size={64} className="mx-auto text-gray-300 mb-4" />
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">
-                            {postedBooks.length === 0 ? "No Books Posted Yet" : "No Books Found"}
-                        </h3>
-                        <p className="text-gray-600 mb-6">
-                            {postedBooks.length === 0
-                                ? "Start uploading your documents to reach more readers!"
-                                : "Try adjusting your search or filters"
-                            }
-                        </p>
-                        {postedBooks.length === 0 && (
-                            <Link href="/advertise">
-                                <button className="bg-blue-950 text-white px-6 py-3 rounded-xl font-semibold inline-flex items-center gap-2 hover:bg-blue-900">
-                                    <Upload size={20} />
-                                    Upload Your First document
-                                </button>
-                            </Link>
-                        )}
-                    </div>
-                ) : (
-                    <>
-                        {/* Desktop Table View */}
-                        <div className="hidden lg:block bg-white rounded-xl shadow-sm overflow-hidden">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 border-b border-gray-200">
-                                    <tr>
-                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Book</th>
-                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Category</th>
-                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Price</th>
-                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Sold</th>
-                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Revenue</th>
-                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
-                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Uploaded</th>
-                                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                    {filteredBooks.map((book) => {
-                                        const salesCount = getBookSalesCount(book);
-                                        const totalSales = getBookTotalSales(book);
-
-                                        return (
-                                            <tr key={book.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <img
-                                                            src={getThumbnailUrl(book)}
-                                                            alt={book.bookTitle}
-                                                            className="w-12 h-16 object-cover rounded border border-gray-200"
-                                                            onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                                                        />
-                                                        <div>
-                                                            <p className="font-semibold text-blue-950">{book.bookTitle}</p>
-                                                            <p className="text-sm text-gray-600">{book.author}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="text-sm text-gray-700 capitalize">{book.category}</span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="font-semibold text-blue-950">₦{Number(book.price).toLocaleString()}</span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="font-semibold text-gray-900">{salesCount}</span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="font-semibold text-purple-600">₦{totalSales.toLocaleString()}</span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {getStatusBadge(book.status)}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="text-sm text-gray-600">
-                                                        {book.uploadedAt?.toLocaleDateString()}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedBook(book);
-                                                                setShowDetailsModal(true);
-                                                            }}
-                                                            className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
-                                                            title="View Details"
-                                                        >
-                                                            <Eye size={18} className="text-blue-950" />
-                                                        </button>
-                                                        <Link href={`/book/preview?id=${book.id}`}>
-                                                            <button className="p-2 hover:bg-green-100 rounded-lg transition-colors" title="Open Book">
-                                                                <BookOpen size={18} className="text-green-600" />
-                                                            </button>
-                                                        </Link>
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedBook(book);
-                                                                setShowDeleteModal(true);
-                                                            }}
-                                                            className="p-2 hover:bg-red-100 rounded-lg transition-colors"
-                                                            title="Delete"
-                                                        >
-                                                            <Trash2 size={18} className="text-red-600" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: CREAM, border: '0.5px solid rgba(184,150,62,0.2)', padding: '8px 14px' }}>
+                            <div className="pulse-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
+                            <span style={{ fontSize: '11px', color: NAVY, fontWeight: 600, fontFamily: "'Lato',sans-serif" }}>{filteredBooks.length} result{filteredBooks.length !== 1 ? 's' : ''}</span>
                         </div>
+                    </div>
 
-                        {/* Mobile Card View */}
-                        <div className="lg:hidden space-y-4">
-                            {filteredBooks.map((book) => {
-                                const salesCount = getBookSalesCount(book);
-                                const totalSales = getBookTotalSales(book);
-
-                                return (
-                                    <div key={book.id} className="bg-white rounded-xl shadow-sm p-4">
-                                        <div className="flex gap-3 mb-3">
-                                            <img
-                                                src={getThumbnailUrl(book)}
-                                                alt={book.bookTitle}
-                                                className="w-20 h-28 object-cover rounded border border-gray-200"
-                                                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                                            />
-                                            <div className="flex-1">
-                                                <h3 className="font-bold text-blue-950 mb-1">{book.bookTitle}</h3>
-                                                <p className="text-sm text-gray-600 mb-2">{book.author}</p>
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span className="text-sm font-semibold text-blue-950">₦{Number(book.price).toLocaleString()}</span>
-                                                    {getStatusBadge(book.status)}
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-xs text-gray-500">
-                                                        Sold: <span className="font-semibold text-gray-900">{salesCount} copies</span>
-                                                    </p>
-                                                    <p className="text-xs text-gray-500">
-                                                        Revenue: <span className="font-semibold text-purple-600">₦{totalSales.toLocaleString()}</span>
-                                                    </p>
-                                                    <p className="text-xs text-gray-500">
-                                                        Uploaded: {book.uploadedAt?.toLocaleDateString()}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2 pt-3 border-t border-gray-200">
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedBook(book);
-                                                    setShowDetailsModal(true);
-                                                }}
-                                                className="flex-1 bg-blue-50 text-blue-950 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-blue-100"
-                                            >
-                                                <Eye size={18} />
-                                                View
-                                            </button>
-                                            <Link href={`/book/preview?id=${book.id}`} className="flex-1">
-                                                <button className="w-full bg-green-50 text-green-600 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-green-100">
-                                                    <BookOpen size={18} />
-                                                    Open
-                                                </button>
-                                            </Link>
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedBook(book);
-                                                    setShowDeleteModal(true);
-                                                }}
-                                                className="bg-red-50 text-red-600 py-2 px-4 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-red-100"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </>
-                )}
-            </div>
-
-            {/* Delete Confirmation Modal */}
-            {showDeleteModal && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md p-6">
-                        <div className="text-center mb-6">
-                            <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Trash2 size={32} className="text-red-600" />
+                    {/* ── Books List ── */}
+                    {filteredBooks.length === 0 ? (
+                        <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '64px 24px', textAlign: 'center' }}>
+                            <div style={{ width: '80px', height: '80px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', background: CREAM }}>
+                                <Book size={36} style={{ color: '#ccc' }} />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-2">Delete Book?</h3>
-                            <p className="text-gray-600">
-                                Are you sure you want to delete "{selectedBook?.bookTitle}"? This action cannot be undone.
+                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '22px', fontWeight: 700, color: NAVY, margin: '0 0 8px' }}>{postedBooks.length === 0 ? "No Documents Yet" : "No Results Found"}</p>
+                            <p style={{ fontSize: '13px', color: '#aaa', marginBottom: '24px', fontFamily: "'Lato',sans-serif" }}>
+                                {postedBooks.length === 0 ? "Start uploading your documents to reach more readers." : "Try adjusting your search or filters."}
                             </p>
-                        </div>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => {
-                                    setShowDeleteModal(false);
-                                    setSelectedBook(null);
-                                }}
-                                disabled={deleting}
-                                className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-300 disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleDeleteBook}
-                                disabled={deleting}
-                                className="flex-1 bg-red-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {deleting ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                        Deleting...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Trash2 size={18} />
-                                        Delete
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Book Details Modal */}
-            {showDetailsModal && selectedBook && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-">
-                    <div className="bg-white w-full max-w-2xl max-h-full flex flex-col rounded-2xl">
-                        {/* Fixed Header */}
-                        <div className="bg-blue-950 text-white p-6 rounded-t-2xl flex items-center justify-between flex-shrink-0">
-                            <h3 className="text-2xl font-bold">Book Details</h3>
-                            <button onClick={() => setShowDetailsModal(false)}>
-                                <X size={24} />
-                            </button>
-                        </div>
-
-                        {/* Scrollable Content */}
-                        <div className="p-6 overflow-y-auto flex-1">
-                            <div className="flex gap-6 mb-6">
-                                <img
-                                    src={getThumbnailUrl(selectedBook)}
-                                    alt={selectedBook.bookTitle}
-                                    className="w-32 h-44 object-cover rounded-lg border border-gray-200 flex-shrink-0"
-                                    onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
-                                />
-                                <div className="flex-1">
-                                    <h4 className="text-2xl font-bold text-blue-950 mb-2">{selectedBook.bookTitle}</h4>
-                                    <p className="text-gray-600 mb-4">by {selectedBook.author}</p>
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm text-gray-600">Category:</span>
-                                            <span className="text-sm font-semibold text-blue-950 capitalize">{selectedBook.category}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm text-gray-600">Price:</span>
-                                            <span className="text-xl font-bold text-blue-950">₦{Number(selectedBook.price).toLocaleString()}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm text-gray-600">Status:</span>
-                                            {getStatusBadge(selectedBook.status)}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm text-gray-600">Pages:</span>
-                                            <span className="text-sm font-semibold text-blue-950">{selectedBook.pages || 'N/A'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {selectedBook.description && (
-                                <div className="mb-6">
-                                    <h5 className="font-bold text-gray-900 mb-2">Description</h5>
-                                    <p className="text-gray-600 text-sm leading-relaxed">{selectedBook.description}</p>
-                                </div>
-                            )}
-
-                            <div className="mb-6">
-                                <h5 className="font-bold text-gray-900 mb-2">Summary</h5>
-                                <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">{selectedBook.message}</p>
-                            </div>
-
-                            <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                                <h5 className="font-bold text-gray-900 mb-3">Sales & Performance</h5>
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">Uploaded:</span>
-                                        <span className="font-semibold text-gray-900">
-                                            {selectedBook.uploadedAt?.toLocaleDateString()} at {selectedBook.uploadedAt?.toLocaleTimeString()}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">Copies Sold:</span>
-                                        <span className="font-semibold text-gray-900">{getBookSalesCount(selectedBook)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">Total Revenue:</span>
-                                        <span className="font-semibold text-purple-600">₦{getBookTotalSales(selectedBook).toLocaleString()}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3">
-                                <Link href={`/book/preview?id=${selectedBook.id}`} className="flex-1">
-                                    <button className="w-full bg-blue-950 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-blue-900">
-                                        <BookOpen size={18} />
-                                        Open Book
+                            {postedBooks.length === 0 && (
+                                <Link href="/advertise">
+                                    <button style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: NAVY, color: '#fff', padding: '12px 24px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif', letterSpacing: '0.05em" }}>
+                                        <Upload size={16} /> Upload Your First Document
                                     </button>
                                 </Link>
-                                <button
-                                    onClick={() => setShowDetailsModal(false)}
-                                    className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-300"
-                                >
-                                    Close
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            {/* Desktop Table */}
+                            <div style={{ display: 'none' }} className="desktop-table">
+                                <style>{`@media(min-width:768px){.desktop-table{display:block !important;}.mobile-cards{display:none !important;}}`}</style>
+                                <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', overflow: 'hidden' }}>
+                                    {/* Table Header */}
+                                    <div style={{ background: NAVY, display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr 1fr 1fr 1fr 1fr', gap: 0 }}>
+                                        {['Document', 'Category', 'Price', 'Sold', 'Revenue', 'Status', 'Actions'].map(h => (
+                                            <div key={h} style={{ padding: '14px 16px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD, fontFamily: "'Lato',sans-serif" }}>{h}</div>
+                                        ))}
+                                    </div>
+                                    {filteredBooks.map((book, i) => {
+                                        const salesCount = getBookSalesCount(book);
+                                        const totalSales = getBookTotalSales(book);
+                                        const statusCfg = getStatusConfig(book.status);
+                                        return (
+                                            <div key={book.id} style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr 1fr 1fr 1fr 1fr', borderBottom: '0.5px solid #f0ebe0', transition: 'background 0.15s' }}
+                                                onMouseEnter={e => e.currentTarget.style.background = CREAM}
+                                                onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                                                <div style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                    <img src={getThumbnailUrl(book)} alt={book.bookTitle} style={{ width: '40px', height: '54px', objectFit: 'cover', border: '0.5px solid #e5ddd0', flexShrink: 0 }}
+                                                        onError={e => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }} />
+                                                    <div>
+                                                        <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>{book.bookTitle}</p>
+                                                        <p style={{ fontSize: '11px', color: '#aaa', margin: 0, fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
+                                                    </div>
+                                                </div>
+                                                <div style={{ padding: '16px', display: 'flex', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '12px', color: '#888', fontFamily: "'Lato',sans-serif", textTransform: 'capitalize' }}>{book.category}</span>
+                                                </div>
+                                                <div style={{ padding: '16px', display: 'flex', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '13px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>₦{Number(book.price).toLocaleString()}</span>
+                                                </div>
+                                                <div style={{ padding: '16px', display: 'flex', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '13px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{salesCount}</span>
+                                                </div>
+                                                <div style={{ padding: '16px', display: 'flex', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '13px', fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif" }}>₦{totalSales.toLocaleString()}</span>
+                                                </div>
+                                                <div style={{ padding: '16px', display: 'flex', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 10px', background: statusCfg.bg, color: statusCfg.color, border: `0.5px solid ${statusCfg.border}`, fontFamily: "'Lato',sans-serif", letterSpacing: '0.06em' }}>{statusCfg.label}</span>
+                                                </div>
+                                                <div style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <button className="action-btn" onClick={() => { setSelectedBook(book); setShowDetailsModal(true); }} title="View Details">
+                                                        <Eye size={15} style={{ color: NAVY }} />
+                                                    </button>
+                                                    <Link href={`/book/preview?id=${book.id}`}>
+                                                        <button className="action-btn" title="Open Book">
+                                                            <BookOpen size={15} style={{ color: '#16a34a' }} />
+                                                        </button>
+                                                    </Link>
+                                                    <button className="action-btn" style={{ borderColor: '#fecaca', background: '#fef2f2' }}
+                                                        onClick={() => { setSelectedBook(book); setShowDeleteModal(true); }} title="Delete">
+                                                        <Trash2 size={15} style={{ color: '#dc2626' }} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Mobile Cards */}
+                            <div className="mobile-cards" style={{ display: 'block' }}>
+                                <style>{`@media(min-width:768px){.mobile-cards{display:none !important;}}`}</style>
+                                {filteredBooks.map(book => {
+                                    const salesCount = getBookSalesCount(book);
+                                    const totalSales = getBookTotalSales(book);
+                                    const statusCfg = getStatusConfig(book.status);
+                                    return (
+                                        <div key={book.id} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '16px', marginBottom: '8px' }}>
+                                            <div style={{ display: 'flex', gap: '14px', marginBottom: '14px' }}>
+                                                <img src={getThumbnailUrl(book)} alt={book.bookTitle} style={{ width: '64px', height: '88px', objectFit: 'cover', border: '0.5px solid #e5ddd0', flexShrink: 0 }}
+                                                    onError={e => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }} />
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
+                                                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '15px', fontWeight: 700, color: NAVY, margin: 0, lineHeight: 1.3 }}>{book.bookTitle}</p>
+                                                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 8px', background: statusCfg.bg, color: statusCfg.color, border: `0.5px solid ${statusCfg.border}`, fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{statusCfg.label}</span>
+                                                    </div>
+                                                    <p style={{ fontSize: '12px', color: '#aaa', margin: '0 0 10px', fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                                                        {[['Price', `₦${Number(book.price).toLocaleString()}`], ['Category', book.category], ['Copies Sold', salesCount], ['Revenue', `₦${totalSales.toLocaleString()}`]].map(([k, v]) => (
+                                                            <div key={k}>
+                                                                <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#bbb', margin: '0 0 1px', fontFamily: "'Lato',sans-serif" }}>{k}</p>
+                                                                <p style={{ fontSize: '12px', fontWeight: 700, color: k === 'Revenue' ? GOLD : NAVY, margin: 0, fontFamily: "'Lato',sans-serif", textTransform: 'capitalize' }}>{v}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '0.5px solid #f0ebe0' }}>
+                                                <button onClick={() => { setSelectedBook(book); setShowDetailsModal(true); }}
+                                                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px', border: '0.5px solid #e5ddd0', background: CREAM, fontSize: '12px', fontWeight: 700, color: NAVY, cursor: 'pointer', fontFamily: "'Lato',sans-serif", transition: 'all 0.15s' }}>
+                                                    <Eye size={14} /> Details
+                                                </button>
+                                                <Link href={`/book/preview?id=${book.id}`} style={{ flex: 1 }}>
+                                                    <button style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px', border: '0.5px solid #86efac', background: '#f0fdf4', fontSize: '12px', fontWeight: 700, color: '#16a34a', cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
+                                                        <BookOpen size={14} /> Open
+                                                    </button>
+                                                </Link>
+                                                <button onClick={() => { setSelectedBook(book); setShowDeleteModal(true); }}
+                                                    style={{ padding: '10px 14px', border: '0.5px solid #fecaca', background: '#fef2f2', fontSize: '12px', fontWeight: 700, color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                {/* ── Mobile Bottom Nav (matches seller page) ── */}
+                <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: NAVY, borderTop: `0.5px solid rgba(184,150,62,0.2)`, display: 'flex', justifyContent: 'space-around', padding: '10px 0 14px', zIndex: 40 }} className="lg-hide">
+                    {[
+                        { href: "/my-account/seller-account", icon: <DollarSign size={20} />, label: 'Account' },
+                        { href: "/my-account/seller-account/my-books", icon: <Book size={20} />, label: 'My Books' },
+                        { href: "/documents", icon: <Globe size={20} />, label: 'Browse' },
+                        { href: "/upload-document", icon: <TrendingUp size={20} />, label: 'Upload' },
+                    ].map(({ href, icon, label }) => (
+                        <Link key={href} href={href} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', textDecoration: 'none', color: href.includes('my-books') ? GOLD : 'rgba(255,255,255,0.55)', fontFamily: "'Lato',sans-serif" }}>
+                            {icon}
+                            <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.06em' }}>{label}</span>
+                        </Link>
+                    ))}
+                </div>
+                <div className="lg-hide" style={{ height: '72px' }} />
+
+                {/* ══ DELETE MODAL ══ */}
+                {showDeleteModal && (
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 80, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+                        <div style={{ background: '#fff', width: '100%', maxWidth: '440px', overflow: 'hidden' }}>
+                            <div style={{ background: '#A32D2D', padding: '32px 24px', textAlign: 'center', position: 'relative' }}>
+                                <button onClick={() => { setShowDeleteModal(false); setSelectedBook(null); }}
+                                    style={{ position: 'absolute', top: '14px', right: '14px', width: '30px', height: '30px', background: 'rgba(255,255,255,0.12)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)' }}><X size={15} /></button>
+                                <div style={{ width: '64px', height: '64px', border: '1.5px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                                    <Trash2 size={28} style={{ color: '#fff' }} />
+                                </div>
+                                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '20px', fontWeight: 700, color: '#fff', margin: '0 0 6px' }}>Delete Document?</p>
+                                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', fontFamily: "'Lato',sans-serif", margin: 0 }}>This action is permanent and cannot be undone</p>
+                            </div>
+                            <div style={{ padding: '24px 20px 0' }}>
+                                <div style={{ background: '#FCEBEB', border: '0.5px solid #F7C1C1', padding: '14px', marginBottom: '16px' }}>
+                                    <p style={{ fontSize: '12px', color: '#791F1F', margin: 0, fontFamily: "'Lato',sans-serif", lineHeight: 1.6 }}>
+                                        You are about to permanently delete <strong>"{selectedBook?.bookTitle}"</strong>. Buyers who already purchased this document will retain access.
+                                    </p>
+                                </div>
+                            </div>
+                            <div style={{ padding: '10px 20px 32px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <button onClick={handleDeleteBook} disabled={deleting}
+                                    style={{ width: '100%', padding: '14px', fontSize: '13px', fontWeight: 700, fontFamily: "'Lato',sans-serif", border: 'none', cursor: deleting ? 'not-allowed' : 'pointer', background: '#A32D2D', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: deleting ? 0.7 : 1 }}>
+                                    {deleting ? <><div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Deleting…</> : <><Trash2 size={15} /> Yes, delete this document</>}
+                                </button>
+                                <button onClick={() => { setShowDeleteModal(false); setSelectedBook(null); }} disabled={deleting}
+                                    style={{ width: '100%', padding: '12px', fontSize: '13px', fontWeight: 700, color: '#6b7280', background: 'transparent', border: '0.5px solid #e5e7eb', cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
+                                    Cancel, keep this document
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Bottom Padding */}
-            <div className="h-20"></div>
-        </div>
+                {/* ══ DETAILS MODAL ══ */}
+                {showDetailsModal && selectedBook && (
+                    <div className="modal-overlay " style={{ marginTop: '0' }}>
+                        <div className="modal-inner">
+                            {/* Header */}
+                            <div style={{ background: NAVY, backgroundImage: 'radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)', backgroundSize: '24px 24px', padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, }}>
+                                <div className="mt-15">
+                                    <p style={{ color: GOLD, fontSize: '10px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Document Details</p>
+                                    <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: '22px', fontWeight: 700, color: '#fff', margin: 0 }}>Book Overview</h2>
+                                </div>
+                                <button onClick={() => setShowDetailsModal(false)} style={{ width: '36px', height: '36px', border: '0.5px solid rgba(255,255,255,0.2)', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.7)' }}>
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            {/* Content */}
+                            <div style={{ padding: '24px', overflowY: 'auto', flex: 1, background: BG }}>
+                                {/* Book Hero */}
+                                <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '20px', marginBottom: '16px', display: 'flex', gap: '16px' }}>
+                                    <img src={getThumbnailUrl(selectedBook)} alt={selectedBook.bookTitle} style={{ width: '100px', height: '140px', objectFit: 'cover', border: '0.5px solid #e5ddd0', flexShrink: 0 }}
+                                        onError={e => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }} />
+                                    <div style={{ flex: 1 }}>
+                                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '20px', fontWeight: 700, color: NAVY, margin: '0 0 4px', lineHeight: 1.3 }}>{selectedBook.bookTitle}</p>
+                                        <p style={{ fontSize: '13px', color: '#aaa', margin: '0 0 14px', fontFamily: "'Lato',sans-serif" }}>by {selectedBook.author}</p>
+                                        {(() => { const cfg = getStatusConfig(selectedBook.status); return <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 12px', background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}`, fontFamily: "'Lato',sans-serif", letterSpacing: '0.06em' }}>{cfg.label}</span>; })()}
+                                        <div style={{ marginTop: '14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                            {[['Price', `₦${Number(selectedBook.price).toLocaleString()}`], ['Category', selectedBook.category], ['Pages', selectedBook.pages || 'N/A'], ['Uploaded', selectedBook.uploadedAt?.toLocaleDateString()]].map(([k, v]) => (
+                                                <div key={k}>
+                                                    <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#bbb', margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>{k}</p>
+                                                    <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif", textTransform: 'capitalize' }}>{v}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Performance */}
+                                <div style={{ background: NAVY, backgroundImage: 'radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)', backgroundSize: '20px 20px', padding: '20px', marginBottom: '16px', position: 'relative', overflow: 'hidden' }}>
+                                    <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '80px', height: '80px', border: '0.5px solid rgba(184,150,62,0.2)', transform: 'rotate(45deg)' }} />
+                                    <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: GOLD, marginBottom: '14px', fontFamily: "'Lato',sans-serif" }}>Sales & Performance</p>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                        <div>
+                                            <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>Copies Sold</p>
+                                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '28px', fontWeight: 700, color: '#fff', margin: 0 }}>{getBookSalesCount(selectedBook)}</p>
+                                        </div>
+                                        <div>
+                                            <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>Total Revenue</p>
+                                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '28px', fontWeight: 700, color: GOLDD, margin: 0 }}>₦{getBookTotalSales(selectedBook).toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Description */}
+                                {selectedBook.description && (
+                                    <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '20px', marginBottom: '16px' }}>
+                                        <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD, marginBottom: '10px', fontFamily: "'Lato',sans-serif" }}>Description</p>
+                                        <p style={{ fontSize: '13px', color: '#555', lineHeight: 1.7, margin: 0, fontFamily: "'Lato',sans-serif" }}>{selectedBook.description}</p>
+                                    </div>
+                                )}
+                                {selectedBook.message && (
+                                    <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '20px', marginBottom: '20px' }}>
+                                        <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD, marginBottom: '10px', fontFamily: "'Lato',sans-serif" }}>Summary</p>
+                                        <p style={{ fontSize: '13px', color: '#555', lineHeight: 1.7, margin: 0, fontFamily: "'Lato',sans-serif", whiteSpace: 'pre-line' }}>{selectedBook.message}</p>
+                                    </div>
+                                )}
+
+                                {/* Action Buttons */}
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <Link href={`/book/preview?id=${selectedBook.id}`} style={{ flex: 1 }}>
+                                        <button style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: NAVY, color: '#fff', padding: '14px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em' }}>
+                                            <BookOpen size={16} /> Open Document
+                                        </button>
+                                    </Link>
+                                    <button onClick={() => setShowDetailsModal(false)}
+                                        style={{ flex: 1, padding: '14px', fontSize: '13px', fontWeight: 700, color: '#666', background: '#f5f5f5', border: '0.5px solid #e5ddd0', cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </>
     );
 }

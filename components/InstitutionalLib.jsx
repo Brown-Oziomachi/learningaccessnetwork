@@ -19,11 +19,6 @@ export default function InstitutionalLibraryPage() {
             ></div>
           </div>
 
-                <div className='text-center pt-10 text-5xl font-black'>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-white">
-              Cominng Soon...
-            </span>
-                </div>
           <div className="relative max-w-7xl mx-auto px-4 py-24">
             <div className="max-w-4xl">
               <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full mb-8 border border-white/20">
@@ -48,14 +43,14 @@ export default function InstitutionalLibraryPage() {
 
               <div className="flex flex-wrap gap-4">
                 <a
-                //   href="/browse-resources"
+                  href="/browse-resources"
                   className="inline-flex items-center gap-2 bg-white text-blue-950 px-8 py-4 rounded-xl font-semibold hover:bg-blue-50 transition-all hover:shadow-lg hover:shadow-white/20"
                 >
                   Browse Resources
                   <ArrowRight className="w-5 h-5" />
                 </a>
                 <a
-                //   href="/become-seller"
+                  href="/upload-document"
                   className="inline-flex items-center gap-2 bg-blue-900 text-white px-8 py-4 rounded-xl font-semibold border border-white/20 hover:bg-blue-800 transition-all"
                 >
                   <Upload className="w-5 h-5" />

@@ -5,279 +5,339 @@ import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebaseConfig';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { Bookmark, Trash2, Lock, ArrowLeft } from 'lucide-react';
+import { Bookmark, Trash2, Lock, ArrowLeft, BookOpen, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
+
+/* ─── colour tokens (matches HomeClient exactly) ─────────────── */
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG    = "#f5f1ea";
 
 export default function SavedBooksClient() {
     const router = useRouter();
-    const [savedBooks, setSavedBooks] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [user, setUser] = useState(null);
-    const [showPopup, setShowPopup] = useState(false);
+    const [savedBooks, setSavedBooks]   = useState([]);
+    const [loading, setLoading]         = useState(true);
+    const [user, setUser]               = useState(null);
+    const [removingId, setRemovingId]   = useState(null);
+    const [showPopup, setShowPopup]     = useState(false);
 
-    // ✅ THUMBNAIL HELPER FUNCTION
+    /* ── thumbnail helper ── */
     const getThumbnailUrl = (book) => {
-        if (book.driveFileId) {
-            return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
-        }
-
+        if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
         if (book.embedUrl) {
-            const match = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
-            if (match) {
-                const fileId = match[1] || match[2] || match[3];
-                if (fileId) {
-                    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
-                }
-            }
+            const m = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
+            if (m) { const id = m[1]||m[2]||m[3]; if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`; }
         }
-
-        if (book.pdfUrl && book.pdfUrl.includes('drive.google.com')) {
-            const match = book.pdfUrl.match(/[-\w]{25,}/);
-            if (match) {
-                return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
-            }
+        if (book.pdfUrl?.includes('drive.google.com')) {
+            const m = book.pdfUrl.match(/[-\w]{25,}/);
+            if (m) return `https://drive.google.com/thumbnail?id=${m[0]}&sz=w400`;
         }
-
         return book.image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
     };
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
-                await fetchSavedBooks(currentUser.uid);
-            } else {
-                router.push('/auth/signin');
-            }
+        const unsub = onAuthStateChanged(auth, async (cu) => {
+            if (cu) { setUser(cu); await fetchSavedBooks(cu.uid); }
+            else router.push('/auth/signin');
         });
-
-        return () => unsubscribe();
+        return () => unsub();
     }, [router]);
 
-    // ✅ FETCH AND PROCESS SAVED BOOKS WITH THUMBNAILS
-    const fetchSavedBooks = async (userId) => {
+    const fetchSavedBooks = async (uid) => {
         try {
             setLoading(true);
-            const userDocRef = doc(db, 'users', userId);
-            const userDoc = await getDoc(userDocRef);
-
-            if (userDoc.exists()) {
-                const userData = userDoc.data();
-                const saved = userData.savedBooks || [];
-
-                // ✅ Process each saved book to ensure proper thumbnail
-                const processedSavedBooks = saved.map(book => ({
-                    ...book,
-                    image: getThumbnailUrl(book) // Generate thumbnail from embedUrl/driveFileId
-                }));
-
-                setSavedBooks(processedSavedBooks);
+            const snap = await getDoc(doc(db, 'users', uid));
+            if (snap.exists()) {
+                const saved = snap.data().savedBooks || [];
+                setSavedBooks(saved.map(b => ({ ...b, image: getThumbnailUrl(b) })));
             }
-        } catch (error) {
-            console.error('Error fetching saved books:', error);
-        } finally {
-            setLoading(false);
-        }
+        } catch (e) { console.error(e); }
+        finally { setLoading(false); }
     };
 
-    const handleRemoveFromSaved = async (bookId) => {
+    const handleRemove = async (bookId) => {
         try {
-            const userDocRef = doc(db, 'users', user.uid);
-            const updatedBooks = savedBooks.filter(book => book.id !== bookId);
-
-            await updateDoc(userDocRef, {
-                savedBooks: updatedBooks
-            });
-
-            setSavedBooks(updatedBooks);
+            setRemovingId(bookId);
+            const updated = savedBooks.filter(b => b.id !== bookId);
+            await updateDoc(doc(db, 'users', user.uid), { savedBooks: updated });
+            setSavedBooks(updated);
             setShowPopup(true);
-            setTimeout(() => setShowPopup(false), 2000);
-        } catch (error) {
-            console.error('Error removing book:', error);
-            alert('Error removing book. Please try again.');
-        }
+            setTimeout(() => setShowPopup(false), 2500);
+        } catch (e) { console.error(e); alert('Error removing book. Please try again.'); }
+        finally { setRemovingId(null); }
     };
 
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    };
+    const formatDate = (ds) => new Date(ds).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
 
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-950 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading saved books...</p>
-                </div>
+    /* ── loading ── */
+    if (loading) return (
+        <div style={{ minHeight:"100vh", background: BG, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Lato',sans-serif" }}>
+            <div style={{ textAlign:"center" }}>
+                <div style={{ width:"52px", height:"52px", border:`3px solid rgba(184,150,62,0.2)`, borderTopColor: GOLD, borderRadius:"50%", margin:"0 auto 20px", animation:"spin 0.8s linear infinite" }} />
+                <p style={{ color: NAVY, fontSize:"13px", fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase" }}>Loading your library…</p>
             </div>
-        );
-    }
+            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        </div>
+    );
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* Header */}
-            <header className="bg-blue-950 text-white shadow-lg">
-                <div className="max-w-7xl mx-auto px-4 py-4">
-                    <div className="flex items-center gap-4">
+        <>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+
+                .lan-root { font-family:'Lato',sans-serif; background:${BG}; }
+                .lan-serif { font-family:'Playfair Display',Georgia,serif; }
+
+                /* header */
+                .saved-header {
+                    background-color:${NAVY};
+                    background-image:
+                        radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px),
+                        radial-gradient(rgba(255,255,255,0.03) 1px,transparent 1px);
+                    background-size:28px 28px,14px 14px;
+                    background-position:0 0,7px 7px;
+                }
+
+                /* book card */
+                .book-card {
+                    background:#fff;
+                    border:0.5px solid #e5ddd0;
+                    transition:transform 0.25s cubic-bezier(.4,0,.2,1), box-shadow 0.25s, border-color 0.25s;
+                    flex-shrink:0;
+                }
+                .book-card:hover { transform:translateY(-6px); box-shadow:0 20px 48px rgba(13,34,68,0.13); border-color:${GOLD}; }
+                .book-card:hover .cover-img { transform:scale(1.04); }
+                .cover-img { transition:transform 0.5s cubic-bezier(.4,0,.2,1); }
+
+                /* btn */
+                .btn-primary {
+                    display:flex; align-items:center; justify-content:center; gap:6px;
+                    width:100%; padding:9px 0; background:${NAVY}; color:#fff;
+                    font-family:'Lato',sans-serif; font-size:11px; font-weight:700;
+                    letter-spacing:0.06em; text-transform:uppercase; border:none; cursor:pointer;
+                    transition:background 0.18s; text-decoration:none;
+                }
+                .btn-primary:hover { background:#1a3a6e; }
+
+                .btn-ghost {
+                    display:flex; align-items:center; justify-content:center; gap:6px;
+                    width:100%; padding:9px 0; background:#fff; color:#dc2626;
+                    border:0.5px solid #dc2626; font-family:'Lato',sans-serif;
+                    font-size:11px; font-weight:700; letter-spacing:0.06em;
+                    text-transform:uppercase; cursor:pointer; transition:background 0.18s;
+                }
+                .btn-ghost:hover { background:#fef2f2; }
+                .btn-ghost:disabled { opacity:0.5; cursor:not-allowed; }
+
+                /* browse empty btn */
+                .btn-browse {
+                    display:inline-flex; align-items:center; gap:8px;
+                    padding:13px 32px; background:${NAVY}; color:#fff;
+                    font-family:'Lato',sans-serif; font-size:13px; font-weight:700;
+                    letter-spacing:0.06em; text-transform:uppercase; text-decoration:none;
+                    border:none; cursor:pointer; transition:background 0.18s;
+                }
+                .btn-browse:hover { background:#1a3a6e; }
+
+                /* scrollbar hide */
+                .sbar-none { scrollbar-width:none; -ms-overflow-style:none; }
+                .sbar-none::-webkit-scrollbar { display:none; }
+
+                /* popup */
+                @keyframes popIn  { from{opacity:0;transform:translateX(-50%) translateY(12px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+                .popup-toast { animation:popIn 0.3s ease-out both; }
+
+                /* gold line */
+                .gold-line { display:flex; align-items:center; gap:14px; }
+                .gold-line::before,.gold-line::after { content:""; flex:1; height:1px; background:rgba(184,150,62,0.3); }
+
+                @keyframes spin { to{transform:rotate(360deg)} }
+            `}</style>
+
+            <div className="lan-root" style={{ minHeight:"100vh" }}>
+
+                {/* ══ HEADER ══ */}
+                <header className="saved-header" style={{ padding:"0 24px" }}>
+                    <div style={{ maxWidth:"1200px", margin:"0 auto", padding:"20px 0", display:"flex", alignItems:"center", gap:"16px" }}>
                         <button
                             onClick={() => router.back()}
-                            className="hover:bg-blue-900 p-2 rounded-lg transition-colors"
+                            style={{ width:"40px", height:"40px", border:"0.5px solid rgba(184,150,62,0.3)", background:"transparent", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, transition:"background 0.18s" }}
+                            onMouseEnter={e => e.currentTarget.style.background="rgba(184,150,62,0.12)"}
+                            onMouseLeave={e => e.currentTarget.style.background="transparent"}
                         >
-                            <ArrowLeft size={24} />
+                            <ArrowLeft size={18} color="#fff" />
                         </button>
+
                         <div>
-                            <h1 className="text-2xl font-bold">Saved Books</h1>
-                            <p className="text-blue-200 text-sm">
-                                {savedBooks.length} {savedBooks.length === 1 ? 'book' : 'books'} saved
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            {/* Main Content */}
-            <main className="max-w-7xl mx-auto py-4">
-                {savedBooks.length === 0 ? (
-                    <div className="bg-white rounded-lg shadow-lg p-12 text-center">
-                        <Bookmark className="w-20 h-20 mx-auto mb-4 text-gray-400" />
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">No Saved Books</h3>
-                        <p className="text-gray-600 mb-6">
-                            Start saving books you're interested in to view them here later!
-                        </p>
-                        <button
-                            onClick={() => router.push('/documents')}
-                            className="inline-block bg-blue-950 text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors"
-                        >
-                            Browse Books
-                        </button>
-                    </div>
-                ) : (
-                    <div className="bg-white rounded-lg shadow-lg p-2">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Your Saved Books</h2>
+                            <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:"0.22em", textTransform:"uppercase", color: GOLD, marginBottom:"4px" }}>Your Collection</p>
+                            <h1 className="lan-serif" style={{ fontSize:"clamp(22px,4vw,34px)", fontWeight:700, color:"#fff", margin:0, lineHeight:1.1 }}>
+                                Saved Books
+                            </h1>
                         </div>
 
-                        {/* Horizontal Scrolling Container */}
-                        <div className="overflow-x-auto scrollbar-hide">
-                            <div className="flex gap-4 pb-4">
-                                {savedBooks.map((book) => (
-                                    <div
-                                        key={book.id}
-                                        className="flex-none w-[200px] sm:w-[220px] bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-xl transition-shadow"
-                                    >
-                                        {/* ✅ Make image clickable to preview */}
-                                        <Link href={`/book/preview?id=${book.id}`}>
-                                            <div className="relative cursor-pointer">
-                                                <img
-                                                    src={book.image}
-                                                    alt={book.title}
-                                                    className="w-full h-64 object-cover bg-gray-200"
-                                                    onError={(e) => {
-                                                        e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                                                    }}
-                                                />
-                                                <span className="absolute top-3 right-3 bg-blue-950 text-white px-2 py-1 rounded-full">
-                                                    <Bookmark size={14} className="fill-white" />
-                                                </span>
-                                                {/* ✅ Show "New" badge for Firestore books */}
-                                                {book.isFromFirestore && (
-                                                    <span className="absolute top-3 left-3 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">
-                                                        New
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </Link>
-
-                                        <div className="p-4">
-                                            {/* ✅ Make title clickable to preview */}
-                                            <Link href={`/book/preview?id=${book.id}`}>
-                                                <h3 className="font-bold text-sm text-gray-900 mb-1 line-clamp-2 hover:text-blue-950 cursor-pointer">
-                                                    {book.title}
-                                                </h3>
-                                            </Link>
-                                            <p className="text-xs text-gray-600 mb-2 line-clamp-1">{book.author}</p>
-
-                                            <div className="mb-2">
-                                                <p className="text-lg font-bold text-blue-950">
-                                                    ₦{book.price?.toLocaleString()}
-                                                </p>
-                                            </div>
-
-                                            <p className="text-xs text-gray-500 mb-3">
-                                                Saved {formatDate(book.savedAt)}
-                                            </p>
-
-                                            <div className="space-y-2">
-                                                {/* ✅ Preview button instead of Purchase */}
-                                                <Link
-                                                    href={`/book/preview?id=${book.id}`}
-                                                    className="w-full bg-blue-950 text-white py-2 rounded-lg hover:bg-blue-900 transition-colors flex items-center justify-center gap-2 text-xs font-semibold"
-                                                >
-                                                    <Lock size={14} />
-                                                    View & Purchase
-                                                </Link>
-
-                                                <button
-                                                    onClick={() => handleRemoveFromSaved(book.id)}
-                                                    className="w-full bg-white border border-red-500 text-red-500 py-2 rounded-lg hover:bg-red-50 transition-colors flex items-center justify-center gap-2 text-xs font-semibold"
-                                                >
-                                                    <Trash2 size={14} />
-                                                    Remove
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* View All Button */}
-                        {savedBooks.length > 5 && (
-                            <div className="mt-6 text-center">
-                                <p className="text-sm text-gray-600">
-                                    💡 Tip: Scroll left or right to see all your saved books
-                                </p>
+                        {savedBooks.length > 0 && (
+                            <div style={{ marginLeft:"auto", textAlign:"right" }}>
+                                <div className="lan-serif" style={{ fontSize:"28px", fontWeight:700, color:"#fff" }}>{savedBooks.length}</div>
+                                <div style={{ fontSize:"10px", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", color:`rgba(184,150,62,0.8)` }}>
+                                    {savedBooks.length === 1 ? "Book" : "Books"}
+                                </div>
                             </div>
                         )}
                     </div>
-                )}
-            </main>
+                </header>
 
-            {/* Popup Notification */}
+                {/* ══ MAIN ══ */}
+                <main style={{ maxWidth:"1200px", margin:"0 auto", padding:"48px 24px" }}>
+
+                    {savedBooks.length === 0 ? (
+                        /* ── Empty state ── */
+                        <div style={{ background:"#fff", border:"0.5px solid #e5ddd0", padding:"80px 24px", textAlign:"center" }}>
+                            {/* diamond icon */}
+                            <div style={{ width:"72px", height:"72px", margin:"0 auto 24px", border:`2px solid #e5ddd0`, transform:"rotate(45deg)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                                <Bookmark size={26} style={{ color:"#ccc", transform:"rotate(-45deg)" }} />
+                            </div>
+
+                            <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:"0.22em", textTransform:"uppercase", color: GOLD, marginBottom:"10px" }}>Empty Shelf</p>
+                            <h3 className="lan-serif" style={{ fontSize:"clamp(24px,4vw,36px)", fontWeight:700, color: NAVY, margin:"0 0 12px" }}>
+                                No Saved Books Yet
+                            </h3>
+
+                            {/* gold diamond divider */}
+                            <div className="gold-line" style={{ maxWidth:"240px", margin:"0 auto 16px" }}>
+                                <div style={{ width:"7px", height:"7px", background: GOLD, transform:"rotate(45deg)", flexShrink:0 }} />
+                            </div>
+
+                            <p style={{ fontSize:"14px", color:"#888", maxWidth:"400px", margin:"0 auto 32px", lineHeight:1.75, fontWeight:300 }}>
+                                Start saving books you're interested in to build your personal library
+                            </p>
+
+                            <a href="/documents" className="btn-browse">
+                                <BookOpen size={14} />
+                                Browse the Library
+                            </a>
+                        </div>
+
+                    ) : (
+                        /* ── Books grid / scroll ── */
+                        <div>
+                            {/* section header */}
+                            <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom:"32px" }}>
+                                <div>
+                                    <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:"0.22em", textTransform:"uppercase", color: GOLD, marginBottom:"6px" }}>
+                                        Your Collection
+                                    </p>
+                                    <h2 className="lan-serif" style={{ fontSize:"clamp(22px,3vw,32px)", fontWeight:700, color: NAVY, margin:0 }}>
+                                        Saved Books
+                                    </h2>
+                                </div>
+                                <a href="/documents" style={{ display:"inline-flex", alignItems:"center", gap:"5px", fontSize:"11px", fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase", color: NAVY, textDecoration:"none", border:`0.5px solid ${NAVY}`, padding:"8px 16px", transition:"background 0.18s" }}
+                                    onMouseEnter={e => e.currentTarget.style.background="rgba(13,34,68,0.06)"}
+                                    onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+                                    <BookOpen size={12} /> Browse More
+                                </a>
+                            </div>
+
+                            {/* horizontal scroll container */}
+                            <div className="sbar-none" style={{ overflowX:"auto", paddingBottom:"12px", margin:"0 -4px", padding:"0 4px 16px" }}>
+                                <div style={{ display:"flex", gap:"20px", minWidth:"min-content" }}>
+                                    {savedBooks.map(book => (
+                                        <div key={book.id} className="book-card" style={{ width:"210px" }}>
+
+                                            {/* cover */}
+                                            <Link href={`/book/preview?id=${book.id}`} style={{ display:"block", textDecoration:"none", position:"relative", background:"#ede8df", overflow:"hidden" }}>
+                                                <img
+                                                    src={book.image}
+                                                    alt={book.title}
+                                                    className="cover-img"
+                                                    style={{ width:"100%", aspectRatio:"3/4", objectFit:"cover", display:"block" }}
+                                                    onError={e => { e.target.src='https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
+                                                />
+
+                                                {/* PDF badge */}
+                                                <div style={{ position:"absolute", top:"8px", left:"8px", display:"inline-flex", alignItems:"center", gap:"4px", background: NAVY, padding:"3px 8px", fontSize:"9px", fontWeight:700, letterSpacing:"0.06em", color:"#fff", fontFamily:"'Lato',sans-serif" }}>
+                                                    <span style={{ width:"5px", height:"5px", borderRadius:"50%", background:"#22c55e", display:"inline-block" }} />
+                                                    PDF
+                                                </div>
+
+                                                {/* bookmark icon */}
+                                                <div style={{ position:"absolute", top:"8px", right:"8px", background: GOLD, width:"28px", height:"28px", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                                                    <Bookmark size={13} style={{ color:"#fff", fill:"#fff" }} />
+                                                </div>
+
+                                                {/* NEW badge */}
+                                                {book.isFromFirestore && (
+                                                    <span style={{ position:"absolute", bottom:"8px", left:"8px", background:"#2563eb", color:"#fff", fontSize:"9px", fontWeight:700, padding:"3px 7px", fontFamily:"'Lato',sans-serif" }}>NEW</span>
+                                                )}
+                                            </Link>
+
+                                            {/* meta */}
+                                            <div style={{ padding:"14px 14px 16px", borderTop:"0.5px solid #f0ebe0" }}>
+                                                <Link href={`/book/preview?id=${book.id}`} style={{ textDecoration:"none" }}>
+                                                    <h3 className="lan-serif" style={{ fontSize:"13px", fontWeight:700, color: NAVY, margin:"0 0 4px", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden", lineHeight:1.35, cursor:"pointer" }}>
+                                                        {book.title}
+                                                    </h3>
+                                                </Link>
+
+                                                <p style={{ fontSize:"11px", color:"#888", margin:"0 0 10px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", fontFamily:"'Lato',sans-serif" }}>
+                                                    {book.author}
+                                                </p>
+
+                                                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"10px" }}>
+                                                    <span className="lan-serif" style={{ fontSize:"16px", fontWeight:700, color: NAVY }}>
+                                                        ₦{book.price?.toLocaleString()}
+                                                    </span>
+                                                    {book.category && (
+                                                        <span style={{ background: CREAM, border:`0.5px solid rgba(184,150,62,0.3)`, color: GOLD, fontSize:"8px", fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", padding:"3px 7px", fontFamily:"'Lato',sans-serif", maxWidth:"80px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                                                            {book.category}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <p style={{ fontSize:"10px", color:"#bbb", margin:"0 0 12px", display:"flex", alignItems:"center", gap:"4px", fontFamily:"'Lato',sans-serif" }}>
+                                                    <ShoppingBag size={9} /> Saved {formatDate(book.savedAt)}
+                                                </p>
+
+                                                <div style={{ display:"flex", flexDirection:"column", gap:"7px" }}>
+                                                    <Link href={`/book/preview?id=${book.id}`} className="btn-primary">
+                                                        <Lock size={12} />
+                                                        View &amp; Purchase
+                                                    </Link>
+                                                    <button
+                                                        className="btn-ghost"
+                                                        onClick={() => handleRemove(book.id)}
+                                                        disabled={removingId === book.id}
+                                                    >
+                                                        {removingId === book.id
+                                                            ? <span style={{ width:"10px", height:"10px", border:"2px solid rgba(220,38,38,0.3)", borderTopColor:"#dc2626", borderRadius:"50%", display:"inline-block", animation:"spin 0.7s linear infinite" }} />
+                                                            : <><Trash2 size={12} /> Remove</>
+                                                        }
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {savedBooks.length > 4 && (
+                                <p style={{ textAlign:"center", fontSize:"11px", color:"#bbb", marginTop:"12px", fontFamily:"'Lato',sans-serif" }}>
+                                    ← Scroll left or right to see all saved books →
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </main>
+            </div>
+
+            {/* ── toast popup ── */}
             {showPopup && (
-                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fadeIn">
+                <div className="popup-toast" style={{ position:"fixed", bottom:"28px", left:"50%", transform:"translateX(-50%)", background: NAVY, color:"#fff", padding:"12px 24px", fontSize:"12px", fontWeight:700, letterSpacing:"0.08em", fontFamily:"'Lato',sans-serif", zIndex:50, display:"flex", alignItems:"center", gap:"8px", border:`0.5px solid rgba(184,150,62,0.3)` }}>
+                    <span style={{ width:"6px", height:"6px", background: GOLD, borderRadius:"50%", flexShrink:0 }} />
                     Removed from saved books
                 </div>
             )}
-
-            {/* Custom Scrollbar Styles & Animations */}
-            <style jsx>{`
-                .scrollbar-hide {
-                    -ms-overflow-style: none;
-                    scrollbar-width: none;
-                }
-                .scrollbar-hide::-webkit-scrollbar {
-                    display: none;
-                }
-                @keyframes fadeIn {
-                    from {
-                        opacity: 0;
-                        transform: translateX(-50%) translateY(10px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateX(-50%) translateY(0);
-                    }
-                }
-                .animate-fadeIn {
-                    animation: fadeIn 0.3s ease-out;
-                }
-            `}</style>
-        </div>
+        </>
     );
 }

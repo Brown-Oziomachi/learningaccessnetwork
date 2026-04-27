@@ -1,1195 +1,632 @@
-"use client"
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Link from 'next/link';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   BookOpen, DollarSign, BookOpenText, TrendingUp, Users,
   ArrowRight, CheckCircle, X, Play, ChevronLeft, ChevronRight,
-  Star, ShoppingCart, Download, Shield, Zap
-} from 'lucide-react';
-import { auth, db } from '@/lib/firebaseConfig';
-import { collection, getDocs } from 'firebase/firestore';
+  Star, Upload, Shield, Zap, Sparkles, GraduationCap,
+  Monitor, Smartphone, Search,
+} from "lucide-react";
+import { auth, db } from "@/lib/firebaseConfig";
+import { collection, getDocs } from "firebase/firestore";
 
-export default function LearningAccessNetwork() {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [currentStudentImageIndex, setCurrentStudentImageIndex] = useState(0);
-  const [currentSellerImageIndex, setCurrentSellerImageIndex] = useState(0);
+/* ─── design tokens (matches home + report pages) ─────────────── */
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG    = "#f5f1ea";
+
+/* ─── shared CSS injected once ────────────────────────────────── */
+const GLOBAL_STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Lato:wght@300;400;700;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  .lan-landing { font-family: 'Lato', sans-serif; background: ${BG}; color: ${NAVY}; }
+  .lan-serif   { font-family: 'Playfair Display', Georgia, serif; }
+
+  /* ── dot-grid hero ── */
+  .hero-bg {
+    background-color: ${NAVY};
+    background-image:
+      radial-gradient(rgba(184,150,62,0.07) 1px, transparent 1px),
+      radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 28px 28px, 14px 14px;
+    background-position: 0 0, 7px 7px;
+  }
+
+  /* ── diagonal-line accent bg ── */
+  .crest-bg {
+    background-color: ${NAVY};
+    background-image:
+      repeating-linear-gradient(45deg,  transparent, transparent 12px, rgba(255,255,255,0.018) 12px, rgba(255,255,255,0.018) 13px),
+      repeating-linear-gradient(-45deg, transparent, transparent 12px, rgba(255,255,255,0.018) 12px, rgba(255,255,255,0.018) 13px);
+  }
+
+  /* ── cream dot-grid ── */
+  .cream-bg {
+    background-color: ${CREAM};
+    background-image: radial-gradient(rgba(13,34,68,0.05) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  /* ── card base ── */
+  .lan-card {
+    background: #fff;
+    border: 0.5px solid #e5ddd0;
+    transition: transform 0.25s cubic-bezier(.4,0,.2,1), box-shadow 0.25s, border-color 0.25s;
+  }
+  .lan-card:hover { transform: translateY(-6px); box-shadow: 0 20px 48px rgba(13,34,68,0.12); border-color: ${GOLD}; }
+
+  /* ── benefit card ── */
+  .ben-card {
+    background: #fff;
+    border: 0.5px solid #e5ddd0;
+    padding: 36px 28px;
+    text-align: center;
+    transition: transform 0.22s, box-shadow 0.22s, border-color 0.22s;
+  }
+  .ben-card:hover { transform: translateY(-5px); box-shadow: 0 14px 36px rgba(13,34,68,0.11); border-color: ${GOLD}; }
+
+  /* ── service card ── */
+  .svc-card {
+    position: relative; overflow: hidden; cursor: pointer;
+    border: 0.5px solid rgba(255,255,255,0.1);
+    transition: transform 0.22s, box-shadow 0.22s;
+  }
+  .svc-card:hover { transform: translateY(-6px) scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.25); }
+
+  /* ── book thumb ── */
+  .book-card { border: 0.5px solid #e5ddd0; overflow: hidden; background: #fff; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+  .book-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(13,34,68,0.14); border-color: ${GOLD}; }
+  .book-card:hover .book-img { transform: scale(1.06); }
+  .book-img { transition: transform 0.5s cubic-bezier(.4,0,.2,1); }
+
+  /* ── testimonial card ── */
+  .test-card { background: #fff; border: 0.5px solid #e5ddd0; padding: 32px; }
+
+  /* ── gold divider ── */
+  .gold-line { display: flex; align-items: center; gap: 14px; }
+  .gold-line::before, .gold-line::after { content: ""; flex: 1; height: 1px; background: rgba(184,150,62,0.3); }
+
+  /* ── primary btn ── */
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 28px; background: ${GOLD}; color: ${NAVY};
+    font-family: 'Lato', sans-serif; font-size: 13px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase;
+    border: none; cursor: pointer; text-decoration: none;
+    transition: background 0.18s, transform 0.15s;
+  }
+  .btn-primary:hover { background: ${GOLDD}; transform: translateY(-1px); }
+
+  /* ── ghost btn ── */
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 28px; background: transparent; color: #fff;
+    font-family: 'Lato', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    border: 0.5px solid rgba(255,255,255,0.35); cursor: pointer; text-decoration: none;
+    transition: background 0.18s;
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.08); }
+
+  /* ── navy btn ── */
+  .btn-navy {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 28px; background: ${NAVY}; color: #fff;
+    font-family: 'Lato', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    border: none; cursor: pointer; text-decoration: none;
+    transition: background 0.18s, transform 0.15s;
+  }
+  .btn-navy:hover { background: #1a3560; transform: translateY(-1px); }
+
+  /* ── stat strip item ── */
+  .stat-item { flex: 1 1 120px; padding: 24px 20px; border-right: 0.5px solid rgba(184,150,62,0.12); }
+
+  /* ── hide scrollbar ── */
+  .sbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+  .sbar-none::-webkit-scrollbar { display: none; }
+
+  /* ── animations ── */
+  @keyframes slideUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+  .anim-up   { animation: slideUp 0.6s cubic-bezier(.4,0,.2,1) both; }
+  .anim-up-2 { animation: slideUp 0.6s .12s cubic-bezier(.4,0,.2,1) both; }
+  .anim-up-3 { animation: slideUp 0.6s .24s cubic-bezier(.4,0,.2,1) both; }
+  .anim-up-4 { animation: slideUp 0.6s .36s cubic-bezier(.4,0,.2,1) both; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pageTurn {
+    0%,100% { transform:perspective(600px) rotateY(0deg); opacity:0; }
+    20%,80%  { opacity:1; }
+    50%      { transform:perspective(600px) rotateY(-120deg); opacity:0.7; }
+  }
+  @keyframes dotPulse {
+    0%,100% { transform:scale(1); opacity:0.5; }
+    50%      { transform:scale(1.3); opacity:1; }
+  }
+
+  /* ── loading ── */
+  .page-turn { position:absolute; right:2px; width:calc(100% - 8px); height:calc(100% - 8px); top:4px;
+    background:linear-gradient(to right,#e5e7eb,#f9fafb 50%,#fff); border-radius:0 4px 4px 0;
+    transform-origin:left center; opacity:0; box-shadow:2px 0 8px rgba(0,0,0,0.1); animation:pageTurn 3s ease-in-out infinite; }
+  .p1{animation-delay:0s} .p2{animation-delay:.15s} .p3{animation-delay:.3s}
+  .dot-anim { animation:dotPulse 1.2s ease-in-out infinite; }
+
+  /* ── feature check row ── */
+  .feat-row { display:flex; align-items:flex-start; gap:14px; padding:18px 20px; border-bottom:0.5px solid #f0ebe0; }
+  .feat-row:last-child { border-bottom:none; }
+  .feat-icon { width:32px; height:32px; border:0.5px solid rgba(184,150,62,0.3); display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+
+  /* ── footer ── */
+  .footer-link { font-size:13px; color:rgba(245,240,232,0.55); text-decoration:none; transition:color .15s; font-family:'Lato',sans-serif; }
+  .footer-link:hover { color:${GOLD}; }
+`;
+
+/* ─── helper ─────────────────────────────────────────────────── */
+const getThumbnailUrl = (book) => {
+  if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
+  if (book.embedUrl) {
+    const m = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
+    if (m) { const id = m[1]||m[2]||m[3]; if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`; }
+  }
+  if (book.pdfUrl?.includes("drive.google.com")) {
+    const m = book.pdfUrl.match(/[-\w]{25,}/);
+    if (m) return `https://drive.google.com/thumbnail?id=${m[0]}&sz=w400`;
+  }
+  return book.image || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+};
+
+/* ─── data ───────────────────────────────────────────────────── */
+const STATS = [
+  { val: "90M+",   label: "Documents"    },
+  { val: "2.4M+",  label: "Learners"     },
+  { val: "₦500K+", label: "Top Monthly Earnings" },
+  { val: "85%",    label: "Revenue Share" },
+];
+
+const STUDENT_FEATURES = [
+  { title: "Discover Specialized Content",  body: "Course-specific books, lecture notes, and research documents tailored to your university curriculum." },
+  { title: "Instant Knowledge Unlock",      body: "Gain immediate digital access to materials that help you ace your exams and master your field." },
+  { title: "Global Academic Reach",         body: "Browse thousands of verified resources from top-performing students and academics worldwide." },
+];
+
+const SELLER_FEATURES = [
+  { title: "Monetize Your Knowledge",  body: "Turn your high-quality study guides, research papers, or written books into a steady stream of passive income." },
+  { title: "Empower Your Peers",       body: "Help fellow students succeed by sharing the resources that helped you excel." },
+  { title: "Seamless Selling",         body: "Upload once, set your price, and reach a global audience of 90M+ learners with automated payouts." },
+];
+
+const BENEFITS = [
+  { emoji: "⚡", title: "Instant Seller Payout",    body: "Get paid immediately after a buyer purchases your book, directly into your LAN wallet." },
+  { emoji: "🔄", title: "Flexible Withdrawal",       body: "Withdraw your earnings at any time that suits you, to any Nigerian bank account." },
+  { emoji: "🚫", title: "No Hidden Charges",         body: "Transfer your money without surprise fees. What you earn is what you get." },
+  { emoji: "💰", title: "Earn Up to ₦500K Monthly",  body: "Top sellers on LAN Library earn consistently, from small daily sales to large monthly payouts." },
+];
+
+const SERVICES = [
+  { gradient: "linear-gradient(135deg,#ea580c,#c2410c)", emoji: "📱", title: "Airtime",     sub: "Instant top-up for all networks", cta: "From ₦50" },
+  { gradient: "linear-gradient(135deg,#1d4ed8,#1e40af)", emoji: "📶", title: "Cheap Data",  sub: "SME bundles from ₦250", cta: "Save up to 40%" },
+  { gradient: "linear-gradient(135deg,#16a34a,#15803d)", emoji: "⚡", title: "Electricity",  sub: "Pay for your hostel units", cta: "All discos supported" },
+  { gradient: "linear-gradient(135deg,#7c3aed,#6d28d9)", emoji: "📺", title: "TV / Cable",  sub: "DSTV, GOTV & Startimes", cta: "Quick renewal" },
+];
+
+const TESTIMONIALS = [
+  { name: "Theresa",  text: "LAN Library is a great company with one of the best support teams I've ever seen. Every question answered instantly." },
+  { name: "Blessing", text: "LAN Library has been helping me since last year. I don't have to stress about finding books anymore — it comes quickly." },
+];
+
+/* ════════════════════════════════════════════════════════════════
+   COMPONENT
+════════════════════════════════════════════════════════════════ */
+export default function LandingPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const currentYear = new Date().getFullYear();
+  const [loading,       setLoading]       = useState(true);
   const [featuredBooks, setFeaturedBooks] = useState([]);
-  const [loadingBooks, setLoadingBooks] = useState(true);
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
-  const [showVideoModal, setShowVideoModal] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [loadingBooks,  setLoadingBooks]  = useState(true);
+  const [heroIdx,       setHeroIdx]       = useState(0);
+  const [showVideo,     setShowVideo]     = useState(false);
+  const currentYear = new Date().getFullYear();
 
-  const heroImages = [
-    '/headpics.jpg', // university students
-  ];
+  const heroImages = ["/headpics.jpg"];
 
-  // Student activity images - showing students using LAN Library
-  const studentActivityImages = [
-    // 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&q=80', // Students studying together with laptops
-    // 'https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=1200&q=80', // Student reading on tablet
-    '/student.jpg', // Student with laptop and books
-    // 'https://images.unsplash.com/photo-1516321497487-e288fb19713f?w=1200&q=80', // Happy student with digital device
-    // 'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=1200&q=80', // Student browsing online
-  ];
-
-  // Seller activity images - showing sellers earning and uploading
-  const sellerActivityImages = [
-    // 'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&q=80', // Person working on laptop happily
-    // 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1200&q=80', // Woman celebrating success
-    'https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=1200&q=80', // Professional uploading content
-    // 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1200&q=80', // Person earning money online
-    // 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=1200&q=80', // Author working on content
-  ];
-
-  const stats = [
-    { icon: DollarSign, value: "₦500K+", label: "Average Monthly Earnings" },
-    { icon: Users, value: "500+", label: "Active Sellers" },
-    { icon: BookOpen, value: "5,000+", label: "Books Sold Monthly" },
-    { icon: TrendingUp, value: "85%", label: "Revenue Share" },
-  ];
-
-  const videos = [
-    {
-      id: 1,
-      title: "Getting Started with LAN Library",
-      description: "Learn the basics of setting up your account and understanding the platform",
-      thumbnail: "/make.png",
-      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      duration: "5:30",
-    },
-    {
-      id: 2,
-      title: "AI Tools For Writing Books",
-      description: "Today's a fantastic time to be writing a book. With a plethora of digital tools and online resources, you can tackle your writing project with ease.",
-      thumbnail: "/make.png",
-      videoUrl: "/seller tools.mp4",
-      duration: "8:45",
-    },
-    {
-      id: 3,
-      title: "Pricing Strategies That Work",
-      description: "Discover the best pricing strategies to maximize your earnings",
-      thumbnail: "/make.png",
-      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      duration: "6:20",
-    },
-  ];
-
-  // Helper function to generate thumbnails
-  const getThumbnailUrl = (book) => {
-    if (book.driveFileId) {
-      return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
-    }
-    if (book.embedUrl) {
-      const match = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
-      if (match) {
-        const fileId = match[1] || match[2] || match[3];
-        if (fileId) {
-          return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
-        }
-      }
-    }
-    if (book.pdfUrl && book.pdfUrl.includes('drive.google.com')) {
-      const match = book.pdfUrl.match(/[-\w]{25,}/);
-      if (match) {
-        return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
-      }
-    }
-    return book.image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-  };
-
-  // Fetch books from Firestore
+  /* auth guard */
   useEffect(() => {
-    const fetchFeaturedBooks = async () => {
-      try {
-        setLoadingBooks(true);
-        const advertBooksRef = collection(db, 'advertMyBook');
-        const snapshot = await getDocs(advertBooksRef);
-
-        if (!snapshot.empty) {
-          const books = [];
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data.bookTitle) {
-              const bookData = {
-                id: `firestore-${doc.id}`,
-                firestoreId: doc.id,
-                title: data.bookTitle,
-                author: data.author || 'Unknown Author',
-                category: (data.category || 'education').toLowerCase(),
-                price: Number(data.price) || 0,
-                description: data.description || 'No description available',
-                driveFileId: data.driveFileId,
-                pdfUrl: data.pdfUrl,
-                embedUrl: data.embedUrl,
-                rating: (4 + Math.random()).toFixed(1),
-                reviews: Math.floor(Math.random() * 500) + 50,
-              };
-              bookData.image = getThumbnailUrl(bookData);
-              books.push(bookData);
-            }
-          });
-          setFeaturedBooks(books.sort(() => 0.5 - Math.random()));
-        }
-      } catch (error) {
-        console.error('Error fetching books:', error);
-      } finally {
-        setLoadingBooks(false);
-      }
-    };
-    fetchFeaturedBooks();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.replace("/home");
-      } else {
-        setTimeout(() => setLoading(false), 1500);
-      }
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) router.replace("/home");
+      else setTimeout(() => setLoading(false), 1400);
     });
-    return () => unsubscribe();
+    return () => unsub();
   }, [router]);
 
-  // Hero carousel auto-play
+  /* hero auto-play */
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % heroImages.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [heroImages.length]);
+    const t = setInterval(() => setHeroIdx(p => (p + 1) % heroImages.length), 5000);
+    return () => clearInterval(t);
+  }, []);
 
-  // Student images auto-play
+  /* fetch books */
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentStudentImageIndex((prev) => (prev + 1) % studentActivityImages.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [studentActivityImages.length]);
+    (async () => {
+      try {
+        const snap = await getDocs(collection(db, "advertMyBook"));
+        const books = [];
+        snap.forEach(d => {
+          const data = d.data();
+          if (!data.bookTitle) return;
+          const b = {
+            id: `firestore-${d.id}`, firestoreId: d.id,
+            title: data.bookTitle, author: data.author || "Unknown",
+            price: Number(data.price) || 0,
+            driveFileId: data.driveFileId, pdfUrl: data.pdfUrl, embedUrl: data.embedUrl,
+            rating: (4 + Math.random()).toFixed(1),
+          };
+          b.image = getThumbnailUrl(b);
+          books.push(b);
+        });
+        setFeaturedBooks(books.sort(() => 0.5 - Math.random()));
+      } catch {}
+      finally { setLoadingBooks(false); }
+    })();
+  }, []);
 
-  // Seller images auto-play
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentSellerImageIndex((prev) => (prev + 1) % sellerActivityImages.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [sellerActivityImages.length]);
+  const goSignIn = () => router.push("/auth/signin");
 
-  const navigateToSignIn = (preSelectedRole = null) => {
-    if (preSelectedRole) {
-      sessionStorage.setItem('preSelectedRole', preSelectedRole);
-    }
-    router.push('/auth/signin');
-  };
-
-  const handleVideoClick = (video) => {
-    setSelectedVideo(video);
-    setShowVideoModal(true);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen items-center justify-center flex flex-col space-y-1 bg-white overflow-hidden">
-        <h1 className="text-center justify-center items-center text-3xl lg:text-7xl md:text-5xl font-bold">
-          <span className="text-white bg-blue-950 px-4 py-2 rounded">LAN</span>
-          <span className="text-blue-950 ml-3">Library</span>
-        </h1>
-        <div>
-          <h2 className="bg-blue-950 text-white text-xs md:text-xl font-semibold mt-3 text-center px-5 py-1 rounded">
-            The Global Student Library 📚
-          </h2>
+  /* ── LOADING SCREEN ── */
+  if (loading) return (
+    <>
+      <style>{GLOBAL_STYLES}</style>
+      <div className="hero-bg" style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:32 }}>
+        {/* wordmark */}
+        <div className="anim-up" style={{ textAlign:"center" }}>
+          <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(184,150,62,0.12)", border:"1px solid rgba(184,150,62,0.25)", borderRadius:999, padding:"7px 18px", marginBottom:20 }}>
+            <Sparkles size={12} style={{ color:GOLD }} />
+            <span style={{ fontSize:10, fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLDD, fontFamily:"'Lato',sans-serif" }}>Africa's #1 Student Library</span>
+          </div>
+          <h1 className="lan-serif" style={{ fontSize:"clamp(36px,8vw,72px)", fontWeight:900, color:"#fff", letterSpacing:"-1px", lineHeight:1 }}>
+            LAN <span style={{ color:GOLD, fontStyle:"italic" }}>Library</span>
+          </h1>
+          <p style={{ fontSize:12, color:"rgba(245,240,232,0.5)", marginTop:8, fontFamily:"'Lato',sans-serif", letterSpacing:".14em", textTransform:"uppercase" }}>
+            The Global Student Library
+          </p>
         </div>
-        <div className="py-5">
-          <div className="relative w-24 h-28">
-            {/* Book with turning pages */}
-            <div className="book-container">
-              {/* Book Base */}
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-950 to-blue-800 rounded-lg shadow-2xl">
-                {/* Spine */}
-                <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-r from-blue-950 to-blue-900 rounded-l-lg"></div>
 
-                {/* Pages turning animation */}
-                <div className="page-turn page-1"></div>
-                <div className="page-turn page-2"></div>
-                <div className="page-turn page-3"></div>
-
-                {/* Cover content that transitions */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="book-content-transition">
-                    {/* Book icon phase */}
-                    <div className="content-phase book-icon-phase">
-                      <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                      </svg>
-                    </div>
-
-                    {/* LAN text phase */}
-                    <div className="content-phase lan-text-phase">
-                      <div className="flex gap-1 text-white font-black text-3xl">
-                        <span className="inline-block lan-bounce" style={{ animationDelay: '0s' }}>L</span>
-                        <span className="inline-block lan-bounce" style={{ animationDelay: '0.1s' }}>A</span>
-                        <span className="inline-block lan-bounce" style={{ animationDelay: '0.2s' }}>N</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Glossy overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent rounded-lg pointer-events-none"></div>
-              </div>
+        {/* animated book */}
+        <div style={{ position:"relative", width:88, height:104 }}>
+          <div style={{ position:"absolute", inset:0, background:`linear-gradient(135deg,${NAVY},#1a3560)`, borderRadius:8, boxShadow:"0 24px 48px rgba(0,0,0,0.4)" }}>
+            <div style={{ position:"absolute", left:0, top:0, bottom:0, width:8, background:"rgba(0,0,0,0.3)", borderRadius:"8px 0 0 8px" }} />
+            <div className="page-turn p1" />
+            <div className="page-turn p2" />
+            <div className="page-turn p3" />
+            <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <BookOpen size={36} style={{ color:GOLD }} strokeWidth={1.5} />
             </div>
-
-            {/* Loading indicator */}
-            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-              <div className="w-2 h-2 bg-blue-950 rounded-full loading-dot" style={{ animationDelay: '0s' }}></div>
-              <div className="w-2 h-2 bg-blue-800 rounded-full loading-dot" style={{ animationDelay: '0.2s' }}></div>
-              <div className="w-2 h-2 bg-blue-600 rounded-full loading-dot" style={{ animationDelay: '0.4s' }}></div>
-            </div>
-
-            <style jsx>{`
-              .book-container {
-                position: relative;
-                width: 100%;
-                height: 100%;
-                transform-style: preserve-3d;
-              }
-              
-              .page-turn {
-                position: absolute;
-                right: 2px;
-                width: calc(100% - 8px);
-                height: calc(100% - 8px);
-                top: 4px;
-                background: linear-gradient(to right, #e5e7eb 0%, #f9fafb 50%, #ffffff 100%);
-                border-radius: 0 4px 4px 0;
-                transform-origin: left center;
-                opacity: 0;
-                box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-              }
-              
-              .page-1 {
-                animation: pageTurn 3s ease-in-out infinite;
-                animation-delay: 0s;
-              }
-              
-              .page-2 {
-                animation: pageTurn 3s ease-in-out infinite;
-                animation-delay: 0.15s;
-              }
-              
-              .page-3 {
-                animation: pageTurn 3s ease-in-out infinite;
-                animation-delay: 0.3s;
-              }
-              
-              @keyframes pageTurn {
-                0%, 100% {
-                  transform: perspective(600px) rotateY(0deg);
-                  opacity: 0;
-                }
-                20%, 80% {
-                  opacity: 1;
-                }
-                50% {
-                  transform: perspective(600px) rotateY(-120deg);
-                  opacity: 0.7;
-                }
-              }
-              
-              .book-content-transition {
-                position: relative;
-                width: 100%;
-                height: 100%;
-              }
-              
-              .content-phase {
-                position: absolute;
-                inset: 0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                animation: contentFade 6s ease-in-out infinite;
-              }
-              
-              .book-icon-phase {
-                animation-delay: 0s;
-              }
-              
-              .lan-text-phase {
-                animation-delay: 3s;
-              }
-              
-              @keyframes contentFade {
-                0%, 45% {
-                  opacity: 1;
-                  transform: scale(1);
-                }
-                50%, 95% {
-                  opacity: 0;
-                  transform: scale(0.8);
-                }
-                100% {
-                  opacity: 1;
-                  transform: scale(1);
-                }
-              }
-              
-              @keyframes lan-bounce {
-                0%, 100% {
-                  transform: translateY(0);
-                }
-                50% {
-                  transform: translateY(-6px);
-                }
-              }
-              
-              .lan-bounce {
-                animation: lan-bounce 0.8s ease-in-out infinite;
-              }
-              
-              @keyframes loading-dot {
-                0%, 100% {
-                  transform: scale(1);
-                  opacity: 0.5;
-                }
-                50% {
-                  transform: scale(1.3);
-                  opacity: 1;
-                }
-              }
-              
-              .loading-dot {
-                animation: loading-dot 1.2s ease-in-out infinite;
-              }
-            `}</style>
+            <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg,rgba(255,255,255,0.15),transparent)", borderRadius:8, pointerEvents:"none" }} />
+          </div>
+          <div style={{ position:"absolute", bottom:-20, left:"50%", transform:"translateX(-50%)", display:"flex", gap:6 }}>
+            {[0,1,2].map(i => (
+              <div key={i} className="dot-anim" style={{ width:7, height:7, borderRadius:"50%", background:GOLD, animationDelay:`${i*0.2}s` }} />
+            ))}
           </div>
         </div>
       </div>
-    );
-  }
+    </>
+  );
 
+  /* ── MAIN PAGE ── */
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="border-b border-gray-800 sticky top-0 z-50 bg-blue-950 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-            <h1
-              className="text-4xl sm:text-6xl font-bold text-gray-50"
-              style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
-            >
-              [LAN Library]
-              <h2
-                className="text-xs sm:text-base font-light"
-                style={{ fontFamily: "'Lato', sans-serif" }}
-              >
-                The Global Student Library 📚
-              </h2>
-            </h1>
-            <img
-              src="/lanlog.png"
-              alt="LAN Logo"
-              className=" h-16 w-16 lg:h-26 lg:w-26 object-contain rounded-full"
-            />
-          </Link>
-        </div>
-      </header>
+    <>
+      <style>{GLOBAL_STYLES}</style>
+      <div className="lan-landing">
 
-      {/* Hero Section - Mobile: Text on Image */}
-      <section className="relative lg:hidden h-[600px] overflow-hidden mb-10">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentImageIndex}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1 }}
-            className="absolute inset-0"
-          >
-            <img
-              src={heroImages[currentImageIndex]}
-              alt="Books"
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-blue-950/35 via-blue-950/70 to-blue-950/60" />
-          </motion.div>
-        </AnimatePresence>
-
-        <div className="relative z-10 h-full flex flex-col justify-end p-6 pb-12 mt-5">
-          <h1 className="text-4xl font-black text-white mb-4 leading-tight ">
-            The Global Student Library 📚
-          </h1>
-          <h1 className="text-xl text-yellow-300 mb-1 font-bold">
-            Share the wealth [of knowledge].
-          </h1>
-          <p className="text-md mb-4 leading-relaxed font-bold">Turn your books into income. Upload your work, reach a global audience [90M+], and earn whenever readers discover and purchase your content.
-          </p>
-          <p className="text-white text-md mb-6 leading-relaxed">
-            A secure marketplace where <span className="font-bold text-yellow-300">students and authors sell original works</span> and <span className="font-bold text-yellow-300">learners access course-specific knowledge</span> they need to excel.
-          </p>
-          <div className="flex max-md:flex-col gap-3">
-            <a href="/auth/signin" target="_blank"
-              className="bg-white text-center text-blue-950 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
-            >
-              Browse Books
-            </a>
-            <a href="/docs" target="_blank"
-              className="cursor-pointer px-8 py-4 border-2 text-center border-white text-white font-bold rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
-            >
-              Documentation
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Hero Section - Desktop: Text Beside Image */}
-      <section className="hidden lg:block relative h-[800px] overflow-hidden ">
-        {/* Image Carousel Background - Full Width */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentImageIndex}
-            initial={{ opacity: 0, scale: 1.1 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1 }}
-            className="absolute inset-0"
-          >
-            <img
-              src={heroImages[currentImageIndex]}
-              alt="Books"
-              className="w-full h-full object-cover"
-            />
-            {/* Dark overlay for better text readability */}
-            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent"></div>
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Content Overlay */}
-        <div className="relative z-10 h-full flex items-center ">
-          <div className="max-w-7xl mx-auto px-4 w-full mb-30">
-            <div className="max-w-2xl">
-              <motion.div
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.8 }}
-              >
-                <h1 className="text-6xl font-black text-white mb-6 leading-tight drop-shadow-lg mt-30">
-                  The Global Student Library 📚
-                </h1>
-
-                <h1 className="text-xl text-blue-200">
-                  Share the wealth [of knowledge].</h1>
-                <p className="text-xl mb-4">Turn your books into income. Upload your work, reach a global audience [90M+], and earn whenever readers discover and purchase your content.
-                </p>
-
-                <p className="text-xl text-white mb-8 leading-relaxed drop-shadow-md">
-                  A secure marketplace where <span className="font-bold text-blue-200">students and authors sell original works</span> and <span className="font-bold text-blue-200">learners access course-specific knowledge</span> they need to excel. Easy, secure, and rewarding for everyone.
-                </p>
-
-                <div className="flex gap-4 mb-8">
-                  <a href="/auth/signin" target="_blank"
-                    className="px-8 py-4 bg-blue-950 text-white font-bold rounded-lg hover:bg-blue-900 transition-all shadow-lg flex items-center gap-2"
-                  >
-                    Browse Books
-                    <ArrowRight className="w-5 h-5" />
-                  </a>
-                  <a href="/docs" target="_blank"
-                    className="cursor-pointer px-8 py-4 border-2 border-white text-white font-bold rounded-lg hover:bg-white/10 backdrop-blur-sm transition-all"
-                  >
-                    Documentation
-                  </a>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  {stats.slice(0, 4).map((stat, index) => {
-                    const Icon = stat.icon;
-                    return (
-                      <div key={index} className="bg-white/95 backdrop-blur-sm p-4 rounded-lg shadow-md border border-gray-200">
-                        <Icon className="w-8 h-8 text-blue-950 mb-2" />
-                        <div className="text-2xl font-black text-gray-900">{stat.value}</div>
-                        <div className="text-sm text-gray-600">{stat.label}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            </div>
-          </div>
-        </div>
-
-        {/* Carousel Controls */}
-        <button
-          onClick={() => setCurrentImageIndex((prev) => (prev - 1 + heroImages.length) % heroImages.length)}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/90 p-3 rounded-full shadow-lg hover:bg-white transition-colors"
-        >
-          <ChevronLeft className="w-6 h-6 text-gray-900" />
-        </button>
-        <button
-          onClick={() => setCurrentImageIndex((prev) => (prev + 1) % heroImages.length)}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/90 p-3 rounded-full shadow-lg hover:bg-white transition-colors"
-        >
-          <ChevronRight className="w-6 h-6 text-gray-900" />
-        </button>
-
-        {/* Dots */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
-          {heroImages.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentImageIndex(index)}
-              className={`w-3 h-3 rounded-full transition-all ${index === currentImageIndex ? 'bg-white w-8' : 'bg-white/50'
-                }`}
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* For Students Section - Desktop: Image on Right, Mobile: Text on Image */}
-      <section className="relative lg:py-20 bg-white mb-5 ">
-        {/* Mobile */}
-        <div className="lg:hidden relative h-[700px] ">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStudentImageIndex}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.8 }}
-              className="absolute inset-0"
-            >
-              <img
-                src={studentActivityImages[currentStudentImageIndex]}
-                alt="Students using LAN Library"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-blue-950/95 via-blue-950/30 to-transparent" />
-            </motion.div>
-          </AnimatePresence>
-
-          <div className="relative z-10 h-full flex flex-col justify-end p-6 pb-12">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="bg-white p-3 rounded-full">
-                <BookOpenText className="w-8 h-8 text-blue-950" />
-              </div>
-              <h2 className="text-3xl font-black text-white">For Students</h2>
-            </div>
-
-            <ul className="space-y-3 text-white">
-              <li className="flex items-start gap-2">
-                <CheckCircle className="w-6 h-6 text-yellow-300 flex-shrink-0 mt-1" />
-                <span><strong>Discover Specialized Content:</strong> Find course-specific books, lecture notes, and research documents tailored to your university curriculum.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle className="w-6 h-6 text-yellow-300 flex-shrink-0 mt-1" />
-                <span><strong>Instant Knowledge Unlock:</strong> Gain immediate digital access to materials that help you ace your exams.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle className="w-6 h-6 text-yellow-300 flex-shrink-0 mt-1" />
-                <span><strong>Global Academic Reach:</strong> Browse thousands of verified resources from top academics worldwide.</span>
-              </li>
-            </ul>
-          <div className='mt-5'>
-            <a href="/auth/signin" target="_blank"
-              className=" px-8 py-4 text-blue-950 bg-white font-bold rounded-lg hover:bg-blue-900 transition-all shadow-lg"
-            >
-              Start Learning →
-            </a>
-          </div>
-          </div>
-        </div>
-
-        {/* Desktop */}
-        <div className="hidden lg:block">
-          <div className="grid lg:grid-cols-2">
-            {/* Left - Text */}
-            <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="flex items-center bg-white px-12 py-20"
-            >
-              <div className="w-full">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="bg-blue-950 p-4 rounded-2xl">
-                    <BookOpenText className="w-12 h-12 text-white" />
-                  </div>
-                  <h2 className="text-4xl font-black text-gray-900">For Students & Learners</h2>
-                </div>
-
-                <ul className="space-y-4">
-                  <li className="flex items-start gap-3 bg-blue-50 p-4 rounded-xl">
-                    <CheckCircle className="w-6 h-6 text-blue-950 flex-shrink-0 mt-1" />
-                    <div>
-                      <strong className="text-blue-950 text-lg">Discover Specialized Content:</strong>
-                      <p className="text-gray-700 mt-1">Find course-specific books, lecture notes, and research documents tailored to your university curriculum.</p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3 bg-blue-50 p-4 rounded-xl">
-                    <CheckCircle className="w-6 h-6 text-blue-950 flex-shrink-0 mt-1" />
-                    <div>
-                      <strong className="text-blue-950 text-lg">Instant Knowledge Unlock:</strong>
-                      <p className="text-gray-700 mt-1">Gain immediate digital access to materials that help you ace your exams and master your field.</p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3 bg-blue-50 p-4 rounded-xl">
-                    <CheckCircle className="w-6 h-6 text-blue-950 flex-shrink-0 mt-1" />
-                    <div>
-                      <strong className="text-blue-950 text-lg">Global Academic Reach:</strong>
-                      <p className="text-gray-700 mt-1">Browse thousands of verified resources from top-performing students and academics worldwide.</p>
-                    </div>
-                  </li>
-                </ul>
-                <div className='mt-5'>
-                  <a href="/auth/signin" target="_blank"
-                    className=" px-8 py-4 bg-blue-950 text-white font-bold rounded-lg hover:bg-blue-900 transition-all shadow-lg"
-                  >
-                    Start Learning →
-                  </a>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Right - Image Carousel - Full Width */}
-            <motion.div
-              initial={{ opacity: 0, x: 50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="relative h-[700px] overflow-hidden"
-            >
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentStudentImageIndex}
-                  initial={{ opacity: 0, scale: 1.05 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.8 }}
-                  className="absolute inset-0"
-                >
-                  <img
-                    src={studentActivityImages[currentStudentImageIndex]}
-                    alt="Students using LAN Library"
-                    className="w-full h-full object-cover"
-                  />
-                  {/* Activity indicator overlay */}
-                  <div className="absolute bottom-6 left-6 bg-blue-950/90 backdrop-blur-sm text-white px-4 py-3 rounded-xl">
-                    <p className="text-sm font-semibold">Students accessing LAN Library</p>
-                    <p className="text-xs text-blue-200">Reading purchased books • Browsing materials</p>
-                  </div>
-                </motion.div>
-              </AnimatePresence>
-
-              {/* Navigation dots */}
-              <div className="absolute bottom-6 right-6 flex gap-2">
-                {studentActivityImages.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentStudentImageIndex(index)}
-                    className={`w-2 h-2 rounded-full transition-all ${index === currentStudentImageIndex ? 'bg-white w-6' : 'bg-white/50'
-                      }`}
-                  />
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* For Sellers Section - Desktop: Image on Left, Mobile: Text on Image */}
-      <section className="relative lg:py-0 bg-gray-50">
-        {/* Mobile */}
-        <div className="lg:hidden relative h-[700px]">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentSellerImageIndex}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.8 }}
-              className="absolute inset-0"
-            >
-              <img
-                src={sellerActivityImages[currentSellerImageIndex]}
-                alt="Sellers earning on LAN Library"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-green-900/95 via-green-900/30 to-transparent" />
-            </motion.div>
-          </AnimatePresence>
-
-          <div className="relative z-10 h-full flex flex-col justify-end p-6 pb-12">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="bg-white p-3 rounded-full">
-                <DollarSign className="w-8 h-8 text-green-600" />
-              </div>
+        {/* ══════ HEADER ══════ */}
+        <header className="hero-bg" style={{ position:"sticky", top:0, zIndex:50, borderBottom:"0.5px solid rgba(184,150,62,0.18)" }}>
+          <div style={{ maxWidth:1200, margin:"0 auto", padding:"0 24px", display:"flex", alignItems:"center", justifyContent:"space-between", height:72 }}>
+            {/* wordmark */}
+            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+              <img src="/lanlog.png" alt="LAN" style={{ width:44, height:44, borderRadius:"50%", objectFit:"cover", border:`1px solid rgba(184,150,62,0.3)` }} />
               <div>
-                <h2 className="text-3xl font-black text-white">For Sellers</h2>
-                <p className="text-yellow-300 font-bold">Students & Authors</p>
+                <div className="lan-serif" style={{ fontSize:22, fontWeight:900, color:"#fff", lineHeight:1 }}>LAN Library</div>
+                <div style={{ fontSize:9, fontWeight:700, letterSpacing:".16em", textTransform:"uppercase", color:"rgba(184,150,62,0.7)", fontFamily:"'Lato',sans-serif" }}>The Global Student Library</div>
               </div>
             </div>
+          </div>
+        </header>
 
-            <ul className="space-y-3 text-white">
-              <li className="flex items-start gap-2">
-                <CheckCircle className="w-6 h-6 text-yellow-300 flex-shrink-0 mt-1" />
-                <span><strong>Monetize Your Knowledge:</strong> Turn your study guides into steady passive income.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle className="w-6 h-6 text-yellow-300 flex-shrink-0 mt-1" />
-                <span><strong>Empower Your Peers:</strong> Help fellow students succeed by sharing your materials.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle className="w-6 h-6 text-yellow-300 flex-shrink-0 mt-1" />
-                <span><strong>Seamless Selling:</strong> Upload once and reach 90M+ learners with automated payouts.</span>
-              </li>
-            </ul>
-            <div className='mt-5'>
-              <a href="/auth/signin" target="_blank"
-                className=" px-8 py-4 text-green-600 bg-white font-bold rounded-lg hover:bg-blue-900 transition-all shadow-lg"
-              >
-                Start Selling →
+        {/* ══════ HERO ══════ */}
+        <section className="hero-bg" style={{ position:"relative", minHeight:680, overflow:"hidden" }}>
+          {/* image layer */}
+          <AnimatePresence mode="wait">
+            <motion.div key={heroIdx} initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} transition={{ duration:1 }}
+              style={{ position:"absolute", inset:0 }}>
+              <img src={heroImages[heroIdx]} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", opacity:.22 }} />
+            </motion.div>
+          </AnimatePresence>
+
+          {/* content */}
+          <div style={{ position:"relative", zIndex:2, maxWidth:1200, margin:"0 auto", padding:"96px 24px 80px" }}>
+            {/* eyebrow */}
+            <div className="anim-up" style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(184,150,62,0.14)", border:"1px solid rgba(184,150,62,0.3)", borderRadius:999, padding:"7px 16px", marginBottom:28 }}>
+              <Sparkles size={13} style={{ color:GOLD }} />
+              <span style={{ fontSize:11, fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:GOLDD, fontFamily:"'Lato',sans-serif" }}>Africa's #1 Student Library</span>
+            </div>
+
+            <h1 className="lan-serif anim-up-2" style={{ fontSize:"clamp(44px,8vw,88px)", fontWeight:900, color:"#fff", lineHeight:1.02, letterSpacing:"-2px", margin:"0 0 12px" }}>
+              Share the wealth
+            </h1>
+            <h1 className="lan-serif anim-up-2" style={{ fontSize:"clamp(44px,8vw,88px)", fontWeight:900, color:GOLD, fontStyle:"italic", lineHeight:1.02, letterSpacing:"-2px", margin:"0 0 28px" }}>
+              [of knowledge].
+            </h1>
+
+            <p className="anim-up-3" style={{ fontSize:17, color:"rgba(245,240,232,0.7)", maxWidth:560, lineHeight:1.8, fontWeight:300, margin:"0 0 44px" }}>
+              Turn your books into income. Upload your work, reach a global audience of{" "}
+              <strong style={{ color:"#fff", fontWeight:700 }}>90M+</strong> learners,
+              and earn whenever readers discover and purchase your content.
+            </p>
+
+            <div className="anim-up-4" style={{ display:"flex", flexWrap:"wrap", gap:12 }}>
+              <button className="btn-primary" onClick={goSignIn}>
+                Browse Books <ArrowRight size={14} />
+              </button>
+              <a href="/docs" className="btn-ghost">
+                Documentation
               </a>
             </div>
-          </div>
-        </div>
 
-        {/* Desktop */}
-        <div className="hidden lg:block">
-          <div className="grid lg:grid-cols-2">
-            {/* Left - Image Carousel - Full Width */}
-            <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="relative h-[700px] overflow-hidden"
-            >
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentSellerImageIndex}
-                  initial={{ opacity: 0, scale: 1.05 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.8 }}
-                  className="absolute inset-0"
-                >
-                  <img
-                    src={sellerActivityImages[currentSellerImageIndex]}
-                    alt="Sellers earning on LAN Library"
-                    className="w-full h-full object-cover"
-                  />
-                  {/* Activity indicator overlay */}
-                  <div className="absolute bottom-6 left-6 bg-green-600/90 backdrop-blur-sm text-white px-4 py-3 rounded-xl">
-                    <p className="text-sm font-semibold">Sellers earning on LAN Library</p>
-                    <p className="text-xs text-green-200">Uploading content • Processing transactions</p>
-                  </div>
-                </motion.div>
-              </AnimatePresence>
-
-              {/* Navigation dots */}
-              <div className="absolute bottom-6 right-6 flex gap-2">
-                {sellerActivityImages.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentSellerImageIndex(index)}
-                    className={`w-2 h-2 rounded-full transition-all ${index === currentSellerImageIndex ? 'bg-white w-6' : 'bg-white/50'
-                      }`}
-                  />
-                ))}
-              </div>
-            </motion.div>
-
-            {/* Right - Text */}
-            <motion.div
-              initial={{ opacity: 0, x: 50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="flex items-center bg-gray-50 px-12 py-20"
-            >
-              <div className="w-full">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="bg-green-600 p-4 rounded-2xl">
-                    <DollarSign className="w-12 h-12 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-4xl font-black text-gray-900">For Sellers</h2>
-                    <p className="text-green-700 font-bold text-lg">Students & Authors</p>
-                  </div>
+            {/* stats strip */}
+            <div style={{ marginTop:64, borderTop:"0.5px solid rgba(184,150,62,0.2)", display:"flex", flexWrap:"wrap" }}>
+              {STATS.map(({ val, label }) => (
+                <div key={label} className="stat-item">
+                  <div className="lan-serif" style={{ fontSize:30, fontWeight:700, color:"#fff" }}>{val}</div>
+                  <div style={{ fontSize:10, fontWeight:700, letterSpacing:".12em", textTransform:"uppercase", color:"rgba(184,150,62,0.7)", marginTop:4, fontFamily:"'Lato',sans-serif" }}>{label}</div>
                 </div>
-
-                <ul className="space-y-4">
-                  <li className="flex items-start gap-3 bg-green-50 p-4 rounded-xl">
-                    <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
-                    <div>
-                      <strong className="text-green-900 text-lg">Monetize Your Knowledge:</strong>
-                      <p className="text-gray-700 mt-1">Turn your high-quality study guides, research papers or written books into a steady stream of passive income.</p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3 bg-green-50 p-4 rounded-xl">
-                    <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
-                    <div>
-                      <strong className="text-green-900 text-lg">Empower Your Peers:</strong>
-                      <p className="text-gray-700 mt-1">Help fellow students succeed by sharing the resources that helped you excel.</p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3 bg-green-50 p-4 rounded-xl">
-                    <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
-                    <div>
-                      <strong className="text-green-900 text-lg">Seamless Selling:</strong>
-                      <p className="text-gray-700 mt-1">Upload once, set your price, and reach a global audience of 90M+ learners with automated payouts.</p>
-                    </div>
-                  </li>
-                </ul>
-                <div className='mt-5'>
-                  <a href="/auth/signin" target="_blank"
-                    className="mt-8 px-8 py-4 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-all shadow-lg"
-                  >
-                    Start Selling →
-                  </a>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* App Screenshot Banner Section */}
-      <section className="relative py-16 lg:py-24 bg-blue-950 overflow-hidden mt-10">
-        {/* Wavy background pattern */}
-        <div className="absolute inset-0 opacity-20">
-          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern
-                id="waves"
-                x="0"
-                y="0"
-                width="100"
-                height="20"
-                patternUnits="userSpaceOnUse"
-              >
-                <path
-                  d="M0 10 Q25 0 50 10 Q75 20 100 10"
-                  stroke="white"
-                  strokeWidth="1.5"
-                  fill="none"
-                />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#waves)" />
-          </svg>
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-6 flex flex-col lg:flex-row items-center gap-12">
-
-          {/* Left - Text */}
-          <div className="flex-1 text-center lg:text-left">
-            <h2 className="text-5xl sm:text-4xl md:text-5xl lg:text-9xl font-black text-white leading-tight mb-6">
-              Knowledge <br className="hidden sm:block" />
-              that works <br className="hidden sm:block" />
-              for every <br className="hidden sm:block" />
-              student
-            </h2>
-
-            <p className="text-gray-300 text-base lg:text-5xl mb-8 max-w-md mx-auto lg:mx-0">
-              Buy, sell, and access books instantly. Stay ahead with one smart library.
-            </p>
-
-            <a
-              href="/auth/signin"
-              className="inline-block bg-white text-gray-900 font-bold lg:px-25 lg:text-2xl lg:py-6 px-5 py-3 rounded-full hover:bg-gray-100 transition-all shadow-lg"
-            >
-              Create account
-            </a>
-          </div>
-
-          {/* Right - Image */}
-          <div className="flex-1 flex justify-center lg:justify-end">
-            <img
-              src="/lan.png"
-              alt="LAN Library App Screenshot"
-              className="w-[280px] sm:w-[350px] md:w-[420px] lg:w-[500px] xl:w-[550px] 
-                   h-auto object-contain rounded-[2.5rem] 
-                   drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)]"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Key Benefits Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-5xl mx-auto px-6 text-center">
-
-          {/* Header */}
-          <h2 className="text-5xl font-black text-gray-900 mb-4">Key Benefits</h2>
-          <p className="text-gray-500 text-lg max-w-2xl mx-auto mb-16">
-            Our payment system is designed for sellers on LAN Library who need fast,
-            reliable access to their earnings without delays or complications.
-          </p>
-
-          {/* Top 3 Benefits */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-16">
-
-            {/* Instant Payout */}
-            <div className="flex flex-col items-center text-center">
-              <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
-                <span className="text-5xl">⚡</span>
-              </div>
-              <h3 className="text-xl font-black text-gray-900 mb-3">Instant seller payout</h3>
-              <p className="text-gray-500 text-base leading-relaxed">
-                Get paid immediately after a buyer purchases your book, directly into your LAN wallet.
-              </p>
+              ))}
             </div>
-
-            {/* Flexible Withdrawal */}
-            <div className="flex flex-col items-center text-center">
-              <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
-                <span className="text-5xl">🔄</span>
-              </div>
-              <h3 className="text-xl font-black text-gray-900 mb-3">Flexible withdrawal</h3>
-              <p className="text-gray-500 text-base leading-relaxed">
-                Withdraw your earnings at any time that suits you, to any Nigerian bank account.
-              </p>
-            </div>
-
-            {/* No Hidden Fees */}
-            <div className="flex flex-col items-center text-center">
-              <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
-                <span className="text-5xl">🚫</span>
-              </div>
-              <h3 className="text-xl font-black text-gray-900 mb-3">No hidden charges</h3>
-              <p className="text-gray-500 text-base leading-relaxed">
-                Transfer your money without surprise fees or physical paperwork. What you earn is what you get.
-              </p>
-            </div>
-
-          </div>
-
-          {/* Bottom Center Benefit */}
-          <div className="flex flex-col items-center text-center max-w-xs mx-auto">
-            <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-6">
-              <span className="text-5xl">💰</span>
-            </div>
-            <h3 className="text-xl font-black text-gray-900 mb-3">Earn up to ₦500K monthly</h3>
-            <p className="text-gray-500 text-base leading-relaxed">
-              Top sellers on LAN Library earn consistently, from small daily sales to large monthly payouts.
-            </p>
-          </div>
-
-        </div>
-      </section>
-
-      <div className="px-4 py-6">
-
-        {/* Recharge Services Section - Add this before the footer in your landing page */}
-        <section className="relative z-10 py-16 px-4 bg-gradient-to-br from-white via-blue-50 to-white">
-          <div className="max-w-7xl mx-auto">
-            {/* Section Header */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-12"
-            >
-              <div className="inline-block mb-4">
-                <img src="lanlog.png" className='rounded-full w-30 h-30 mx-auto mb-5' />
-
-                <span className="bg-blue-950 text-white px-6 py-2 rounded-full text-sm font-bold uppercase tracking-wider">
-                  Beyond Books
-                </span>
-              </div>
-              <h2 className="text-2xl font-black text-slate-900 mt-2">
-                The smartest fintech platform for students.
-              </h2>
-              <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-blue-950 mb-4">
-                Campus Life Made Easy
-              </h2>
-              <p className="text-xl md:text-2xl text-gray-700 max-w-3xl mx-auto font-semibold">
-                Buy books, sell notes, and recharge everything—all in one platform
-              </p>
-            </motion.div>
-
-            {/* Services Grid - Desktop & Mobile Optimized */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6"
-            >
-              {/* Item 1: Airtime */}
-              <div className="group bg-gradient-to-br from-orange-500 to-orange-600 p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 cursor-pointer relative overflow-hidden">
-                {/* Decorative Background Pattern */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
-
-                <div className="relative z-10">
-                  <div className="w-14 h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
-                    <svg className="w-7 h-7 md:w-9 md:h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <h3 className="font-black text-white text-lg md:text-2xl mb-2">Airtime</h3>
-                  <p className="text-orange-100 text-xs md:text-sm font-semibold leading-tight">
-                    Instant top-up for all networks
-                  </p>
-                  <div className="mt-4 text-white/80 text-xs md:text-sm font-bold">
-                    From ₦50 →
-                  </div>
-                </div>
-              </div>
-
-              {/* Item 2: Data */}
-              <div className="group bg-gradient-to-br from-blue-600 to-blue-700 p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 cursor-pointer relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
-
-                <div className="relative z-10">
-                  <div className="w-14 h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
-                    <svg className="w-7 h-7 md:w-9 md:h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8.111 16.404a5.5 5.5 0 117.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-                    </svg>
-                  </div>
-                  <h3 className="font-black text-white text-lg md:text-2xl mb-2">Cheap Data</h3>
-                  <p className="text-blue-100 text-xs md:text-sm font-semibold leading-tight">
-                    SME bundles from ₦250
-                  </p>
-                  <div className="mt-4 text-white/80 text-xs md:text-sm font-bold">
-                    Save up to 40% →
-                  </div>
-                </div>
-              </div>
-
-              {/* Item 3: Electricity */}
-              <div className="group bg-gradient-to-br from-green-500 to-green-600 p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 cursor-pointer relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
-
-                <div className="relative z-10">
-                  <div className="w-14 h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
-                    <svg className="w-7 h-7 md:w-9 md:h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <h3 className="font-black text-white text-lg md:text-2xl mb-2">Electricity</h3>
-                  <p className="text-green-100 text-xs md:text-sm font-semibold leading-tight">
-                    Pay for your hostel units
-                  </p>
-                  <div className="mt-4 text-white/80 text-xs md:text-sm font-bold">
-                    All discos supported →
-                  </div>
-                </div>
-              </div>
-
-              {/* Item 4: TV/Cable */}
-              <div className="group bg-gradient-to-br from-purple-600 to-purple-700 p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 cursor-pointer relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
-
-                <div className="relative z-10">
-                  <div className="w-14 h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
-                    <svg className="w-7 h-7 md:w-9 md:h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <h3 className="font-black text-white text-lg md:text-2xl mb-2">TV/Cable</h3>
-                  <p className="text-purple-100 text-xs md:text-sm font-semibold leading-tight">
-                    DSTV, GOTV & Startimes
-                  </p>
-                  <div className="mt-4 text-white/80 text-xs md:text-sm font-bold">
-                    Quick renewal →
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* CTA Section */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.4 }}
-              className="mt-12 text-center"
-            >
-             
-            </motion.div>
-
-            {/* Trust Badges */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.6 }}
-              className="mt-12 flex flex-wrap justify-center items-center gap-8 text-gray-600"
-            >
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span className="font-bold text-sm">Instant Delivery</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span className="font-bold text-sm">100% Secure</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span className="font-bold text-sm">24/7 Support</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span className="font-bold text-sm">Best Rates</span>
-              </div>
-            </motion.div>
           </div>
         </section>
 
-        {/* Featured Books Section */}
-        {!loadingBooks && featuredBooks.length > 0 && (
-          <section className="py-20 bg-white">
-            <div className="max-w-7xl mx-auto px-4">
-              <div className="text-center mb-12">
-                <h2 className="text-4xl font-black text-gray-900 mb-4">Featured Books</h2>
-                <p className="text-gray-600 text-lg">Recently published by our community</p>
+        {/* ══════ FOR STUDENTS ══════ */}
+        <section style={{ background:"#fff", padding:"96px 24px" }}>
+          <div style={{ maxWidth:1200, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", gap:56, alignItems:"center" }}>
+
+            {/* text col */}
+            <div>
+              <p style={{ fontSize:10, fontWeight:700, letterSpacing:".22em", textTransform:"uppercase", color:GOLD, marginBottom:12, fontFamily:"'Lato',sans-serif" }}>For Students & Learners</p>
+              <h2 className="lan-serif" style={{ fontSize:"clamp(30px,4vw,48px)", fontWeight:700, color:NAVY, margin:"0 0 12px" }}>
+                Every document<br/><span style={{ color:GOLD, fontStyle:"italic" }}>your campus needs.</span>
+              </h2>
+              <div className="gold-line" style={{ maxWidth:220, margin:"0 0 32px" }}>
+                <div style={{ width:8, height:8, background:GOLD, transform:"rotate(45deg)", flexShrink:0 }} />
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                {featuredBooks.slice(0, 10).map((book) => (
-                  <button
-                    key={book.id}
-                    onClick={() => navigateToSignIn()}
-                    className="group text-left"
-                  >
-                    <div className="relative mb-3 overflow-hidden shadow-lg">
-                      <img
-                        src={book.image}
-                        alt={book.title}
-                        className="w-full h-72 object-cover group-hover:scale-110 transition-transform duration-300"
-                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
+              <div className="lan-card" style={{ marginBottom:24 }}>
+                {STUDENT_FEATURES.map(({ title, body }) => (
+                  <div key={title} className="feat-row">
+                    <div className="feat-icon"><CheckCircle size={15} style={{ color:GOLD }} /></div>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:700, color:NAVY, marginBottom:4, fontFamily:"'Lato',sans-serif" }}>{title}</div>
+                      <div style={{ fontSize:12, color:"#888", lineHeight:1.65, fontFamily:"'Lato',sans-serif" }}>{body}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button className="btn-navy" onClick={goSignIn}>
+                <BookOpenText size={14} /> Start Learning
+              </button>
+            </div>
+
+            {/* image col */}
+            <div style={{ position:"relative" }}>
+              <div style={{ position:"absolute", top:-20, right:-20, width:200, height:200, background:`radial-gradient(circle, rgba(184,150,62,0.12), transparent 70%)`, zIndex:0 }} />
+              <div style={{ position:"relative", zIndex:1, border:`0.5px solid #e5ddd0`, overflow:"hidden" }}>
+                <img src="/student.jpg" alt="Students using LAN Library"
+                  style={{ width:"100%", aspectRatio:"4/3", objectFit:"cover", display:"block" }}
+                  onError={e => { e.target.src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800"; }}
+                />
+                {/* overlay badge */}
+                <div style={{ position:"absolute", bottom:20, left:20, background:NAVY, padding:"12px 18px", display:"flex", flexDirection:"column", gap:3 }}>
+                  <span style={{ fontSize:10, fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:GOLD, fontFamily:"'Lato',sans-serif" }}>Students Active Now</span>
+                  <span style={{ fontSize:12, color:"rgba(255,255,255,0.7)", fontFamily:"'Lato',sans-serif" }}>Reading purchased books · Browsing materials</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ══════ FOR SELLERS ══════ */}
+        <section className="cream-bg" style={{ padding:"96px 24px" }}>
+          <div style={{ maxWidth:1200, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", gap:56, alignItems:"center" }}>
+
+            {/* image col — reversed order on desktop via order */}
+            <div style={{ position:"relative", order:0 }}>
+              <div style={{ position:"absolute", bottom:-20, left:-20, width:220, height:220, background:`radial-gradient(circle, rgba(22,163,74,0.1), transparent 70%)`, zIndex:0 }} />
+              <div style={{ position:"relative", zIndex:1, border:`0.5px solid #e5ddd0`, overflow:"hidden" }}>
+                <img src="https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=800" alt="Seller earning on LAN Library"
+                  style={{ width:"100%", aspectRatio:"4/3", objectFit:"cover", display:"block" }} />
+                <div style={{ position:"absolute", bottom:20, left:20, background:"#16a34a", padding:"12px 18px", display:"flex", flexDirection:"column", gap:3 }}>
+                  <span style={{ fontSize:10, fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:"rgba(255,255,255,0.7)", fontFamily:"'Lato',sans-serif" }}>Sellers Earning Now</span>
+                  <span style={{ fontSize:12, color:"rgba(255,255,255,0.85)", fontFamily:"'Lato',sans-serif" }}>Uploading content · Processing transactions</span>
+                </div>
+              </div>
+            </div>
+
+            {/* text col */}
+            <div style={{ order:1 }}>
+              <p style={{ fontSize:10, fontWeight:700, letterSpacing:".22em", textTransform:"uppercase", color:"#16a34a", marginBottom:12, fontFamily:"'Lato',sans-serif" }}>For Sellers · Students & Authors</p>
+              <h2 className="lan-serif" style={{ fontSize:"clamp(30px,4vw,48px)", fontWeight:700, color:NAVY, margin:"0 0 12px" }}>
+                Monetize your<br/><span style={{ color:"#16a34a", fontStyle:"italic" }}>expertise.</span>
+              </h2>
+              <div className="gold-line" style={{ maxWidth:220, margin:"0 0 32px" }}>
+                <div style={{ width:8, height:8, background:"#16a34a", transform:"rotate(45deg)", flexShrink:0 }} />
+              </div>
+
+              <div className="lan-card" style={{ marginBottom:24 }}>
+                {SELLER_FEATURES.map(({ title, body }) => (
+                  <div key={title} className="feat-row">
+                    <div className="feat-icon" style={{ border:"0.5px solid rgba(22,163,74,0.3)" }}><CheckCircle size={15} style={{ color:"#16a34a" }} /></div>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:700, color:NAVY, marginBottom:4, fontFamily:"'Lato',sans-serif" }}>{title}</div>
+                      <div style={{ fontSize:12, color:"#888", lineHeight:1.65, fontFamily:"'Lato',sans-serif" }}>{body}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={goSignIn}
+                style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"14px 28px", background:"#16a34a", color:"#fff", fontSize:13, fontWeight:700, fontFamily:"'Lato',sans-serif", letterSpacing:".06em", textTransform:"uppercase", border:"none", cursor:"pointer", transition:"background .18s" }}
+                onMouseEnter={e=>e.currentTarget.style.background="#15803d"}
+                onMouseLeave={e=>e.currentTarget.style.background="#16a34a"}>
+                <Upload size={14} /> Start Selling
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* ══════ APP SHOWCASE BANNER ══════ */}
+        <section className="crest-bg" style={{ padding:"88px 24px", overflow:"hidden" }}>
+          <div style={{ maxWidth:1200, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:48, alignItems:"center" }}>
+            {/* text */}
+            <div>
+              <p style={{ fontSize:10, fontWeight:700, letterSpacing:".22em", textTransform:"uppercase", color:GOLD, marginBottom:16, fontFamily:"'Lato',sans-serif" }}>One Smart Platform</p>
+              <h2 className="lan-serif" style={{ fontSize:"clamp(40px,7vw,80px)", fontWeight:900, color:"#fff", lineHeight:1, margin:"0 0 20px", letterSpacing:"-2px" }}>
+                Knowledge<br/>that works<br/>for every<br/><span style={{ color:GOLD, fontStyle:"italic" }}>student.</span>
+              </h2>
+              <p style={{ fontSize:15, color:"rgba(245,240,232,0.55)", lineHeight:1.8, maxWidth:400, marginBottom:36, fontWeight:300, fontFamily:"'Lato',sans-serif" }}>
+                Buy, sell, and access books instantly. Stay ahead with one smart library built for African scholars.
+              </p>
+              <button className="btn-primary" onClick={goSignIn} style={{ fontSize:14, padding:"16px 32px" }}>
+                Create Account <ArrowRight size={15} />
+              </button>
+            </div>
+
+            {/* screenshot */}
+            <div style={{ display:"flex", justifyContent:"center" }}>
+              <div style={{ position:"relative" }}>
+                <div style={{ position:"absolute", inset:-2, background:`linear-gradient(135deg,${GOLD},transparent,${GOLD})`, borderRadius:42, opacity:.4 }} />
+                <img src="/dashboard.png" alt="LAN Library App"
+                  style={{ position:"relative", width:"clamp(260px,40vw,460px)", borderRadius:40, boxShadow:"0 40px 80px rgba(0,0,0,0.5)", display:"block" }}
+                  onError={e => { e.target.style.display="none"; }}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ══════ KEY BENEFITS ══════ */}
+        <section style={{ background:"#fff", padding:"96px 24px" }}>
+          <div style={{ maxWidth:1100, margin:"0 auto" }}>
+            <div style={{ textAlign:"center", marginBottom:56 }}>
+              <p style={{ fontSize:10, fontWeight:700, letterSpacing:".22em", textTransform:"uppercase", color:GOLD, marginBottom:12, fontFamily:"'Lato',sans-serif" }}>Why LAN Library</p>
+              <h2 className="lan-serif" style={{ fontSize:"clamp(30px,4vw,48px)", fontWeight:700, color:NAVY, margin:"0 0 16px" }}>Key Benefits</h2>
+              <div className="gold-line" style={{ maxWidth:200, margin:"0 auto 16px" }}>
+                <div style={{ width:8, height:8, background:GOLD, transform:"rotate(45deg)", flexShrink:0 }} />
+              </div>
+              <p style={{ fontSize:14, color:"#888", maxWidth:500, margin:"0 auto", lineHeight:1.75, fontWeight:300, fontFamily:"'Lato',sans-serif" }}>
+                Our payment system is designed for sellers who need fast, reliable access to their earnings.
+              </p>
+            </div>
+
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:16 }}>
+              {BENEFITS.map(({ emoji, title, body }) => (
+                <div key={title} className="ben-card">
+                  <div style={{ width:72, height:72, border:`0.5px solid rgba(184,150,62,0.25)`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", fontSize:32 }}>
+                    {emoji}
+                  </div>
+                  <h3 className="lan-serif" style={{ fontSize:17, fontWeight:700, color:NAVY, margin:"0 0 10px" }}>{title}</h3>
+                  <p style={{ fontSize:12, color:"#888", lineHeight:1.7, fontFamily:"'Lato',sans-serif" }}>{body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ══════ CAMPUS SERVICES ══════ */}
+        <section className="cream-bg" style={{ padding:"96px 24px" }}>
+          <div style={{ maxWidth:1100, margin:"0 auto" }}>
+            {/* header */}
+            <div style={{ textAlign:"center", marginBottom:56 }}>
+              <img src="/lanlog.png" alt="" style={{ width:64, height:64, borderRadius:"50%", objectFit:"cover", margin:"0 auto 20px", border:`1px solid rgba(184,150,62,0.3)`, display:"block" }} />
+              <div style={{ display:"inline-block", background:NAVY, color:"#fff", padding:"6px 20px", fontSize:10, fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", fontFamily:"'Lato',sans-serif", marginBottom:16 }}>
+                Beyond Books
+              </div>
+              <h2 className="lan-serif" style={{ fontSize:"clamp(30px,4vw,48px)", fontWeight:700, color:NAVY, margin:"0 0 10px" }}>
+                Campus Life <span style={{ color:GOLD, fontStyle:"italic" }}>Made Easy.</span>
+              </h2>
+              <p style={{ fontSize:15, color:"#888", maxWidth:520, margin:"0 auto", lineHeight:1.75, fontWeight:300, fontFamily:"'Lato',sans-serif" }}>
+                Buy books, sell notes, and recharge everything — all in one platform built for students.
+              </p>
+            </div>
+
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:16 }}>
+              {SERVICES.map(({ gradient, emoji, title, sub, cta }) => (
+                <div key={title} className="svc-card" style={{ background:gradient, padding:"36px 28px", borderRadius:0 }}>
+                  {/* decorative circles */}
+                  <div style={{ position:"absolute", top:-40, right:-40, width:120, height:120, background:"rgba(255,255,255,0.08)", borderRadius:"50%", pointerEvents:"none" }} />
+                  <div style={{ position:"absolute", bottom:-30, left:-30, width:90, height:90, background:"rgba(255,255,255,0.06)", borderRadius:"50%", pointerEvents:"none" }} />
+                  <div style={{ position:"relative", zIndex:1 }}>
+                    <div style={{ width:60, height:60, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, marginBottom:18 }}>
+                      {emoji}
+                    </div>
+                    <h3 style={{ fontFamily:"'Playfair Display',serif", fontSize:20, fontWeight:700, color:"#fff", margin:"0 0 8px" }}>{title}</h3>
+                    <p style={{ fontSize:12, color:"rgba(255,255,255,0.7)", lineHeight:1.6, margin:"0 0 20px", fontFamily:"'Lato',sans-serif" }}>{sub}</p>
+                    <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.6)", fontFamily:"'Lato',sans-serif", letterSpacing:".08em" }}>
+                      {cta} →
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* trust badges */}
+            <div style={{ marginTop:48, display:"flex", flexWrap:"wrap", justifyContent:"center", gap:32 }}>
+              {["Instant Delivery","100% Secure","24/7 Support","Best Rates"].map(badge => (
+                <div key={badge} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <div style={{ width:18, height:18, borderRadius:"50%", background:"#16a34a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                  <span style={{ fontSize:12, fontWeight:700, color:NAVY, fontFamily:"'Lato',sans-serif" }}>{badge}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ══════ FEATURED BOOKS ══════ */}
+        {!loadingBooks && featuredBooks.length > 0 && (
+          <section style={{ background:"#fff", padding:"96px 24px" }}>
+            <div style={{ maxWidth:1200, margin:"0 auto" }}>
+              <div style={{ textAlign:"center", marginBottom:48 }}>
+                <p style={{ fontSize:10, fontWeight:700, letterSpacing:".22em", textTransform:"uppercase", color:GOLD, marginBottom:12, fontFamily:"'Lato',sans-serif" }}>Community Uploads</p>
+                <h2 className="lan-serif" style={{ fontSize:"clamp(28px,4vw,44px)", fontWeight:700, color:NAVY, margin:"0 0 8px" }}>Featured Books</h2>
+                <p style={{ fontSize:13, color:"#aaa", fontFamily:"'Lato',sans-serif", fontWeight:300 }}>Recently published by our community of scholars</p>
+              </div>
+
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:20 }}>
+                {featuredBooks.slice(0,6).map(book => (
+                  <button key={book.id} className="book-card" onClick={goSignIn} style={{ background:"#fff", border:"none", textAlign:"left", cursor:"pointer", display:"block", width:"100%" }}>
+                    <div style={{ position:"relative", background:"#ede8df" }}>
+                      <img src={book.image} alt={book.title} className="book-img"
+                        style={{ width:"100%", aspectRatio:"3/4", objectFit:"cover", display:"block" }}
+                        onError={e => { e.target.src="/lanlog.png"; }}
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
-                        <span className="text-white font-bold">Sign in to view</span>
+                      <div style={{ position:"absolute", top:8, left:8, display:"inline-flex", alignItems:"center", gap:4, background:NAVY, padding:"3px 8px", fontSize:9, fontWeight:700, color:"#fff", fontFamily:"'Lato',sans-serif" }}>
+                        <span style={{ width:5, height:5, borderRadius:"50%", background:"#22c55e", display:"inline-block" }} /> PDF
+                      </div>
+                      <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top,rgba(0,0,0,0.5),transparent)", opacity:0, transition:"opacity .2s", display:"flex", alignItems:"flex-end", justifyContent:"center", paddingBottom:12 }}
+                        onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity="0"}>
+                        <span style={{ fontSize:11, fontWeight:700, color:"#fff", fontFamily:"'Lato',sans-serif" }}>Sign in to view</span>
                       </div>
                     </div>
-                    <h3 className="font-bold text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-950">
-                      {book.title}
-                    </h3>
-                    <p className="text-gray-600 text-sm mb-2">{book.author}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="text-sm font-semibold">{book.rating}</span>
+                    <div style={{ padding:"10px 10px 12px", borderTop:"0.5px solid #f0ebe0" }}>
+                      <h4 className="lan-serif" style={{ fontSize:13, fontWeight:700, color:NAVY, margin:"0 0 4px", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden", lineHeight:1.35 }}>{book.title}</h4>
+                      <p style={{ fontSize:11, color:"#888", margin:"0 0 8px", fontFamily:"'Lato',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{book.author}</p>
+                      <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                        <Star size={11} style={{ color:GOLD, fill:GOLD }} />
+                        <span style={{ fontSize:11, fontWeight:700, color:NAVY, fontFamily:"'Lato',sans-serif" }}>{book.rating}</span>
                       </div>
                     </div>
                   </button>
@@ -1199,204 +636,285 @@ export default function LearningAccessNetwork() {
           </section>
         )}
 
-        {/* Testimonials Section */}
-        <section className="py-20 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4">
-            <div className="text-center mb-16">
-              <h2 className="text-5xl md:text-6xl font-black text-gray-900 mb-6">
-                Over 10,000+ people love us. You will too.
+        {/* ══════ TESTIMONIALS ══════ */}
+        <section className="cream-bg" style={{ padding:"96px 24px" }}>
+          <div style={{ maxWidth:1100, margin:"0 auto" }}>
+            <div style={{ textAlign:"center", marginBottom:56 }}>
+              <p style={{ fontSize:10, fontWeight:700, letterSpacing:".22em", textTransform:"uppercase", color:GOLD, marginBottom:12, fontFamily:"'Lato',sans-serif" }}>Social Proof</p>
+              <h2 className="lan-serif" style={{ fontSize:"clamp(28px,4vw,48px)", fontWeight:700, color:NAVY, margin:0, lineHeight:1.15 }}>
+                Over <span style={{ color:GOLD, fontStyle:"italic" }}>10,000+ people</span><br/>love us. You will too.
               </h2>
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-8">
-              {/* Left Column */}
-              <div className="space-y-8">
-               
-                <div className="bg-white rounded-2xl p-8 shadow-lg">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Best in Class Support</h3>
-                  <p className="text-gray-700 leading-relaxed mb-6">
-                    LAN Library is a great company with one of the best supports I've ever seen.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold">
-                      <img src="lanlog.png" className='rounded-full' />
+            <div style={{ display:"grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap:20, marginBottom:24 }}>
+              {TESTIMONIALS.map(({ name, text }) => (
+                <div key={name} className="test-card lan-card">
+                  {/* quote mark */}
+                  <div className="lan-serif" style={{ fontSize:64, color:CREAM, lineHeight:1, marginBottom:-16 }}>"</div>
+                  <p style={{ fontSize:14, color:"#666", lineHeight:1.8, marginBottom:24, fontFamily:"'Lato',sans-serif" }}>{text}</p>
+                  <div style={{ display:"flex", alignItems:"center", gap:12, borderTop:"0.5px solid #f0ebe0", paddingTop:18 }}>
+                    <div style={{ width:40, height:40, background:NAVY, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, overflow:"hidden" }}>
+                      <img src="/lanlog.png" alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
                     </div>
-                    <span className="font-semibold text-gray-900">Theresa</span>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:700, color:NAVY, fontFamily:"'Lato',sans-serif" }}>{name}</div>
+                      <div style={{ fontSize:11, color:GOLD, fontFamily:"'Lato',sans-serif", letterSpacing:".06em" }}>Verified User</div>
+                    </div>
+                    <div style={{ marginLeft:"auto", display:"flex", gap:2 }}>
+                      {[0,1,2,3,4].map(i => <Star key={i} size={12} style={{ color:GOLD, fill:GOLD }} />)}
+                    </div>
                   </div>
                 </div>
-              </div>
+              ))}
 
-              {/* Center Column - Video */}
-              <div className="lg:row-span-1">
-                <button
-                  onClick={() => handleVideoClick(videos[1])}
-                  className="group relative w-full h-full min-h-[500px] rounded-2xl overflow-hidden shadow-2xl"
-                >
-                  <img
-                    src="/lanlogo.jpg"
-                    alt="Testimonial video"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 to-transparent" />
-
-                  {/* Play Button */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-xl">
-                      <Play className="w-10 h-10 text-gray-900 fill-gray-900 ml-1" />
-                    </div>
+              {/* video card */}
+              <button onClick={() => setShowVideo(true)}
+                style={{ position:"relative", minHeight:240, border:"0.5px solid #e5ddd0", overflow:"hidden", cursor:"pointer", background:"none" }}>
+                <img src="/lanlogo.jpg" alt="Watch video" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover" }}
+                  onError={e => { e.target.style.background=NAVY; e.target.style.display="none"; }} />
+                <div style={{ position:"absolute", inset:0, background:"rgba(13,34,68,0.55)" }} />
+                <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:16 }}>
+                  <div style={{ width:68, height:68, background:"rgba(255,255,255,0.92)", borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", transition:"transform .2s", boxShadow:"0 8px 24px rgba(0,0,0,0.25)" }}>
+                    <Play size={26} style={{ color:NAVY, fill:NAVY, marginLeft:4 }} />
                   </div>
-
-                  {/* Name at Bottom */}
-                  <div className="absolute bottom-8 left-8 flex items-center gap-3">
-                    <div className="w-12 h-12  rounded-full flex items-center justify-center text-white font-bold text-lg">
-                      <img src="lanlog.png"  className='rounded-full'/>
-                    </div>
-                    <span className="text-blue-950 font-bold text-xl">LAN Library</span>
-                  </div>
-                </button>
-              </div>
-
-              {/* Right Column */}
-              <div className="space-y-8">
-                <div className="bg-white rounded-2xl p-8 shadow-lg">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Seamless for Purchases</h3>
-                  <p className="text-gray-700 leading-relaxed mb-6">
-                    LAN Library has been helping me since last year that I found it, I don't have to stress about finding books anymore as it comes quickly and very fast.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold">
-                      <img src="lanlog.png" className='rounded-full' />
-                    </div>
-                    <span className="font-semibold text-gray-900">Blessing</span>
-                  </div>
+                  <span style={{ fontSize:12, fontWeight:700, color:"#fff", fontFamily:"'Lato',sans-serif", letterSpacing:".1em", textTransform:"uppercase" }}>Watch Story</span>
                 </div>
-              </div>
-              <div> </div>
-              <a href="/learn/make-money" target="_blank"
-                className="px-10 py-4 bg-white text-blue-950 font-black rounded-lg hover:bg-gray-100 text-center transition-all shadow-xl text-lg "
-              >
-                Watch More Videos
-              </a>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA Section */}
-        <section className="py-20 bg-gradient-to-br from-blue-950 to-indigo-950 text-white">
-          <div className="max-w-4xl mx-auto px-4 text-center">
-            <h2 className="text-5xl font-black mb-6">Ready to Start Earning?</h2>
-            <p className="text-xl text-blue-100 mb-10">
-              Join thousands of sellers making money with their knowledge. Get 80% revenue share on every sale.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href='/auth/signin' target="_blank"
-                className="px-10 py-4 bg-white text-blue-950 font-black rounded-lg hover:bg-gray-100 transition-all shadow-xl text-lg"
-              >
-                Start Selling Now
-              </a>
-              <button
-                onClick={() => navigateToSignIn()}
-                className="px-10 py-4 border-2 border-white text-white font-black rounded-lg hover:bg-white/10 transition-all text-lg"
-              >
-                Browse Books
+                <div style={{ position:"absolute", bottom:16, left:16, display:"flex", alignItems:"center", gap:10 }}>
+                  <img src="/lanlog.png" alt="" style={{ width:36, height:36, borderRadius:"50%", objectFit:"cover", border:"1px solid rgba(184,150,62,0.4)" }} />
+                  <span className="lan-serif" style={{ color:"#fff", fontSize:16, fontWeight:700 }}>LAN Library</span>
+                </div>
               </button>
             </div>
 
-            <div className="mt-16 grid grid-cols-3 gap-8">
-              <div>
-                <div className="text-4xl font-black mb-2">80%</div>
-                <div className="text-blue-200">Revenue Share</div>
-              </div>
-              <div>
-                <div className="text-4xl font-black mb-2">90M+</div>
-                <div className="text-blue-200">Global Reach</div>
-              </div>
-              <div>
-                <div className="text-4xl font-black mb-2">24/7</div>
-                <div className="text-blue-200">Support</div>
-              </div>
+            <div style={{ textAlign:"center" }}>
+              <a href="/learn/make-money" target="_blank" className="btn-navy" style={{ textDecoration:"none", display:"inline-flex" }}>
+                Watch More Videos <ArrowRight size={13} />
+              </a>
             </div>
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="bg-white text-blue-950 py-12">
-          <div className="max-w-7xl mx-auto px-4">
-              <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-                <h1
-                  className="text-4xl sm:text-6xl font-bold text-blue-950"
-                  style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
-                >
-                  [LAN Library]
-                  <h2
-                    className="text-xs sm:text-base font-light"
-                    style={{ fontFamily: "'Lato', sans-serif" }}
-                  >
-                    The Global Student Library 📚
-                  </h2>
-                </h1>
-              </Link>
-            <div className="grid md:grid-cols-4 gap-8 mb-8 mt-10">
-              <div>
-                <h3 className="font-bold mb-4">For Students</h3>
-                <ul className="space-y-2 text-blue-950">
-                  <li><button onClick={() => navigateToSignIn()} className="hover:text-white">Browse Books</button></li>
-                  <li><button onClick={() => navigateToSignIn()} className="hover:text-white">Categories</button></li>
-                  <li><button onClick={() => navigateToSignIn()} className="hover:text-white">My Books</button></li>
-                  <li><button onClick={() => navigateToSignIn()} className="hover:text-white">Saved Books</button></li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-bold mb-4">For Sellers</h3>
-                <ul className="space-y-2 text-blue-950">
-                  <li><button onClick={() => navigateToSignIn('wallet')} className="hover:text-white">LAN Wallet</button></li>
-                  <li><button onClick={() => navigateToSignIn('transfer')} className="hover:text-white">Transfer</button></li>
-                  <li><button onClick={() => navigateToSignIn('recharge')} className="hover:text-white">Recharge</button></li>
-                  <li><button onClick={() => navigateToSignIn('referral')} className="hover:text-white">Referral</button></li>
-
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-bold mb-4">Company</h3>
-                <ul className="space-y-2 text-blue-950">
-                  <li><Link href="/about/lan" className="hover:text-white">About Us</Link></li>
-                  <li><Link href="/docs" className="hover:text-white">Documentation</Link></li>
-                  <li><Link href="/lan/privacy-policy" className="hover:text-white">Privacy Policy</Link></li>
-                  <li><Link href="/lan/terms-of-service" className="hover:text-white">Terms of Service</Link></li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-800 pt-8 text-center text-blue-950">
-              <p>&copy; {currentYear} [ LAN Library ] - Learning Access Network. All rights reserved.</p>
-            </div>
+        {/* ══════ FINAL CTA ══════ */}
+        <section className="crest-bg" style={{ padding:"96px 24px", textAlign:"center" }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:16, marginBottom:28 }}>
+            <div style={{ height:1, width:60, background:"rgba(184,150,62,0.4)" }} />
+            <Star size={14} style={{ color:GOLD, fill:GOLD }} />
+            <div style={{ height:1, width:60, background:"rgba(184,150,62,0.4)" }} />
           </div>
-        </footer>
 
-        {/* Video Modal */}
-        {showVideoModal && selectedVideo && (
-          <div className="fixed inset-0 bg-black z-[100] flex items-center justify-center p-4">
-            <button
-              onClick={() => setShowVideoModal(false)}
-              className="absolute top-4 right-4 z-[110] bg-white/10 hover:bg-white/20 p-3 rounded-full"
-            >
-              <X className="w-6 h-6 text-white" />
+          <h2 className="lan-serif" style={{ fontSize:"clamp(32px,5vw,60px)", fontWeight:700, color:"#fff", margin:"0 0 16px", lineHeight:1.1 }}>
+            Ready to <span style={{ color:GOLD, fontStyle:"italic" }}>Start Earning?</span>
+          </h2>
+          <p style={{ fontSize:15, color:"rgba(255,255,255,0.5)", maxWidth:500, margin:"0 auto 44px", lineHeight:1.8, fontWeight:300, fontFamily:"'Lato',sans-serif" }}>
+            Join thousands of sellers making money with their knowledge. Get 85% revenue share on every sale.
+          </p>
+
+          <div style={{ display:"flex", flexWrap:"wrap", gap:14, justifyContent:"center", marginBottom:56 }}>
+            <button className="btn-primary" onClick={goSignIn} style={{ fontSize:14, padding:"16px 32px" }}>
+              <Upload size={15} /> Start Selling Now
             </button>
-            <div className="w-full h-full max-w-5xl max-h-[80vh]">
-              <video
-                src={selectedVideo.videoUrl}
-                title={selectedVideo.title}
-                className="w-full h-full rounded-lg"
-                controls
-                autoPlay
-              />
+            <button className="btn-ghost" onClick={goSignIn} style={{ fontSize:14, padding:"16px 32px" }}>
+              <Search size={15} /> Browse Books
+            </button>
+          </div>
+
+          <div style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap:48, borderTop:"0.5px solid rgba(184,150,62,0.2)", paddingTop:40 }}>
+            {[{ val:"85%", label:"Revenue Share" }, { val:"90M+", label:"Global Reach" }, { val:"24/7", label:"Support" }].map(({ val, label }) => (
+              <div key={label} style={{ textAlign:"center" }}>
+                <div className="lan-serif" style={{ fontSize:40, fontWeight:900, color:"#fff" }}>{val}</div>
+                <div style={{ fontSize:11, fontWeight:700, letterSpacing:".12em", textTransform:"uppercase", color:"rgba(184,150,62,0.6)", marginTop:4, fontFamily:"'Lato',sans-serif" }}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+      <footer
+  className="hero-bg"
+  style={{
+    padding: "64px 16px 32px",
+    borderTop: "0.5px solid rgba(184,150,62,0.15)",
+    overflow: "hidden",
+  }}
+>
+  <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+    
+    {/* GRID */}
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+        gap: 32,
+        marginBottom: 48,
+      }}
+    >
+      {/* BRAND */}
+      <div>
+        <div
+          className="lan-serif"
+          style={{
+            fontSize: 28,
+            fontWeight: 900,
+            color: "#fff",
+            marginBottom: 4,
+          }}
+        >
+          LAN Library
+        </div>
+        <p
+          style={{
+            fontSize: 12,
+            color: "rgba(245,240,232,0.4)",
+            lineHeight: 1.7,
+            maxWidth: 260,
+            fontFamily: "'Lato',sans-serif",
+            fontWeight: 300,
+          }}
+        >
+          Africa's #1 Student Library. Share the wealth of knowledge with 90M+
+          learners worldwide.
+        </p>
+      </div>
+
+      {/* LINKS */}
+      {[
+        {
+          heading: "For Students",
+          links: ["Browse Books", "Categories", "My Books", "Saved Books"],
+        },
+        {
+          heading: "For Sellers",
+          links: ["LAN Wallet", "Transfer", "Recharge", "Referral"],
+        },
+        {
+          heading: "Company",
+          links: [
+            { label: "About Us", href: "/about/lan" },
+            { label: "Documentation", href: "/docs" },
+            { label: "Privacy Policy", href: "/lan/privacy-policy" },
+            { label: "Terms of Service", href: "/lan/terms-of-service" },
+          ],
+        },
+      ].map(({ heading, links }) => (
+        <div key={heading}>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: ".18em",
+              textTransform: "uppercase",
+              color: GOLD,
+              marginBottom: 18,
+              fontFamily: "'Lato',sans-serif",
+            }}
+          >
+            {heading}
+          </div>
+
+          <ul
+            style={{
+              listStyle: "none",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            {links.map((item) => {
+              // COMPANY LINKS (real routing)
+              if (typeof item === "object") {
+                return (
+                  <li key={item.label}>
+                    <a href={item.href} className="footer-link">
+                      {item.label}
+                    </a>
+                  </li>
+                );
+              }
+
+              // OTHER LINKS → SIGN IN
+              return (
+                <li key={item}>
+                  <button
+                    onClick={() => router.push("/auth/signin")}
+                    className="footer-link"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      padding: 0,
+                    }}
+                  >
+                    {item}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </div>
+
+    {/* BOTTOM */}
+    <div
+      style={{
+        borderTop: "0.5px solid rgba(184,150,62,0.15)",
+        paddingTop: 24,
+        display: "flex",
+        flexWrap: "wrap",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 12,
+      }}
+    >
+      <p
+        style={{
+          fontSize: 12,
+          color: "rgba(245,240,232,0.35)",
+          fontFamily: "'Lato',sans-serif",
+        }}
+      >
+        © 2026 LAN Library — Learning Access Network. All rights reserved.
+      </p>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: "#22c55e",
+          }}
+        />
+        <span
+          style={{
+            fontSize: 11,
+            color: "rgba(245,240,232,0.4)",
+            fontFamily: "'Lato',sans-serif",
+          }}
+        >
+          All systems operational
+        </span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+        {/* ══════ VIDEO MODAL ══════ */}
+        {showVideo && (
+          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.92)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}
+            onClick={() => setShowVideo(false)}>
+            <button onClick={() => setShowVideo(false)}
+              style={{ position:"fixed", top:20, right:20, width:44, height:44, background:"rgba(255,255,255,0.1)", border:"0.5px solid rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"#fff" }}>
+              <X size={20} />
+            </button>
+            <div onClick={e => e.stopPropagation()} style={{ width:"100%", maxWidth:900, maxHeight:"80vh" }}>
+              <video src="/seller tools.mp4" controls autoPlay style={{ width:"100%", maxHeight:"80vh", display:"block" }} />
             </div>
           </div>
         )}
+
       </div>
-    </div>
+    </>
   );
 }

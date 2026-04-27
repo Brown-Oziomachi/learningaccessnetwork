@@ -1,9 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-     experimental:{
+  experimental: {
     globalNotFound: true,
   },
-  /* config options here */
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "Permissions-Policy",
+            value: "unload=(self)",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

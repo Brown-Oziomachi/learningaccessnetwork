@@ -6,10 +6,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  Facebook,
-  Twitter,
-  Instagram,
-  Linkedin,
   Youtube,
   ArrowRight,
   CreditCard,
@@ -29,475 +25,581 @@ export default function Footer() {
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const router = useRouter();
-  
-   const checkSellerStatus = async (userId) => {
-      try {
-        setCheckingSeller(true);
-        console.log("Checking seller status for user:", userId);
-  
-        const userDocRef = doc(db, "users", userId);
-        const userDoc = await getDoc(userDocRef);
-  
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const isUserSeller = userData.isSeller === true;
-          console.log("User is seller:", isUserSeller);
-          setIsSeller(isUserSeller);
-          setUserRole(userData.role || null); // ✅ Add this line
-        } else {
-          console.log("User document not found");
-          setIsSeller(false);
-          setUserRole(null); // ✅ Add this line
-        }
-      } catch (error) {
-        console.error("Error checking seller status:", error);
+
+  const checkSellerStatus = async (userId) => {
+    try {
+      setCheckingSeller(true);
+      const userDocRef = doc(db, "users", userId);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        setIsSeller(userData.isSeller === true);
+        setUserRole(userData.role || null);
+      } else {
         setIsSeller(false);
-        setUserRole(null); // ✅ Add this line
-      } finally {
+        setUserRole(null);
+      }
+    } catch (error) {
+      console.error("Error checking seller status:", error);
+      setIsSeller(false);
+      setUserRole(null);
+    } finally {
+      setCheckingSeller(false);
+    }
+  };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        await checkSellerStatus(currentUser.uid);
+      } else {
+        setIsSeller(false);
         setCheckingSeller(false);
       }
-  };
-  
-   // Check seller status
-    useEffect(() => {
-      const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-        setUser(currentUser);
-  
-        if (currentUser) {
-          await checkSellerStatus(currentUser.uid);
-        } else {
-          setIsSeller(false);
-          setCheckingSeller(false);
-        }
-      });
-  
-      return () => unsubscribe();
-    }, []);
-  
-   const HandleClick = () => {
-     if (!user) {
-       router.push("/auth/signin");
-       return;
-     }
+    });
+    return () => unsubscribe();
+  }, []);
 
-     if (isSeller) {
-       // User is already a seller, go to upload page
-       router.push("/upload-document");
-     } else {
-       // User is not a seller, go to become seller page
-       router.push("/become-seller");
-     }
-   };
-  
+  const HandleClick = () => {
+    if (!user) {
+      router.push("/auth/signin");
+      return;
+    }
+    if (isSeller) {
+      router.push("/upload-document");
+    } else {
+      router.push("/become-seller");
+    }
+  };
+
   return (
-    <footer className="bg-blue-950 text-blue-50 border-t border-gray-200">
+    <footer
+      className="text-amber-100 border-t"
+      style={{
+        background: "#0d2244",
+        borderColor: "rgba(184,150,62,0.2)",
+        fontFamily: "'Lato', sans-serif",
+      }}
+    >
+      {/* Top divider accent */}
+      <div
+        style={{
+          height: "2px",
+          background:
+            "linear-gradient(90deg, transparent, #b8963e, transparent)",
+        }}
+      />
+
       <div className="max-w-7xl mx-auto px-4 py-12">
-        {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
-          {/* Company Info */}
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
+          {/* Brand */}
           <div>
-            <div className="flex items-center gap-2 mb-4 text-blue-200">
-              <Link
-                href="/home"
-                className="flex items-center gap-2 flex-shrink-0"
+            <Link href="/home" className="flex flex-col flex-shrink-0 mb-4">
+              <h1
+                style={{
+                  fontFamily: "'Playfair Display', Georgia, serif",
+                  fontSize: "26px",
+                  fontWeight: 700,
+                  color: "#f5f0e8",
+                  lineHeight: 1.1,
+                }}
               >
-                <h1
-                  className="text-4xl sm:text-3xl font-bold"
-                  style={{ fontFamily: "'Playfair Display', 'Georgia', serif" }}
-                >
-                  [LAN Library]
-                  <h2
-                    className="text-xs sm:text-base font-light"
-                    style={{ fontFamily: "'Lato', sans-serif" }}
-                  >
-                    The Global Student Library 📚
-                  </h2>
-                </h1>
-              </Link>
+                [LAN Library]
+              </h1>
+              <span
+                style={{
+                  fontFamily: "'Lato', sans-serif",
+                  fontSize: "12px",
+                  fontWeight: 300,
+                  color: "#b8963e",
+                  marginTop: "4px",
+                }}
+              >
+                The Global Student Library
+              </span>
+            </Link>
+
+            {/* Gold divider */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "14px",
+              }}
+            >
+              <div
+                style={{
+                  height: "1px",
+                  flex: 1,
+                  background: "#b8963e",
+                  opacity: 0.4,
+                }}
+              />
+              <div
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  background: "#b8963e",
+                  transform: "rotate(45deg)",
+                }}
+              />
+              <div
+                style={{
+                  height: "1px",
+                  flex: 1,
+                  background: "#b8963e",
+                  opacity: 0.4,
+                }}
+              />
             </div>
-            <p className="text-blue-200 text-sm mb-4">
+
+            <p
+              style={{
+                fontSize: "13px",
+                color: "#a08c5b",
+                lineHeight: 1.7,
+                marginBottom: "12px",
+              }}
+            >
               Digital PDF library making knowledge accessible to everyone.
               Discover, learn, and grow with our extensive collection.
             </p>
-            <div className="flex items-center gap-3 text-sm text-blue-200">
+            <div
+              className="flex items-center gap-2"
+              style={{ fontSize: "12px", color: "#b8963e" }}
+            >
               <Book className="w-4 h-4" />
               <span>90M+ Documents Available</span>
             </div>
           </div>
 
           {/* Quick Links */}
-          <div className="text-blue-200 py-1 max-md:py-10 ">
-            <h4 className="font-bold mb-4 text-lg">Quick Links</h4>
-            <ul className="space-y-3">
+          <div>
+            <h4
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#b8963e",
+                letterSpacing: "2px",
+                textTransform: "uppercase",
+                marginBottom: "16px",
+              }}
+            >
+              Quick Links
+            </h4>
+            <ul className="space-y-2">
+              {[
+                { label: "About Us", href: "/about/lan" },
+                { label: "Contact Us", href: "/contact/lan/4/enquiry" },
+                { label: "How It Works", href: "/learn/make-money" },
+                { label: "FAQs", href: "/lan/faqs" },
+                { label: "Referral", href: "/referrals" },
+                { label: "Transfer", href: "/transfer" },
+                { label: "Help Center", href: "/lan/net/help-center" },
+              ].map(({ label, href }) => (
+                <li key={label}>
+                  <Link
+                    href={href}
+                    className="group flex items-center gap-2 transition-colors"
+                    style={{ fontSize: "13px", color: "#a08c5b" }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.color = "#d4aa5a")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.color = "#a08c5b")
+                    }
+                  >
+                    <ArrowRight
+                      className="w-3 h-3 transition-transform group-hover:translate-x-1"
+                      style={{ color: "#b8963e" }}
+                    />
+                    {label}
+                  </Link>
+                </li>
+              ))}
               <li>
-                <Link
-                  href="/about/lan"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
+                <button
+                  onClick={HandleClick}
+                  disabled={checkingSeller}
+                  className="group flex items-center gap-2 transition-colors"
+                  style={{
+                    fontSize: "13px",
+                    color: "#a08c5b",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                  }}
                 >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>About Us</span>
-                </Link>
-                <Link
-                  href="/contact/lan/4/enquiry"
-                  className=" hover:text-blue-950 mt-2 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>Contact Us</span>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/learn/make-money"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>How It Works</span>
-                </Link>
-              </li>
-              <button
-                onClick={HandleClick}
-                disabled={checkingSeller}
-                className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-              >
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                {checkingSeller ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    Loading...
-                  </>
-                ) : isSeller ? (
-                  <>Upload</>
-                ) : (
-                  <>Become a Seller</>
-                )}
-              </button>
-
-              <li>
-                <Link
-                  href="/lan/faqs"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>FAQs</span>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/referrals"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>Referral</span>
-                </Link>
-              </li>
-               <li>
-                <Link
-                  href="/transfer"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>Transfer </span>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/lan/net/help-center"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>Help Center</span>
-                </Link>
+                  <ArrowRight
+                    className="w-3 h-3"
+                    style={{ color: "#b8963e" }}
+                  />
+                  {checkingSeller ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-3 w-3 border-b border-amber-400" />
+                      Loading...
+                    </span>
+                  ) : isSeller ? (
+                    "Upload"
+                  ) : (
+                    "Become a Seller"
+                  )}
+                </button>
               </li>
             </ul>
           </div>
 
           {/* Categories */}
           <div>
-            <h4 className="font-bold  mb-4 text-lg">Categories</h4>
-            <ul className="space-y-3">
-              <li>
-                <Link
-                  href="/category/education"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>Education</span>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/business"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>Business</span>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/technology"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>Technology</span>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/category/science"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>Science</span>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/documents"
-                  className=" hover:text-blue-950 transition-colors flex items-center gap-2 group"
-                >
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  <span>All Documents</span>
-                </Link>
-              </li>
+            <h4
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#b8963e",
+                letterSpacing: "2px",
+                textTransform: "uppercase",
+                marginBottom: "16px",
+              }}
+            >
+              Categories
+            </h4>
+            <ul className="space-y-2">
+              {[
+                { label: "Education", href: "/category/education" },
+                { label: "Business", href: "/category/business" },
+                { label: "Technology", href: "/category/technology" },
+                { label: "Science", href: "/category/science" },
+                { label: "All Documents", href: "/documents" },
+              ].map(({ label, href }) => (
+                <li key={label}>
+                  <Link
+                    href={href}
+                    className="group flex items-center gap-2 transition-colors"
+                    style={{ fontSize: "13px", color: "#a08c5b" }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.color = "#d4aa5a")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.color = "#a08c5b")
+                    }
+                  >
+                    <ArrowRight
+                      className="w-3 h-3 transition-transform group-hover:translate-x-1"
+                      style={{ color: "#b8963e" }}
+                    />
+                    {label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
           {/* Customer Service */}
           <div>
-            <h4 className="font-bold mb-4 text-lg">Customer Service</h4>
-            {/* Contact Info */}
-            <div className="space-y-2 text-sm ">
-              <div className="flex items-start gap-2">
-                <Mail className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <h4
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#b8963e",
+                letterSpacing: "2px",
+                textTransform: "uppercase",
+                marginBottom: "16px",
+              }}
+            >
+              Customer Service
+            </h4>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <Mail
+                  className="w-4 h-4 mt-0.5 flex-shrink-0"
+                  style={{ color: "#b8963e" }}
+                />
                 <a
                   href="mailto:support@lanlibrary.com"
-                  className="hover:text-blue-950 transition-colors"
+                  style={{ fontSize: "13px", color: "#a08c5b" }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.color = "#d4aa5a")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.color = "#a08c5b")
+                  }
                 >
                   support@lanlibrary.com
                 </a>
               </div>
-              <div className="flex items-start gap-2">
-                <Phone className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <div className="flex items-start gap-3">
+                <Phone
+                  className="w-4 h-4 mt-0.5 flex-shrink-0"
+                  style={{ color: "#b8963e" }}
+                />
                 <a
-                  href="tel:+2341234567890"
-                  className="hover:text-blue-950 transition-colors"
+                  href="tel:+2348142995114"
+                  style={{ fontSize: "13px", color: "#a08c5b" }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.color = "#d4aa5a")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.color = "#a08c5b")
+                  }
                 >
                   +234 8142 995 114
                 </a>
               </div>
-              <div className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>Abuja, Nigeria</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Social Media & Newsletter */}
-        <div className="border-t border-gray-200 pt-8 mb-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            {/* Social Media Links */}
-            <div className="flex flex-col items-center md:items-start">
-              <h4 className="font-bold  mb-3 text-sm">Connect With Us</h4>
-              <div className="flex items-center gap-3">
-                {/* <a
-                  href="https://facebook.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-gray-100 hover:bg-blue-950 text-blue-950 hover:text-white rounded-full flex items-center justify-center transition-all duration-300"
-                  aria-label="Facebook"
-                >
-                  <Facebook className="w-5 h-5" />
-                </a>
-                <a
-                  href="https://twitter.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-gray-100 hover:bg-blue-950 text-blue-950 hover:text-white rounded-full flex items-center justify-center transition-all duration-300"
-                  aria-label="Twitter"
-                >
-                  <Twitter className="w-5 h-5" />
-                </a>
-                <a
-                  href="https://instagram.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-gray-100 hover:bg-blue-950 text-blue-950 hover:text-white rounded-full flex items-center justify-center transition-all duration-300"
-                  aria-label="Instagram"
-                >
-                  <Instagram className="w-5 h-5" />
-                </a>
-                <a
-                  href="https://linkedin.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-gray-100 hover:bg-blue-950 text-blue-950 hover:text-white rounded-full flex items-center justify-center transition-all duration-300"
-                  aria-label="LinkedIn"
-                >
-                  <Linkedin className="w-5 h-5" />
-                </a> */}
-                <a
-                  href="https://youtube.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-gray-100 hover:bg-blue-950 text-blue-950 hover:text-white rounded-full flex items-center justify-center transition-all duration-300"
-                  aria-label="YouTube"
-                >
-                  <Youtube className="w-5 h-5" />
-                </a>
-              </div>
-            </div>
-
-            {/* Newsletter Signup */}
-            <div className="flex flex-col items-center md:items-end">
-              <h4 className="font-bold mb-3 text-sm">Stay Updated</h4>
-              <div className="flex flex-col sm:flex-row gap-2 w-full max-w-md">
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="flex-1 px-4 py-2 border text-white border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-950 text-sm"
+              <div className="flex items-start gap-3">
+                <MapPin
+                  className="w-4 h-4 mt-0.5 flex-shrink-0"
+                  style={{ color: "#b8963e" }}
                 />
-                <button className="bg-blue-950 text-white px-6 py-2 rounded-lg hover:bg-blue-800 transition-colors whitespace-nowrap text-sm font-semibold">
-                  Subscribe
-                </button>
+                <span style={{ fontSize: "13px", color: "#a08c5b" }}>
+                  Abuja, Nigeria
+                </span>
               </div>
-              <p className="text-xs text-gray-500 mt-2 text-center md:text-right">
-                Get the latest books and updates delivered to your inbox
-              </p>
             </div>
           </div>
         </div>
 
-        {/* Payment Methods Section */}
-        <div className="border-t border-gray-200 pt-8 mb-8">
-          <div className="text-center">
-            <h4 className="font-bold text-blue-950 mb-4 text-sm">
-              Safe & Secure Payment Methods
+        {/* Social + Newsletter */}
+        <div
+          className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 py-8"
+          style={{
+            borderTop: "0.5px solid rgba(184,150,62,0.2)",
+            borderBottom: "0.5px solid rgba(184,150,62,0.2)",
+            marginBottom: "28px",
+          }}
+        >
+          {/* Social */}
+          <div>
+            <h4
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#b8963e",
+                letterSpacing: "2px",
+                textTransform: "uppercase",
+                marginBottom: "12px",
+              }}
+            >
+              Connect With Us
             </h4>
-            <div className="flex flex-wrap items-center justify-center gap-6 mb-4">
-              {/* Flutterwave Badge */}
-              <div className="flex items-center gap-2 bg-gradient-to-r from-orange-50 to-orange-100 px-5 py-2.5 rounded-lg border border-orange-200 shadow-sm">
-                <span className="text-sm font-medium text-gray-700">
-                  Powered by
-                </span>
-                <span className="text-xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
-                  Flutterwave
-                </span>
-              </div>
+            <a
+              href="https://youtube.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="YouTube"
+              className="flex items-center justify-center transition-all"
+              style={{
+                width: "38px",
+                height: "38px",
+                borderRadius: "50%",
+                border: "0.5px solid rgba(184,150,62,0.4)",
+                background: "rgba(184,150,62,0.08)",
+                color: "#b8963e",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(184,150,62,0.2)";
+                e.currentTarget.style.borderColor = "#b8963e";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(184,150,62,0.08)";
+                e.currentTarget.style.borderColor = "rgba(184,150,62,0.4)";
+              }}
+            >
+              <Youtube className="w-4 h-4" />
+            </a>
+          </div>
 
-              {/* Payment Icons */}
-              <div className="flex items-center gap-3 flex-wrap justify-center">
-                {/* Card Payment - Blue gradient */}
-                <div
-                  className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2.5 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all"
-                  title="Card Payment"
-                >
-                  <CreditCard className="w-5 h-5 text-white" />
-                  <span className="text-sm font-semibold text-white">Card</span>
-                </div>
-
-                {/* Bank Transfer - Green gradient */}
-                <div
-                  className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 px-4 py-2.5 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all"
-                  title="Bank Transfer"
-                >
-                  <Building2 className="w-5 h-5 text-white" />
-                  <span className="text-sm font-semibold text-white">
-                    Bank Transfer
-                  </span>
-                </div>
-
-                {/* USSD - Purple gradient */}
-                <div
-                  className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-purple-600 px-4 py-2.5 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all"
-                  title="USSD Payment"
-                >
-                  <Smartphone className="w-5 h-5 text-white" />
-                  <span className="text-sm font-semibold text-white">USSD</span>
-                </div>
-
-                {/* eNaira - Teal gradient (Nigerian green) */}
-                <div
-                  className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-teal-600 px-4 py-2.5 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all"
-                  title="eNaira"
-                >
-                  <Wallet className="w-5 h-5 text-white" />
-                  <span className="text-sm font-semibold text-white">
-                    eNaira
-                  </span>
-                </div>
-
-                {/* PayPal - Official PayPal blue */}
-                <div
-                  className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2.5 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all"
-                  title="PayPal"
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M20.067 8.478c.492.88.556 2.014.3 3.327-.74 3.806-3.276 5.12-6.514 5.12h-.5a.805.805 0 0 0-.794.68l-.04.22-.63 3.993-.028.15a.805.805 0 0 1-.794.679H7.72a.483.483 0 0 1-.477-.558L8.926 14.5"
-                      fill="white"
-                    />
-                    <path
-                      d="M8.926 14.5l.63-3.993.04-.22a.805.805 0 0 1 .794-.68h.5c3.238 0 5.774-1.314 6.514-5.12.256-1.313.192-2.446-.3-3.327-.503-.9-1.446-1.537-2.818-1.917a13.6 13.6 0 0 0-2.114-.238H8.114c-.386 0-.716.28-.777.66L5.23 13.558c-.083.466.27.887.746.887h2.95z"
-                      fill="white"
-                    />
-                    <path
-                      d="M9.644 2.762c.061-.38.39-.66.777-.66h4.058c.721 0 1.351.047 1.886.143-1.074 5.5-4.54 7.376-9.042 7.376H5.976l1.922-12.198c.061-.38.39-.66.777-.66h4.058"
-                      fill="white"
-                    />
-                  </svg>
-                  <span className="text-sm font-semibold text-white">
-                    PayPal
-                  </span>
-                </div>
-              </div>
+          {/* Newsletter */}
+          <div className="w-full md:w-auto">
+            <h4
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#b8963e",
+                letterSpacing: "2px",
+                textTransform: "uppercase",
+                marginBottom: "12px",
+              }}
+            >
+              Stay Updated
+            </h4>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                placeholder="Enter your email"
+                style={{
+                  flex: 1,
+                  minWidth: "200px",
+                  padding: "9px 14px",
+                  background: "rgba(184,150,62,0.06)",
+                  border: "0.5px solid rgba(184,150,62,0.3)",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  color: "#f5f0e8",
+                  outline: "none",
+                  fontFamily: "'Lato', sans-serif",
+                }}
+              />
+              <button
+                style={{
+                  background: "#b8963e",
+                  color: "#0d2244",
+                  border: "none",
+                  borderRadius: "8px",
+                  padding: "9px 18px",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "'Lato', sans-serif",
+                  whiteSpace: "nowrap",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "#d4aa5a")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "#b8963e")
+                }
+              >
+                Subscribe
+              </button>
             </div>
-            <p className="text-xs text-gray-200 max-w-2xl mx-auto">
-              All transactions are encrypted and secured with industry-standard
-              SSL technology. Your payment information is safe with us.
+            <p style={{ fontSize: "11px", color: "#6b5a35", marginTop: "6px" }}>
+              Get the latest books and updates delivered to your inbox
             </p>
           </div>
+        </div>
+
+        {/* Payment Methods */}
+        <div className="mb-8 text-center">
+          <h4
+            style={{
+              fontSize: "11px",
+              fontWeight: 700,
+              color: "#b8963e",
+              letterSpacing: "2px",
+              textTransform: "uppercase",
+              marginBottom: "18px",
+            }}
+          >
+            Safe &amp; Secure Payment Methods
+          </h4>
+          <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
+            {/* Flutterwave */}
+            <div
+              className="flex items-center gap-2 px-4 py-2 rounded-lg"
+              style={{
+                background: "rgba(184,150,62,0.08)",
+                border: "0.5px solid rgba(184,150,62,0.3)",
+              }}
+            >
+              <span style={{ fontSize: "11px", color: "#b8963e" }}>
+                Powered by
+              </span>
+              <span
+                style={{ fontSize: "14px", fontWeight: 700, color: "#d4aa5a" }}
+              >
+                Flutterwave
+              </span>
+            </div>
+
+            {[
+              {
+                label: "Card",
+                bg: "#1e3a6e",
+                icon: <CreditCard className="w-3.5 h-3.5 text-amber-300" />,
+              },
+              {
+                label: "Bank Transfer",
+                bg: "#14532d",
+                icon: <Building2 className="w-3.5 h-3.5 text-amber-300" />,
+              },
+              {
+                label: "USSD",
+                bg: "#3b1a6b",
+                icon: <Smartphone className="w-3.5 h-3.5 text-amber-300" />,
+              },
+              {
+                label: "eNaira",
+                bg: "#0f4a44",
+                icon: <Wallet className="w-3.5 h-3.5 text-amber-300" />,
+              },
+            ].map(({ label, bg, icon }) => (
+              <div
+                key={label}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                style={{
+                  background: bg,
+                  border: "0.5px solid rgba(184,150,62,0.2)",
+                }}
+              >
+                {icon}
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: "#d4aa5a",
+                  }}
+                >
+                  {label}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p
+            style={{
+              fontSize: "11px",
+              color: "#6b5a35",
+              maxWidth: "480px",
+              margin: "0 auto",
+            }}
+          >
+            All transactions are encrypted and secured with industry-standard
+            SSL technology.
+          </p>
         </div>
 
         {/* Bottom Bar */}
-        <div className="border-t border-gray-200 pt-6">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-200">
-            <p className="text-center md:text-left">
-              &copy; {currentYear} [ LAN Library ] Learning Access Network. All
-              rights reserved.
-            </p>
-            <div className="flex items-center gap-6">
+        <div
+          className="flex flex-col md:flex-row justify-between items-center gap-4 pt-6"
+          style={{ borderTop: "0.5px solid rgba(184,150,62,0.2)" }}
+        >
+          <p style={{ fontSize: "12px", color: "#6b5a35" }}>
+            &copy; {currentYear} [ LAN Library ] Learning Access Network. All
+            rights reserved.
+          </p>
+          <div className="flex items-center gap-6">
+            {[
+              { label: "Privacy Policy", href: "/lan/privacy-policy" },
+              { label: "Terms of Service", href: "/lan/terms-of-service" },
+            ].map(({ label, href }) => (
               <Link
-                href="/lan/privacy-policy"
-                className="hover:text-blue-950 transition-colors"
+                key={label}
+                href={href}
+                style={{ fontSize: "12px", color: "#6b5a35" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#b8963e")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#6b5a35")}
               >
-                Privacy Policy
+                {label}
               </Link>
-              <Link
-                href="/lan/terms-of-service"
-                className="hover:text-blue-950 transition-colors"
-              >
-                Terms of Service
-              </Link>
-              {/* <Link
-                href="/cookie-policy"
-                className="hover:text-blue-950 transition-colors"
-              >
-                Cookie Policy
-              </Link> */}
-            </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Back to Top Button */}
+      {/* Back to Top */}
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="fixed bottom-8 right-8 w-12 h-12 bg-blue-950 text-white rounded-full shadow-lg hover:bg-blue-800 transition-all duration-300 flex items-center justify-center z-40 hover:scale-110"
+        className="fixed bottom-8 right-8 w-12 h-12 rounded-full flex items-center justify-center z-40 transition-all duration-300 hover:scale-110"
+        style={{ background: "#b8963e", border: "none", cursor: "pointer" }}
         aria-label="Back to top"
       >
-        <ArrowRight className="w-5 h-5 -rotate-90" />
+        <ArrowRight
+          className="w-5 h-5 -rotate-90"
+          style={{ color: "#0d2244" }}
+        />
       </button>
     </footer>
   );
