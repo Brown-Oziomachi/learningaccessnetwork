@@ -411,7 +411,7 @@ export default function RechargeClient() {
     if (t && ["airtime", "data", "electricity", "tv"].includes(t)) setTab(t);
   }, [searchParams]);
 
-  useEffect(() => {
+useEffect(() => {
     if (tab !== "airtime" || !selectedNetwork) return;
     setAirtimePlans([]); setLoadingAirtimePlans(true);
     fetch(`/api/recharge?type=airtime-plans&biller=${selectedNetwork}`)
@@ -420,18 +420,18 @@ export default function RechargeClient() {
       .catch(console.error).finally(() => setLoadingAirtimePlans(false));
   }, [selectedNetwork, tab]);
 
-  const fetchElecPlans = (billerCode) => {
+  const fetchElecPlans = (billerId) => {
     setElecPlans([]); setSelectedElecPlan(null); setElecPlansError(""); setLoadingElecPlans(true);
-    fetch(`/api/recharge?type=electricity-plans&biller=${billerCode}`)
+    fetch(`/api/recharge?type=electricity-plans&biller=${billerId}`)
       .then((r) => r.json())
       .then((res) => { if (res.error) throw new Error(res.error); setElecPlans(res.plans || []); })
       .catch((err) => setElecPlansError(err.message || "Failed to load meter types"))
       .finally(() => setLoadingElecPlans(false));
   };
 
-  const fetchTvPlans = (billerCode) => {
+  const fetchTvPlans = (billerId) => {
     setTvPlans([]); setSelectedTvPlan(null); setTvPlansError(""); setLoadingTvPlans(true);
-    fetch(`/api/recharge?type=tv-plans&biller=${billerCode}`)
+    fetch(`/api/recharge?type=tv-plans&biller=${billerId}`)
       .then((r) => r.json())
       .then((res) => { if (res.error) throw new Error(res.error); setTvPlans(res.plans || []); })
       .catch((err) => setTvPlansError(err.message || "Failed to load packages"))
@@ -450,22 +450,42 @@ export default function RechargeClient() {
       .finally(() => setLoadingPlans(false));
   }, [selectedNetwork, tab]);
 
-  useEffect(() => {
-    if (tab === "electricity" && !elecBillersLoaded) {
-      setElecBillersLoaded(true); setLoadingBillers(true);
-      fetch("/api/recharge?type=electricity")
-        .then((r) => r.json())
-        .then((res) => setElecBillers((res.billers || []).map((b) => ({ biller_code: b.code, biller_name: b.name }))))
-        .catch(console.error).finally(() => setLoadingBillers(false));
-    }
-    if (tab === "tv" && !tvBillersLoaded) {
-      setTvBillersLoaded(true); setLoadingBillers(true);
-      fetch("/api/recharge?type=tv")
-        .then((r) => r.json())
-        .then((res) => setTvBillers((res.billers || []).map((b) => ({ biller_code: b.code, biller_name: b.name }))))
-        .catch(console.error).finally(() => setLoadingBillers(false));
-    }
-  }, [tab, elecBillersLoaded, tvBillersLoaded]);
+ useEffect(() => {
+  if (tab === "electricity" && !elecBillersLoaded) {
+    setElecBillersLoaded(true);
+    setLoadingBillers(true);
+    fetch("/api/recharge?type=electricity")
+      .then((r) => r.json())
+      .then((res) =>
+        setElecBillers(
+          (res.billers || []).map((b) => ({
+            biller_code: b.code,
+            biller_id: b.id,
+            biller_name: b.name,
+          }))
+        )
+      )
+      .catch(console.error)
+      .finally(() => setLoadingBillers(false));
+  }
+  if (tab === "tv" && !tvBillersLoaded) {
+    setTvBillersLoaded(true);
+    setLoadingBillers(true);
+    fetch("/api/recharge?type=tv")
+      .then((r) => r.json())
+      .then((res) =>
+        setTvBillers(
+          (res.billers || []).map((b) => ({
+            biller_code: b.code,
+            biller_id: b.id,
+            biller_name: b.name,
+          }))
+        )
+      )
+      .catch(console.error)
+      .finally(() => setLoadingBillers(false));
+  }
+}, [tab, elecBillersLoaded, tvBillersLoaded]);
 
   useEffect(() => {
     const customerId = tab === "electricity" ? meterNumber : smartcardNumber;
@@ -625,7 +645,6 @@ export default function RechargeClient() {
     setSelectedNetwork(null); setAirtimeAmount(""); setCustomAmount(""); setSelectedPlan(null);
     setSelectedElecBiller(null); setElecPlans([]); setSelectedElecPlan(null); setMeterNumber(""); setElecAmount("");
     setSelectedTvBiller(null); setTvPlans([]); setSelectedTvPlan(null); setSmartcardNumber("");
-    setElecBillersLoaded(false); setTvBillersLoaded(false);
   };
   const switchTab = (id) => {
     setTab(id); clearCommonFields(); setSelectedNetwork(null); setAirtimePlans([]); setSelectedPlan(null);
@@ -1028,14 +1047,18 @@ export default function RechargeClient() {
                                 </div>
                               ) : (
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-                                  {elecBillers.map((b) => (
-                                    <BillerBtn
-                                      key={b.biller_code}
-                                      label={b.biller_name}
-                                      selected={selectedElecBiller === b.biller_code}
-                                      onClick={() => { setSelectedElecBiller(b.biller_code); fetchElecPlans(b.biller_code); }}
-                                    />
-                                  ))}
+                                 {elecBillers.map((b) => (
+                                  <BillerBtn
+                                    key={b.biller_code}
+                                    label={b.biller_name}
+                                    selected={selectedElecBiller === b.biller_code}
+onClick={() => {
+  console.log('Elec biller selected:', b);
+  setSelectedElecBiller(b.biller_code);
+  fetchElecPlans(b.biller_id);
+}}
+                                  />
+                                ))}
                                 </div>
                               )}
                             </div>
@@ -1127,14 +1150,17 @@ export default function RechargeClient() {
                                 </div>
                               ) : (
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
-                                  {tvBillers.map((b) => (
-                                    <BillerBtn
-                                      key={b.biller_code}
-                                      label={b.biller_name}
-                                      selected={selectedTvBiller === b.biller_code}
-                                      onClick={() => { setSelectedTvBiller(b.biller_code); fetchTvPlans(b.biller_code); }}
-                                    />
-                                  ))}
+                               {tvBillers.map((b) => (
+                                  <BillerBtn
+                                    key={b.biller_code}
+                                    label={b.biller_name}
+                                    selected={selectedTvBiller === b.biller_code}
+onClick={() => {
+  console.log('TV biller selected:', b);
+  setSelectedTvBiller(b.biller_code);
+  fetchTvPlans(b.biller_id);
+}}                                  />
+                                ))}
                                 </div>
                               )}
                             </div>

@@ -164,6 +164,10 @@ const GLOBAL_STYLES = `
   /* ── footer ── */
   .footer-link { font-size:13px; color:rgba(245,240,232,0.55); text-decoration:none; transition:color .15s; font-family:'Lato',sans-serif; }
   .footer-link:hover { color:${GOLD}; }
+
+  @media (max-width: 640px) {
+  .grid-2col { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+}
 `;
 
 /* ─── helper ─────────────────────────────────────────────────── */
@@ -530,8 +534,8 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:16 }}>
-              {BENEFITS.map(({ emoji, title, body }) => (
+         <div style={{ display:"grid", gridTemplateColumns:"repeat(2,minmax(0,1fr))", gap:16 }}>
+  {SERVICES.map(({ emoji, title, body }) => (
                 <div key={title} className="ben-card">
                   <div style={{ width:72, height:72, border:`0.5px solid rgba(184,150,62,0.25)`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", fontSize:32 }}>
                     {emoji}
@@ -561,8 +565,8 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:16 }}>
-              {SERVICES.map(({ gradient, emoji, title, sub, cta }) => (
+          <div className="grid-2col" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:16 }}>              
+            {SERVICES.map(({ gradient, emoji, title, sub, cta }) => (
                 <div key={title} className="svc-card" style={{ background:gradient, padding:"36px 28px", borderRadius:0 }}>
                   {/* decorative circles */}
                   <div style={{ position:"absolute", top:-40, right:-40, width:120, height:120, background:"rgba(255,255,255,0.08)", borderRadius:"50%", pointerEvents:"none" }} />
@@ -605,7 +609,7 @@ export default function LandingPage() {
                 <p style={{ fontSize:13, color:"#aaa", fontFamily:"'Lato',sans-serif", fontWeight:300 }}>Recently published by our community of scholars</p>
               </div>
 
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:20 }}>
+              <div className="grid-2col" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:20 }}>
                 {featuredBooks.slice(0,6).map(book => (
                   <button key={book.id} className="book-card" onClick={goSignIn} style={{ background:"#fff", border:"none", textAlign:"left", cursor:"pointer", display:"block", width:"100%" }}>
                     <div style={{ position:"relative", background:"#ede8df" }}>

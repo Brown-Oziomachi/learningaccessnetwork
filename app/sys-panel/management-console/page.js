@@ -646,17 +646,43 @@ export default function ComprehensiveAdminPanel() {
     } catch (error) { alert('Failed: ' + error.message); }
   };
 
-  const sendEmailReply = async () => {
-    if (!replyMessage.trim() || !selectedItem) { alert('Please write a message'); return; }
-    setSending(true);
-    try {
-      await addDoc(collection(db, 'adminReplies'), { to: selectedItem.email || selectedItem.reporterEmail, subject: `Re: ${selectedItem.subject || selectedItem.reason || 'Your inquiry'}`, message: replyMessage, from: user.email, sentAt: serverTimestamp(), originalTicketId: selectedItem.id, type: activeSection });
-      const collectionName = activeSection === 'support' ? 'supportTickets' : 'bookReports';
-      await updateDoc(doc(db, collectionName, selectedItem.id), { adminResponse: replyMessage, status: 'resolved', resolvedAt: serverTimestamp() });
-      setShowModal(false); setReplyMessage(''); setSelectedItem(null);
-      if (activeSection === 'support') await fetchSupportTickets(); else await fetchBookReports();
-    } catch (error) { alert(`Failed: ${error.message}`); } finally { setSending(false); }
-  };
+ const sendEmailReply = async () => {
+  if (!replyMessage.trim() || !selectedItem) { alert('Please write a message'); return; }
+  setSending(true);
+  try {
+    const collectionName = activeSection === 'support' ? 'supportTickets' : 'bookReports';
+    const updateData = {
+      adminNotes: replyMessage,
+      adminResponse: replyMessage,
+      status: 'resolved',
+      resolvedAt: serverTimestamp(),
+    };
+    await updateDoc(doc(db, collectionName, selectedItem.id), updateData);
+
+    // Send notification to the user who made the report/ticket
+    const reporterId = selectedItem.reportedBy || selectedItem.userId || null;
+    if (reporterId) {
+      await addDoc(collection(db, 'notifications'), {
+        userId: reporterId,
+        type: 'admin_reply',
+        title: `Re: ${selectedItem.reason || selectedItem.subject || 'Your report'}`,
+        message: replyMessage,
+        createdAt: serverTimestamp(),
+        read: false,
+      });
+    }
+
+    setShowModal(false);
+    setReplyMessage('');
+    setSelectedItem(null);
+    if (activeSection === 'support') await fetchSupportTickets();
+    else await fetchBookReports();
+  } catch (error) {
+    alert(`Failed: ${error.message}`);
+  } finally {
+    setSending(false);
+  }
+};
 
   const openModal = (type, item) => { setModalType(type); setSelectedItem(item); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setModalType(''); setSelectedItem(null); setReplyMessage(''); setPdfUrl(''); };

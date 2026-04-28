@@ -11,7 +11,7 @@ import { usePayment } from '../hooks/usePayment';
 import { fetchBookDetails, validateBookForPurchase, fetchSellerDetails } from '@/utils/bookUtils';
 import { PaymentMethodSelector } from '@/components/PaymentMethodSelector';
 import { PaymentForm } from '@/components/PaymentForm';
-import OrderSummary from '@/components/OrderSummary';
+import { OrderSummary } from '@/components/OrderSummary';
 
 /* ─── colour tokens ───────────────────────────────────────────── */
 const NAVY = "#0d2244";

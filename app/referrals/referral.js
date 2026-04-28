@@ -41,50 +41,36 @@ function StatCard({ icon, label, value, highlight }) {
             gap: '8px',
             position: 'relative',
             overflow: 'hidden',
-            minWidth: 0   // ✅ FIX
+            minWidth: 0,
         }}>
             {highlight && (
                 <div style={{
                     position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
+                    top: 0, left: 0, right: 0,
                     height: '2px',
                     background: `linear-gradient(90deg, ${GOLD}, ${GOLDD})`
                 }} />
             )}
-
             <div style={{
-                width: '36px',
-                height: '36px',
+                width: '36px', height: '36px',
                 border: '0.5px solid #e5ddd0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: CREAM
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: CREAM, flexShrink: 0,
             }}>
                 {icon}
             </div>
-
             <p style={{
-                fontSize: '9px',
-                fontWeight: 700,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                color: '#aaa',
-                margin: 0,
+                fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em',
+                textTransform: 'uppercase', color: '#aaa', margin: 0,
                 fontFamily: "'Lato',sans-serif"
             }}>
                 {label}
             </p>
-
             <p style={{
                 fontFamily: "'Playfair Display',serif",
-                fontSize: 'clamp(18px,4vw,24px)',
-                fontWeight: 700,
-                color: NAVY,
-                margin: 0,
-                lineHeight: 1
+                fontSize: 'clamp(16px,3.5vw,24px)',
+                fontWeight: 700, color: NAVY, margin: 0, lineHeight: 1,
+                wordBreak: 'break-word',
             }}>
                 {value}
             </p>
@@ -92,10 +78,9 @@ function StatCard({ icon, label, value, highlight }) {
     );
 }
 
-
 function ReferralCard({ step, title, desc, badge }) {
     return (
-        <div style={{ flexShrink: 0, width: '180px' }} className="ref-book-card">
+        <div style={{ flexShrink: 0, width: '160px' }} className="ref-book-card">
             <div style={{ position: 'relative', marginBottom: '10px' }}>
                 <div style={{
                     width: '100%', aspectRatio: '3/4',
@@ -290,24 +275,25 @@ export default function ReferralClient() {
                     display:flex;
                     flex-direction:column;
                     gap:8px;
+                    width:100%;
                     max-width:680px;
                 }
-                .hero-link-bar-inner {
-                    display:flex;
-                    gap:8px;
-                    align-items:stretch;
-                }
                 .hero-link-display {
-                    flex:1;
                     background:rgba(255,255,255,0.07);
                     border:0.5px solid rgba(255,255,255,0.15);
                     padding:12px 14px;
                     min-width:0;
+                    overflow:hidden;
+                    width:100%;
                 }
                 .hero-link-actions {
                     display:flex;
                     gap:8px;
-                    flex-shrink:0;
+                    width:100%;
+                }
+                .hero-link-actions button {
+                    flex:1 1 0;
+                    min-width:0;
                 }
 
                 /* ── Two-col main layout ── */
@@ -317,19 +303,14 @@ export default function ReferralClient() {
                     gap:20px;
                 }
 
-                /* ── Stats grid: 2-col always, text scales ── */
+                /* ── Stats grid: always 2-col, no overflow ── */
                 .ref-stats-grid {
                     display:grid;
-                    grid-template-columns:repeat(2,1fr);
+                    grid-template-columns:repeat(2,minmax(0,1fr));
                     gap:10px;
                 }
 
-                /* ── Claim card inner ── */
-                .claim-card-inner {
-                    display:flex;
-                    flex-direction:column;
-                    gap:12px;
-                }
+                /* ── Claim card top row ── */
                 .claim-top-row {
                     display:flex;
                     align-items:flex-start;
@@ -346,22 +327,37 @@ export default function ReferralClient() {
                     padding:28px 20px;
                 }
 
-                /* Desktop overrides */
+                /* ── Sidebar share buttons ── */
+                .sidebar-share-btns {
+                    display:flex;
+                    gap:8px;
+                    width:100%;
+                }
+                .sidebar-share-btns button {
+                    flex:1 1 0;
+                    min-width:0;
+                }
+
+                /* ── Desktop overrides ── */
                 @media(min-width:900px) {
                     .ref-main-grid { grid-template-columns:2fr 1fr; }
-                    .hero-link-bar { flex-direction:row; }
-                    .hero-link-display { flex:1; }
-                    .hero-link-actions { flex-direction:row; }
+
+                    .hero-link-bar { flex-direction:row; align-items:stretch; }
+                    .hero-link-display { flex:1; width:auto; }
+                    .hero-link-actions { width:auto; flex-shrink:0; }
+                    .hero-link-actions button { flex:none; width:auto; }
+
                     .cta-banner {
                         flex-direction:row;
                         align-items:center;
                         justify-content:space-between;
                         padding:40px 32px;
                     }
-                }
-
-                @media(min-width:640px) {
-                    .hero-link-bar-inner { flex-direction:row; }
+                    .cta-banner-btn {
+                        width:auto !important;
+                        max-width:260px !important;
+                        flex-shrink:0;
+                    }
                 }
             `}</style>
 
@@ -382,7 +378,7 @@ export default function ReferralClient() {
                         </div>
 
                         <h1 className="lan-serif anim-up" style={{
-                            fontSize: 'clamp(28px,6vw,56px)', fontWeight: 900,
+                            fontSize: 'clamp(26px,6vw,56px)', fontWeight: 900,
                             color: '#fff', lineHeight: 1.08,
                             letterSpacing: '-0.5px', margin: '0 0 12px',
                         }}>
@@ -409,14 +405,14 @@ export default function ReferralClient() {
                             </div>
                             <div className="hero-link-actions">
                                 <button onClick={handleCopy} disabled={!referralLink}
-                                    style={{ flex: 1, padding: '12px 18px', background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: referralLink ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap', transition: 'background 0.18s' }}
+                                    style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: referralLink ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap', transition: 'background 0.18s' }}
                                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.18)'}
                                     onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
                                 >
                                     {copied ? <><Check size={14} />Copied!</> : <><Copy size={14} />Copy Link</>}
                                 </button>
                                 <button onClick={handleShare} disabled={!referralLink}
-                                    style={{ flex: 1, padding: '12px 18px', background: GOLD, border: 'none', color: NAVY, fontSize: '12px', fontWeight: 700, cursor: referralLink ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap', transition: 'background 0.18s' }}
+                                    style={{ padding: '12px 14px', background: GOLD, border: 'none', color: NAVY, fontSize: '12px', fontWeight: 700, cursor: referralLink ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap', transition: 'background 0.18s' }}
                                     onMouseEnter={e => e.currentTarget.style.background = GOLDD}
                                     onMouseLeave={e => e.currentTarget.style.background = GOLD}
                                 >
@@ -462,7 +458,7 @@ export default function ReferralClient() {
                     <div className="ref-main-grid">
 
                         {/* ═══ LEFT COLUMN ═══ */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
 
                             {/* Stats */}
                             <div className="ref-stats-grid">
@@ -485,13 +481,13 @@ export default function ReferralClient() {
                                 <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: GOLD, margin: '0 0 8px', fontFamily: "'Lato',sans-serif" }}>Available Reward</p>
 
                                 <div className="claim-top-row">
-                                    <div>
+                                    <div style={{ minWidth: 0 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(28px,6vw,48px)', fontWeight: 700, color: '#fff', margin: 0, lineHeight: 1 }}>
+                                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(26px,6vw,48px)', fontWeight: 700, color: '#fff', margin: 0, lineHeight: 1 }}>
                                                 {showBalance ? `₦${referralStats.unclaimedEarnings.toLocaleString()}` : '₦****'}
                                             </p>
                                             <button onClick={() => setShowBalance(!showBalance)}
-                                                style={{ width: '32px', height: '32px', border: '0.5px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
+                                                style={{ width: '32px', height: '32px', flexShrink: 0, border: '0.5px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)' }}>
                                                 {showBalance ? <Eye size={15} /> : <EyeOff size={15} />}
                                             </button>
                                         </div>
@@ -511,7 +507,7 @@ export default function ReferralClient() {
 
                                 {referralStats.pendingEarnings > 0 && (
                                     <div style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)', padding: '10px 14px', margin: '14px 0 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Loader2 size={13} style={{ color: GOLD, animation: 'spin 1.2s linear infinite' }} />
+                                        <Loader2 size={13} style={{ color: GOLD, animation: 'spin 1.2s linear infinite', flexShrink: 0 }} />
                                         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0, fontFamily: "'Lato',sans-serif" }}>
                                             ₦{referralStats.pendingEarnings.toLocaleString()} pending — friends yet to qualify
                                         </p>
@@ -575,7 +571,7 @@ export default function ReferralClient() {
                         </div>
 
                         {/* ═══ RIGHT COLUMN (sidebar) ═══ */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', minWidth: 0 }}>
 
                             {/* Referral code card */}
                             <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: 'clamp(16px,4vw,24px)' }}>
@@ -593,16 +589,16 @@ export default function ReferralClient() {
                                     </p>
                                 </div>
 
-                                <div style={{ display: 'flex', gap: '8px' }}>
+                                <div className="sidebar-share-btns">
                                     <button onClick={handleCopy} disabled={!referralLink}
-                                        style={{ flex: 1, padding: '11px 8px', border: `1.5px solid ${NAVY}`, background: '#fff', color: NAVY, fontSize: '11px', fontWeight: 700, cursor: referralLink ? 'pointer' : 'not-allowed', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'all 0.18s', opacity: referralLink ? 1 : 0.5 }}
+                                        style={{ padding: '11px 8px', border: `1.5px solid ${NAVY}`, background: '#fff', color: NAVY, fontSize: '11px', fontWeight: 700, cursor: referralLink ? 'pointer' : 'not-allowed', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'all 0.18s', opacity: referralLink ? 1 : 0.5 }}
                                         onMouseEnter={e => { if (referralLink) { e.currentTarget.style.background = NAVY; e.currentTarget.style.color = '#fff'; } }}
                                         onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = NAVY; }}
                                     >
                                         {copied ? <><Check size={13} />Copied</> : <><Copy size={13} />Copy</>}
                                     </button>
                                     <button onClick={handleShare} disabled={!referralLink}
-                                        style={{ flex: 1, padding: '11px 8px', border: 'none', background: NAVY, color: '#fff', fontSize: '11px', fontWeight: 700, cursor: referralLink ? 'pointer' : 'not-allowed', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'background 0.18s', opacity: referralLink ? 1 : 0.5 }}
+                                        style={{ padding: '11px 8px', border: 'none', background: NAVY, color: '#fff', fontSize: '11px', fontWeight: 700, cursor: referralLink ? 'pointer' : 'not-allowed', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'background 0.18s', opacity: referralLink ? 1 : 0.5 }}
                                         onMouseEnter={e => { if (referralLink) e.currentTarget.style.background = '#1a3a6e'; }}
                                         onMouseLeave={e => e.currentTarget.style.background = NAVY}
                                     >
@@ -624,16 +620,16 @@ export default function ReferralClient() {
                                     <Sparkles size={10} style={{ color: GOLD }} />
                                     <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: GOLD, fontFamily: "'Lato',sans-serif" }}>Earnings Potential</span>
                                 </div>
-                                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(22px,4vw,28px)', fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>Up to ₦5,000,000</p>
+                                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(20px,4vw,28px)', fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>Up to ₦5,000,000</p>
                                 <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '16px', fontFamily: "'Lato',sans-serif", lineHeight: 1.6 }}>No cap on earnings. Refer as many friends as you like.</p>
                                 {[
                                     ['10 referrals', '₦5,000'],
                                     ['50 referrals', '₦25,000'],
                                     ['100 referrals', '₦50,000'],
                                 ].map(([k, v]) => (
-                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
+                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.06)', gap: '8px' }}>
                                         <span style={{ color: 'rgba(255,255,255,0.5)', fontFamily: "'Lato',sans-serif" }}>{k}</span>
-                                        <span style={{ fontWeight: 700, color: GOLDD, fontFamily: "'Lato',sans-serif" }}>{v}</span>
+                                        <span style={{ fontWeight: 700, color: GOLDD, fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{v}</span>
                                     </div>
                                 ))}
                                 <button onClick={handleShare} disabled={!referralLink}
@@ -658,14 +654,14 @@ export default function ReferralClient() {
                                 ].map(([k, v], i, arr) => (
                                     <div key={k} style={{
                                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                        fontSize: '12px', padding: '8px 0',
+                                        fontSize: '12px', padding: '8px 0', gap: '8px',
                                         borderBottom: i < arr.length - 1 ? '0.5px solid #f0ebe0' : 'none',
                                         borderTop: i === arr.length - 1 ? '0.5px solid #e5ddd0' : 'none',
                                         marginTop: i === arr.length - 1 ? '4px' : 0,
                                         paddingTop: i === arr.length - 1 ? '12px' : '8px',
                                     }}>
                                         <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{k}</span>
-                                        <span style={{ fontWeight: 700, color: i === arr.length - 1 ? NAVY : '#555', fontFamily: "'Lato',sans-serif", fontSize: i === arr.length - 1 ? '14px' : '12px' }}>{v}</span>
+                                        <span style={{ fontWeight: 700, color: i === arr.length - 1 ? NAVY : '#555', fontFamily: "'Lato',sans-serif", fontSize: i === arr.length - 1 ? '14px' : '12px', flexShrink: 0 }}>{v}</span>
                                     </div>
                                 ))}
                             </div>
@@ -679,8 +675,8 @@ export default function ReferralClient() {
                             <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(18px,3vw,26px)', fontWeight: 700, color: NAVY, margin: '0 0 6px' }}>The more friends, the more you earn</h3>
                             <p style={{ fontSize: '13px', color: '#888', margin: 0, fontFamily: "'Lato',sans-serif" }}>Rewards go straight into your seller wallet — no waiting, no minimum.</p>
                         </div>
-                        <button onClick={handleShare} disabled={!referralLink}
-                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px 24px', background: NAVY, color: '#fff', fontSize: '13px', fontWeight: 700, border: 'none', cursor: referralLink ? 'pointer' : 'not-allowed', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em', transition: 'background 0.18s', opacity: referralLink ? 1 : 0.5, width: '100%', maxWidth: '260px', flexShrink: 0 }}
+                        <button onClick={handleShare} disabled={!referralLink} className="cta-banner-btn"
+                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px 24px', background: NAVY, color: '#fff', fontSize: '13px', fontWeight: 700, border: 'none', cursor: referralLink ? 'pointer' : 'not-allowed', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em', transition: 'background 0.18s', opacity: referralLink ? 1 : 0.5, width: '100%' }}
                             onMouseEnter={e => { if (referralLink) e.currentTarget.style.background = '#1a3a6e'; }}
                             onMouseLeave={e => e.currentTarget.style.background = NAVY}
                         >

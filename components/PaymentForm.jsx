@@ -1,5 +1,34 @@
 import { Lock, Loader2, AlertCircle } from "lucide-react";
 
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+
+const labelStyle = {
+  display: "block",
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: ".14em",
+  textTransform: "uppercase",
+  color: "#aaa",
+  marginBottom: 8,
+  fontFamily: "'Lato',sans-serif",
+};
+
+const inputBase = {
+  width: "100%",
+  border: "0.5px solid #e5ddd0",
+  padding: "12px 14px",
+  fontSize: 14,
+  color: NAVY,
+  fontFamily: "'Lato',sans-serif",
+  outline: "none",
+  background: "#fff",
+  transition: "border-color 0.18s",
+  boxSizing: "border-box",
+};
+
 export const PaymentForm = ({
   formData,
   handleInputChange,
@@ -26,13 +55,14 @@ export const PaymentForm = ({
 
   return (
     <form onSubmit={onSubmit}>
+
       {/* Error Message Display */}
       {paymentError && (
-        <div className="mb-6 bg-red-50 border-l-4 border-red-600 rounded-r-lg p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-          <AlertCircle className="text-red-600 mt-0.5" size={20} />
+        <div style={{ marginBottom: 24, background: "#fef2f2", borderLeft: "3px solid #ef4444", padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 10 }}>
+          <AlertCircle size={20} style={{ color: "#ef4444", flexShrink: 0, marginTop: 1 }} />
           <div>
-            <h3 className="text-sm font-bold text-red-800">Payment Issue</h3>
-            <p className="text-sm text-red-700">
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: "#991b1b", margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>Payment Issue</h3>
+            <p style={{ fontSize: 12, color: "#b91c1c", margin: 0, fontFamily: "'Lato',sans-serif" }}>
               {typeof paymentError === "string"
                 ? paymentError
                 : paymentError.message}
@@ -42,10 +72,8 @@ export const PaymentForm = ({
       )}
 
       {/* Form Fields */}
-      <div className="mb-4">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Full Name *
-        </label>
+      <div style={{ marginBottom: 20 }}>
+        <label style={labelStyle}>Full Name *</label>
         <input
           type="text"
           name="name"
@@ -53,14 +81,14 @@ export const PaymentForm = ({
           onChange={handleInputChange}
           placeholder="John Doe"
           required
-          className="w-full text-blue-950 border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-950"
+          style={inputBase}
+          onFocus={e => e.target.style.borderColor = GOLD}
+          onBlur={e => e.target.style.borderColor = "#e5ddd0"}
         />
       </div>
 
-      <div className="mb-4">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Email Address *
-        </label>
+      <div style={{ marginBottom: 20 }}>
+        <label style={labelStyle}>Email Address *</label>
         <input
           type="email"
           name="email"
@@ -68,14 +96,14 @@ export const PaymentForm = ({
           onChange={handleInputChange}
           placeholder="your@email.com"
           required
-          className="w-full text-blue-950 border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-950"
+          style={inputBase}
+          onFocus={e => e.target.style.borderColor = GOLD}
+          onBlur={e => e.target.style.borderColor = "#e5ddd0"}
         />
       </div>
 
-      <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Phone Number *
-        </label>
+      <div style={{ marginBottom: 28 }}>
+        <label style={labelStyle}>Phone Number *</label>
         <input
           type="tel"
           name="phone"
@@ -83,14 +111,16 @@ export const PaymentForm = ({
           onChange={handleInputChange}
           placeholder="+234 800 000 0000"
           required
-          className="w-full text-blue-950 border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-950"
+          style={inputBase}
+          onFocus={e => e.target.style.borderColor = GOLD}
+          onBlur={e => e.target.style.borderColor = "#e5ddd0"}
         />
       </div>
 
       {paymentMethod === "paypal" && (
-        <div className="mt-4">
+        <div style={{ marginBottom: 16 }}>
           <div id="paypal-button-container"></div>
-          <p className="text-xs text-center text-gray-500 mt-2">
+          <p style={{ fontSize: 11, color: "#aaa", textAlign: "center", marginTop: 8, fontFamily: "'Lato',sans-serif" }}>
             Secure payment via PayPal (USD)
           </p>
         </div>
@@ -99,15 +129,31 @@ export const PaymentForm = ({
       <button
         type="submit"
         disabled={processing}
-        className={`w-full py-4 rounded-lg transition-colors font-semibold text-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-          paymentError && paymentMethod === "wallet"
-            ? "bg-red-600 hover:bg-red-700"
-            : "bg-blue-950 hover:bg-blue-900"
-        } text-white`}
+        style={{
+          width: "100%",
+          padding: "15px 20px",
+          background: paymentError && paymentMethod === "wallet" ? "#dc2626" : NAVY,
+          color: "#fff",
+          border: "none",
+          cursor: processing ? "not-allowed" : "pointer",
+          fontSize: 13,
+          fontWeight: 700,
+          fontFamily: "'Lato',sans-serif",
+          letterSpacing: ".06em",
+          textTransform: "uppercase",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          opacity: processing ? 0.6 : 1,
+          transition: "background 0.18s",
+        }}
+        onMouseEnter={e => { if (!processing) e.currentTarget.style.background = paymentError && paymentMethod === "wallet" ? "#b91c1c" : "#1a3560"; }}
+        onMouseLeave={e => { if (!processing) e.currentTarget.style.background = paymentError && paymentMethod === "wallet" ? "#dc2626" : NAVY; }}
       >
         {processing ? (
           <>
-            <Loader2 className="animate-spin" size={20} />
+            <Loader2 size={20} style={{ animation: "spin 0.8s linear infinite" }} />
             Processing...
           </>
         ) : (
@@ -118,10 +164,12 @@ export const PaymentForm = ({
         )}
       </button>
 
-      <p className="text-xs text-gray-500 text-center mt-4 flex items-center justify-center gap-1">
+      <p style={{ fontSize: 11, color: "#aaa", textAlign: "center", marginTop: 12, fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
         <Lock size={12} />
         Your payment information is secure and encrypted
       </p>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </form>
   );
 };

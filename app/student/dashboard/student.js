@@ -1,22 +1,33 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     BookOpen, ShoppingBag, Heart, User, Settings, LogOut, Store,
     Bell, Search, TrendingUp, Clock, DollarSign, Plus, Filter,
-    Download, PlayCircle, CheckCircle, Globe, Award, ChevronRight,
-    Upload, BarChart3, Eye, Sparkles, GraduationCap, MessageSquare,
+    Download, CheckCircle, Globe, Award, ChevronRight,
+    Upload, Eye, Sparkles, GraduationCap, MessageSquare,
     BookMarked, Zap, Star, Users, ArrowRight, Brain, FileText,
-    Layers, ChevronDown, Mic, Video, BookCopy, Lock, Unlock,
-    LayoutDashboard, LibraryBig, Flame, BarChart2, LucideShield
+    Layers, BookCopy, Lock, LayoutDashboard, LibraryBig,
+    Flame, BarChart2, UserPlus, UserCheck, ChevronDown,
+    Activity, Wifi, Circle,
 } from 'lucide-react';
 import { auth, db } from '@/lib/firebaseConfig';
-import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import {
+    doc, getDoc, collection, query, where, getDocs,
+    orderBy, limit, updateDoc, serverTimestamp,
+} from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import Link from 'next/link';
 import Navbar from '@/components/NavBar';
-import CampusPulse from '@/components/Campus';
+import NotificationBell from '@/components/NotificationBell';
+
+/* ─── colour tokens (identical to home / seller pages) ─── */
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG    = "#f5f1ea";
 
 /* ─── helpers ─── */
 const getThumbnailUrl = (book) => {
@@ -29,149 +40,198 @@ const getThumbnailUrl = (book) => {
         const m = book.pdfUrl.match(/[-\w]{25,}/);
         if (m) return `https://drive.google.com/thumbnail?id=${m[0]}&sz=w400`;
     }
-    return book?.image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+    return book?.image || null;
 };
 
-/* ─── stat card ─── */
-function StatCard({ icon: Icon, label, value, color, sub }) {
+const avatarPalettes = [
+    { bg: NAVY, text: GOLDD },
+    { bg: "#1a3a5c", text: CREAM },
+    { bg: "#2c1810", text: GOLDD },
+    { bg: "#1a2c1a", text: "#a8d5a2" },
+    { bg: "#2c1a2c", text: GOLDD },
+    { bg: "#0a2233", text: "#7eccd4" },
+];
+const getPalette = (name = "?") => avatarPalettes[name.charCodeAt(0) % avatarPalettes.length];
+const getInitials = (name = "?") => {
+    const p = name.trim().split(' ').filter(Boolean);
+    if (!p.length) return '?';
+    if (p.length === 1) return p[0][0].toUpperCase();
+    return (p[0][0] + p[p.length - 1][0]).toUpperCase();
+};
+const formatTime = (ts) => {
+    if (!ts) return '';
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    const diff = Date.now() - d;
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'Just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(diff / 3600000);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(diff / 86400000)}d ago`;
+};
+
+/* ════════════════════════════════════════════════════════════
+   SUB-COMPONENTS
+════════════════════════════════════════════════════════════ */
+
+/* Book cover card — navy/gold aesthetic */
+function BookCard({ book, badge, owned }) {
+    const thumb = getThumbnailUrl(book);
+    const navId = book.firestoreId || book.bookId || String(book.id || '').replace('firestore-', '').replace('nb-', '').replace('lb-', '');
+    if (!navId) return null;
     return (
-        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${color}`}>
-                <Icon size={18} className="text-white" />
+        <Link href={`/book/preview?id=${navId}`} style={{ textDecoration: 'none', display: 'block' }}>
+            <div className="book-thumb-card">
+                <div style={{ position: 'relative', background: '#ede8df' }}>
+                    {thumb ? (
+                        <img src={thumb} alt={book.title || book.bookTitle || ''}
+                            style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }}
+                            onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                    ) : null}
+                    <div style={{ display: thumb ? 'none' : 'flex', width: '100%', aspectRatio: '3/4', alignItems: 'center', justifyContent: 'center', background: '#ede8df', flexDirection: 'column', gap: '6px' }}>
+                        <BookOpen size={28} style={{ color: '#ccc' }} />
+                        <span style={{ fontSize: '10px', color: '#bbb', fontFamily: "'Lato',sans-serif", textAlign: 'center', padding: '0 8px' }}>
+                            {(book.title || book.bookTitle || '').slice(0, 30)}
+                        </span>
+                    </div>
+                    {/* PDF badge */}
+                    <div style={{ position: 'absolute', top: '7px', left: '7px', background: NAVY, color: '#fff', fontSize: '8px', fontWeight: 700, padding: '2px 7px', fontFamily: "'Lato',sans-serif", letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />PDF
+                    </div>
+                    {badge && (
+                        <div style={{ position: 'absolute', bottom: '7px', left: '7px', background: GOLD, color: NAVY, fontSize: '8px', fontWeight: 700, padding: '2px 7px', fontFamily: "'Lato',sans-serif", letterSpacing: '0.06em' }}>{badge}</div>
+                    )}
+                    {owned && (
+                        <div style={{ position: 'absolute', top: '7px', right: '7px', background: '#16a34a', color: '#fff', fontSize: '8px', fontWeight: 700, padding: '2px 7px', fontFamily: "'Lato',sans-serif" }}>OWNED</div>
+                    )}
+                </div>
+                <div style={{ padding: '10px 10px 12px', borderTop: '0.5px solid #f0ebe0' }}>
+                    <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '12px', fontWeight: 700, color: NAVY, margin: '0 0 3px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.35 }}>
+                        {book.title || book.bookTitle || 'Untitled'}
+                    </p>
+                    <p style={{ fontSize: '10px', color: '#888', margin: '0 0 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Lato',sans-serif" }}>
+                        {book.lecturerTitle ? `${book.lecturerTitle} ` : ''}{book.author || book.sellerName || book.lecturerName || ''}
+                    </p>
+                    {book.price && !owned && (
+                        <p style={{ fontSize: '11px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>₦{Number(book.price).toLocaleString()}</p>
+                    )}
+                </div>
             </div>
-            <p className="text-2xl font-black text-slate-800">{value}</p>
-            <p className="text-xs font-semibold text-slate-500 mt-0.5">{label}</p>
-            {sub && <p className="text-[10px] text-slate-400 mt-1">{sub}</p>}
+        </Link>
+    );
+}
+
+/* Lecturer card — exactly matching the /lecturers page style */
+function LecturerCard({ lecturer }) {
+    const palette = getPalette(lecturer.sellerName || lecturer.name || '?');
+    const initials = getInitials(lecturer.sellerName || lecturer.name || '?');
+    const name = lecturer.sellerName || lecturer.name || 'Lecturer';
+    const titleDisplay = lecturer.title?.toLowerCase().includes('lecturer') ? 'Lecturer' : lecturer.title;
+    const profileHref = `/seller-profile?sellerId=${lecturer.sellerId || lecturer.id}`;
+    const displayName = lecturer.title ? `${lecturer.title} ${name}` : name;
+    const photo = lecturer.photo || lecturer.photoURL || null;
+
+    return (
+        <div className="lec-card">
+            {/* Photo / avatar */}
+            <div style={{ position: 'relative' }}>
+                {photo ? (
+                    <img src={photo} alt={name}
+                        className="lec-img"
+                        style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
+                ) : (
+                    <div style={{ width: '100%', aspectRatio: '4/3', background: palette.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ color: palette.text, fontSize: '40px', fontFamily: "'Playfair Display',serif", fontWeight: 900 }}>{initials}</span>
+                    </div>
+                )}
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '56px', background: 'linear-gradient(to top,rgba(13,34,68,.6),transparent)', pointerEvents: 'none' }} />
+                {lecturer.title && (
+                    <div style={{ position: 'absolute', bottom: '8px', left: '8px', background: NAVY, color: GOLDD, fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '3px 9px', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <GraduationCap size={8} />{titleDisplay}
+                    </div>
+                )}
+            </div>
+            {/* Body */}
+            <div style={{ padding: '13px 13px 15px' }}>
+                <Link href={profileHref} style={{ textDecoration: 'none' }}>
+                    <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 5px', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{displayName}</h3>
+                </Link>
+                {lecturer.department && (
+                    <p style={{ fontSize: '11px', color: '#888', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <BookMarked size={8} style={{ color: GOLD, flexShrink: 0 }} />{lecturer.department}
+                    </p>
+                )}
+                {lecturer.university && (
+                    <p style={{ fontSize: '10px', color: '#aaa', margin: '0 0 10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <GraduationCap size={8} style={{ color: GOLD, flexShrink: 0 }} />{lecturer.university}
+                    </p>
+                )}
+                <div style={{ borderTop: '0.5px solid #f0ebe0', paddingTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '10px', color: '#888', display: 'flex', alignItems: 'center', gap: '3px', fontFamily: "'Lato',sans-serif" }}>
+                        <BookOpen size={9} style={{ color: NAVY }} />
+                        <strong style={{ color: NAVY }}>{lecturer.uploadedBooks || lecturer.bookCount || 0}</strong> files
+                    </span>
+                    <Link href={profileHref} style={{ fontSize: '9px', fontWeight: 700, color: NAVY, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '2px', letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'Lato',sans-serif" }}>
+                        Profile <ChevronRight size={10} />
+                    </Link>
+                </div>
+            </div>
         </div>
     );
 }
 
-/* ─── book card ─── */
-function BookCard({ book, badge }) {
-    const thumb = getThumbnailUrl(book);
-    // firestoreId is the real Firestore doc ID; id may be prefixed (e.g. 'nb-xxx')
-    const navId = book.firestoreId || book.bookId || book.id;
+/* Active student row */
+function ActiveStudentRow({ student, rank }) {
+    const palette = getPalette(student.name || '?');
+    const initials = getInitials(student.name || '?');
+    const rankColors = ['#b8963e', '#aaa', '#cd7f32'];
+    const rankBg = rank < 3 ? `rgba(${rank === 0 ? '184,150,62' : rank === 1 ? '170,170,170' : '205,127,50'},.1)` : 'rgba(13,34,68,.04)';
+
     return (
-        <Link href={`/book/preview?id=${navId}`}>
-            <div className="group relative bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer">
-                {badge && (
-                    <span className="absolute top-2 left-2 z-10 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-600 text-white">
-                        {badge}
-                    </span>
-                )}
-                <div className="aspect-[3/4] overflow-hidden bg-slate-100">
-                    <img src={thumb} alt={book.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        onError={e => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }} />
-                </div>
-                <div className="p-3">
-                    <p className="text-xs font-black text-slate-800 line-clamp-2 leading-tight">{book.title}</p>
-                    <p className="text-[10px] text-slate-400 mt-1 truncate">
-                        {book.lecturerTitle
-                            ? `${book.lecturerTitle} ${book.lecturerName || book.author || book.sellerName || ''}`
-                            : (book.author || book.sellerName || book.lecturerName || 'Unknown')}
-                    </p>
-                    {book.price && (
-                        <p className="text-xs font-black text-indigo-600 mt-1.5">₦{Number(book.price).toLocaleString()}</p>
-                    )}
-                </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '0.5px solid #f0ebe0' }}>
+            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: rankBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: '10px', fontWeight: 700, color: rankColors[rank] || '#888', fontFamily: "'Lato',sans-serif" }}>{rank + 1}</span>
             </div>
-        </Link>
+            {student.photoURL ? (
+                <img src={student.photoURL} alt={student.name}
+                    style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${GOLD}`, flexShrink: 0 }}
+                    onError={e => e.target.style.display = 'none'} />
+            ) : (
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: palette.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid rgba(184,150,62,.3)`, flexShrink: 0 }}>
+                    <span style={{ color: palette.text, fontSize: '11px', fontWeight: 700, fontFamily: "'Playfair Display',serif" }}>{initials}</span>
+                </div>
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: '12px', fontWeight: 700, color: NAVY, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Lato',sans-serif" }}>{student.name}</p>
+                <p style={{ fontSize: '10px', color: '#aaa', margin: 0, fontFamily: "'Lato',sans-serif" }}>{student.university || 'Student'}</p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
+                <span style={{ fontSize: '10px', color: '#16a34a', fontWeight: 700, fontFamily: "'Lato',sans-serif" }}>Active</span>
+            </div>
+        </div>
     );
 }
 
-function LecturerCard({ lecturer }) {
-    const [imgErr, setImgErr] = useState(false);
-    const initial = lecturer.name?.charAt(0)?.toUpperCase() || 'L';
-    const gradients = [
-        'from-indigo-500 to-blue-600', 'from-violet-500 to-purple-600',
-        'from-emerald-500 to-teal-600', 'from-rose-500 to-pink-600',
-        'from-amber-500 to-orange-600', 'from-sky-500 to-cyan-600',
-    ];
-    const grad = gradients[initial.charCodeAt(0) % gradients.length];
-
-    const displayName = lecturer.title
-        ? `${lecturer.title} ${lecturer.name}`.trim()
-        : lecturer.name;
-
-    return (
-        <Link href={`/seller-profile?sellerId=${lecturer.id}`}>  {/* ✅ FIXED */}
-            <div className="flex-shrink-0 w-40 bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer text-center group">
-                <div className="relative w-14 h-14 mx-auto mb-2">
-                    {lecturer.photoURL && !imgErr ? (
-                        <img
-                            src={lecturer.photoURL}
-                            alt={displayName}
-                            onError={() => setImgErr(true)}
-                            className="w-14 h-14 rounded-full object-cover shadow-md ring-2 ring-white group-hover:ring-indigo-200 transition-all"
-                        />
-                    ) : (
-                        <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${grad} flex items-center justify-center text-white font-black text-xl shadow-md group-hover:scale-105 transition-transform`}>
-                            {initial}
-                        </div>
-                    )}
-                    <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-400 rounded-full border-2 border-white" />
-                </div>
-
-                {lecturer.title && (
-                    <span className="inline-block text-[8px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full mb-1">
-                        {lecturer.title}
-                    </span>
-                )}
-
-                <p className="text-[11px] font-black text-slate-800 line-clamp-1 group-hover:text-indigo-600 transition-colors leading-tight">
-                    {lecturer.name}
-                </p>
-                {lecturer.department && (
-                    <p className="text-[9px] text-slate-400 mt-0.5 line-clamp-1">{lecturer.department}</p>
-                )}
-                {lecturer.university && (
-                    <p className="text-[9px] text-slate-300 mt-0.5 line-clamp-1 italic">{lecturer.university}</p>
-                )}
-                <div className="mt-2 inline-flex items-center gap-1 bg-indigo-50 rounded-full px-2 py-0.5">
-                    <BookCopy size={9} className="text-indigo-500" />
-                    <span className="text-[9px] font-bold text-indigo-500">
-                        {lecturer.bookCount > 0 ? `${lecturer.bookCount} book${lecturer.bookCount !== 1 ? 's' : ''}` : 'No books yet'}
-                    </span>
-                </div>
-            </div>
-        </Link>
-    );
-}
-
-/* ─── ai chat pill ─── */
-function AIChatBanner({ bookTitle, bookId }) {
-    return (
-        <Link href={`/ai-chat?bookId=${bookId}&bookTitle=${encodeURIComponent(bookTitle)}`}>
-            <div className="flex items-center gap-3 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl px-4 py-3 cursor-pointer hover:opacity-95 transition-opacity shadow-lg shadow-indigo-200">
-                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                    <Sparkles size={14} className="text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-black text-white/70 uppercase tracking-wider">AI Tutor</p>
-                    <p className="text-xs font-bold text-white truncate">Ask about "{bookTitle}"</p>
-                </div>
-                <ArrowRight size={14} className="text-white/70 shrink-0" />
-            </div>
-        </Link>
-    );
-}
-
+/* ════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+════════════════════════════════════════════════════════════ */
 export default function StudentDashboardClient() {
     const router = useRouter();
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('home');
-    const [library, setLibrary] = useState([]);
-    const [wishlist, setWishlist] = useState([]);
-    const [sellerStats, setSellerStats] = useState(null);
-    const [trending, setTrending] = useState([]);
+    const [user,          setUser]          = useState(null);
+    const [loading,       setLoading]       = useState(true);
+    const [activeTab,     setActiveTab]     = useState('home');
+    const [library,       setLibrary]       = useState([]);
+    const [wishlist,      setWishlist]      = useState([]);
+    const [sellerStats,   setSellerStats]   = useState(null);
     const [lecturerBooks, setLecturerBooks] = useState([]);
-    const [lecturers, setLecturers] = useState([]);
-    const [latestBooks, setLatestBooks] = useState([]);
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [aiSessions, setAiSessions] = useState([]);
-    const [topStudents, setTopStudents] = useState([]);
+    const [lecturers,     setLecturers]     = useState([]);
+    const [latestBooks,   setLatestBooks]   = useState([]);
+    const [aiSessions,    setAiSessions]    = useState([]);
+    const [activeStudents,setActiveStudents]= useState([]);
+    const [campusBooks,   setCampusBooks]   = useState([]);
+
+    /* ── auth + data ── */
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (u) => {
             if (u) await fetchAll(u.uid);
@@ -184,796 +244,882 @@ export default function StudentDashboardClient() {
         try {
             setLoading(true);
             const userDoc = await getDoc(doc(db, 'users', uid));
-            if (!userDoc.exists()) return;
+            if (!userDoc.exists()) { router.push('/auth/signin'); return; }
             const userData = userDoc.data();
             setUser({ uid, ...userData });
 
+            /* library */
             if (userData.purchasedBooks) {
-                setLibrary(Object.values(userData.purchasedBooks).map(b => ({ ...b, thumbnail: getThumbnailUrl(b) })));
-            }
-            if (userData.savedBooks) {
-                setWishlist(userData.savedBooks.map(b => ({ ...b, thumbnail: getThumbnailUrl(b) })));
-            }
-            if (userData.isSeller) {
-                const sd = await getDoc(doc(db, 'sellers', uid));
-                if (sd.exists()) setSellerStats(sd.data());
+                const lib = Object.values(userData.purchasedBooks).map(b => ({
+                    ...b,
+                    title: b.title || b.bookTitle || '',
+                    firestoreId: b.bookId || b.firestoreId || '',
+                }));
+                setLibrary(lib);
             }
 
-            // Fetch AI sessions
+            /* wishlist */
+            if (userData.savedBooks) {
+                setWishlist(Object.values(userData.savedBooks).map(b => ({ ...b })));
+            }
+
+            /* seller stats */
+            if (userData.isSeller) {
+                try {
+                    const sd = await getDoc(doc(db, 'sellers', uid));
+                    if (sd.exists()) setSellerStats(sd.data());
+                } catch {}
+            }
+
+            /* AI sessions */
             try {
                 const sq = query(collection(db, 'ai_chat_sessions'), where('userId', '==', uid));
                 const ss = await getDocs(sq);
-                const sessions = ss.docs.map(d => ({ id: d.id, ...d.data() }))
+                setAiSessions(ss.docs.map(d => ({ id: d.id, ...d.data() }))
                     .sort((a, b) => (b.updatedAt?.toDate?.()?.getTime() || 0) - (a.updatedAt?.toDate?.()?.getTime() || 0))
-                    .slice(0, 6);
-                setAiSessions(sessions);
-            } catch { }
+                    .slice(0, 6));
+            } catch {}
 
-            // Fetch top selling students
-            // Fetch top selling students (minimum 15 books sold, students only)
+            /* Active students — users where isStudent:true, recently active */
             try {
-                // Step 1 — get all sellers with 15+ books sold
-                const sellersSnap = await getDocs(
-                    query(
-                        collection(db, 'sellers'),
-                        where('booksSold', '>=', 15),
-                        orderBy('booksSold', 'desc'),
-                        limit(30) // fetch more so we can filter down to students
-                    )
+                const sq = query(
+                    collection(db, 'users'),
+                    where('isStudent', '==', true),
+                    limit(40)
                 );
-
-                // Step 2 — check each seller's users doc for isStudent flag
-                const results = await Promise.all(
-                    sellersSnap.docs.map(async (d) => {
-                        try {
-                            const userDoc = await getDoc(doc(db, 'users', d.id));
-                            if (!userDoc.exists()) return null;
-                            const userData = userDoc.data();
-
-                            // Only include if they are a student
-                            if (!userData.isStudent) return null;
-
-                            return {
-                                id: d.id,
-                                name: d.data().sellerName || userData.firstName || 'Anonymous',
-                                earnings: d.data().totalEarnings || 0,
-                                booksSold: d.data().booksSold || 0,
-                                photoURL: userData.photoBase64 || d.data().photoURL || null,
-                            };
-                        } catch {
-                            return null;
-                        }
+                const ss = await getDocs(sq);
+                const list = ss.docs
+                    .map(d => {
+                        const data = d.data();
+                        return {
+                            id: d.id,
+                            name: data.displayName || `${data.firstName || ''} ${data.surname || ''}`.trim() || 'Student',
+                            photoURL: data.photoBase64 || data.photoURL || null,
+                            university: data.university || data.institution || '',
+                            lastActive: data.lastActive || data.updatedAt || null,
+                        };
                     })
-                );
+                    .filter(s => s.name && s.name !== 'Student')
+                    .slice(0, 10);
+                setActiveStudents(list);
+            } catch {}
 
-                const topSellers = results
-                    .filter(Boolean) // remove nulls
-                    .slice(0, 10);   // keep top 10
+            /* Lecturers — same logic as /lecturers page */
+            const TITLES = ['Lecturer', 'Dr.', 'Prof.', 'Professor'];
+            const seenIds = new Set();
+            const rawLecs = [];
 
-                setTopStudents(topSellers);
-            } catch (e) {
-                console.warn('Top sellers fetch error:', e.message);
-            }
-
-            try {
-                const ACADEMIC_TITLES = ['Lecturer', 'Dr.', 'Prof.', 'Professor'];
-                const seenLecturerIds = new Set();
-                const rawLecturers = [];
-
-                // Query sellers collection for each academic title value
-                for (const title of ACADEMIC_TITLES) {
-                    try {
-                        const snap = await getDocs(
-                            query(collection(db, 'sellers'), where('title', '==', title))
-                        );
-                        snap.docs.forEach(d => {
-                            if (!seenLecturerIds.has(d.id)) {
-                                seenLecturerIds.add(d.id);
-                                const data = d.data();
-                                rawLecturers.push({
-                                    id: d.id,
-                                    // sellerName is stored at top level in sellers doc
-                                    name: data.sellerName ||
-                                        data.businessInfo?.businessName ||
-                                        'Lecturer',
-                                    title: data.title || '',
-                                    department: data.department || data.faculty || '',
-                                    photoURL: data.photoURL || data.avatar || null,
-                                    university: data.university || data.institution || '',
-                                    description: data.businessInfo?.businessDescription || '',
-                                    bookCount: 0,
-                                });
+            for (const title of TITLES) {
+                try {
+                    const snap = await getDocs(query(collection(db, 'sellers'), where('title', '==', title)));
+                    for (const d of snap.docs) {
+                        if (seenIds.has(d.id)) continue;
+                        seenIds.add(d.id);
+                        const data = d.data();
+                        /* fetch user doc for photo — same as lecturers page */
+                        let photo = null;
+                        try {
+                            const ud = await getDoc(doc(db, 'users', d.id));
+                            if (ud.exists()) {
+                                const udata = ud.data();
+                                photo = udata.photoBase64 || udata.photoURL || udata.profilePicture || null;
                             }
+                        } catch {}
+                        rawLecs.push({
+                            sellerId: d.id,
+                            sellerName: data.sellerName || data.displayName || 'Lecturer',
+                            title: data.title || '',
+                            department: data.department || data.faculty || '',
+                            university: data.university || data.institution || '',
+                            uploadedBooks: 0,
+                            photo,
                         });
-                    } catch { /* title value not indexed — skip silently */ }
-                }
-
-                console.log(`🎓 Found ${rawLecturers.length} lecturers in sellers collection`);
-
-                // Attach real book count per lecturer from advertMyBook
-                const lecturersWithCounts = await Promise.all(
-                    rawLecturers.map(async (lec) => {
-                        try {
-                            const bsnap = await getDocs(query(
-                                collection(db, 'advertMyBook'),
-                                where('sellerId', '==', lec.id),
-                                where('status', '==', 'approved')
-                            ));
-                            return { ...lec, bookCount: bsnap.size };
-                        } catch {
-                            return lec;
-                        }
-                    })
-                );
-
-                // Sort: most books first
-                lecturersWithCounts.sort((a, b) => b.bookCount - a.bookCount);
-                setLecturers(lecturersWithCounts);
-                console.log(`✅ Loaded ${lecturersWithCounts.length} lecturers`);
-
-                // ── Now fetch their books from advertMyBook ──────────────────
-                if (seenLecturerIds.size > 0) {
-                    const idArr = [...seenLecturerIds];
-                    let lecBooks = [];
-
-                    // Batch into groups of 30 (Firestore 'in' limit)
-                    for (let i = 0; i < idArr.length; i += 30) {
-                        const batch = idArr.slice(i, i + 30);
-                        try {
-                            const snap = await getDocs(query(
-                                collection(db, 'advertMyBook'),
-                                where('status', '==', 'approved'),
-                                where('sellerId', 'in', batch)
-                            ));
-                            snap.docs.forEach(d => {
-                                lecBooks.push({
-                                    ...d.data(),
-                                    id: `lb-${d.id}`,
-                                    firestoreId: d.id,
-                                    thumbnail: getThumbnailUrl(d.data()),
-                                    // Attach lecturer name to show on card
-                                    lecturerName: lecturersWithCounts.find(l => l.id === d.data().sellerId)?.name || d.data().sellerName || '',
-                                    lecturerTitle: lecturersWithCounts.find(l => l.id === d.data().sellerId)?.title || '',
-                                });
-                            });
-                        } catch { }
                     }
-
-                    // Deduplicate & sort newest first
-                    const seenBookIds = new Set();
-                    const dedupedBooks = lecBooks
-                        .filter(b => {
-                            if (seenBookIds.has(b.firestoreId)) return false;
-                            seenBookIds.add(b.firestoreId);
-                            return true;
-                        })
-                        .sort((a, b) =>
-                            (b.createdAt?.toDate?.()?.getTime() || 0) -
-                            (a.createdAt?.toDate?.()?.getTime() || 0)
-                        )
-                        .slice(0, 10);
-
-                    setLecturerBooks(dedupedBooks);
-                    console.log(`✅ Loaded ${dedupedBooks.length} lecturer books`);
-                }
-            } catch (e) {
-                console.warn('Lecturers/books fetch error:', e.message);
+                } catch {}
             }
 
-            // Fetch latest books overall — deduplicate by firestoreId
-            // Fetch latest books — exclude any book already shown in lecturer section
+            /* book counts per lecturer */
+            await Promise.all(rawLecs.map(async l => {
+                try {
+                    const bq = query(collection(db, 'advertMyBook'), where('sellerId', '==', l.sellerId), where('status', '==', 'approved'));
+                    l.uploadedBooks = (await getDocs(bq)).size;
+                } catch {}
+            }));
+            rawLecs.sort((a, b) => b.uploadedBooks - a.uploadedBooks);
+            setLecturers(rawLecs);
+
+            /* Lecturer books */
+            if (seenIds.size > 0) {
+                const idArr = [...seenIds];
+                let lecBooks = [];
+                for (let i = 0; i < idArr.length; i += 30) {
+                    const batch = idArr.slice(i, i + 30);
+                    try {
+                        const snap = await getDocs(query(
+                            collection(db, 'advertMyBook'),
+                            where('status', '==', 'approved'),
+                            where('sellerId', 'in', batch)
+                        ));
+                        snap.docs.forEach(d => {
+                            const data = d.data();
+                            const lec = rawLecs.find(l => l.sellerId === data.sellerId);
+                            lecBooks.push({
+                                ...data,
+                                id: `lb-${d.id}`, firestoreId: d.id,
+                                title: data.bookTitle || data.title || '',
+                                lecturerName: lec?.sellerName || data.sellerName || '',
+                                lecturerTitle: lec?.title || '',
+                            });
+                        });
+                    } catch {}
+                }
+                const seenBook = new Set();
+                setLecturerBooks(lecBooks.filter(b => {
+                    if (seenBook.has(b.firestoreId)) return false;
+                    seenBook.add(b.firestoreId); return true;
+                }).sort((a, b) =>
+                    (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0)
+                ).slice(0, 10));
+            }
+
+            /* Latest books (non-lecturer) */
             try {
+                const lecturerSellerIds = new Set(seenIds);
                 const bq = query(collection(db, 'advertMyBook'), where('status', '==', 'approved'));
                 const bs = await getDocs(bq);
-
-                // Get current lecturer book IDs from state to exclude them
-                const lecturerBookSnap = await getDocs(query(
-                    collection(db, 'advertMyBook'),
-                    where('status', '==', 'approved'),
-                    where('sellerId', 'in',
-                        lecturers.length > 0
-                            ? lecturers.map(l => l.id).slice(0, 30)
-                            : ['__none__']
-                    )
-                ));
-                const lecturerFirestoreIds = new Set(lecturerBookSnap.docs.map(d => d.id));
-
-                const seenIds = new Set();
+                const seenB = new Set();
                 const all = bs.docs
+                    .filter(d => !lecturerSellerIds.has(d.data().sellerId))
                     .map(d => ({
                         ...d.data(),
-                        id: `nb-${d.id}`,
-                        firestoreId: d.id,
-                        thumbnail: getThumbnailUrl(d.data()),
+                        id: `nb-${d.id}`, firestoreId: d.id,
+                        title: d.data().bookTitle || d.data().title || '',
                     }))
                     .filter(b => {
-                        if (lecturerFirestoreIds.has(b.firestoreId)) return false; // exclude lecturer books
-                        if (seenIds.has(b.firestoreId)) return false;
-                        seenIds.add(b.firestoreId);
-                        return true;
+                        if (seenB.has(b.firestoreId)) return false;
+                        seenB.add(b.firestoreId); return true;
                     })
                     .sort((a, b) =>
-                        (b.createdAt?.toDate?.()?.getTime() || 0) -
-                        (a.createdAt?.toDate?.()?.getTime() || 0)
-                    )
-                    .slice(0, 10);
+                        (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0)
+                    ).slice(0, 10);
                 setLatestBooks(all);
-            } catch { }
+            } catch {}
 
-            setTrending([
-                { id: 1, title: 'Advanced Calculus Notes', downloads: 245, price: 2500, category: 'Mathematics' },
-                { id: 2, title: 'Organic Chemistry Lab Manual', downloads: 189, price: 3000, category: 'Chemistry' },
-                { id: 3, title: 'CS Algorithms & Data Structures', downloads: 156, price: 2800, category: 'CS' },
-                { id: 4, title: 'Anatomy & Physiology Vol. II', downloads: 134, price: 3200, category: 'Medicine' },
-            ]);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
+            /* Campus books — for campus pulse */
+            try {
+                const bq = query(collection(db, 'advertMyBook'), where('status', '==', 'approved'), orderBy('createdAt', 'desc'), limit(8));
+                const bs = await getDocs(bq);
+                setCampusBooks(bs.docs.map(d => ({
+                    ...d.data(), firestoreId: d.id,
+                    title: d.data().bookTitle || d.data().title || '',
+                })));
+            } catch {}
+
+        } catch (e) { console.error(e); }
+        finally { setLoading(false); }
     };
 
+    /* ── Loading ── */
     if (loading) return (
-        <div className="min-h-screen bg-[#f4f6fb] flex items-center justify-center">
-            <div className="text-center">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center mx-auto mb-4 animate-pulse">
-                    <BookOpen size={26} className="text-white" />
-                </div>
-                <p className="text-slate-500 text-sm font-semibold">Loading your dashboard…</p>
+        <div style={{ minHeight: '100vh', background: BG, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            <div style={{ textAlign: 'center' }}>
+                <div style={{ width: '56px', height: '56px', border: `3px solid ${GOLD}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite', margin: '0 auto 16px' }} />
+                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '17px', color: NAVY }}>Loading your dashboard…</p>
             </div>
         </div>
     );
 
-    /* ════════════════ HOME TAB ════════════════ */
-    const renderHome = () => (
-        <div className="space-y-8">
+    const displayName = user?.displayName || `${user?.firstName || ''} ${user?.surname || ''}`.trim() || 'Scholar';
+    const initials = getInitials(displayName);
+    const palette = getPalette(displayName);
 
-            {/* ── Hero ── */}
-            <div className="relative overflow-hidden rounded-3xl bg-[#0f1b4c] text-white p-7 shadow-2xl">
-                <div className="absolute inset-0 opacity-10"
-                    style={{ backgroundImage: 'radial-gradient(circle at 70% 50%, #6366f1 0%, transparent 60%), radial-gradient(circle at 20% 80%, #3b82f6 0%, transparent 50%)' }} />
-                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+    /* ════════ HOME TAB ════════ */
+    const renderHome = () => (
+        <div>
+            {/* ── HERO ── */}
+            <div className="student-hero">
+                <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '160px', height: '160px', border: '0.5px solid rgba(184,150,62,.15)', transform: 'rotate(45deg)' }} />
+                <div style={{ position: 'absolute', bottom: '20px', left: '-20px', width: '80px', height: '80px', border: '0.5px solid rgba(184,150,62,.1)', transform: 'rotate(45deg)' }} />
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '20px', position: 'relative' }}>
                     <div>
-                        <span className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm border border-white/20 text-blue-200 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-4">
-                            <GraduationCap size={11} /> {user?.university || 'LAN Library'}
-                        </span>
-                        <h2 className="text-3xl md:text-4xl font-black leading-tight">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(184,150,62,.14)', border: '1px solid rgba(184,150,62,.3)', borderRadius: '999px', padding: '5px 13px', marginBottom: '16px' }}>
+                            <Sparkles size={10} style={{ color: GOLD }} />
+                            <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLDD, fontFamily: "'Lato',sans-serif" }}>
+                                {user?.university || 'LAN Library'}
+                            </span>
+                        </div>
+                        <h2 className="lan-serif" style={{ fontSize: 'clamp(26px,5vw,44px)', fontWeight: 900, color: '#fff', margin: '0 0 10px', lineHeight: 1.05 }}>
                             Welcome back,<br />
-                            <span className="text-blue-300">{user?.firstName || 'Student'} ✦</span>
+                            <span style={{ color: GOLD, fontStyle: 'italic' }}>{user?.firstName || 'Scholar'} ✦</span>
                         </h2>
-                        <p className="text-blue-200/70 text-sm mt-2 max-w-sm">
-                            {library.length} books in your library · {aiSessions.length} AI conversations
+                        <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.6)', fontFamily: "'Lato',sans-serif", margin: '0 0 22px' }}>
+                            {library.length} {library.length === 1 ? 'book' : 'books'} in your library · {aiSessions.length} AI sessions
                         </p>
                         <Link href="/ai-chat">
-                            <button className="mt-5 flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors shadow-lg shadow-indigo-500/30">
-                                <Sparkles size={15} /> Chat with AI Tutor
+                            <button className="hero-cta-btn">
+                                <Sparkles size={13} /> Chat with AI Tutor
                             </button>
                         </Link>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 shrink-0">
+
+                    {/* Quick stats */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', flexShrink: 0 }}>
                         {[
-                            { icon: BookOpen, label: 'Books', val: library.length, bg: 'bg-blue-500/20' },
-                            { icon: Sparkles, label: 'AI Chats', val: aiSessions.length, bg: 'bg-violet-500/20' },
-                            { icon: Heart, label: 'Saved', val: wishlist.length, bg: 'bg-pink-500/20' },
-                            { icon: Flame, label: 'Day Streak', val: '5 🔥', bg: 'bg-orange-500/20' },
-                        ].map(({ icon: Icon, label, val, bg }) => (
-                            <div key={label} className={`${bg} backdrop-blur-sm rounded-2xl p-3 text-center border border-white/10`}>
-                                <Icon size={16} className="text-white/80 mx-auto mb-1" />
-                                <p className="text-lg font-black text-white">{val}</p>
-                                <p className="text-[9px] text-white/50 font-bold uppercase">{label}</p>
+                            { icon: BookOpen, label: 'Books', val: library.length, accent: GOLD },
+                            { icon: Sparkles, label: 'AI Chats', val: aiSessions.length, accent: '#a78bfa' },
+                            { icon: Heart, label: 'Saved', val: wishlist.length, accent: '#f87171' },
+                            { icon: Users, label: 'Online', val: activeStudents.length, accent: '#34d399' },
+                        ].map(({ icon: Icon, label, val, accent }) => (
+                            <div key={label} style={{ background: 'rgba(255,255,255,.07)', border: '0.5px solid rgba(255,255,255,.1)', padding: '12px', textAlign: 'center', backdropFilter: 'blur(4px)' }}>
+                                <Icon size={14} style={{ color: accent, margin: '0 auto 5px' }} />
+                                <p className="lan-serif" style={{ fontSize: '20px', fontWeight: 700, color: '#fff', margin: 0 }}>{val}</p>
+                                <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(245,240,232,.45)', fontFamily: "'Lato',sans-serif" }}>{label}</p>
                             </div>
                         ))}
                     </div>
                 </div>
             </div>
 
-            {/* ── AI Tutor Sessions ── */}
-            {aiSessions.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+
+                {/* ── CONTINUE READING ── */}
+                {library.length > 0 && (
+                    <section>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '18px' }}>
+                            <div>
+                                <p className="section-label">My Library</p>
+                                <h3 className="lan-serif section-title">Jump Back In</h3>
+                            </div>
+                            <button onClick={() => setActiveTab('library')} className="section-link">
+                                Full Library <ChevronRight size={12} />
+                            </button>
+                        </div>
+                        <div className="books-grid">
+                            {library.slice(0, 5).map((b, i) => (
+                                <BookCard key={b.bookId || b.id || i} book={b} owned />
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* ── OUR LECTURERS ── */}
                 <section>
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
-                            <Sparkles size={16} className="text-indigo-500" /> Recent AI Conversations
-                        </h3>
-                        <Link href="/ai-chat" className="text-[11px] font-bold text-indigo-600 hover:underline flex items-center gap-1">
-                            View All <ArrowRight size={11} />
-                        </Link>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '18px' }}>
+                        <div>
+                            <p className="section-label">Faculty Directory</p>
+                            <h3 className="lan-serif section-title">
+                                Our Lecturers
+                                {lecturers.length > 0 && (
+                                    <span style={{ fontSize: '11px', fontWeight: 400, color: GOLD, fontFamily: "'Lato',sans-serif", marginLeft: '10px', fontStyle: 'normal' }}>
+                                        {lecturers.length} on LAN
+                                    </span>
+                                )}
+                            </h3>
+                        </div>
+                        <Link href="/lecturers" className="section-link">View All <ChevronRight size={12} /></Link>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {aiSessions.map(s => (
-                            <Link key={s.id} href={`/ai-chat?sessionId=${s.id}&bookId=${s.bookId}&bookTitle=${encodeURIComponent(s.bookTitle || '')}`}>
-                                <div className="group bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer">
-                                    <div className="flex items-start gap-3">
-                                        <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
-                                            <MessageSquare size={14} className="text-indigo-500" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-[12px] font-black text-slate-800 line-clamp-1 group-hover:text-indigo-600 transition-colors">
-                                                {s.title || 'New conversation'}
-                                            </p>
-                                            <p className="text-[10px] text-indigo-500 font-semibold mt-0.5 line-clamp-1">{s.bookTitle || ''}</p>
-                                            <p className="text-[9px] text-slate-400 mt-1">
-                                                {s.messages?.length || 0} messages · {s.updatedAt?.toDate?.()?.toLocaleDateString?.() || ''}
-                                            </p>
-                                        </div>
-                                        <ChevronRight size={13} className="text-slate-300 group-hover:text-indigo-400 shrink-0 mt-1" />
-                                    </div>
-                                </div>
-                            </Link>
-                        ))}
+
+                    {lecturers.length === 0 ? (
+                        <div className="empty-state">
+                            <GraduationCap size={32} style={{ color: '#e5ddd0', margin: '0 auto 10px' }} />
+                            <p style={{ fontSize: '13px', color: '#aaa', fontFamily: "'Lato',sans-serif" }}>No lecturers found yet</p>
+                        </div>
+                    ) : (
+                        <div className="sbar-none" style={{ display: 'flex', gap: '14px', overflowX: 'auto', paddingBottom: '8px' }}>
+                            {lecturers.map(l => <div key={l.sellerId} style={{ flexShrink: 0, width: '200px' }}><LecturerCard lecturer={l} /></div>)}
+                        </div>
+                    )}
+                </section>
+
+                {/* ── NEW FROM LECTURERS ── */}
+                <section>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '18px' }}>
+                        <div>
+                            <p className="section-label">Faculty Uploads</p>
+                            <h3 className="lan-serif section-title">New from Lecturers</h3>
+                        </div>
+                        <Link href="/documents?filter=lecturer" className="section-link">Browse All <ChevronRight size={12} /></Link>
                     </div>
-                    {/* AI prompt for library books */}
-                    {library.length > 0 && (
-                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {library.slice(0, 2).map((b, idx) => (
-                                <AIChatBanner
-                                    key={b.bookId || b.id || `ai-home-${idx}`}
-                                    bookTitle={b.title}
-                                    bookId={b.bookId || b.firestoreId || b.id}
-                                />
+
+                    {lecturerBooks.length === 0 ? (
+                        <div className="empty-state">
+                            <BookMarked size={32} style={{ color: '#e5ddd0', margin: '0 auto 10px' }} />
+                            <p style={{ fontSize: '13px', color: '#aaa', fontFamily: "'Lato',sans-serif" }}>No lecturer books yet</p>
+                        </div>
+                    ) : (
+                        <div className="books-grid">
+                            {lecturerBooks.slice(0, 5).map((b, i) => (
+                                <BookCard key={b.firestoreId || i} book={b} badge="Lecturer" />
                             ))}
                         </div>
                     )}
                 </section>
-            )}
 
-            {/* ── Continue Reading ── */}
-            {library.length > 0 && (
+                {/* ── CAMPUS PULSE ── */}
                 <section>
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
-                            <Clock size={16} className="text-blue-500" /> Jump Back In
-                        </h3>
-                        <button onClick={() => setActiveTab('library')} className="text-[11px] font-bold text-indigo-600 hover:underline flex items-center gap-1">
-                            My Library <ArrowRight size={11} />
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {library.slice(0, 5).map((b, idx) => (
-                            <BookCard key={`lib-${idx}`} book={b} />
-                        ))}                    </div>
-                </section>
-            )}
-
-            {/* ── Lecturer Spotlight ── */}
-            <section>
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
-                        <GraduationCap size={16} className="text-emerald-600" /> Our Lecturers
-                        {lecturers.length > 0 && (
-                            <span className="text-[10px] font-bold bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full">
-                                {lecturers.length} on LAN
-                            </span>
-                        )}
-                    </h3>
-                    <Link href="/lecturers" className="text-[11px] font-bold text-indigo-600 hover:underline flex items-center gap-1">
-                        View All <ArrowRight size={11} />
-                    </Link>
-                </div>
-                {lecturers.length === 0 ? (
-                    <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-8 text-center">
-                        <GraduationCap size={32} className="text-slate-200 mx-auto mb-2" />
-                        <p className="text-sm font-bold text-slate-400">No lecturers found yet</p>
-                        <p className="text-[11px] text-slate-300 mt-1">Lecturers who join LAN Library will appear here</p>
-                    </div>
-                ) : (
-                    <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                        {lecturers.map(l => <LecturerCard key={l.id} lecturer={l} />)}
-                    </div>
-                )}
-            </section>
-
-            {/* ── Latest from Lecturers ── */}
-            <section>
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
-                        <BookMarked size={16} className="text-indigo-600" /> New from Lecturers
-                    </h3>
-                    <Link href="/documents?filter=lecturer" className="text-[11px] font-bold text-indigo-600 hover:underline flex items-center gap-1">
-                        Browse All <ArrowRight size={11} />
-                    </Link>
-                </div>
-                {lecturerBooks.length === 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {[
-                            { id: 'l1', title: 'Engineering Mathematics IV', author: 'Dr. Adeyemi', price: 2500, image: 'https://images.unsplash.com/photo-1509228468518-180dd4864904?w=400' },
-                            { id: 'l2', title: 'Organic Chemistry Practicals', author: 'Prof. Okafor', price: 3000, image: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=400' },
-                            { id: 'l3', title: 'Data Structures & Algorithms', author: 'Dr. Balogun', price: 2800, image: 'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?w=400' },
-                            { id: 'l4', title: 'Human Anatomy Vol. II', author: 'Dr. Eze', price: 3200, image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=400' },
-                            { id: 'l5', title: 'Quantum Physics Notes', author: 'Prof. Suleiman', price: 2600, image: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=400' },
-                        ].map(b => <BookCard key={b.id} book={b} badge="Lecturer" />)}
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {lecturerBooks.slice(0, 5).map((b, idx) => (
-                            <BookCard key={`lec-${idx}`} book={b} badge="Lecturer" />
-                        ))}                    </div>
-                )}
-            </section>
-
-            {/* ── Latest Uploads ── */}
-            <section>
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
-                        <Zap size={16} className="text-yellow-500" /> Just Added
-                    </h3>
-                    <Link href="/documents" className="text-[11px] font-bold text-indigo-600 hover:underline flex items-center gap-1">
-                        All Books <ArrowRight size={11} />
-                    </Link>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {(latestBooks.length > 0 ? latestBooks : [
-                        { id: 'n1', title: 'Advanced Accounting Principles', author: 'Sarah A.', price: 1800, image: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400' },
-                        { id: 'n2', title: 'Nigerian Constitutional Law', author: 'David O.', price: 2200, image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400' },
-                        { id: 'n3', title: 'Microbiology Practical Guide', author: 'Emeka W.', price: 2000, image: 'https://images.unsplash.com/photo-1576086213369-97a306d36557?w=400' },
-                        { id: 'n4', title: 'Financial Mathematics', author: 'Amaka I.', price: 1600, image: 'https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=400' },
-                        { id: 'n5', title: 'Civil Engineering Drawing', author: 'Tunde B.', price: 2400, image: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=400' },
-                    ]).slice(0, 5).map(b => <BookCard key={b.id} book={b} />)}
-                </div>
-            </section>
-
-            {/* ── Learning Tools ── */}
-            <section>
-                <h3 className="text-base font-black text-slate-800 mb-4 flex items-center gap-2">
-                    <Brain size={16} className="text-pink-500" /> Learning Tools
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {[
-                        { icon: Sparkles, label: 'AI Book Chat', desc: 'Ask anything about your books', href: '/ai-chat', bg: 'from-indigo-600 to-violet-600', text: 'text-white' },
-                        { icon: FileText, label: 'Study Notes', desc: 'Summarise & save notes', href: '/ai-chat', bg: 'from-blue-50 to-indigo-50', text: 'text-slate-800', border: 'border border-indigo-100' },
-                        { icon: BookCopy, label: 'Past Questions', desc: 'Exam prep resources', href: '/documents?filter=past-questions', bg: 'from-emerald-50 to-teal-50', text: 'text-slate-800', border: 'border border-emerald-100' }, { icon: Users, label: 'Study Groups', desc: 'Collaborate with peers', href: '/documents', bg: 'from-orange-50 to-amber-50', text: 'text-slate-800', border: 'border border-orange-100' },
-                    ].map(({ icon: Icon, label, desc, href, bg, text, border }) => (
-                        <Link href={href} key={label}>
-                            <div className={`bg-gradient-to-br ${bg} ${border || ''} rounded-2xl p-4 hover:shadow-md transition-all cursor-pointer h-full`}>
-                                <Icon size={20} className={label === 'AI Book Chat' ? 'text-white mb-2' : 'text-indigo-500 mb-2'} />
-                                <p className={`text-xs font-black ${text}`}>{label}</p>
-                                <p className={`text-[10px] mt-0.5 ${label === 'AI Book Chat' ? 'text-white/70' : 'text-slate-400'}`}>{desc}</p>
-                            </div>
-                        </Link>
-                    ))}
-                </div>
-            </section>
-
-            <CampusPulse />
-
-            {/* ── Seller/Author Card ── */}
-            {user?.isSeller ? (
-                <div className="bg-[#0d2b1e] rounded-3xl p-6 text-white shadow-xl flex flex-col justify-between">
-                    <div>
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="p-2.5 bg-emerald-500/20 rounded-xl">
-                                <DollarSign size={20} className="text-emerald-400" />
-                            </div>
-                            <span className="text-[9px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded-md uppercase tracking-wider">Author</span>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '18px' }}>
+                        <div>
+                            <p className="section-label">What's Happening</p>
+                            <h3 className="lan-serif section-title">Campus Pulse</h3>
                         </div>
-                        <p className="text-emerald-300/60 text-xs font-semibold">Available Balance</p>
-                        <h3 className="text-4xl font-black mt-0.5">₦{sellerStats?.accountBalance?.toLocaleString() || '0'}</h3>
-                        <p className="text-emerald-400/50 text-[10px] mt-1">{sellerStats?.totalSales || 0} total sales</p>
+                        <Link href="/documents" className="section-link">All Docs <ChevronRight size={12} /></Link>
                     </div>
-                    <div className="mt-6 grid grid-cols-2 gap-3">
-                        <Link href="/advertise">
-                            <button className="w-full bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors">
-                                <Plus size={14} /> Upload
-                            </button>
-                        </Link>
-                        <Link href="/my-account/seller-account">
-                            <button className="w-full bg-white/10 hover:bg-white/20 text-white font-black py-2.5 rounded-xl text-xs transition-colors">
-                                Studio
-                            </button>
-                        </Link>
-                    </div>
-                </div>
-            ) : (
-                <div className="bg-gradient-to-br from-indigo-700 to-violet-800 rounded-3xl p-6 text-white shadow-xl flex flex-col justify-between">
-                    <div>
-                        <div className="p-2.5 bg-white/10 rounded-xl w-fit mb-4">
-                            <Store size={20} className="text-white" />
-                        </div>
-                        <h3 className="text-xl font-black leading-tight">Turn Notes<br />into Cash 💸</h3>
-                        <p className="text-indigo-200 text-xs mt-2 leading-relaxed">
-                            Your study guides could earn thousands. Join 500+ student authors on LAN Library.
-                        </p>
-                    </div>
-                    <Link href="/become-seller" className="mt-5">
-                        <button className="w-full bg-white text-indigo-700 font-black py-3 rounded-2xl shadow-lg hover:bg-indigo-50 transition-colors text-sm">
-                            Start Selling Now →
-                        </button>
-                    </Link>
-                </div>
-            )}
 
-            {/* ── Top Contributors ── */}
-            {/* ── Top Students Making Money ── */}
-            <section className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
-                <h3 className="text-sm font-black text-slate-800 flex items-center gap-2 mb-5">
-                    <Award size={15} className="text-yellow-500" /> Top Students Making Money on LAN Library
-                </h3>
-                <div className="space-y-3">
-                    {topStudents.length === 0 ? (
-                        <div className="text-center py-6">
-                            <Award size={32} className="mx-auto text-slate-200 mb-2" />
-                            <p className="text-xs font-bold text-slate-400">No student with 15+ sales yet</p>
-                            <p className="text-[10px] text-slate-300 mt-1">Be the first to make the leaderboard!</p>
-                        </div>
-                    ) : (
-                        topStudents.map((s, i) => (
-                            <div key={s.id} className="flex items-center gap-3">
-                                {/* Rank badge */}
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs flex-shrink-0 ${i === 0 ? 'bg-yellow-100 text-yellow-700' :
-                                    i === 1 ? 'bg-slate-100 text-slate-600' :
-                                        i === 2 ? 'bg-orange-100 text-orange-600' :
-                                            'bg-gray-50 text-gray-400'
-                                    }`}>
-                                    {i + 1}
-                                </div>
-
-                                {/* Avatar */}
-                                {s.photoURL ? (
-                                    <img
-                                        src={s.photoURL}
-                                        alt={s.name}
-                                        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                                        onError={e => {
-                                            e.target.style.display = 'none';
-                                        }}
-                                    />
-                                ) : (
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-blue-500 flex items-center justify-center text-white font-black text-xs flex-shrink-0">
-                                        {s.name.charAt(0).toUpperCase()}
-                                    </div>
-                                )}
-
-                                {/* Info */}
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-black text-slate-800 truncate">{s.name}</p>
-                                    <p className="text-[10px] text-slate-400">{s.booksSold} docs sold</p>
-                                </div>
-
-                                {/* Earnings */}
-                                <span className="text-xs font-black text-emerald-600 flex-shrink-0">
-                                    ₦{Number(s.earnings).toLocaleString()}
-                                </span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0' }}>
+                        {campusBooks.length === 0 ? (
+                            <div className="empty-state">
+                                <Activity size={32} style={{ color: '#e5ddd0', margin: '0 auto 10px' }} />
+                                <p style={{ fontSize: '13px', color: '#aaa', fontFamily: "'Lato',sans-serif" }}>No activity yet</p>
                             </div>
-                        ))
-                    )}
-                </div>
-            </section>
-        </div>
-    );
-
-    /* ════════════════ LIBRARY TAB ════════════════ */
-    const renderLibrary = () => (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h2 className="text-xl font-black text-slate-800">My Library</h2>
-                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
-                    <Filter size={14} className="text-slate-400" />
-                    <span className="text-xs font-semibold text-slate-500">Filter</span>
-                </div>
-            </div>
-            {library.length === 0 ? (
-                <div className="bg-white rounded-3xl p-14 text-center border border-slate-100 shadow-sm">
-                    <BookOpen size={48} className="mx-auto text-slate-200 mb-4" />
-                    <h3 className="text-lg font-black text-slate-800 mb-1">Your Library is Empty</h3>
-                    <p className="text-slate-500 text-sm mb-6">Start building your collection</p>
-                    <Link href="/documents">
-                        <button className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-indigo-500 transition-colors">
-                            Browse Documents
-                        </button>
-                    </Link>
-                </div>
-            ) : (
-                <>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {library.map((b, idx) => {
-                            const stableKey = b.bookId || b.id || `lib-${idx}`;
-                            const chatId = b.bookId || b.firestoreId || b.id;
+                        ) : campusBooks.map((b, i) => {
+                            const navId = b.firestoreId;
+                            const thumb = getThumbnailUrl(b);
                             return (
-                                <div key={stableKey} className="flex flex-col gap-2">
-                                    <BookCard book={b} />
-                                    <AIChatBanner bookTitle={b.title} bookId={chatId} />
-                                </div>
+                                <Link key={b.firestoreId || i} href={`/book/preview?id=${navId}`} style={{ textDecoration: 'none' }}>
+                                    <div className="campus-row">
+                                        {/* rank */}
+                                        <div style={{ width: '24px', flexShrink: 0, textAlign: 'center' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 700, color: i < 3 ? GOLD : '#ccc', fontFamily: "'Lato',sans-serif" }}>{i + 1}</span>
+                                        </div>
+                                        {/* thumb */}
+                                        <div style={{ width: '38px', height: '52px', background: '#ede8df', flexShrink: 0, overflow: 'hidden' }}>
+                                            {thumb ? (
+                                                <img src={thumb} alt={b.title || ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display = 'none'} />
+                                            ) : (
+                                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <BookOpen size={14} style={{ color: '#ccc' }} />
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* meta */}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <p style={{ fontSize: '12px', fontWeight: 700, color: NAVY, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Lato',sans-serif" }}>
+                                                {b.title}
+                                            </p>
+                                            <p style={{ fontSize: '10px', color: '#888', margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>
+                                                {b.sellerName || b.author || ''}
+                                            </p>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{ fontSize: '10px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>
+                                                    ₦{Number(b.price || 0).toLocaleString()}
+                                                </span>
+                                                {b.category && (
+                                                    <span style={{ fontSize: '8px', fontWeight: 700, background: CREAM, border: '0.5px solid rgba(184,150,62,.3)', color: GOLD, padding: '1px 7px', fontFamily: "'Lato',sans-serif", textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                                                        {b.category}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <ChevronRight size={13} style={{ color: '#ccc', flexShrink: 0 }} />
+                                    </div>
+                                </Link>
                             );
                         })}
                     </div>
-                </>
+                </section>
+
+                {/* ── JUST ADDED ── */}
+                <section>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '18px' }}>
+                        <div>
+                            <p className="section-label">Fresh Uploads</p>
+                            <h3 className="lan-serif section-title">Just Added</h3>
+                        </div>
+                        <Link href="/documents" className="section-link">All Books <ChevronRight size={12} /></Link>
+                    </div>
+
+                    {latestBooks.length === 0 ? (
+                        <div className="empty-state">
+                            <Zap size={32} style={{ color: '#e5ddd0', margin: '0 auto 10px' }} />
+                            <p style={{ fontSize: '13px', color: '#aaa', fontFamily: "'Lato',sans-serif" }}>No books uploaded yet</p>
+                        </div>
+                    ) : (
+                        <div className="books-grid">
+                            {latestBooks.slice(0, 5).map((b, i) => (
+                                <BookCard key={b.firestoreId || i} book={b} />
+                            ))}
+                        </div>
+                    )}
+                </section>
+
+                {/* ── LEARNING TOOLS ── */}
+                <section>
+                    <p className="section-label" style={{ marginBottom: '8px' }}>Resources</p>
+                    <h3 className="lan-serif section-title" style={{ marginBottom: '18px' }}>Learning Tools</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: '12px' }}>
+                        {[
+                            { icon: Sparkles, label: 'AI Book Chat', sub: 'Ask anything about your books', href: '/ai-chat', accent: true },
+                            { icon: FileText, label: 'Study Notes', sub: 'Summarise & save', href: '/ai-chat', accent: false },
+                            { icon: BookCopy, label: 'Past Questions', sub: 'Exam prep resources', href: '/document-type/past-question', accent: false },
+                            { icon: Users, label: 'Study Groups', sub: 'Collaborate with peers', href: '/documents', accent: false },
+                        ].map(({ icon: Icon, label, sub, href, accent }) => (
+                            <Link key={label} href={href} style={{ textDecoration: 'none' }}>
+                                <div className={`tool-card${accent ? ' tool-card-accent' : ''}`}>
+                                    <Icon size={18} style={{ color: accent ? '#fff' : GOLD, marginBottom: '8px' }} />
+                                    <p style={{ fontSize: '12px', fontWeight: 700, color: accent ? '#fff' : NAVY, margin: '0 0 3px', fontFamily: "'Lato',sans-serif" }}>{label}</p>
+                                    <p style={{ fontSize: '10px', color: accent ? 'rgba(245,240,232,.6)' : '#aaa', margin: 0, fontFamily: "'Lato',sans-serif" }}>{sub}</p>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                </section>
+
+                {/* ── SELL PANEL ── */}
+                <section>
+                    {user?.isSeller ? (
+                        <div className="seller-panel">
+                            <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '80px', height: '80px', border: '0.5px solid rgba(184,150,62,.15)', transform: 'rotate(45deg)' }} />
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                                <div>
+                                    <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: GOLD, margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>Author Dashboard</p>
+                                    <p className="lan-serif" style={{ fontSize: '28px', fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>
+                                        ₦{(sellerStats?.accountBalance || 0).toLocaleString()}
+                                    </p>
+                                    <p style={{ fontSize: '11px', color: 'rgba(245,240,232,.5)', fontFamily: "'Lato',sans-serif" }}>{sellerStats?.totalSales || sellerStats?.booksSold || 0} total sales</p>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <Link href="/upload-document"><button className="panel-btn-gold">Upload</button></Link>
+                                    <Link href="/my-account/seller-account"><button className="panel-btn-ghost">Studio</button></Link>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="seller-panel">
+                            <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '80px', height: '80px', border: '0.5px solid rgba(184,150,62,.15)', transform: 'rotate(45deg)' }} />
+                            <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: GOLD, margin: '0 0 10px', fontFamily: "'Lato',sans-serif" }}>Earn on LAN</p>
+                            <h3 className="lan-serif" style={{ fontSize: '22px', fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>
+                                Turn Notes<br />into Cash 💸
+                            </h3>
+                            <p style={{ fontSize: '12px', color: 'rgba(245,240,232,.55)', fontFamily: "'Lato',sans-serif", lineHeight: 1.65, margin: '0 0 18px', maxWidth: '340px' }}>
+                                Your study guides could earn thousands. Join 500+ student authors — keep 80% of every sale.
+                            </p>
+                            <Link href="/become-seller"><button className="panel-btn-gold">Start Selling Now →</button></Link>
+                        </div>
+                    )}
+                </section>
+
+                {/* ── ACTIVE STUDENTS ── */}
+                <section>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '18px' }}>
+                        <div>
+                            <p className="section-label">Community</p>
+                            <h3 className="lan-serif section-title">Active Students</h3>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#16a34a' }} />
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: '#16a34a', fontFamily: "'Lato',sans-serif" }}>{activeStudents.length} online</span>
+                        </div>
+                    </div>
+
+                    <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '4px 16px 0' }}>
+                        {activeStudents.length === 0 ? (
+                            <div style={{ padding: '32px 0', textAlign: 'center' }}>
+                                <Users size={28} style={{ color: '#e5ddd0', margin: '0 auto 8px' }} />
+                                <p style={{ fontSize: '12px', color: '#aaa', fontFamily: "'Lato',sans-serif" }}>No active students right now</p>
+                            </div>
+                        ) : activeStudents.map((s, i) => (
+                            <ActiveStudentRow key={s.id} student={s} rank={i} />
+                        ))}
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    );
+
+    /* ════════ LIBRARY TAB ════════ */
+    const renderLibrary = () => (
+        <div>
+            <div style={{ marginBottom: '24px' }}>
+                <p className="section-label">Your Collection</p>
+                <h2 className="lan-serif" style={{ fontSize: '28px', fontWeight: 700, color: NAVY, margin: '4px 0 0' }}>My Library</h2>
+            </div>
+
+            {library.length === 0 ? (
+                <div className="empty-state" style={{ padding: '64px 24px' }}>
+                    <BookOpen size={48} style={{ color: '#e5ddd0', margin: '0 auto 16px' }} />
+                    <h3 className="lan-serif" style={{ fontSize: '22px', color: NAVY, marginBottom: '8px' }}>Your Library is Empty</h3>
+                    <p style={{ fontSize: '13px', color: '#aaa', marginBottom: '20px', fontFamily: "'Lato',sans-serif" }}>Start building your collection</p>
+                    <Link href="/documents"><button className="cta-btn">Browse Documents</button></Link>
+                </div>
+            ) : (
+                <div>
+                    <div className="books-grid-wide">
+                        {library.map((b, i) => (
+                            <BookCard key={b.bookId || b.id || i} book={b} owned />
+                        ))}
+                    </div>
+                    {/* AI prompts under each book */}
+                    <div style={{ marginTop: '24px', borderTop: '0.5px solid #f0ebe0', paddingTop: '24px' }}>
+                        <p className="section-label" style={{ marginBottom: '12px' }}>AI Tutor</p>
+                        <h3 className="lan-serif" style={{ fontSize: '18px', color: NAVY, margin: '0 0 14px' }}>Chat About Your Books</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {library.slice(0, 4).map((b, i) => {
+                                const chatId = b.bookId || b.firestoreId || b.id || '';
+                                return (
+                                    <Link key={i} href={`/ai-chat?bookId=${chatId}&bookTitle=${encodeURIComponent(b.title || '')}`} style={{ textDecoration: 'none' }}>
+                                        <div className="ai-banner">
+                                            <div style={{ width: '34px', height: '34px', background: 'rgba(255,255,255,.15)', border: '0.5px solid rgba(255,255,255,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                <Sparkles size={14} style={{ color: '#fff' }} />
+                                            </div>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.6)', margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>AI Tutor</p>
+                                                <p style={{ fontSize: '12px', fontWeight: 700, color: '#fff', margin: 0, fontFamily: "'Lato',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Ask about "{b.title}"</p>
+                                            </div>
+                                            <ArrowRight size={13} style={{ color: 'rgba(255,255,255,.5)', flexShrink: 0 }} />
+                                        </div>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
 
-    /* ════════════════ AI TAB ════════════════ */
+    /* ════════ AI TAB ════════ */
     const renderAI = () => (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-                    <Sparkles size={18} className="text-indigo-500" /> AI Tutor
-                </h2>
+        <div>
+            <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                <div>
+                    <p className="section-label">Powered by Claude</p>
+                    <h2 className="lan-serif" style={{ fontSize: '28px', fontWeight: 700, color: NAVY, margin: '4px 0 0' }}>AI Tutor</h2>
+                </div>
                 <Link href="/ai-chat">
-                    <button className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-500 transition-colors">
+                    <button className="cta-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <Plus size={13} /> New Chat
                     </button>
                 </Link>
             </div>
 
             {/* Quick start */}
-            <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-6 text-white">
-                <Sparkles size={24} className="mb-3 text-white/80" />
-                <h3 className="text-lg font-black mb-1">Ask anything about your books</h3>
-                <p className="text-indigo-200 text-xs mb-4">Summaries, key concepts, exam tips, explanations — powered by AI.</p>
-                <Link href="/ai-chat">
-                    <button className="bg-white text-indigo-700 font-black px-5 py-2.5 rounded-xl text-sm hover:bg-indigo-50 transition-colors shadow-lg">
-                        Start AI Chat →
-                    </button>
-                </Link>
+            <div className="seller-panel" style={{ marginBottom: '24px' }}>
+                <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '80px', height: '80px', border: '0.5px solid rgba(184,150,62,.15)', transform: 'rotate(45deg)' }} />
+                <Sparkles size={22} style={{ color: GOLD, marginBottom: '12px' }} />
+                <h3 className="lan-serif" style={{ fontSize: '22px', fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>Ask anything about your books</h3>
+                <p style={{ fontSize: '12px', color: 'rgba(245,240,232,.55)', fontFamily: "'Lato',sans-serif", margin: '0 0 18px' }}>Summaries, key concepts, exam tips, explanations.</p>
+                <Link href="/ai-chat"><button className="panel-btn-gold">Start AI Chat →</button></Link>
             </div>
 
-            {/* Chat sessions grouped by book */}
+            {/* sessions */}
             {aiSessions.length > 0 && (
-                <div className="space-y-3">
-                    <h3 className="text-sm font-black text-slate-700">Recent Conversations</h3>
-                    {aiSessions.map(s => (
-                        <Link key={s.id} href={`/ai-chat?sessionId=${s.id}&bookId=${s.bookId}&bookTitle=${encodeURIComponent(s.bookTitle || '')}`}>
-                            <div className="group bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
-                                    <BookMarked size={16} className="text-indigo-500" />
+                <div style={{ marginBottom: '24px' }}>
+                    <p className="section-label" style={{ marginBottom: '12px' }}>Recent</p>
+                    <h3 className="lan-serif" style={{ fontSize: '18px', color: NAVY, margin: '0 0 14px' }}>Your Conversations</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {aiSessions.map(s => (
+                            <Link key={s.id} href={`/ai-chat?sessionId=${s.id}&bookId=${s.bookId}&bookTitle=${encodeURIComponent(s.bookTitle || '')}`} style={{ textDecoration: 'none' }}>
+                                <div className="ai-session-row">
+                                    <div style={{ width: '36px', height: '36px', border: '0.5px solid #e5ddd0', background: CREAM, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                        <MessageSquare size={14} style={{ color: NAVY }} />
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <p style={{ fontSize: '12px', fontWeight: 700, color: NAVY, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Lato',sans-serif" }}>
+                                            {s.title || 'New conversation'}
+                                        </p>
+                                        <p style={{ fontSize: '10px', color: GOLD, margin: 0, fontFamily: "'Lato',sans-serif" }}>{s.bookTitle || ''}</p>
+                                    </div>
+                                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                        <p style={{ fontSize: '10px', color: '#aaa', margin: 0, fontFamily: "'Lato',sans-serif" }}>{s.messages?.length || 0} msgs</p>
+                                        <p style={{ fontSize: '9px', color: '#ccc', margin: '2px 0 0', fontFamily: "'Lato',sans-serif" }}>{formatTime(s.updatedAt)}</p>
+                                    </div>
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-black text-slate-800 line-clamp-1 group-hover:text-indigo-600 transition-colors">{s.title || 'Conversation'}</p>
-                                    <p className="text-[10px] text-indigo-500 font-semibold mt-0.5">{s.bookTitle}</p>
-                                    <p className="text-[9px] text-slate-400 mt-0.5">{s.messages?.length || 0} messages · {s.updatedAt?.toDate?.()?.toLocaleDateString?.() || ''}</p>
-                                </div>
-                                <ChevronRight size={14} className="text-slate-300 group-hover:text-indigo-400 shrink-0" />
-                            </div>
-                        </Link>
-                    ))}
+                            </Link>
+                        ))}
+                    </div>
                 </div>
             )}
 
-            {/* Library books with AI prompt */}
             {library.length > 0 && (
-                <div className="space-y-3">
-                    <h3 className="text-sm font-black text-slate-700">Chat About Your Books</h3>
-                    <div className="space-y-2">
-                        {library.slice(0, 2).map((b, idx) => (
-                            <AIChatBanner
-                                key={`ai-${idx}`}
-                                bookTitle={b.title}
-                                bookId={b.bookId || b.firestoreId || b.id}
-                            />
-                        ))}
+                <div>
+                    <p className="section-label" style={{ marginBottom: '12px' }}>Quick Access</p>
+                    <h3 className="lan-serif" style={{ fontSize: '18px', color: NAVY, margin: '0 0 14px' }}>Chat About Your Books</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {library.map((b, i) => {
+                            const chatId = b.bookId || b.firestoreId || b.id || '';
+                            return (
+                                <Link key={i} href={`/ai-chat?bookId=${chatId}&bookTitle=${encodeURIComponent(b.title || '')}`} style={{ textDecoration: 'none' }}>
+                                    <div className="ai-banner">
+                                        <div style={{ width: '34px', height: '34px', background: 'rgba(255,255,255,.15)', border: '0.5px solid rgba(255,255,255,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                            <Sparkles size={14} style={{ color: '#fff' }} />
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.6)', margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>AI Tutor</p>
+                                            <p style={{ fontSize: '12px', fontWeight: 700, color: '#fff', margin: 0, fontFamily: "'Lato',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Ask about "{b.title}"</p>
+                                        </div>
+                                        <ArrowRight size={13} style={{ color: 'rgba(255,255,255,.5)', flexShrink: 0 }} />
+                                    </div>
+                                </Link>
+                            );
+                        })}
                     </div>
                 </div>
             )}
         </div>
     );
 
-    /* ════════════════ WISHLIST TAB ════════════════ */
+    /* ════════ WISHLIST TAB ════════ */
     const renderWishlist = () => (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h2 className="text-xl font-black text-slate-800">Saved Books</h2>
-                <p className="text-xs font-semibold text-slate-400">{wishlist.length} items</p>
+        <div>
+            <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                <div>
+                    <p className="section-label">Your Wishlist</p>
+                    <h2 className="lan-serif" style={{ fontSize: '28px', fontWeight: 700, color: NAVY, margin: '4px 0 0' }}>Saved Books</h2>
+                </div>
+                <span style={{ fontSize: '12px', color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{wishlist.length} items</span>
             </div>
+
             {wishlist.length === 0 ? (
-                <div className="bg-white rounded-3xl p-14 text-center border border-slate-100 shadow-sm">
-                    <Heart size={48} className="mx-auto text-slate-200 mb-4" />
-                    <h3 className="text-lg font-black text-slate-800 mb-1">Nothing Saved Yet</h3>
-                    <p className="text-slate-500 text-sm mb-6">Browse and save books for later</p>
-                    <Link href="/documents">
-                        <button className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-indigo-500 transition-colors">Browse Documents</button>
-                    </Link>
+                <div className="empty-state" style={{ padding: '64px 24px' }}>
+                    <Heart size={48} style={{ color: '#e5ddd0', margin: '0 auto 16px' }} />
+                    <h3 className="lan-serif" style={{ fontSize: '22px', color: NAVY, marginBottom: '8px' }}>Nothing Saved Yet</h3>
+                    <p style={{ fontSize: '13px', color: '#aaa', marginBottom: '20px', fontFamily: "'Lato',sans-serif" }}>Browse and save books for later</p>
+                    <Link href="/documents"><button className="cta-btn">Browse Documents</button></Link>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {wishlist.map(item => (
-                        <div key={item.id} className="bg-white rounded-2xl shadow-sm p-4 flex gap-4 border border-slate-100 hover:border-indigo-100 hover:shadow-md transition-all">
-                            <div className="w-20 h-28 bg-slate-100 rounded-xl flex-shrink-0 overflow-hidden">
-                                <img src={item.thumbnail || item.image} alt={item.title} className="w-full h-full object-cover"
-                                    onError={e => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h4 className="font-black text-slate-800 text-sm line-clamp-2 leading-tight">{item.title}</h4>
-                                <p className="text-xs text-slate-400 mt-1">{item.author}</p>
-                                <p className="text-base font-black text-indigo-600 mt-2">₦{item.price?.toLocaleString()}</p>
-                                <div className="flex gap-2 mt-3">
-                                    <Link href={`/payment?bookId=${item.id}`} className="flex-1">
-                                        <button className="w-full bg-indigo-600 text-white px-3 py-2 rounded-xl text-xs font-bold hover:bg-indigo-500 transition-colors">Buy Now</button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {wishlist.map((item, i) => {
+                        const thumb = getThumbnailUrl(item);
+                        const navId = item.bookId || item.firestoreId || item.id;
+                        return (
+                            <div key={item.id || i} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '14px 16px', display: 'flex', gap: '14px', alignItems: 'center', transition: 'border-color .18s' }}
+                                onMouseEnter={e => e.currentTarget.style.borderColor = GOLD}
+                                onMouseLeave={e => e.currentTarget.style.borderColor = '#e5ddd0'}>
+                                <div style={{ width: '44px', height: '58px', background: '#ede8df', flexShrink: 0, overflow: 'hidden' }}>
+                                    {thumb ? <img src={thumb} alt={item.title || ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display = 'none'} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><BookOpen size={16} style={{ color: '#ccc' }} /></div>}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Lato',sans-serif" }}>{item.title || item.bookTitle}</p>
+                                    <p style={{ fontSize: '11px', color: '#888', margin: '0 0 6px', fontFamily: "'Lato',sans-serif" }}>{item.author || ''}</p>
+                                    <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>₦{Number(item.price || 0).toLocaleString()}</p>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                    <Link href={`/payment?bookId=${navId}`}>
+                                        <button style={{ padding: '8px 16px', background: NAVY, color: '#fff', border: 'none', fontSize: '11px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>Buy</button>
                                     </Link>
-                                    <button className="px-3 py-2 border-2 border-slate-100 rounded-xl hover:bg-red-50 hover:border-red-100 transition-colors">
-                                        <Heart size={14} className="text-red-400" fill="currentColor" />
-                                    </button>
+                                    <Link href={`/book/preview?id=${navId}`}>
+                                        <button style={{ padding: '8px 12px', background: 'transparent', color: NAVY, border: '0.5px solid #e5ddd0', fontSize: '11px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
+                                            <Eye size={13} />
+                                        </button>
+                                    </Link>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>
     );
 
     const NAV = [
-        { id: 'home', icon: LayoutDashboard, label: 'Home' },
-        { id: 'library', icon: LibraryBig, label: 'Library' },
-        { id: 'ai', icon: Sparkles, label: 'AI Tutor' },
-        { id: 'wishlist', icon: Heart, label: 'Saved' },
+        { id: 'home',     icon: LayoutDashboard, label: 'Home'    },
+        { id: 'library',  icon: LibraryBig,       label: 'Library' },
+        { id: 'ai',       icon: Sparkles,          label: 'AI Tutor'},
+        { id: 'wishlist', icon: Heart,             label: 'Saved'  },
     ];
 
+    /* ════════ RENDER ════════ */
     return (
-        <div className="min-h-screen bg-[#f4f6fb]" style={{ fontFamily: "'DM Sans', 'Nunito', system-ui, sans-serif" }}>
-            <Navbar />
+        <>
+            <style>{`
+              @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
 
-            <div className="flex max-w-7xl mx-auto">
-                {/* ── Desktop Sidebar ── */}
-                <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-slate-100 min-h-[calc(100vh-64px)] sticky top-16 p-4 gap-1">
+              * { box-sizing: border-box; }
+              .lan-root  { font-family: 'Lato', sans-serif; background: ${BG}; }
+              .lan-serif { font-family: 'Playfair Display', Georgia, serif; }
+              .sbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+              .sbar-none::-webkit-scrollbar { display: none; }
+
+              /* hero */
+              .student-hero {
+                background-color: ${NAVY};
+                background-image: radial-gradient(rgba(184,150,62,.06) 1px,transparent 1px),
+                                  radial-gradient(rgba(255,255,255,.03) 1px,transparent 1px);
+                background-size: 28px 28px, 14px 14px;
+                background-position: 0 0, 7px 7px;
+                padding: 32px 28px 28px;
+                position: relative; overflow: hidden;
+                margin-bottom: 28px;
+              }
+
+              /* section labels */
+              .section-label { font-size: 10px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: ${GOLD}; margin: 0 0 6px; font-family: 'Lato', sans-serif; }
+              .section-title { font-family: 'Playfair Display', serif; font-size: clamp(18px,3vw,26px); font-weight: 700; color: ${NAVY}; margin: 0; }
+              .section-link  { font-size: 11px; font-weight: 700; color: ${NAVY}; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; letter-spacing: .04em; font-family: 'Lato', sans-serif; transition: color .15s; }
+              .section-link:hover { color: ${GOLD}; }
+
+              /* books grid */
+              .books-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
+              .books-grid-wide { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
+
+              /* book card */
+              .book-thumb-card { background: #fff; border: 0.5px solid #e5ddd0; overflow: hidden; transition: transform .22s, box-shadow .22s, border-color .22s; }
+              .book-thumb-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(13,34,68,.12); border-color: ${GOLD}; }
+
+              /* lecturer card */
+              .lec-card { background: #fff; border: 0.5px solid #e5ddd0; overflow: hidden; transition: transform .25s cubic-bezier(.4,0,.2,1), box-shadow .25s, border-color .25s; }
+              .lec-card:hover { transform: translateY(-5px); box-shadow: 0 18px 44px rgba(13,34,68,.12); border-color: ${GOLD}; }
+              .lec-card:hover .lec-img { transform: scale(1.05); }
+              .lec-img { transition: transform .6s cubic-bezier(.4,0,.2,1); }
+
+              /* campus row */
+              .campus-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 0.5px solid #f0ebe0; background: #fff; text-decoration: none; transition: background .15s; cursor: pointer; }
+              .campus-row:hover { background: ${CREAM}; }
+              .campus-row:last-child { border-bottom: none; }
+
+              /* tool card */
+              .tool-card { background: #fff; border: 0.5px solid #e5ddd0; padding: 18px 16px; transition: transform .2s, border-color .2s, box-shadow .2s; height: 100%; }
+              .tool-card:hover { transform: translateY(-3px); border-color: ${GOLD}; box-shadow: 0 8px 24px rgba(13,34,68,.08); }
+              .tool-card-accent { background: ${NAVY}; border-color: ${NAVY}; }
+              .tool-card-accent:hover { border-color: ${GOLD}; }
+
+              /* seller panel */
+              .seller-panel { background: ${NAVY}; background-image: radial-gradient(rgba(184,150,62,.07) 1px,transparent 1px); background-size: 24px 24px; padding: 28px; position: relative; overflow: hidden; }
+
+              /* panel buttons */
+              .panel-btn-gold { padding: 10px 20px; background: ${GOLD}; color: ${NAVY}; border: none; fontSize: 12px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Lato', sans-serif; letter-spacing: .04em; transition: background .18s; }
+              .panel-btn-gold:hover { background: ${GOLDD}; }
+              .panel-btn-ghost { padding: 10px 20px; background: rgba(255,255,255,.1); color: #fff; border: 0.5px solid rgba(255,255,255,.2); font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Lato', sans-serif; letter-spacing: .04em; transition: background .18s; }
+              .panel-btn-ghost:hover { background: rgba(255,255,255,.18); }
+
+              /* hero cta */
+              .hero-cta-btn { display: inline-flex; align-items: center; gap: 7px; padding: 11px 22px; background: ${GOLD}; color: ${NAVY}; border: none; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Lato', sans-serif; letter-spacing: .04em; transition: background .18s; }
+              .hero-cta-btn:hover { background: ${GOLDD}; }
+
+              /* cta button */
+              .cta-btn { padding: 10px 22px; background: ${NAVY}; color: #fff; border: none; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Lato', sans-serif; letter-spacing: .04em; transition: background .18s; }
+              .cta-btn:hover { background: #1a3a6e; }
+
+              /* empty state */
+              .empty-state { background: #fff; border: 0.5px solid #e5ddd0; padding: 48px 24px; text-align: center; }
+
+              /* ai banner */
+              .ai-banner { display: flex; align-items: center; gap: 12px; background: ${NAVY}; padding: 12px 16px; transition: background .15s; }
+              .ai-banner:hover { background: #1a3a6e; }
+
+              /* ai session row */
+              .ai-session-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 0.5px solid #e5ddd0; background: #fff; transition: border-color .15s, background .15s; }
+              .ai-session-row:hover { border-color: ${GOLD}; background: ${CREAM}; }
+
+              /* sidebar */
+              .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; font-size: 13px; font-weight: 700; color: #888; transition: all .15s; background: none; border: none; width: 100%; text-align: left; font-family: 'Lato', sans-serif; letter-spacing: .02em; }
+              .sidebar-item:hover { background: ${CREAM}; color: ${NAVY}; border-left: 2px solid transparent; }
+              .sidebar-item.active { background: ${CREAM}; color: ${NAVY}; border-left: 2px solid ${GOLD}; }
+
+              /* mobile nav */
+              .mob-nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none; cursor: pointer; font-family: 'Lato', sans-serif; padding: 6px 12px; transition: all .15s; color: rgba(245,240,232,.4); }
+              .mob-nav-item.active { color: ${GOLD}; }
+
+              @keyframes spin { to { transform: rotate(360deg); } }
+              @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+              .anim-up { animation: slideUp .45s cubic-bezier(.4,0,.2,1) both; }
+              @keyframes pulse2 { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+              .pulse-dot { animation: pulse2 2s infinite; }
+            `}</style>
+
+            <div className="lan-root" style={{ minHeight: '100vh' }}>
+                <Navbar />
+
+                <div style={{ display: 'flex', maxWidth: '1280px', margin: '0 auto' }}>
+
+                    {/* ── Desktop Sidebar ── */}
+                    <aside style={{ width: '220px', flexShrink: 0, display: 'none', flexDirection: 'column', borderRight: '0.5px solid #e5ddd0', minHeight: 'calc(100vh - 64px)', position: 'sticky', top: '64px', background: '#fff', padding: '24px 0' }} className="desk-sidebar">
+                        <style>{`@media(min-width:1024px){.desk-sidebar{display:flex !important;}}`}</style>
+
+                        {/* user pill */}
+                        <div style={{ padding: '0 16px 20px', borderBottom: '0.5px solid #f0ebe0', marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                {user?.photoBase64 || user?.photoURL ? (
+                                    <img src={user.photoBase64 || user.photoURL} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${GOLD}` }} />
+                                ) : (
+                                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: palette.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid rgba(184,150,62,.3)` }}>
+                                        <span style={{ color: palette.text, fontSize: '13px', fontWeight: 700, fontFamily: "'Playfair Display',serif" }}>{initials}</span>
+                                    </div>
+                                )}
+                                <div style={{ minWidth: 0 }}>
+                                    <p style={{ fontSize: '12px', fontWeight: 700, color: NAVY, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Lato',sans-serif" }}>{displayName}</p>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                        <div className="pulse-dot" style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#16a34a' }} />
+                                        <span style={{ fontSize: '9px', fontWeight: 700, color: GOLD, letterSpacing: '.1em', textTransform: 'uppercase', fontFamily: "'Lato',sans-serif" }}>Student</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {NAV.map(({ id, icon: Icon, label }) => (
+                            <button key={id} onClick={() => setActiveTab(id)} className={`sidebar-item${activeTab === id ? ' active' : ''}`}>
+                                <Icon size={15} style={{ color: activeTab === id ? GOLD : '#bbb' }} />{label}
+                            </button>
+                        ))}
+
+                        <div style={{ borderTop: '0.5px solid #f0ebe0', margin: '12px 0', padding: '8px 0' }}>
+                            <Link href="/documents" style={{ textDecoration: 'none' }}>
+                                <button className="sidebar-item"><Search size={15} style={{ color: '#bbb' }} />Browse All</button>
+                            </Link>
+                            <Link href="/my-account" style={{ textDecoration: 'none' }}>
+                                <button className="sidebar-item"><User size={15} style={{ color: '#bbb' }} />Profile</button>
+                            </Link>
+                            {user?.isSeller ? (
+                                <Link href="/my-account/seller-account" style={{ textDecoration: 'none' }}>
+                                    <button className="sidebar-item" style={{ color: '#16a34a' }}>
+                                        <BarChart2 size={15} style={{ color: '#16a34a' }} />Author Studio
+                                    </button>
+                                </Link>
+                            ) : (
+                                <Link href="/become-seller" style={{ textDecoration: 'none' }}>
+                                    <button className="sidebar-item" style={{ color: GOLD }}>
+                                        <Store size={15} style={{ color: GOLD }} />Become a Seller
+                                    </button>
+                                </Link>
+                            )}
+                        </div>
+
+                        <button onClick={() => { auth.signOut(); router.push('/auth/signin'); }}
+                            style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: '13px', fontWeight: 700, fontFamily: "'Lato',sans-serif" }}>
+                            <LogOut size={15} /> Sign Out
+                        </button>
+                    </aside>
+
+                    {/* ── Main Content ── */}
+                    <main style={{ flex: 1, minWidth: 0, padding: '0 0 80px' }} className="main-pad">
+                        <style>{`@media(min-width:1024px){.main-pad{padding:32px 32px 32px !important;}}`}</style>
+                        {activeTab === 'home'     && renderHome()}
+                        {activeTab === 'library'  && renderLibrary()}
+                        {activeTab === 'ai'       && renderAI()}
+                        {activeTab === 'wishlist' && renderWishlist()}
+                    </main>
+                </div>
+
+                {/* ── Mobile Bottom Nav ── */}
+                <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: NAVY, borderTop: '0.5px solid rgba(184,150,62,.2)', display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', padding: '10px 0 14px', zIndex: 50 }} className="mob-nav">
+                    <style>{`@media(min-width:1024px){.mob-nav{display:none !important;}}`}</style>
+
                     {NAV.map(({ id, icon: Icon, label }) => (
-                        <button key={id} onClick={() => setActiveTab(id)}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all ${activeTab === id ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}>
-                            <Icon size={16} /> {label}
+                        <button key={id} onClick={() => setActiveTab(id)} className={`mob-nav-item${activeTab === id ? ' active' : ''}`}>
+                            <Icon size={20} />
+                            <span style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase' }}>{label}</span>
+                            {activeTab === id && <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: GOLD }} />}
                         </button>
                     ))}
-                    <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
-                        <Link href="/documents">
-                            <button className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-slate-50 text-sm font-semibold w-full">
-                                <Search size={16} /> Browse All
-                            </button>
-                        </Link>
-                        <Link href="/my-account/seller-account">
-                            <button className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-slate-50 text-sm font-semibold w-full">
-                                <User size={16} /> Profile
-                            </button>
-                        </Link>
-                        {user?.isSeller ? (
-                            <Link href="/my-account/seller-account">
-                                <button className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-sm font-bold w-full">
-                                    <BarChart3 size={16} /> Author Studio
-                                </button>
-                            </Link>
-                        ) : (
-                            <Link href="/become-seller">
-                                <button className="flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-sm font-bold w-full">
-                                    <Store size={16} /> Become a Seller
-                                </button>
-                            </Link>
-                        )}
-                    </div>
-                    <button onClick={() => { auth.signOut(); router.push('/auth/signin'); }}
-                        className="mt-auto flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 text-sm font-semibold">
-                        <LogOut size={16} /> Logout
-                    </button>
-                </aside>
 
-                {/* ── Main ── */}
-                <main className="flex-1 p-4 md:p-6 pb-28 lg:pb-8 min-w-0">
-                    {activeTab === 'home' && renderHome()}
-                    {activeTab === 'library' && renderLibrary()}
-                    {activeTab === 'ai' && renderAI()}
-                    {activeTab === 'wishlist' && renderWishlist()}
-                </main>
-            </div>
-
-            {/* ── Mobile Bottom Nav ── */}
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#0f1b4c] z-50 px-2 pb-safe">
-                <div className="flex justify-around items-end py-3">
-                    {NAV.map(({ id, icon: Icon, label }) => (
-                        <button key={id} onClick={() => setActiveTab(id)}
-                            className={`flex flex-col items-center gap-1 transition-all duration-300 px-3 ${activeTab === id ? 'text-white scale-110' : 'text-blue-300/40'}`}>
-                            <Icon size={22} />
-                            <span className="text-[9px] font-black uppercase tracking-wider">{label}</span>
-                            {activeTab === id && <div className="w-1 h-1 bg-indigo-400 rounded-full animate-pulse" />}
-                        </button>
-                    ))}
-                    <Link href="/advertise" className="-translate-y-4">
-                        <div className="bg-indigo-500 p-3.5 rounded-2xl shadow-lg shadow-indigo-500/40 border-4 border-[#0f1b4c] active:scale-90 transition-transform">
-                            <Plus size={22} className="text-white" strokeWidth={3} />
+                    {/* Upload FAB */}
+                    <Link href="/advertise" style={{ marginBottom: '8px' }}>
+                        <div style={{ width: '48px', height: '48px', background: GOLD, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${NAVY}` }}>
+                            <Plus size={22} style={{ color: NAVY }} strokeWidth={3} />
                         </div>
                     </Link>
-                    <Link href="/my-account/seller-account">
-                        <button className="flex flex-col items-center gap-1 text-blue-300/40 hover:text-white transition-colors px-3">
-                            <User size={22} />
-                            <span className="text-[9px] font-black uppercase tracking-wider">Profile</span>
+
+                    <Link href="/my-account" style={{ textDecoration: 'none' }}>
+                        <button className="mob-nav-item">
+                            <User size={20} />
+                            <span style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase' }}>Profile</span>
                         </button>
                     </Link>
                 </div>
             </div>
-        </div>
+        </>
     );
 }

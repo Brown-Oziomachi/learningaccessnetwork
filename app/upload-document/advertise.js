@@ -99,6 +99,12 @@ const documentTypes = [
     { name: 'Translation Resource', group: 'General' },
     { name: 'Motivational Resource', group: 'General' },
     { name: 'Community Timetable', group: 'General' },
+    // Cooking & Culinary
+    { name: 'Recipe Book', group: 'Cooking & Culinary' },
+    { name: 'Culinary Notes', group: 'Cooking & Culinary' },
+    { name: 'Food Science Notes', group: 'Cooking & Culinary' },
+    { name: 'Nutrition Guide', group: 'Cooking & Culinary' },
+    { name: 'Meal Plan', group: 'Cooking & Culinary' },
 ];
 
 const docTypeGroups = [...new Set(documentTypes.map(d => d.group))];
@@ -109,7 +115,7 @@ const categories = [
     'History', 'Arts & Culture', 'Relationship', 'Self-Help', 'Finance',
     'Marketing', 'Programming', 'Psychology', 'Fiction', 'Non-Fiction',
     'Philosophy', 'Travel', 'Cooking', 'Religion & Spirituality',
-    'Sex Education', 'Social Media'
+    'Sex Education', 'Social Media', 'Cooking',
 ];
 
 const institutionalCategories = [

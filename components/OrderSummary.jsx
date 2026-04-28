@@ -1,5 +1,10 @@
 // OrderSummary.jsx - Complete Component with PDF Thumbnail Support
 
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+
 // Helper function to generate thumbnail from PDF
 const getThumbnailUrl = (book) => {
   if (!book)
@@ -42,21 +47,29 @@ const getThumbnailUrl = (book) => {
 export const OrderSummary = ({ book }) => {
   if (!book) {
     return (
-      <div className="bg-white rounded-lg shadow-lg p-6 sticky top-8">
-        <p className="text-gray-600">Loading order summary...</p>
+      <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24, position: "sticky", top: 32 }}>
+        <p style={{ color: "#888", fontFamily: "'Lato',sans-serif", fontSize: 13 }}>Loading order summary...</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 sticky top-8">
-      <h3 className="text-xl font-bold text-gray-900 mb-4">Order Summary</h3>
+    <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24, position: "sticky", top: 32 }}>
 
-      <div className="mb-4">
+      {/* Header */}
+      <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".2em", textTransform: "uppercase", color: GOLD, margin: "0 0 4px", fontFamily: "'Lato',sans-serif" }}>
+        Order Summary
+      </p>
+      <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: NAVY, margin: "0 0 20px" }}>
+        Your Purchase
+      </h3>
+
+      {/* Thumbnail */}
+      <div style={{ marginBottom: 16, border: "0.5px solid #e5ddd0", overflow: "hidden", background: CREAM }}>
         <img
           src={getThumbnailUrl(book)}
           alt={book.title}
-          className="w-full h-48 object-cover rounded-lg mb-3 border border-gray-200 bg-gray-100"
+          style={{ width: "100%", height: 192, objectFit: "cover", display: "block" }}
           onError={(e) => {
             console.log("Thumbnail failed to load, using fallback");
             e.target.src =
@@ -64,57 +77,75 @@ export const OrderSummary = ({ book }) => {
           }}
           loading="lazy"
         />
-        <h4 className="font-bold text-gray-900">{book.title}</h4>
-        <p className="text-sm text-gray-600">{book.author}</p>
-        <p className="text-xs text-gray-500 mt-1">
+      </div>
+
+      {/* Book info */}
+      <div style={{ marginBottom: 20 }}>
+        <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>
+          {book.title}
+        </h4>
+        <p style={{ fontSize: 12, color: "#888", fontFamily: "'Lato',sans-serif", margin: "0 0 4px" }}>
+          {book.author}
+        </p>
+        <p style={{ fontSize: 11, color: "#aaa", fontFamily: "'Lato',sans-serif", margin: 0 }}>
           {book.pages} pages • {book.format}
         </p>
         {book.description && (
-          <p className="text-xs text-gray-500 mt-2 line-clamp-2">
+          <p style={{ fontSize: 11, color: "#aaa", fontFamily: "'Lato',sans-serif", marginTop: 8, lineHeight: 1.6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
             {book.description}
           </p>
         )}
       </div>
 
-      <div className="border-t border-gray-200 pt-4 space-y-3">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Subtotal</span>
-          <span className="font-semibold text-blue-950">
-            ₦ {book.price?.toLocaleString() || "0"}
-          </span>
+      {/* Price breakdown */}
+      <div style={{ borderTop: "0.5px solid #e5ddd0", paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, fontFamily: "'Lato',sans-serif" }}>
+          <span style={{ color: "#888" }}>Subtotal</span>
+          <span style={{ fontWeight: 700, color: NAVY }}>₦ {book.price?.toLocaleString() || "0"}</span>
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Processing Fee</span>
-          <span className="font-semibold text-blue-950">₦ 0</span>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, fontFamily: "'Lato',sans-serif" }}>
+          <span style={{ color: "#888" }}>Processing Fee</span>
+          <span style={{ fontWeight: 700, color: NAVY }}>₦ 0</span>
         </div>
+
         {book.discount && (
-          <div className="flex justify-between text-sm text-green-600">
-            <span>LAN Lib's </span>
-            <span className="font-semibold">
-              20%
-            </span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, fontFamily: "'Lato',sans-serif" }}>
+            <span style={{ color: "#16a34a" }}>LAN Lib's Discount</span>
+            <span style={{ fontWeight: 700, color: "#16a34a" }}>20%</span>
           </div>
         )}
-        <div className="border-t border-gray-200 pt-3 flex justify-between text-lg font-bold">
-          <span className="text-gray-600">Total</span>
-          <span className="text-blue-950">
+
+        {/* Total */}
+        <div style={{ borderTop: "0.5px solid #e5ddd0", paddingTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 13, color: "#888", fontFamily: "'Lato',sans-serif" }}>Total</span>
+          <span style={{ fontFamily: "'Playfair Display',serif", fontSize: 24, fontWeight: 700, color: NAVY }}>
             ₦ {book.price?.toLocaleString() || "0"}
           </span>
         </div>
       </div>
 
-      <div className="mt-6 bg-blue-950 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-50">
-          <strong>✓ Instant Access</strong>
+      {/* Instant access badge */}
+      <div style={{
+        marginTop: 20,
+        background: NAVY,
+        backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)",
+        backgroundSize: "20px 20px",
+        border: "0.5px solid rgba(184,150,62,0.2)",
+        padding: "14px 16px",
+      }}>
+        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", fontFamily: "'Lato',sans-serif", lineHeight: 1.65, margin: 0 }}>
+          <span style={{ color: GOLDD, fontWeight: 700 }}>✓ Instant Access</span>
           <br />
           Access your PDF immediately after payment
         </p>
       </div>
 
+      {/* Sold by */}
       {book.sellerName && (
-        <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
-          <p className="text-xs text-gray-600">
-            <strong>Sold by:</strong> {book.sellerName}
+        <div style={{ marginTop: 12, background: CREAM, border: "0.5px solid #e5ddd0", padding: "10px 14px" }}>
+          <p style={{ fontSize: 11, color: "#888", fontFamily: "'Lato',sans-serif", margin: 0 }}>
+            <span style={{ fontWeight: 700, color: NAVY }}>Sold by:</span> {book.sellerName}
           </p>
         </div>
       )}

@@ -2571,17 +2571,18 @@ export default function BookPreviewPage() {
                 >
                   By {book.author}
                 </p>
-                <p
-                  style={{
-                    fontSize: "13px",
-                    color: "#555",
-                    lineHeight: 1.8,
-                    whiteSpace: "pre-line",
-                    fontFamily: "'Lato',sans-serif",
-                  }}
-                >
-                  {book.message}
-                </p>
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "#555",
+                  lineHeight: 1.75,
+                  fontFamily: "'Lato',sans-serif",
+                  margin: 0,
+                  whiteSpace: "pre-line",
+                }}
+              >
+                {book.message}
+              </p>
               </div>
             </div>
           </>

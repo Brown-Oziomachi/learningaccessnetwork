@@ -39,44 +39,25 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { createPortal } from "react-dom";
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
 const GOLD = "#b8963e";
-const GOLDD = "#d4aa5a"; // lighter / hover gold
+const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
-const TOPBAR_BG = "#f9f6f0"; // the "recently published" strip
+const TOPBAR_BG = "#f9f6f0";
 
 /* ─── search tag data ────────────────────────────────────────── */
 const searchTags = [
   { name: "Textbook", description: "Standard educational books", icon: Book },
-  {
-    name: "Lecture Note",
-    description: "Summarized class materials",
-    icon: FileText,
-  },
-  {
-    name: "Past Question",
-    description: "Previous exam papers",
-    icon: FileQuestion,
-  },
-  {
-    name: "Thesis",
-    description: "Academic research papers",
-    icon: GraduationCap,
-  },
+  { name: "Lecture Note", description: "Summarized class materials", icon: FileText },
+  { name: "Past Question", description: "Previous exam papers", icon: FileQuestion },
+  { name: "Thesis", description: "Academic research papers", icon: GraduationCap },
   { name: "Summary", description: "Quick study breakdowns", icon: List },
   { name: "Syllabus", description: "Course requirements", icon: ClipboardList },
-  {
-    name: "Course Outline",
-    description: "Topic distributions",
-    icon: BookOpen,
-  },
-  {
-    name: "Assignment",
-    description: "Practice tasks and projects",
-    icon: PenTool,
-  },
+  { name: "Course Outline", description: "Topic distributions", icon: BookOpen },
+  { name: "Assignment", description: "Practice tasks and projects", icon: PenTool },
   { name: "Project", description: "Detailed student projects", icon: Folder },
 ];
 
@@ -86,11 +67,7 @@ const NAV_CATS = [
   { key: "business", label: "Business" },
   { key: "technology", label: "Technology" },
   { key: "science", label: "Science" },
-  {
-    key: "sexeducation",
-    label: "Sex Education",
-    href: "/category/sex-education",
-  },
+  { key: "sexeducation", label: "Sex Education", href: "/category/sex-education" },
 ];
 
 export default function Navbar() {
@@ -105,10 +82,12 @@ export default function Navbar() {
   const [checkingSeller, setCheckingSeller] = useState(true);
   const [showSearchTags, setShowSearchTags] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+  const catButtonRefs = useRef({});
   const router = useRouter();
   const searchTagsRef = useRef(null);
   const dropdownTimer = useRef(null);
+  const [isDesktop, setIsDesktop] = useState(false);
 
   /* scroll shadow */
   useEffect(() => {
@@ -168,6 +147,14 @@ export default function Navbar() {
     return () => unsub();
   }, []);
 
+
+useEffect(() => {
+  const check = () => setIsDesktop(window.innerWidth > 900);
+  check(); // run on mount
+  window.addEventListener("resize", check);
+  return () => window.removeEventListener("resize", check);
+}, []);
+
   /* click outside search tags */
   useEffect(() => {
     const handler = (e) => {
@@ -189,45 +176,34 @@ export default function Navbar() {
   };
 
   const HandleClick = () => {
-    if (!user) {
-      router.push("/auth/signin");
-      return;
-    }
+    if (!user) { router.push("/auth/signin"); return; }
     router.push(isSeller ? "/upload-document" : "/become-seller");
   };
 
   const handleMyAccountClick = async () => {
-    if (!user) {
-      router.push("/auth/signin");
-      return;
-    }
+    if (!user) { router.push("/auth/signin"); return; }
     try {
       const snap = await getDoc(doc(db, "users", user.uid));
-      if (!snap.exists()) {
-        router.push("/role-selection");
-        return;
-      }
+      if (!snap.exists()) { router.push("/role-selection"); return; }
       const data = snap.data();
-      if (!data.role) {
-        router.push("/role-selection");
-        return;
-      }
+      if (!data.role) { router.push("/role-selection"); return; }
       if (data.role === "student") router.push("/student/dashboard");
-      else if (data.role === "seller" || data.isSeller)
-        router.push("/my-account/seller-account");
+      else if (data.role === "seller" || data.isSeller) router.push("/my-account/seller-account");
       else router.push("/");
     } catch {
       router.push("/");
     }
   };
 
-  const getBooksByCategory = (cat) =>
-    allBooks
-      .filter((b) => b.category?.toLowerCase().includes(cat.toLowerCase()))
-      .slice(0, 6);
+  /* ─── FIX: getBooksByCategory is defined INSIDE useMemo so it
+         always reads the current allBooks when the memo recalculates ─── */
+  const menuCategories = useMemo(() => {
+    const getBooksByCategory = (cat) =>
+      allBooks
+        .filter((b) => b.category?.toLowerCase().includes(cat.toLowerCase()))
+        .slice(0, 6);
 
-  const menuCategories = useMemo(
-    () => ({
+    return {
       education: {
         title: "Education Documents",
         description: "Academic resources and study guides",
@@ -253,9 +229,8 @@ export default function Navbar() {
         description: "Sexual health, relationships, wellness",
         books: getBooksByCategory("sex education"),
       },
-    }),
-    [allBooks],
-  );
+    };
+  }, [allBooks]); // ← allBooks is the only dep; memo re-runs whenever books load
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -266,9 +241,14 @@ export default function Navbar() {
 
   /* dropdown hover with delay to avoid flicker */
   const openDropdown = (key) => {
-    clearTimeout(dropdownTimer.current);
-    setActiveDropdown(key);
-  };
+  clearTimeout(dropdownTimer.current);
+  const btn = catButtonRefs.current[key];
+  if (btn) {
+    const rect = btn.getBoundingClientRect();
+    setDropdownPos({ top: rect.bottom, left: rect.left });
+  }
+  setActiveDropdown(key);
+};
   const closeDropdown = () => {
     dropdownTimer.current = setTimeout(() => setActiveDropdown(null), 180);
   };
@@ -302,12 +282,25 @@ export default function Navbar() {
         }
         .lan-cat-btn:hover, .lan-cat-btn.active { color: ${NAVY}; background: rgba(13,34,68,0.06); }
 
+        /* ─── DESKTOP DROPDOWN FIX: removed top gap that caused mouseLeave ─── */
+        .lan-dropdown-wrapper {
+          position: relative;
+        }
+        .lan-dropdown-wrapper::after {
+          content: '';
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          height: 8px; /* bridges the 1px gap between button and dropdown */
+          background: transparent;
+        }
         .lan-dropdown {
-          position: absolute; top: calc(100% + 1px); left: 0;
+          position: fixed;
           min-width: 640px; background: #fff;
           border: 0.5px solid #e8e2d8;
           box-shadow: 0 20px 60px rgba(13,34,68,0.14);
-          z-index: 999; padding: 0; overflow: hidden;
+          z-index: 9999; padding: 0;
           animation: dropIn 0.18s cubic-bezier(0.4,0,0.2,1);
         }
         @keyframes dropIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
@@ -382,6 +375,21 @@ export default function Navbar() {
         }
         .lan-mobile-link:hover { background: #f9f6f0; }
 
+        /* ─── MOBILE: book cards in submenu ─── */
+        .lan-mobile-book-card {
+          padding: 12px 16px;
+          border: 0.5px solid #ede8df;
+          border-radius: 8px;
+          background: #fdfaf6;
+          text-decoration: none;
+          display: block;
+          transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .lan-mobile-book-card:hover {
+          border-color: ${GOLD};
+          box-shadow: 0 4px 16px rgba(184,150,62,0.12);
+        }
+
         .lan-divider-gold {
           height: 1px; background: linear-gradient(90deg, transparent, ${GOLD}, transparent);
           opacity: 0.35; margin: 8px 0;
@@ -412,20 +420,25 @@ export default function Navbar() {
         }
         .lan-ai-fab:hover { transform: scale(1.06); box-shadow: 0 8px 32px rgba(14,165,233,0.5); }
         @keyframes fabPop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+       @media (max-width: 900px) {
+      #hamburger-btn { display: flex !important; }
+      .lan-search-wrap { display: none !important; }
+      nav { display: none !important; }
+      .lan-category-bar { display: none !important; }
+    }
       `}</style>
 
-      {/* ═══════════════════════════════════════════════════════════
-          TOP ANNOUNCEMENT BAR
-      ═══════════════════════════════════════════════════════════ */}
+      {/* ══ TOP ANNOUNCEMENT BAR ══ */}
       <Link href="/latest/documentations" className="lan-topbar-ticker">
         <span style={{ color: GOLD }}>●</span>
         Recently Published
         <ChevronRight size={13} />
       </Link>
 
-      {/* ═══════════════════════════════════════════════════════════
-          MAIN HEADER
-      ═══════════════════════════════════════════════════════════ */}
+      {/* ══ MAIN HEADER ══ */}
       <header
         style={{
           background: NAVY,
@@ -433,78 +446,39 @@ export default function Navbar() {
           position: "sticky",
           top: 0,
           zIndex: 500,
-          transition: "box-shadow 0.3s",
-          boxShadow: scrolled ? "0 4px 32px rgba(13,34,68,0.38)" : "none",
         }}
       >
-        <div
-          style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 20px" }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "16px",
-              height: "64px",
-            }}
-          >
+        <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px", height: "64px" }}>
+
             {/* hamburger */}
             <button
               className="lan-nav-link"
               style={{ padding: "8px", display: "none" }}
               id="hamburger-btn"
-              onClick={() => {
-                setShowMobileMenu(!showMobileMenu);
-                setShowMobileSearch(false);
-              }}
+              onClick={() => { setShowMobileMenu(!showMobileMenu); setShowMobileSearch(false); }}
               aria-label="Menu"
             >
               {showMobileMenu ? <X size={22} /> : <Menu size={22} />}
             </button>
 
             {/* ── BRAND ── */}
-            <Link
-              href="/home"
-              style={{ textDecoration: "none", flexShrink: 0 }}
-            >
-              <div
-                style={{
-                  fontFamily: "'Playfair Display', Georgia, serif",
-                  lineHeight: 1.05,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "22px",
-                    fontWeight: 900,
-                    color: CREAM,
-                    letterSpacing: "-0.5px",
-                  }}
-                >
+            <Link href="/home" style={{ textDecoration: "none", flexShrink: 0 }}>
+              <div style={{ fontFamily: "'Playfair Display', Georgia, serif", lineHeight: 1.05 }}>
+                <div style={{ fontSize: "22px", fontWeight: 900, color: CREAM, letterSpacing: "-0.5px" }}>
                   [LAN Library]
                 </div>
-                <div
-                  style={{
-                    fontSize: "10px",
-                    fontWeight: 300,
-                    color: GOLD,
-                    letterSpacing: "0.15em",
-                    textTransform: "uppercase",
-                    fontFamily: "'Lato', sans-serif",
-                    marginTop: "1px",
-                  }}
-                >
+                <div style={{
+                  fontSize: "10px", fontWeight: 300, color: GOLD, letterSpacing: "0.15em",
+                  textTransform: "uppercase", fontFamily: "'Lato', sans-serif", marginTop: "1px",
+                }}>
                   The Global Student Library
                 </div>
               </div>
             </Link>
 
             {/* ── DESKTOP SEARCH ── */}
-            <div
-              className="lan-search-wrap"
-              ref={searchTagsRef}
-              style={{ margin: "0 12px" }}
-            >
+            <div className="lan-search-wrap" ref={searchTagsRef} style={{ margin: "0 12px" }}>
               <input
                 className="lan-search-input"
                 type="text"
@@ -517,43 +491,24 @@ export default function Navbar() {
               <button
                 onClick={handleSearch}
                 style={{
-                  position: "absolute",
-                  right: "10px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: GOLD,
-                  display: "flex",
+                  position: "absolute", right: "10px", top: "50%",
+                  transform: "translateY(-50%)", background: "none",
+                  border: "none", cursor: "pointer", color: GOLD, display: "flex",
                 }}
               >
                 <Search size={16} />
               </button>
 
-              {/* search tag dropdown */}
               {showSearchTags && (
                 <div className="lan-tag-dropdown">
-                  <p
-                    style={{
-                      fontSize: "10px",
-                      fontWeight: 700,
-                      color: "#aaa",
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase",
-                      marginBottom: "8px",
-                      paddingLeft: "10px",
-                    }}
-                  >
+                  <p style={{
+                    fontSize: "10px", fontWeight: 700, color: "#aaa",
+                    letterSpacing: "0.12em", textTransform: "uppercase",
+                    marginBottom: "8px", paddingLeft: "10px",
+                  }}>
                     Browse by type
                   </p>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr 1fr",
-                      gap: "4px",
-                    }}
-                  >
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "4px" }}>
                     {searchTags.map((tag) => {
                       const Icon = tag.icon;
                       return (
@@ -566,40 +521,16 @@ export default function Navbar() {
                             handleSearch();
                           }}
                         >
-                          <div
-                            style={{
-                              width: "30px",
-                              height: "30px",
-                              borderRadius: "6px",
-                              background: "#f9f6f0",
-                              border: `0.5px solid #ede8df`,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
+                          <div style={{
+                            width: "30px", height: "30px", borderRadius: "6px",
+                            background: "#f9f6f0", border: `0.5px solid #ede8df`,
+                            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                          }}>
                             <Icon size={14} style={{ color: NAVY }} />
                           </div>
                           <div>
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: NAVY,
-                              }}
-                            >
-                              {tag.name}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                color: "#888",
-                                marginTop: "1px",
-                              }}
-                            >
-                              {tag.description}
-                            </div>
+                            <div style={{ fontSize: "12px", fontWeight: 700, color: NAVY }}>{tag.name}</div>
+                            <div style={{ fontSize: "11px", color: "#888", marginTop: "1px" }}>{tag.description}</div>
                           </div>
                         </button>
                       );
@@ -610,28 +541,12 @@ export default function Navbar() {
             </div>
 
             {/* ── DESKTOP NAV LINKS ── */}
-            <nav
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "2px",
-                marginLeft: "auto",
-              }}
-            >
-              <Link href="/my-books" className="lan-nav-link">
-                <Book size={15} /> My Books
-              </Link>
-              <button className="lan-nav-link" onClick={handleMyAccountClick}>
-                <User size={15} /> Account
-              </button>
-              <Link href="/lecturers" className="lan-nav-link">
-                <Crown size={15} /> Lecturers
-              </Link>
-              <Link href="/saved-my-book" className="lan-nav-link">
-                <Bookmark size={15} /> Saved
-              </Link>
+            <nav style={{ display: "flex", alignItems: "center", gap: "2px", marginLeft: "auto" }}>
+              <Link href="/my-books" className="lan-nav-link"><Book size={15} /> My Books</Link>
+              <button className="lan-nav-link" onClick={handleMyAccountClick}><User size={15} /> Account</button>
+              <Link href="/lecturers" className="lan-nav-link"><Crown size={15} /> Lecturers</Link>
+              <Link href="/saved-my-book" className="lan-nav-link"><Bookmark size={15} /> Saved</Link>
 
-              {/* sell / upload CTA */}
               <button
                 className="lan-sell-btn"
                 onClick={HandleClick}
@@ -639,362 +554,188 @@ export default function Navbar() {
                 style={{ marginLeft: "6px" }}
               >
                 {checkingSeller ? (
-                  <span
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: "12px",
-                        height: "12px",
-                        border: "2px solid rgba(13,34,68,0.3)",
-                        borderTopColor: NAVY,
-                        borderRadius: "50%",
-                        display: "inline-block",
-                        animation: "spin 0.7s linear infinite",
-                      }}
-                    />
+                  <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{
+                      width: "12px", height: "12px",
+                      border: "2px solid rgba(13,34,68,0.3)", borderTopColor: NAVY,
+                      borderRadius: "50%", display: "inline-block",
+                      animation: "spin 0.7s linear infinite",
+                    }} />
                     Loading…
                   </span>
                 ) : isSeller ? (
-                  <span
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "5px",
-                    }}
-                  >
-                    <Upload size={13} />
-                    Upload
+                  <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                    <Upload size={13} /> Upload
                   </span>
-                ) : (
-                  "Become a Seller"
-                )}
+                ) : "Become a Seller"}
               </button>
 
-              <button
-                className="lan-logout-btn"
-                onClick={handleLogout}
-                style={{ marginLeft: "4px" }}
-              >
+              <button className="lan-logout-btn" onClick={handleLogout} style={{ marginLeft: "4px" }}>
                 <LogOut size={14} />
               </button>
             </nav>
-
-            {/* mobile: search + hamburger shown via CSS on small screens */}
           </div>
         </div>
 
         {/* ── CATEGORY BAR ── */}
-        <div
-          style={{
-            background: CREAM,
-            borderTop: `1px solid rgba(13,34,68,0.1)`,
-          }}
-        >
-          <div
-            style={{
-              maxWidth: "1280px",
-              margin: "0 auto",
-              padding: "0 20px",
-              display: "flex",
-              alignItems: "center",
-              gap: "0",
-              overflowX: "auto",
-            }}
-          >
-            <Link
-              href="/docs"
-              target="_blank"
-              style={{
-                fontSize: "11px",
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                padding: "10px 14px",
-                color: "#888",
-                textDecoration: "none",
-                whiteSpace: "nowrap",
-                fontFamily: "'Lato', sans-serif",
-              }}
-            >
+          <div className="lan-category-bar" style={{ background: CREAM, borderTop: `1px solid rgba(13,34,68,0.1)`, position: "relative", zIndex: 600, overflow: "visible" }}>
+            <div style={{
+            maxWidth: "1280px", margin: "0 auto", padding: "0 20px",
+            display: "flex", alignItems: "center", gap: "0", overflowX: "auto",
+          }}>
+            <Link href="/docs" target="_blank" style={{
+              fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em",
+              textTransform: "uppercase", padding: "10px 14px",
+              color: "#888", textDecoration: "none", whiteSpace: "nowrap",
+              fontFamily: "'Lato', sans-serif",
+            }}>
               What is LAN?
             </Link>
 
-            {/* thin gold divider */}
-            <div
-              style={{
-                width: "1px",
-                height: "18px",
-                background: "rgba(184,150,62,0.3)",
-                flexShrink: 0,
-              }}
-            />
+            <div style={{ width: "1px", height: "18px", background: "rgba(184,150,62,0.3)", flexShrink: 0 }} />
 
-            {/* category dropdowns */}
+            {/* ─── DESKTOP DROPDOWN: wrapper div handles both button + panel hover ─── */}
             {NAV_CATS.map(({ key, label, href }) => (
               <div
                 key={key}
+                className="lan-dropdown-wrapper"
                 style={{ position: "relative" }}
                 onMouseEnter={() => openDropdown(key)}
                 onMouseLeave={closeDropdown}
               >
-                <button
-                  className={`lan-cat-btn ${activeDropdown === key ? "active" : ""}`}
-                >
+                <button 
+                  ref={(el) => (catButtonRefs.current[key] = el)}  
+                className={`lan-cat-btn ${activeDropdown === key ? "active" : ""}`}>
                   {label}
                   <ChevronDown
                     size={11}
                     style={{
                       transition: "transform 0.2s",
-                      transform:
-                        activeDropdown === key ? "rotate(180deg)" : "none",
+                      transform: activeDropdown === key ? "rotate(180deg)" : "none",
                     }}
                   />
                 </button>
 
-                {activeDropdown === key && (
-                  <div
-                    className="lan-dropdown"
-                    onMouseEnter={() => openDropdown(key)}
-                    onMouseLeave={closeDropdown}
-                  >
-                    {/* dropdown header */}
+                  {activeDropdown === key && isDesktop && createPortal(               
                     <div
-                      style={{
-                        padding: "20px 24px 16px",
-                        borderBottom: `1px solid #f0ebe0`,
-                        background: "#fdfaf6",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                          marginBottom: "6px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "3px",
-                            height: "20px",
-                            background: GOLD,
-                            borderRadius: "2px",
-                          }}
-                        />
-                        <h3
-                          style={{
-                            fontFamily: "'Playfair Display', serif",
-                            fontSize: "18px",
-                            fontWeight: 700,
-                            color: NAVY,
-                            margin: 0,
-                          }}
-                        >
-                          {menuCategories[key]?.title}
-                        </h3>
-                      </div>
-                      <p
-                        style={{
-                          fontSize: "12px",
-                          color: "#888",
-                          margin: "0 0 0 13px",
-                          fontFamily: "'Lato', sans-serif",
-                        }}
-                      >
-                        {menuCategories[key]?.description}
-                      </p>
+                  className="lan-dropdown"
+                  style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left }}
+                  onMouseEnter={() => openDropdown(key)}
+                  onMouseLeave={closeDropdown}
+                >
+                  {/* dropdown header */}
+                  <div style={{
+                    padding: "20px 24px 16px", borderBottom: `1px solid #f0ebe0`,
+                    background: "#fdfaf6",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                      <div style={{ width: "3px", height: "20px", background: GOLD, borderRadius: "2px" }} />
+                      <h3 style={{
+                        fontFamily: "'Playfair Display', serif", fontSize: "18px",
+                        fontWeight: 700, color: NAVY, margin: 0,
+                      }}>
+                        {menuCategories[key]?.title}
+                      </h3>
                     </div>
+                    <p style={{ fontSize: "12px", color: "#888", margin: "0 0 0 13px", fontFamily: "'Lato', sans-serif" }}>
+                      {menuCategories[key]?.description}
+                    </p>
+                  </div>
 
-                    {menuCategories[key]?.books?.length > 0 ? (
-                      <>
-                        <div style={{ padding: "16px 24px 0" }}>
-                          <p
-                            style={{
-                              fontSize: "10px",
-                              fontWeight: 700,
-                              color: GOLD,
-                              letterSpacing: "0.14em",
-                              textTransform: "uppercase",
-                              margin: "0 0 12px",
-                            }}
-                          >
-                            Recommended for you
-                          </p>
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: "repeat(3, 1fr)",
-                              gap: "10px",
-                            }}
-                          >
-                            {menuCategories[key].books.map((book) => (
-                              <Link
-                                key={book.id}
-                                href={`/book/preview?id=${book.id}`}
-                                className="lan-book-card"
-                                onClick={() => setActiveDropdown(null)}
-                              >
-                                <h5
-                                  style={{
-                                    fontSize: "12px",
-                                    fontWeight: 700,
-                                    color: NAVY,
-                                    margin: "0 0 4px",
-                                    display: "-webkit-box",
-                                    WebkitLineClamp: 2,
-                                    WebkitBoxOrient: "vertical",
-                                    overflow: "hidden",
-                                  }}
-                                >
-                                  {book.title}
-                                </h5>
-                                <p
-                                  style={{
-                                    fontSize: "11px",
-                                    color: "#888",
-                                    margin: 0,
-                                  }}
-                                >
-                                  by {book.author}
-                                </p>
-                              </Link>
-                            ))}
-                          </div>
-                        </div>
-                        <div style={{ padding: "14px 24px 16px" }}>
-                          <Link
-                            href={href || `/category/${key}`}
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: GOLD,
-                              textDecoration: "none",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              letterSpacing: "0.04em",
-                            }}
-                            onClick={() => setActiveDropdown(null)}
-                          >
-                            View all {label} documents{" "}
-                            <ChevronRight size={12} />
-                          </Link>
-                        </div>
-                      </>
-                    ) : (
-                      <div style={{ padding: "24px", textAlign: "center" }}>
-                        <BookOpen
-                          size={28}
-                          style={{ color: "#ddd", margin: "0 auto 8px" }}
-                        />
-                        <p
-                          style={{
-                            fontSize: "12px",
-                            color: "#aaa",
-                            fontFamily: "'Lato', sans-serif",
-                          }}
-                        >
-                          No documents yet in this category.
+                  {menuCategories[key]?.books?.length > 0 ? (
+                    <>
+                      <div style={{ padding: "16px 24px 0" }}>
+                        <p style={{
+                          fontSize: "10px", fontWeight: 700, color: GOLD,
+                          letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 12px",
+                        }}>
+                          Recommended for you
                         </p>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
+                          {menuCategories[key].books.map((book) => (
+                            <Link
+                              key={book.id}
+                              href={`/book/preview?id=${book.id}`}
+                              className="lan-book-card"
+                              onClick={() => setActiveDropdown(null)}
+                            >
+                              <h5 style={{
+                                fontSize: "12px", fontWeight: 700, color: NAVY,
+                                margin: "0 0 4px", display: "-webkit-box",
+                                WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                              }}>
+                                {book.title}
+                              </h5>
+                              <p style={{ fontSize: "11px", color: "#888", margin: 0 }}>
+                                by {book.author}
+                              </p>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ padding: "14px 24px 16px" }}>
                         <Link
-                          href="/upload-document"
+                          href={href || `/category/${key}`}
                           style={{
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            color: GOLD,
-                            textDecoration: "none",
+                            fontSize: "12px", fontWeight: 700, color: GOLD,
+                            textDecoration: "none", display: "inline-flex",
+                            alignItems: "center", gap: "4px", letterSpacing: "0.04em",
                           }}
+                          onClick={() => setActiveDropdown(null)}
                         >
-                          Be the first to upload →
+                          View all {label} documents <ChevronRight size={12} />
                         </Link>
                       </div>
-                    )}
-                  </div>
-                )}
+                    </>
+                  ) : (
+                    <div style={{ padding: "24px", textAlign: "center" }}>
+                      <BookOpen size={28} style={{ color: "#ddd", margin: "0 auto 8px" }} />
+                      <p style={{ fontSize: "12px", color: "#aaa", fontFamily: "'Lato', sans-serif" }}>
+                        No documents yet in this category.
+                      </p>
+                      <Link href="/upload-document" style={{ fontSize: "12px", fontWeight: 700, color: GOLD, textDecoration: "none" }}>
+                        Be the first to upload →
+                      </Link>
+                    </div>
+                  )}
+                </div>,
+                document.body 
+              )}
               </div>
             ))}
 
-            <div
-              style={{
-                width: "1px",
-                height: "18px",
-                background: "rgba(184,150,62,0.3)",
-                flexShrink: 0,
-              }}
-            />
+            <div style={{ width: "1px", height: "18px", background: "rgba(184,150,62,0.3)", flexShrink: 0 }} />
 
-            <Link
-              href="/documents"
-              style={{
-                fontSize: "11px",
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                padding: "10px 14px",
-                color: "#555",
-                textDecoration: "none",
-                whiteSpace: "nowrap",
-                fontFamily: "'Lato', sans-serif",
-              }}
-            >
+            <Link href="/documents" style={{
+              fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em",
+              textTransform: "uppercase", padding: "10px 14px",
+              color: "#555", textDecoration: "none", whiteSpace: "nowrap",
+              fontFamily: "'Lato', sans-serif",
+            }}>
               All Documents
             </Link>
           </div>
         </div>
       </header>
 
-      {/* ═══════════════════════════════════════════════════════════
-          MOBILE MENU OVERLAY
-      ═══════════════════════════════════════════════════════════ */}
+      {/* ══ MOBILE MENU OVERLAY ══ */}
       {showMobileMenu && (
         <div className="lan-mobile-overlay">
           <div style={{ padding: "16px 20px" }}>
             {/* header row */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: "20px",
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: "'Playfair Display', serif",
-                  fontSize: "20px",
-                  fontWeight: 900,
-                  color: NAVY,
-                }}
-              >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", fontWeight: 900, color: NAVY }}>
                 [LAN Library]
-                <div
-                  style={{
-                    fontFamily: "'Lato', sans-serif",
-                    fontSize: "10px",
-                    color: GOLD,
-                    fontWeight: 300,
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                  }}
-                >
+                <div style={{
+                  fontFamily: "'Lato', sans-serif", fontSize: "10px", color: GOLD,
+                  fontWeight: 300, letterSpacing: "0.12em", textTransform: "uppercase",
+                }}>
                   The Global Student Library
                 </div>
               </div>
               <button
                 onClick={() => setShowMobileMenu(false)}
-                style={{
-                  padding: "8px",
-                  background: "#f9f6f0",
-                  border: "none",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  color: NAVY,
-                }}
+                style={{ padding: "8px", background: "#f9f6f0", border: "none", borderRadius: "8px", cursor: "pointer", color: NAVY }}
               >
                 <X size={20} />
               </button>
@@ -1009,297 +750,201 @@ export default function Navbar() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 style={{
-                  width: "100%",
-                  padding: "11px 40px 11px 14px",
-                  border: `1px solid rgba(13,34,68,0.15)`,
-                  borderRadius: "8px",
-                  fontSize: "14px",
-                  fontFamily: "'Lato', sans-serif",
-                  outline: "none",
-                  color: NAVY,
-                  background: "#fdfaf6",
-                  boxSizing: "border-box",
+                  width: "100%", padding: "11px 40px 11px 14px",
+                  border: `1px solid rgba(13,34,68,0.15)`, borderRadius: "8px",
+                  fontSize: "14px", fontFamily: "'Lato', sans-serif",
+                  outline: "none", color: NAVY, background: "#fdfaf6", boxSizing: "border-box",
                 }}
               />
               <button
                 onClick={handleSearch}
                 style={{
-                  position: "absolute",
-                  right: "12px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: GOLD,
+                  position: "absolute", right: "12px", top: "50%",
+                  transform: "translateY(-50%)", background: "none",
+                  border: "none", cursor: "pointer", color: GOLD,
                 }}
               >
                 <Search size={17} />
               </button>
             </div>
 
+            {/* ─── MOBILE: main menu vs submenu ─── */}
             {mobileSubmenu === null ? (
               <>
-                {/* primary CTA */}
                 <button
                   onClick={HandleClick}
                   disabled={checkingSeller}
                   style={{
-                    width: "100%",
-                    padding: "14px 20px",
-                    background: GOLD,
-                    color: NAVY,
-                    border: "none",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    fontWeight: 700,
-                    fontFamily: "'Lato', sans-serif",
-                    cursor: "pointer",
-                    marginBottom: "20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
+                    width: "100%", padding: "14px 20px", background: GOLD,
+                    color: NAVY, border: "none", borderRadius: "8px",
+                    fontSize: "14px", fontWeight: 700, fontFamily: "'Lato', sans-serif",
+                    cursor: "pointer", marginBottom: "20px",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
                   }}
                 >
-                  {checkingSeller ? (
-                    "Loading…"
-                  ) : isSeller ? (
-                    <>
-                      <Upload size={16} />
-                      Upload Document
-                    </>
-                  ) : (
-                    "Become a Seller"
-                  )}
+                  {checkingSeller ? "Loading…" : isSeller ? <><Upload size={16} />Upload Document</> : "Become a Seller"}
                 </button>
 
                 <div className="lan-divider-gold" />
 
-                {/* nav links */}
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "2px",
-                    marginBottom: "12px",
-                  }}
-                >
+                <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginBottom: "12px" }}>
                   {[
                     { href: "/home", icon: Home, label: "Home" },
                     { href: "/my-books", icon: Book, label: "My Books" },
-                    {
-                      fn: handleMyAccountClick,
-                      icon: User,
-                      label: "My Account",
-                    },
+                    { fn: handleMyAccountClick, icon: User, label: "My Account" },
                     { href: "/lecturers", icon: Crown, label: "Lecturers" },
                     { href: "/saved-my-book", icon: Bookmark, label: "Saved" },
                     { href: "/transfer", icon: Bookmark, label: "Transfer" },
                     { href: "/referrals", icon: Bookmark, label: "Referral" },
-                    {
-                      href: "/lan/net/help-center",
-                      icon: HelpCircle,
-                      label: "Help & FAQ",
-                    },
+                    { href: "/lan/net/help-center", icon: HelpCircle, label: "Help & FAQ" },
                   ].map(({ href, fn, icon: Icon, label }) =>
                     href ? (
-                      <Link
-                        key={label}
-                        href={href}
-                        className="lan-mobile-link"
-                        onClick={() => setShowMobileMenu(false)}
-                      >
+                      <Link key={label} href={href} className="lan-mobile-link" onClick={() => setShowMobileMenu(false)}>
                         <Icon size={17} style={{ color: GOLD }} /> {label}
                       </Link>
                     ) : (
-                      <button
-                        key={label}
-                        className="lan-mobile-link"
-                        onClick={() => {
-                          fn?.();
-                          setShowMobileMenu(false);
-                        }}
-                      >
+                      <button key={label} className="lan-mobile-link" onClick={() => { fn?.(); setShowMobileMenu(false); }}>
                         <Icon size={17} style={{ color: GOLD }} /> {label}
                       </button>
-                    ),
+                    )
                   )}
                 </div>
 
                 <div className="lan-divider-gold" />
 
-                {/* categories */}
-                <p
-                  style={{
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    color: GOLD,
-                    letterSpacing: "0.14em",
-                    textTransform: "uppercase",
-                    padding: "12px 0 6px",
-                    fontFamily: "'Lato', sans-serif",
-                  }}
-                >
+                <p style={{
+                  fontSize: "10px", fontWeight: 700, color: GOLD,
+                  letterSpacing: "0.14em", textTransform: "uppercase",
+                  padding: "12px 0 6px", fontFamily: "'Lato', sans-serif",
+                }}>
                   Categories
                 </p>
-                {Object.keys(menuCategories).map((key) => (
+
+                {/* ─── each category button opens the submenu ─── */}
+                {NAV_CATS.map(({ key, label }) => (   // ← destructure label here
                   <button
                     key={key}
                     className="lan-mobile-link"
                     onClick={() => setMobileSubmenu(key)}
                     style={{ justifyContent: "space-between" }}
                   >
-                    <span
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
+                    <span style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                       <BookOpen size={16} style={{ color: GOLD }} />
-                      {menuCategories[key].title.replace(" Documents", "")}
+                      {menuCategories[key]?.title?.replace(" Documents", "") ?? label}  {/* ← fallback */}
                     </span>
                     <ChevronRight size={15} style={{ color: "#ccc" }} />
                   </button>
                 ))}
-                <Link
-                  href="/documents"
-                  className="lan-mobile-link"
-                  onClick={() => setShowMobileMenu(false)}
-                >
+
+                <Link href="/documents" className="lan-mobile-link" onClick={() => setShowMobileMenu(false)}>
                   <Book size={16} style={{ color: GOLD }} /> All Documents
                 </Link>
 
                 <div className="lan-divider-gold" />
 
-                {/* logout */}
                 <button
                   onClick={handleLogout}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "12px 20px",
-                    borderRadius: "8px",
-                    background: "rgba(239,68,68,0.08)",
-                    border: "0.5px solid rgba(239,68,68,0.2)",
-                    color: "#ef4444",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    fontFamily: "'Lato', sans-serif",
-                    cursor: "pointer",
-                    marginTop: "12px",
-                    width: "100%",
+                    display: "flex", alignItems: "center", gap: "8px",
+                    padding: "12px 20px", borderRadius: "8px",
+                    background: "rgba(239,68,68,0.08)", border: "0.5px solid rgba(239,68,68,0.2)",
+                    color: "#ef4444", fontSize: "13px", fontWeight: 700,
+                    fontFamily: "'Lato', sans-serif", cursor: "pointer",
+                    marginTop: "12px", width: "100%",
                   }}
                 >
                   <LogOut size={16} /> Sign Out
                 </button>
               </>
             ) : (
-              /* ── mobile sub-menu ── */
-              <div>
-                <button
-                  onClick={() => setMobileSubmenu(null)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    marginBottom: "20px",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: NAVY,
-                    fontFamily: "'Lato', sans-serif",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                  }}
-                >
-                  <ChevronRight
-                    size={16}
-                    style={{ transform: "rotate(180deg)" }}
-                  />{" "}
-                  Back
-                </button>
+              /* ─── MOBILE SUBMENU: shows books for tapped category ─── */
+            // ─── MOBILE SUBMENU ───
+<div>
+  <button
+    onClick={() => setMobileSubmenu(null)}
+    style={{
+      display: "flex", alignItems: "center", gap: "8px",
+      marginBottom: "20px", background: "none", border: "none",
+      cursor: "pointer", color: NAVY, fontFamily: "'Lato', sans-serif",
+      fontSize: "13px", fontWeight: 700,
+    }}
+  >
+    <ChevronRight size={16} style={{ transform: "rotate(180deg)" }} /> Back
+  </button>
 
-                <h2
-                  style={{
-                    fontFamily: "'Playfair Display', serif",
-                    fontSize: "22px",
-                    fontWeight: 700,
-                    color: NAVY,
-                    marginBottom: "6px",
-                  }}
-                >
-                  {menuCategories[mobileSubmenu]?.title}
-                </h2>
-                <p
-                  style={{
-                    fontSize: "13px",
-                    color: "#888",
-                    marginBottom: "20px",
-                    fontFamily: "'Lato', sans-serif",
-                  }}
-                >
-                  {menuCategories[mobileSubmenu]?.description}
-                </p>
+  {/* ── Use NAV_CATS label as fallback so heading always shows ── */}
+  <h2 style={{
+    fontFamily: "'Playfair Display', serif", fontSize: "22px",
+    fontWeight: 700, color: NAVY, marginBottom: "4px",
+  }}>
+    {menuCategories[mobileSubmenu]?.title 
+      ?? NAV_CATS.find(c => c.key === mobileSubmenu)?.label}
+  </h2>
+  <p style={{ fontSize: "13px", color: "#888", marginBottom: "20px", fontFamily: "'Lato', sans-serif" }}>
+    {menuCategories[mobileSubmenu]?.description ?? "Browse documents in this category"}
+  </p>
 
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "10px",
-                  }}
-                >
-                  {menuCategories[mobileSubmenu]?.books?.map((book) => (
-                    <Link
-                      key={book.id}
-                      href={`/book/preview?id=${book.id}`}
-                      onClick={() => setShowMobileMenu(false)}
-                      style={{
-                        padding: "12px 16px",
-                        border: `0.5px solid #ede8df`,
-                        borderRadius: "8px",
-                        background: "#fdfaf6",
-                        textDecoration: "none",
-                      }}
-                    >
-                      <h5
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: NAVY,
-                          margin: "0 0 4px",
-                        }}
-                      >
-                        {book.title}
-                      </h5>
-                      <p style={{ fontSize: "12px", color: "#888", margin: 0 }}>
-                        by {book.author}
-                      </p>
-                    </Link>
-                  ))}
-                </div>
+  {/* ── Show loading spinner while books are fetching ── */}
+  {allBooks.length === 0 ? (
+    <div style={{ textAlign: "center", padding: "40px 0" }}>
+      <span style={{
+        width: "24px", height: "24px",
+        border: `2px solid rgba(184,150,62,0.3)`, borderTopColor: GOLD,
+        borderRadius: "50%", display: "inline-block",
+        animation: "spin 0.7s linear infinite",
+      }} />
+      <p style={{ fontSize: "13px", color: "#aaa", marginTop: "12px", fontFamily: "'Lato', sans-serif" }}>
+        Loading documents…
+      </p>
+    </div>
 
-                <Link
-                  href={`/category/${mobileSubmenu}`}
-                  onClick={() => setShowMobileMenu(false)}
-                  style={{
-                    display: "block",
-                    textAlign: "center",
-                    padding: "14px",
-                    marginTop: "20px",
-                    fontWeight: 700,
-                    color: GOLD,
-                    textDecoration: "none",
-                    fontFamily: "'Lato', sans-serif",
-                    fontSize: "13px",
-                    borderTop: `1px solid #ede8df`,
-                  }}
-                >
-                  View all {menuCategories[mobileSubmenu]?.title} →
-                </Link>
-              </div>
+  ) : menuCategories[mobileSubmenu]?.books?.length > 0 ? (
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      {menuCategories[mobileSubmenu].books.map((book) => (
+        <Link
+          key={book.id}
+          href={`/book/preview?id=${book.id}`}
+          className="lan-mobile-book-card"
+          onClick={() => setShowMobileMenu(false)}
+        >
+          <h5 style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>
+            {book.title}
+          </h5>
+          <p style={{ fontSize: "12px", color: "#888", margin: 0 }}>
+            by {book.author}
+          </p>
+        </Link>
+      ))}
+    </div>
+
+  ) : (
+    <div style={{ textAlign: "center", padding: "32px 0" }}>
+      <BookOpen size={32} style={{ color: "#ddd", margin: "0 auto 10px" }} />
+      <p style={{ fontSize: "13px", color: "#aaa", fontFamily: "'Lato', sans-serif" }}>
+        No documents yet in this category.
+      </p>
+      <Link href="/upload-document" style={{ fontSize: "13px", fontWeight: 700, color: GOLD, textDecoration: "none" }}>
+        Be the first to upload →
+      </Link>
+    </div>
+  )}
+
+  {menuCategories[mobileSubmenu]?.books?.length > 0 && (
+    <Link
+      href={NAV_CATS.find(c => c.key === mobileSubmenu)?.href || `/category/${mobileSubmenu}`}
+      onClick={() => setShowMobileMenu(false)}
+      style={{
+        display: "block", textAlign: "center", padding: "14px",
+        marginTop: "20px", fontWeight: 700, color: GOLD,
+        textDecoration: "none", fontFamily: "'Lato', sans-serif",
+        fontSize: "13px", borderTop: `1px solid #ede8df`,
+      }}
+    >
+      View all {menuCategories[mobileSubmenu]?.title 
+        ?? NAV_CATS.find(c => c.key === mobileSubmenu)?.label} →
+    </Link>
+  )}
+</div>
             )}
           </div>
         </div>
@@ -1309,16 +954,6 @@ export default function Navbar() {
       <Link href="/ai-chat" className="lan-ai-fab">
         <Sparkles size={15} /> Ask AI
       </Link>
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        /* responsive: show hamburger on small, hide desktop nav */
-        @media (max-width: 900px) {
-          #hamburger-btn { display: flex !important; }
-          .lan-search-wrap { display: none !important; }
-          nav { display: none !important; }
-        }
-      `}</style>
     </>
   );
 }

@@ -85,7 +85,11 @@ const documentTypes = [
     { name: 'Engineering Formula Sheet', slug: 'engineering-formula-sheet', image: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=600', description: 'Consolidated formulas for mechanical, civil, and electrical', icon: FileText, color: '#1a3a2b' },
     { name: 'Pharmacy Notes', slug: 'pharmacy-notes', image: 'https://images.unsplash.com/photo-1585435557343-3b092031a831?w=600', description: 'Drug classifications, dosages, and pharmacology notes', icon: FlaskConical, color: '#4a1a4a' },
     { name: 'Architecture Portfolio', slug: 'architecture-portfolio', image: 'https://images.unsplash.com/photo-1503387762-592dec58ef4e?w=600', description: 'Design portfolios for architecture and urban planning', icon: Briefcase, color: '#3a2b1a' },
-
+    { name: 'Recipe Book', slug: 'recipe-book', image: 'https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=600', description: 'Curated recipe collections and culinary guides', icon: BookOpen, color: '#7a4500' },
+    { name: 'Culinary Notes', slug: 'culinary-notes', image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600', description: 'Food science, nutrition, and cooking technique notes', icon: PenLine, color: '#2d6a4f' },
+    { name: 'Food Science Notes', slug: 'food-science-notes', image: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=600', description: 'Scientific principles behind cooking and food chemistry', icon: FlaskConical, color: '#5c3a00' },
+    { name: 'Nutrition Guide', slug: 'nutrition-guide', image: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600', description: 'Dietary guidelines, macros, and healthy eating resources', icon: ClipboardList, color: '#2d6a2d' },
+    { name: 'Meal Plan', slug: 'meal-plan', image: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=600', description: 'Weekly and monthly meal planning guides and templates', icon: Layers, color: '#7a4500' },
     // ── GENERAL EXTRAS ──
     { name: 'Workshop Material', slug: 'workshop-material', image: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?w=600', description: 'Handouts and activities from academic workshops', icon: Layers, color: '#2b1a2b' },
     { name: 'Tutorial Sheet', slug: 'tutorial-sheet', image: 'https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=600', description: 'Guided problem sets from tutorial sessions', icon: PenLine, color: '#1a4a1a' },
@@ -95,7 +99,7 @@ const documentTypes = [
     { name: 'Community Timetable', slug: 'community-timetable', image: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=600', description: 'Student-shared exam and lecture timetables by department', icon: ClipboardList, color: '#1a2b3a' },
 ];
 
-const filters = ['All', 'Academic', 'Exam Prep', 'Research', 'Practical', 'Administrative', 'Career', 'Digital', 'Professional'];
+const filters = ['All', 'Academic', 'Exam Prep', 'Research', 'Practical', 'Administrative', 'Career', 'Digital', 'Professional', 'Cooking'];
 
 const filterMap = {
     'Academic': ['textbook', 'lecture-note', 'syllabus', 'course-outline', 'handwritten-notes', 'summary', 'study-guide', 'reading-list', 'mind-map', 'flashcards', 'cheat-sheet', 'annotated-bibliography', 'tutorial-sheet', 'community-timetable'],
@@ -106,7 +110,7 @@ const filterMap = {
     'Career': ['cv-template', 'cover-letter-template', 'portfolio', 'career-guide', 'interview-prep', 'networking-guide'],
     'Digital': ['presentation-slides', 'infographic', 'video-lecture-notes', 'podcast-transcript', 'e-book'],
     'Professional': ['medical-notes', 'law-case-brief', 'nursing-guide', 'accounting-workbook', 'engineering-formula-sheet', 'pharmacy-notes', 'architecture-portfolio', 'workshop-material', 'motivational-resource', 'translation-resource'],
-};
+    'Cooking': ['recipe-book', 'culinary-notes', 'food-science-notes', 'nutrition-guide', 'meal-plan'],};
 
 export default function ResourcesPage() {
     const [searchQuery, setSearchQuery] = useState('');
