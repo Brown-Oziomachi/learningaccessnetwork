@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { DollarSign, TrendingUp, ShoppingBag, Download, Book, Globe, Settings, X, Camera, Save, AlertCircle, ChevronRight, User, Building, Users, ArrowUpRight, ArrowDownLeft, Sparkles } from "lucide-react";
+import { DollarSign, TrendingUp, ShoppingBag, Download, Book, Globe, Settings, X, Camera, Save, AlertCircle, ChevronRight, User, Building, Users, ArrowUpRight, ArrowDownLeft, Sparkles, Package } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, increment, setDoc } from "firebase/firestore";
@@ -613,7 +613,26 @@ export default function SellerAccountClient() {
                 if (data.senderId) { try { const sd = await getDoc(doc(db, "users", data.senderId)); if (sd.exists()) buyerCountry = sd.data().country || null; } catch { } }
                 return { id: `incoming-${d.id}`, ...data, bookTitle: `Transfer from ${data.senderName || 'Unknown'}`, buyerName: data.senderName || 'Unknown', amount: data.amount, sellerAmount: data.amount, buyerCountry, createdAtDate: data.createdAt?.toDate?.() || new Date(), type: 'transfer_in' };
             }));
-            allTransactions = [...allTransactions, ...transfersList, ...incomingList];
+
+             const physicalSalesQuery = query(
+            collection(db, "physicalSales"),
+            where("sellerId", "==", uid)
+            );
+            const physicalSalesSnap = await getDocs(physicalSalesQuery);
+            const physicalSalesList = physicalSalesSnap.docs.map(d => {
+            const data = d.data();
+            return {
+                id: d.id,
+                ...data,
+                bookTitle: `📦 ${data.bookTitle} (Registry Pickup)`,
+                buyerName: data.studentName || "Student",
+                amount: data.salePrice,
+                sellerAmount: data.sellerPayout,
+                createdAtDate: data.soldAt?.toDate?.() || new Date(),
+                type: "physical_sale",
+            };
+            });
+            allTransactions = [...allTransactions, ...transfersList, ...incomingList, ...physicalSalesList];
             allTransactions.sort((a, b) => b.createdAtDate - a.createdAtDate);
             setTransactions(allTransactions);
         } catch (error) { console.error("Error fetching seller transactions:", error); }
@@ -831,7 +850,7 @@ export default function SellerAccountClient() {
                                         <div key={txn.id} className="txn-row">
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                 <div style={{ width: '38px', height: '38px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}>
-                                                    {txn.type === 'transfer_out' ? <ArrowUpRight size={16} style={{ color: '#ef4444' }} /> : <ShoppingBag size={16} style={{ color: NAVY }} />}
+                                                    {txn.type === 'transfer_out' ? <ArrowUpRight size={16} style={{ color: '#ef4444' }} />  : txn.type === 'physical_sale' ? <Package size={16} style={{ color: GOLD }} />  : <ShoppingBag size={16} style={{ color: NAVY }} />}
                                                 </div>
                                                 <div>
                                                     <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>{txn.bookTitle}</p>
@@ -960,6 +979,7 @@ export default function SellerAccountClient() {
                                     { label: 'My Profile', icon: <User size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setIsEditing(true); } },
                                     { label: 'Bank Details', icon: <Building size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setShowBankModal(true); if (user?.bankDetails) setBankFormData({ accountName: user.bankDetails.accountName || "", accountNumber: user.bankDetails.accountNumber || "", bankName: user.bankDetails.bankName || "", bankCode: user.bankDetails.bankCode || "" }); } },
                                     { label: 'Transaction History', icon: <TrendingUp size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setShowTransactionHistory(true); } },
+                                    { label: 'Physical Repository', icon: <Package size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); router.push('/my-account/seller-account/repository'); } },
                                     { label: 'Reset Transfer PIN', icon: <Settings size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setResetPinView('forgot'); setResetPinError(''); setResetPinSuccess(false); setResetOtpInput(''); setResetNewPin(''); setShowResetPinModal(true); } },
                                     { label: 'Help', icon: <AlertCircle size={18} style={{ color: NAVY }} />, onClick: handleButton },
                                 ].map(({ label, icon, onClick }) => (

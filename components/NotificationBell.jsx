@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Bell, X, CheckCircle, XCircle, Gift, DollarSign,
   AlertCircle, BookOpen, Trash2, ChevronRight, MessageSquare,
+  Package, AlertTriangle, RefreshCw, ShoppingBag,
 } from "lucide-react";
 import {
   collection, query, where, orderBy, onSnapshot,
@@ -10,78 +11,141 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 
-const NAVY = "#0d2244";
-const GOLD = "#b8963e";
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
 const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
 
+/* ══════════════════════════════════════════════════════════════
+   TYPE_CONFIG — all notification types, including the three
+   new physical-inventory types:
+     · physical_sale        (a student picked up a copy)
+     · physical_low_stock   (stock at/below 30%)
+     · physical_intake      (admin confirmed your consignment)
+══════════════════════════════════════════════════════════════ */
 const TYPE_CONFIG = {
+  /* ── existing types (preserved) ── */
   withdrawal_approved: {
     icon: CheckCircle, iconColor: "#16a34a", barColor: "#16a34a",
     bg: "#f0fdf4", border: "rgba(22,163,74,0.25)",
+    label: null,
   },
   referral_bonus: {
     icon: CheckCircle, iconColor: "#16a34a", barColor: "#16a34a",
     bg: "#f0fdf4", border: "rgba(22,163,74,0.25)",
+    label: null,
   },
   withdrawal_rejected: {
     icon: XCircle, iconColor: "#dc2626", barColor: "#dc2626",
     bg: "#fef2f2", border: "rgba(220,38,38,0.25)",
+    label: null,
   },
   referral_reward: {
     icon: Gift, iconColor: GOLD, barColor: GOLD,
     bg: "#fdf8ee", border: "rgba(184,150,62,0.3)",
+    label: null,
   },
   sale: {
     icon: DollarSign, iconColor: NAVY, barColor: NAVY,
     bg: CREAM, border: "rgba(13,34,68,0.15)",
+    label: null,
   },
   new_upload: {
     icon: BookOpen, iconColor: NAVY, barColor: NAVY,
     bg: CREAM, border: "rgba(13,34,68,0.15)",
+    label: null,
   },
   admin_reply: {
     icon: MessageSquare, iconColor: "#7c3aed", barColor: "#7c3aed",
     bg: "#f5f3ff", border: "rgba(124,58,237,0.25)",
+    label: "Admin Reply",
   },
+
+  /* ── NEW: physical inventory types ── */
+  physical_sale: {
+    icon: ShoppingBag, iconColor: "#16a34a", barColor: "#16a34a",
+    bg: "#f0fdf4", border: "rgba(22,163,74,0.25)",
+    label: "Copy Sold",
+  },
+  physical_low_stock: {
+    icon: AlertTriangle, iconColor: "#d97706", barColor: "#d97706",
+    bg: "#fffbeb", border: "rgba(217,119,6,0.3)",
+    label: "Low Stock",
+  },
+  physical_intake: {
+    icon: Package, iconColor: NAVY, barColor: GOLD,
+    bg: CREAM, border: "rgba(184,150,62,0.3)",
+    label: "Intake Confirmed",
+  },
+physical_order: {
+  icon: ShoppingBag, iconColor: "#16a34a", barColor: "#16a34a",
+  bg: "#f0fdf4", border: "rgba(22,163,74,0.25)",
+  label: "New Order",
+},
+physical_reserved: {                          // ← ADD THIS
+  icon: Package, iconColor: "#0d2244", barColor: "#b8963e",
+  bg: "#f5f0e8", border: "rgba(184,150,62,0.3)",
+  label: "Copy Reserved",
+},
 };
 
 const getConfig = (type) =>
   TYPE_CONFIG[type] || {
     icon: AlertCircle, iconColor: "#aaa", barColor: "#aaa",
-    bg: "#fff", border: "#e5ddd0",
+    bg: "#fff", border: "#e5ddd0", label: null,
   };
 
 const formatTime = (ts) => {
   if (!ts) return "";
   const date = ts.toDate ? ts.toDate() : new Date(ts);
-  const diff = Date.now() - date;
-  const mins = Math.floor(diff / 60000);
+  const diff  = Date.now() - date;
+  const mins  = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
+  const days  = Math.floor(diff / 86400000);
+  if (mins  <  1) return "Just now";
+  if (mins  < 60) return `${mins}m ago`;
   if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
+  if (days  <  7) return `${days}d ago`;
   return date.toLocaleDateString("en-NG", { day: "2-digit", month: "short" });
 };
 
+/* ─── Mini stock-health pill (used inside low_stock notifications) ── */
+function StockPill({ current, total }) {
+  if (!total) return null;
+  const pct   = Math.round((current / total) * 100);
+  const color = pct === 0 ? "#dc2626" : pct <= 20 ? "#ea580c" : "#d97706";
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center", gap: "5px",
+      background: "#fff7ed", border: `0.5px solid ${color}`,
+      padding: "2px 8px", marginTop: "5px"
+    }}>
+      <div style={{ width: "32px", height: "4px", background: "#e5ddd0", overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: color }} />
+      </div>
+      <span style={{ fontSize: "9px", fontWeight: 700, color, fontFamily: "'Lato',sans-serif" }}>
+        {current} / {total} left
+      </span>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+════════════════════════════════════════════════════════════════ */
 export default function NotificationBell({ userId }) {
-  const [notifications, setNotifications] = useState([]);       // ← main notifications collection
-  const [adminReplies, setAdminReplies] = useState([]);          // ← adminReplies collection
-  const [repliedReports, setRepliedReports] = useState([]);      // ← bookReports with adminNotes
+  const [notifications,   setNotifications]   = useState([]);
+  const [adminReplies,    setAdminReplies]     = useState([]);
+  const [repliedReports,  setRepliedReports]   = useState([]);
   const [readAdminReplies, setReadAdminReplies] = useState(() => {
-    try {
-      return new Set(JSON.parse(localStorage.getItem("readAdminReplies") || "[]"));
-    } catch {
-      return new Set();
-    }
+    try { return new Set(JSON.parse(localStorage.getItem("readAdminReplies") || "[]")); }
+    catch { return new Set(); }
   });
-  const [open, setOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  const [open,     setOpen]     = useState(false);
+  const [showAll,  setShowAll]  = useState(false);
   const dropdownRef = useRef(null);
 
-  // ── 1. Main notifications listener (new_upload, withdrawal, sale, etc.) ──
+  /* ── 1. Main notifications — includes physical_* types ── */
   useEffect(() => {
     if (!userId) return;
     const q = query(
@@ -94,7 +158,7 @@ export default function NotificationBell({ userId }) {
     );
   }, [userId]);
 
-  // ── 2. bookReports with adminNotes (admin replied to a report) ──
+  /* ── 2. bookReports with adminNotes ── */
   useEffect(() => {
     if (!userId) return;
     const q = query(
@@ -112,7 +176,7 @@ export default function NotificationBell({ userId }) {
     );
   }, [userId]);
 
-  // ── 3. adminReplies collection listener ──
+  /* ── 3. adminReplies collection ── */
   useEffect(() => {
     if (!userId) return;
     const q = query(
@@ -125,7 +189,7 @@ export default function NotificationBell({ userId }) {
     );
   }, [userId]);
 
-  // ── Close on outside click ──
+  /* ── Close on outside click ── */
   useEffect(() => {
     const handler = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target))
@@ -135,24 +199,23 @@ export default function NotificationBell({ userId }) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ── Merge all three streams ──
+  /* ── Merge all three sources ── */
   const allNotifications = [
     ...notifications,
-    // bookReports with adminNotes → shown as admin_reply type
     ...repliedReports.map((r) => ({
-      id: `report_reply__${r.id}`,
+      id:        `report_reply__${r.id}`,
       _reportId: r.id,
-      type: "admin_reply",
-      title: `Re: ${r.reason || "Your report"}`,
-      message: r.adminResponse || "",      
+      type:      "admin_reply",
+      title:     `Re: ${r.reason || "Your report"}`,
+      message:   r.adminResponse || "",
       createdAt: r.resolvedAt || r.createdAt || null,
-      read: readAdminReplies.has(r.id),
-      link: null,
+      read:      readAdminReplies.has(r.id),
+      link:      null,
     })),
   ].sort((a, b) => {
     const toMs = (ts) => {
-      if (!ts) return 0;
-      if (ts.toDate) return ts.toDate().getTime();
+      if (!ts)        return 0;
+      if (ts.toDate)  return ts.toDate().getTime();
       return new Date(ts).getTime();
     };
     return toMs(b.createdAt) - toMs(a.createdAt);
@@ -160,10 +223,14 @@ export default function NotificationBell({ userId }) {
 
   const unreadCount = allNotifications.filter((n) => !n.read).length;
 
-  // ── Mark helpers ──
+  /* ── Physical-inventory unread count (highlighted separately) ── */
+    const physicalUnread = allNotifications.filter(
+      (n) => !n.read && ["physical_sale", "physical_low_stock", "physical_intake", "physical_reserved"].includes(n.type)
+    ).length;
+
+  /* ── Mark helpers (unchanged logic) ── */
   const markAsRead = async (n) => {
     if (n._reportId) {
-      // bookReport reply — mark locally in localStorage
       setReadAdminReplies((prev) => {
         const next = new Set(prev);
         next.add(n._reportId);
@@ -171,47 +238,32 @@ export default function NotificationBell({ userId }) {
         return next;
       });
     } else {
-      // regular notification — update Firestore
-      try {
-        await updateDoc(doc(db, "notifications", n.id), { read: true });
-      } catch (err) {
-        console.error(err);
-      }
+      try { await updateDoc(doc(db, "notifications", n.id), { read: true }); } catch (err) { console.error(err); }
     }
   };
 
   const markAllAsRead = async () => {
     try {
       const batch = writeBatch(db);
-      notifications
-        .filter((n) => !n.read)
+      notifications.filter((n) => !n.read)
         .forEach((n) => batch.update(doc(db, "notifications", n.id), { read: true }));
       await batch.commit();
-
-      // also mark all bookReport replies as read
       const allReportIds = repliedReports.map((r) => r.id);
       setReadAdminReplies((prev) => {
         const next = new Set([...prev, ...allReportIds]);
         try { localStorage.setItem("readAdminReplies", JSON.stringify([...next])); } catch {}
         return next;
       });
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const deleteNotification = async (e, n) => {
     e.stopPropagation();
     if (n._reportId) {
-      // just hide it locally — don't delete the bookReport from Firestore
       markAsRead(n);
       setRepliedReports((prev) => prev.filter((r) => r.id !== n._reportId));
     } else {
-      try {
-        await deleteDoc(doc(db, "notifications", n.id));
-      } catch (err) {
-        console.error(err);
-      }
+      try { await deleteDoc(doc(db, "notifications", n.id)); } catch (err) { console.error(err); }
     }
   };
 
@@ -221,13 +273,10 @@ export default function NotificationBell({ userId }) {
       const batch = writeBatch(db);
       notifications.forEach((n) => batch.delete(doc(db, "notifications", n.id)));
       await batch.commit();
-      // clear bookReport replies locally
       setRepliedReports([]);
       setReadAdminReplies(new Set());
       try { localStorage.removeItem("readAdminReplies"); } catch {}
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const handleClick = (n) => {
@@ -237,10 +286,20 @@ export default function NotificationBell({ userId }) {
       const rawId = (n.bookId || n.docId || n.relatedId || "").replace("firestore-", "");
       if (rawId) { window.location.href = `/book/preview?id=${rawId}`; return; }
     }
+    /* Physical types → deep-link to repository */
+    if (["physical_sale", "physical_low_stock", "physical_intake"].includes(n.type)) {
+      const assetId = n.assetId || "";
+      window.location.href = `/my-account/seller-account/repository${assetId ? `?highlight=${assetId}` : ""}`;
+      return;
+    }
     if (n.link) window.location.href = n.link;
   };
 
-  const displayed = showAll ? allNotifications : allNotifications.slice(0, 5);
+  const displayed = showAll ? allNotifications : allNotifications.slice(0, 6);
+
+  /* ── Group-header: show "Physical Updates" divider when needed ── */
+const physicalTypes = new Set(["physical_sale", "physical_low_stock", "physical_intake", "physical_reserved"]); 
+ let lastWasPhysical = false;
 
   return (
     <>
@@ -271,41 +330,50 @@ export default function NotificationBell({ userId }) {
           to   { opacity:1; transform:translateY(0) scale(1); }
         }
         .nb-dropdown { animation:nbSlide .22s cubic-bezier(.4,0,.2,1) both; }
-        .nb-reply-badge {
+        .nb-type-badge {
           font-size:9px; font-weight:700; letter-spacing:0.06em;
-          padding:2px 7px; background:#f5f3ff; color:#7c3aed;
-          border:0.5px solid rgba(124,58,237,0.25); border-radius:2px;
-          font-family:'Lato',sans-serif;
+          padding:2px 7px; border-radius:2px; font-family:'Lato',sans-serif;
+        }
+        .nb-section-header {
+          padding:6px 16px; background:rgba(184,150,62,0.08);
+          border-bottom:0.5px solid rgba(184,150,62,0.2);
+          font-size:9px; font-weight:700; letter-spacing:0.18em;
+          text-transform:uppercase; color:${GOLD}; font-family:'Lato',sans-serif;
+          display:flex; align-items:center; gap:6px;
         }
       `}</style>
 
       <div style={{ position: "relative" }} ref={dropdownRef}>
 
-        {/* Bell Button */}
+        {/* ── Bell Button ── */}
         <button className="nb-bell" onClick={() => setOpen((p) => !p)} title="Notifications">
           <Bell size={18} style={{ color: NAVY }} />
           {unreadCount > 0 && (
             <span style={{
               position: "absolute", top: "-6px", right: "-6px",
-              minWidth: "18px", height: "18px", background: "#dc2626",
+              minWidth: "18px", height: "18px",
+              background: physicalUnread > 0 ? "#d97706" : "#dc2626",
               color: "#fff", fontSize: "9px", fontWeight: 700,
-              borderRadius: "999px", display: "flex", alignItems: "center",
-              justifyContent: "center", padding: "0 4px",
-              fontFamily: "'Lato',sans-serif", border: "1.5px solid #fff",
+              borderRadius: "999px", display: "flex",
+              alignItems: "center", justifyContent: "center",
+              padding: "0 4px", fontFamily: "'Lato',sans-serif",
+              border: "1.5px solid #fff",
             }}>
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </button>
 
-        {/* Dropdown */}
+        {/* ── Dropdown ── */}
         {open && (
           <div className="nb-dropdown" style={{
             position: "fixed", right: "16px", top: "70px",
-            width: "min(calc(100vw - 32px), 380px)",
+            width: "min(calc(100vw - 32px), 400px)",
             background: "#fff", border: "0.5px solid #e5ddd0",
-            boxShadow: "0 24px 64px rgba(13,34,68,0.2)", zIndex: 999, overflow: "hidden",
+            boxShadow: "0 24px 64px rgba(13,34,68,0.2)",
+            zIndex: 999, overflow: "hidden",
           }}>
+
             {/* Header */}
             <div style={{
               background: NAVY,
@@ -321,9 +389,10 @@ export default function NotificationBell({ userId }) {
                 }}>Notifications</p>
                 {unreadCount > 0 && (
                   <span style={{
-                    background: "#dc2626", color: "#fff", fontSize: "9px",
-                    fontWeight: 700, padding: "2px 7px",
-                    fontFamily: "'Lato',sans-serif", letterSpacing: "0.04em",
+                    background: physicalUnread > 0 ? "#d97706" : "#dc2626",
+                    color: "#fff", fontSize: "9px", fontWeight: 700,
+                    padding: "2px 7px", fontFamily: "'Lato',sans-serif",
+                    letterSpacing: "0.04em"
                   }}>{unreadCount} new</span>
                 )}
               </div>
@@ -353,8 +422,31 @@ export default function NotificationBell({ userId }) {
               </div>
             </div>
 
+            {/* Physical updates sub-header (if any physical unread) */}
+            {physicalUnread > 0 && (
+              <div style={{
+                background: "rgba(184,150,62,0.06)", borderBottom: "0.5px solid rgba(184,150,62,0.2)",
+                padding: "9px 16px", display: "flex", alignItems: "center", gap: "8px"
+              }}>
+                <Package size={12} style={{ color: GOLD }} />
+                <span style={{
+                  fontSize: "10px", fontWeight: 700, color: NAVY,
+                  fontFamily: "'Lato',sans-serif", flex: 1
+                }}>
+                  {physicalUnread} new physical update{physicalUnread > 1 ? "s" : ""} from Abuja Registry
+                </span>
+                <a href="/dashboard/repository" onClick={() => setOpen(false)} style={{
+                  fontSize: "10px", fontWeight: 700, color: GOLD,
+                  textDecoration: "none", fontFamily: "'Lato',sans-serif",
+                  display: "flex", alignItems: "center", gap: "3px"
+                }}>
+                  View Repository <ChevronRight size={10} />
+                </a>
+              </div>
+            )}
+
             {/* Body */}
-            <div style={{ maxHeight: "420px", overflowY: "auto", scrollbarWidth: "none" }}>
+            <div style={{ maxHeight: "440px", overflowY: "auto", scrollbarWidth: "none" }}>
               {allNotifications.length === 0 ? (
                 <div style={{ padding: "48px 24px", textAlign: "center" }}>
                   <div style={{
@@ -373,10 +465,23 @@ export default function NotificationBell({ userId }) {
                   </p>
                 </div>
               ) : (
-                displayed.map((n) => {
-                  const cfg = getConfig(n.type);
-                  const Icon = cfg.icon;
-                  return (
+                displayed.map((n, idx) => {
+                  const cfg       = getConfig(n.type);
+                  const Icon      = cfg.icon;
+                  const isPhysical = physicalTypes.has(n.type);
+
+                  /* Section divider: show "Physical Updates" header before first physical notification */
+                  let sectionHeader = null;
+                  if (isPhysical && !lastWasPhysical) {
+                    sectionHeader = (
+                      <div key={`phys-header-${idx}`} className="nb-section-header">
+                        <Package size={10} /> Abuja Registry Updates
+                      </div>
+                    );
+                  }
+                  lastWasPhysical = isPhysical;
+
+                  const row = (
                     <div
                       key={n.id}
                       className="nb-row"
@@ -408,10 +513,13 @@ export default function NotificationBell({ userId }) {
                               color: n.read ? "#888" : NAVY, margin: 0,
                               fontFamily: "'Lato',sans-serif", lineHeight: 1.4,
                             }}>{n.title}</p>
-                            {n.type === "admin_reply" && (
-                              <span className="nb-reply-badge" style={{ alignSelf: "flex-start" }}>
-                                Admin Reply
-                              </span>
+                            {cfg.label && (
+                              <span className="nb-type-badge" style={{
+                                alignSelf: "flex-start",
+                                background: cfg.bg,
+                                color: cfg.iconColor,
+                                border: `0.5px solid ${cfg.border}`,
+                              }}>{cfg.label}</span>
                             )}
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
@@ -424,38 +532,53 @@ export default function NotificationBell({ userId }) {
                             </button>
                           </div>
                         </div>
+
                         {n.message && (
                           <p style={{
                             fontSize: "11px", color: n.read ? "#aaa" : "#666",
-                            margin: "4px 0 0", fontFamily: "'Lato',sans-serif",
-                            lineHeight: 1.5,
-                            display: "-webkit-box",
-                            WebkitLineClamp: 3,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
+                            margin: "4px 0 0", fontFamily: "'Lato',sans-serif", lineHeight: 1.5,
+                            display: "-webkit-box", WebkitLineClamp: 3,
+                            WebkitBoxOrient: "vertical", overflow: "hidden",
                           }}>{n.message}</p>
+                        )}
+
+                        {/* Stock pill for low-stock notifications */}
+                        {n.type === "physical_low_stock" && n.currentStock !== undefined && (
+                          <StockPill current={n.currentStock} total={n.totalConsignment} />
+                        )}
+
+                        {/* Amount chip for physical_sale */}
+                        {n.type === "physical_sale" && n.amount && (
+                          <div style={{
+                            display: "inline-flex", alignItems: "center", gap: "4px",
+                            background: "#f0fdf4", border: "0.5px solid rgba(22,163,74,0.3)",
+                            padding: "2px 8px", marginTop: "5px"
+                          }}>
+                            <span style={{ fontSize: "10px", fontWeight: 700, color: "#16a34a", fontFamily: "'Lato',sans-serif" }}>
+                              +₦{Number(n.amount).toLocaleString()} added to balance
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>
                   );
+
+                  return sectionHeader ? [sectionHeader, row] : row;
                 })
               )}
             </div>
 
             {/* Footer */}
-            {allNotifications.length > 5 && (
+            {allNotifications.length > 6 && (
               <div style={{ borderTop: "0.5px solid #f0ebe0", padding: "10px 16px", background: CREAM }}>
-                <button
-                  onClick={() => setShowAll((p) => !p)}
-                  style={{
-                    width: "100%", display: "flex", alignItems: "center",
-                    justifyContent: "center", gap: "4px", fontSize: "10px",
-                    fontWeight: 700, color: NAVY, background: "transparent",
-                    border: "none", cursor: "pointer",
-                    fontFamily: "'Lato',sans-serif",
-                    letterSpacing: "0.08em", textTransform: "uppercase",
-                  }}
-                >
+                <button onClick={() => setShowAll((p) => !p)} style={{
+                  width: "100%", display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: "4px", fontSize: "10px",
+                  fontWeight: 700, color: NAVY, background: "transparent",
+                  border: "none", cursor: "pointer",
+                  fontFamily: "'Lato',sans-serif",
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}>
                   {showAll ? "Show less" : `View all ${allNotifications.length} notifications`}
                   <ChevronRight size={11} style={{
                     transform: showAll ? "rotate(90deg)" : "none",

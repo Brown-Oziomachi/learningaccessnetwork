@@ -1,6 +1,12 @@
 "use client"
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, addDoc, serverTimestamp, increment, where } from 'firebase/firestore';
+import {
+  collection, query, where, getDocs, getDoc,
+  doc, updateDoc, deleteDoc, addDoc,
+  serverTimestamp, increment, orderBy,
+  runTransaction, limit,      // ← these two are the ones most likely missing
+  writeBatch,
+} from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   FileText, Trash2, Check, X, Search, Calendar, User, Shield,
@@ -10,7 +16,7 @@ import {
   Download, Book, Phone, MapPin, CreditCard, Building,
   Clock, ThumbsUp, Smartphone, Bell, ChevronDown, Menu, Home,
   LayoutDashboard, Activity, PieChart, Layers, Star, ArrowUp, ArrowDown,
-  MoreHorizontal, Filter, Plus, Minus, CheckCircle, Info
+  MoreHorizontal, Filter, Plus, Minus, CheckCircle, Info, Package, Receipt, ShoppingBag
 } from 'lucide-react';
 import { BookApprovalModal, ReplyModal, TransactionModal, UserModal } from '@/components/ApprovalModal';
 import FlwBalanceWidget from '@/components/admin/FlwBalanceWidget';
@@ -350,7 +356,10 @@ const NAV_SECTIONS = [
       { id: 'advertisements', icon: BookOpen, label: 'Books', badgeKey: 'pendingAds' },
       { id: 'schools', icon: Building, label: 'Schools', badgeKey: 'pendingSchools' },
       { id: 'school-documents', icon: FileText, label: 'School Docs', badgeKey: 'pendingSchoolDocs' },
-    ]
+      { id: 'physical-orders', icon: ShoppingBag, label: 'Physical Orders', badgeKey: 'pendingPhysicalOrders', badgeType: 'warn' },
+      { id: 'office-checkin',  icon: Package,  label: 'Office Check-In'   },
+      { id: 'registry-checkout', icon: Receipt, label: 'Registry Checkout' },   
+         ]
   },
   {
     label: 'Finance',
@@ -414,6 +423,8 @@ export default function ComprehensiveAdminPanel() {
   const [sellerDetails, setSellerDetails] = useState(null);
   const [loadingSellerDetails, setLoadingSellerDetails] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [physicalOrders, setPhysicalOrders] = useState([]);
+  const [paymentConfirmed, setPaymentConfirmed] = useState({});
   const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
 
   useEffect(() => {
@@ -441,16 +452,26 @@ export default function ComprehensiveAdminPanel() {
     } catch (error) { console.error(error); setIsAdmin(false); } finally { setCheckingAdmin(false); }
   };
 
+  const fetchPhysicalOrders = async () => {
+  try {
+    const q = query(collection(db, 'physicalOrders'), orderBy('createdAt', 'desc'));
+    const s = await getDocs(q);
+    setPhysicalOrders(s.docs.map(d => ({ id: d.id, ...d.data() })));
+  } catch (e) { console.error(e); }
+};
+
   const fetchAllData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([
-        fetchAdvertisements(), fetchSupportTickets(), fetchBookReports(),
-        fetchTransactions(), fetchUsers(), fetchWithdrawals(),
-        fetchSchoolApplications(), fetchSchoolDocuments(), fetchFeedbacks(), fetchArticleFeedbacks(),
-      ]);
-    } catch (error) { console.error(error); } finally { setLoading(false); }
-  };
+  setLoading(true);
+  try {
+    await Promise.all([
+      fetchAdvertisements(), fetchSupportTickets(), fetchBookReports(),
+      fetchTransactions(), fetchUsers(), fetchWithdrawals(),
+      fetchSchoolApplications(), fetchSchoolDocuments(),
+      fetchFeedbacks(), fetchArticleFeedbacks(),
+      fetchPhysicalOrders(), 
+    ]);
+  } catch (error) { console.error(error); } finally { setLoading(false); }
+};
 
   const fetchSellerFullDetails = async (sellerId) => {
     setLoadingSellerDetails(true);
@@ -709,6 +730,7 @@ export default function ComprehensiveAdminPanel() {
     pendingSchools: schoolApplications?.filter(s => s.status === 'pending').length || 0,
     pendingSchoolDocs: schoolDocuments?.filter(d => d.status === 'pending').length || 0,
     pendingWithdrawals: withdrawals?.filter(w => w.status === 'pending').length || 0,
+    pendingPhysicalOrders: physicalOrders?.filter(o => o.status === 'pending_pickup').length || 0, // ← ADD
   };
 
   if (checkingAdmin) return (
@@ -1238,6 +1260,450 @@ export default function ComprehensiveAdminPanel() {
               </div>
             </div>
           )}
+
+          {activeSection === 'office-checkin' && (
+            <div>
+              <div className="section-header">
+                <div className="section-title"><Package size={18} />Office Check-In</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Step 1 — Seller brings copies to Abuja Registry</div>
+              </div>
+ 
+              {/* Quick-link card */}
+              <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '24px 28px', marginBottom: 20 }}>
+                <div style={{ width: 52, height: 52, background: 'var(--accent-glow)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Package size={22} color="var(--accent-light)" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Physical Consignment Intake</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    Use this when a seller physically delivers copies to the registry. Assigns an Asset ID, creates inventory, and notifies the seller.
+                  </div>
+                </div>
+                <a href="/sys-panel/management-console/office-check-in" className="btn btn-primary" style={{ fontSize: 13, padding: '12px 24px', whiteSpace: 'nowrap', textDecoration: 'none' }}>
+                  <Package size={15} /> Open Form
+                </a>
+              </div>
+ 
+              {/* How it works */}
+              <div className="card" style={{ padding: '20px 24px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 14 }}>What this does</div>
+                {[
+                  ['📋', 'Runs 3-layer Firestore search to find the seller account'],
+                  ['🏷️', 'Assigns a unique Asset ID (e.g. LAN-ABJ-2026-2127)'],
+                  ['📦', 'Creates or updates a physicalInventory record with stock count'],
+                  ['🔔', 'Fires a physical_intake notification to the seller dashboard'],
+                  ['🧾', 'Generates a printable + WhatsApp-shareable Consignment Receipt'],
+                ].map(([emoji, text]) => (
+                  <div key={text} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                    <span style={{ fontSize: 14, flexShrink: 0 }}>{emoji}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+ 
+          {activeSection === 'registry-checkout' && (
+            <div>
+              <div className="section-header">
+                <div className="section-title"><Receipt size={18} />Registry Checkout</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Step 2 — Student walks in to collect their copy</div>
+              </div>
+ 
+              {/* Quick-link card */}
+              <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '24px 28px', marginBottom: 20 }}>
+                <div style={{ width: 52, height: 52, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Receipt size={22} color="#34d399" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Record a Student Pickup</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    When a student collects a copy at the registry, enter the Asset ID and their email. Stock drops, seller is credited, and notifications fire automatically.
+                  </div>
+                </div>
+                <a href="/sys-panel/management-console/registry-checkout" className="btn btn-success" style={{ fontSize: 13, padding: '12px 24px', whiteSpace: 'nowrap', textDecoration: 'none', background: '#10b981', color: '#fff', border: 'none' }}>
+                  <Receipt size={15} /> Open Checkout
+                </a>
+              </div>
+ 
+              {/* Flow diagram */}
+              <div className="card" style={{ padding: '20px 24px', marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 14 }}>What happens when you record a sale</div>
+                {[
+                  ['📦', 'physicalInventory.currentStock   −1',      'rgba(59,130,246,0.12)',  '#60a5fa'],
+                  ['💰', 'sellers.accountBalance   +90% of price',   'rgba(16,185,129,0.12)', '#34d399'],
+                  ['📋', 'New row added to physicalSales ledger',     'rgba(139,92,246,0.12)', '#a78bfa'],
+                  ['🔔', 'Bell notification → seller dashboard',      'rgba(245,158,11,0.12)', '#fbbf24'],
+                  ['📧', 'Email via /api/physical-sale-email',        'rgba(239,68,68,0.12)',  '#f87171'],
+                  ['⚠️', 'Low-stock alert if copies ≤ 20% remain',   'rgba(245,158,11,0.08)', '#fbbf24'],
+                ].map(([emoji, text, bg, color]) => (
+                  <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, background: bg, borderRadius: 8, padding: '8px 12px' }}>
+                    <span style={{ fontSize: 14, flexShrink: 0 }}>{emoji}</span>
+                    <span style={{ fontSize: 12, color, fontWeight: 600, fontFamily: 'monospace' }}>{text}</span>
+                  </div>
+                ))}
+              </div>
+ 
+              {/* The flow */}
+              <div className="card" style={{ padding: '16px 24px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Full Registry Flow</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap' }}>
+                  {[
+                    { step: '1', label: 'Seller Check-In',   sub: 'office-check-in', color: '#3b82f6' },
+                    { step: '→', label: '',                   sub: '',                color: 'var(--text-muted)' },
+                    { step: '2', label: 'Asset ID Issued',    sub: 'LAN-ABJ-2026-XXXX', color: '#b8963e' },
+                    { step: '→', label: '',                   sub: '',                color: 'var(--text-muted)' },
+                    { step: '3', label: 'Student Pickup',     sub: 'registry-checkout', color: '#10b981' },
+                    { step: '→', label: '',                   sub: '',                color: 'var(--text-muted)' },
+                    { step: '4', label: 'Seller Notified',    sub: 'bell + email',    color: '#8b5cf6' },
+                  ].map(({ step, label, sub, color }) => (
+                    step === '→'
+                      ? <div key={sub + Math.random()} style={{ fontSize: 18, color: 'var(--text-muted)', margin: '0 8px' }}>→</div>
+                      : <div key={label} style={{ background: 'var(--surface)', border: `1px solid ${color}22`, borderRadius: 8, padding: '10px 14px', textAlign: 'center', minWidth: 110 }}>
+                          <div style={{ fontSize: 18, fontWeight: 700, color, marginBottom: 2 }}>{step}</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{label}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>
+                        </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'physical-orders' && (
+          <div>
+            {/* Pre-order warning banner */}
+          <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10 }}>
+            <AlertTriangle size={14} color="#fbbf24" style={{ flexShrink: 0, marginTop: 1 }} />
+            <p style={{ fontSize: 12, color: '#fbbf24', margin: 0, lineHeight: 1.6 }}>
+              <strong>These are online pre-orders only.</strong> Click "Mark Collected" only when the student physically arrives and picks up their copy.
+              For walk-in students with no pre-order, use{' '}
+              <a href="/sys-panel/management-console/registry-checkout" style={{ color: '#fbbf24', fontWeight: 700 }}>
+                Registry Checkout
+              </a> instead.
+            </p>
+          </div>
+            <div className="section-header">
+              <div>
+                <div className="section-title"><ShoppingBag size={18} />Physical Orders</div>
+                <div className="section-sub">Online orders placed by students — pending pickup at Abuja Registry</div>
+              </div>
+              <button onClick={fetchPhysicalOrders} className="btn btn-ghost"><RefreshCw size={13} />Refresh</button>
+            </div>
+
+            {/* Stats row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+              {[
+                { label: 'Pending Pickup', count: physicalOrders.filter(o => o.status === 'pending_pickup').length, color: '#f59e0b' },
+                { label: 'Collected',      count: physicalOrders.filter(o => o.status === 'collected').length,      color: '#10b981' },
+                { label: 'Cancelled',      count: physicalOrders.filter(o => o.status === 'cancelled').length,      color: '#ef4444' },
+                { label: 'Total Orders',   count: physicalOrders.length,                                             color: '#3b82f6' },
+              ].map(({ label, count, color }) => (
+                <div key={label} className="card-sm">
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color }}>{count}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Search */}
+            <div style={{ marginBottom: 14 }}>
+              <input className="input-dark" placeholder="Search by student name, email or pickup code…"
+                value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            </div>
+
+            {physicalOrders.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: 48 }}>
+                <ShoppingBag size={32} color="var(--text-muted)" style={{ margin: '0 auto 12px' }} />
+                <div style={{ color: 'var(--text-muted)' }}>No physical orders yet</div>
+              </div>
+            ) : (
+              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      {['Student', 'Book', 'Pickup Code', 'Price', 'Shelf', 'Date', 'Status', ''].map(h => (
+                        <th key={h}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {physicalOrders
+                      .filter(o =>
+                        o.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        o.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        o.pickupCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        o.bookTitle?.toLowerCase().includes(searchTerm.toLowerCase())
+                      )
+                      .map(order => (
+                        <tr key={order.id}>
+                          <td>
+                            <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>{order.userName || 'Unknown'}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{order.userEmail}</div>
+                          </td>
+                          <td style={{ color: 'var(--text-primary)', fontWeight: 500, maxWidth: 180 }}>
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.bookTitle}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{order.bookAuthor}</div>
+                          </td>
+                          <td>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: '#d4aa5a', background: 'rgba(184,150,62,0.1)', border: '1px solid rgba(184,150,62,0.3)', padding: '3px 8px', borderRadius: 4 }}>
+                              {order.pickupCode}
+                            </span>
+                          </td>
+                          <td style={{ color: '#34d399', fontWeight: 700 }}>₦{Number(order.price).toLocaleString()}</td>
+                          <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                            {[order.section, order.shelfLocation].filter(Boolean).join(' · ') || '—'}
+                          </td>
+                          <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatDate(order.createdAt)}</td>
+                          <td>
+                            <span className={`pill ${
+                              order.status === 'collected'      ? 'pill-success' :
+                              order.status === 'pending_pickup' ? 'pill-warn'    :
+                              order.status === 'cancelled'      ? 'pill-danger'  : 'pill-gray'
+                            }`}>
+                              <span className="pill-dot" />
+                              {order.status === 'pending_pickup' ? 'Pending' :
+                              order.status === 'collected'      ? 'Collected' :
+                              order.status === 'cancelled'      ? 'Cancelled' : order.status}
+                            </span>
+                          </td>
+                        <td>
+  {order.status === 'pending_pickup' && (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+      {/* Payment confirmation checkbox */}
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: '#fbbf24' }}>
+        <input
+          type="checkbox"
+          checked={!!paymentConfirmed[order.id]}
+          onChange={e => setPaymentConfirmed(prev => ({ ...prev, [order.id]: e.target.checked }))}
+          style={{ cursor: 'pointer' }}
+        />
+        Cash / transfer received
+      </label>
+
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button
+          disabled={!paymentConfirmed[order.id]}
+        onClick={async () => {
+  if (!confirm(`Mark order for ${order.userName} as COLLECTED?\n\nThis will:\n• Mark order collected\n• Decrement shelf stock\n• Credit seller ₦${(Number(order.price) * 0.8).toLocaleString()} (80%)\n• Notify student and seller`)) return;
+  try {
+
+    // 1. Resolve sellerId — use order field or look up from book
+    let sellerId   = order.sellerId   || null;
+    let sellerName = order.sellerName || null;
+
+    if (!sellerId && order.bookId) {
+      try {
+        const cleanId  = order.bookId.replace('firestore-', '');
+        const bookSnap = await getDoc(doc(db, 'advertMyBook', cleanId));
+        if (bookSnap.exists()) {
+          const bData = bookSnap.data();
+          sellerId   = bData.userId || bData.sellerId || bData.uploadedBy || null;
+          sellerName = bData.sellerName || bData.author || null;
+        }
+      } catch (lookupErr) {
+        console.warn('Seller lookup failed:', lookupErr.message);
+      }
+    }
+
+    if (!sellerId) {
+      alert('❌ Cannot find seller for this order. Check the book record in Firestore.');
+      return;
+    }
+
+    // 2. Find physicalInventory record
+    const variants = [
+      order.bookId,
+      order.bookId?.replace('firestore-', ''),
+      `firestore-${order.bookId?.replace('firestore-', '')}`,
+    ].filter(Boolean);
+
+    let inventoryDoc = null;
+    for (const id of variants) {
+      const snap = await getDocs(
+        query(collection(db, 'physicalInventory'), where('bookId', '==', id), limit(1))
+      );
+      if (!snap.empty) { inventoryDoc = snap.docs[0]; break; }
+    }
+
+    const price  = Number(order.price) || 0;
+    const payout = price * 0.8;
+
+    // 3. Transaction — all or nothing
+   await runTransaction(db, async (txn) => {
+  // ── ALL READS FIRST ──
+  const sellerRef      = doc(db, 'sellers', sellerId);
+  const sellerSnap     = await txn.get(sellerRef);
+  const userSellerRef  = doc(db, 'users', sellerId);
+  const userSellerSnap = await txn.get(userSellerRef);
+
+  // ── ALL WRITES AFTER ──
+
+  // 1. Mark order collected
+  txn.update(doc(db, 'physicalOrders', order.id), {
+    status:      'collected',
+    collectedAt: serverTimestamp(),
+    collectedBy: user.email,
+    sellerId:    sellerId,
+  });
+
+  // 2. Decrement inventory
+  let newStock = 0;
+  if (inventoryDoc) {
+    const inv = inventoryDoc.data();
+    newStock = Math.max(0, (inv.currentStock || 1) - 1);
+    txn.update(doc(db, 'physicalInventory', inventoryDoc.id), {
+      currentStock: newStock,
+      soldCount:    (inv.soldCount || 0) + 1,
+      updatedAt:    serverTimestamp(),
+    });
+  }
+
+  // 3. Credit seller balance
+  if (sellerSnap.exists()) {
+    txn.update(sellerRef, {
+      accountBalance: (sellerSnap.data().accountBalance || 0) + payout,
+      totalEarnings:  (sellerSnap.data().totalEarnings  || 0) + payout,
+      booksSold:      (sellerSnap.data().booksSold      || 0) + 1,
+      updatedAt:      serverTimestamp(),
+    });
+  } else if (userSellerSnap.exists()) {
+    txn.update(userSellerRef, {
+      accountBalance: (userSellerSnap.data().accountBalance || 0) + payout,
+      updatedAt:      serverTimestamp(),
+    });
+  }
+
+  // 4. ✅ Write to physicalSales — this is what the repository page reads
+  txn.set(doc(collection(db, 'physicalSales')), {
+    assetId:       inventoryDoc?.data()?.assetId || order.assetId || '',
+    bookId:        order.bookId,
+    bookTitle:     order.bookTitle,
+    sellerId:      sellerId,
+    sellerName:    sellerName || order.sellerName || '',
+    studentName:   order.userName  || 'Unknown Student',
+    studentEmail:  order.userEmail || '',
+    userId:        order.userId,
+    orderId:       order.id,
+    price:         Number(order.price) || 0,
+    sellerPayout:  payout,
+    stockAfter:    newStock,
+    soldAt:        serverTimestamp(),
+    collectedBy:   user.email,
+  });
+
+  // 5. Student notification
+  txn.set(doc(collection(db, 'notifications')), {
+    userId:    order.userId,
+    type:      'physical_sale',
+    title:     `Copy collected: ${order.bookTitle} ✅`,
+    message:   `You collected your physical copy at LAN Head Office, Abuja. Enjoy your reading!`,
+    createdAt: serverTimestamp(),
+    read:      false,
+  });
+
+  // 6. Seller notification
+  txn.set(doc(collection(db, 'notifications')), {
+    userId:    sellerId,
+    type:      'physical_sale',
+    title:     `Copy collected — ${order.bookTitle}`,
+    message:   `${order.userName || 'A student'} collected their copy. ₦${payout.toLocaleString()} credited.`,
+    amount:    payout,
+    assetId:   inventoryDoc?.data()?.assetId || '',
+    createdAt: serverTimestamp(),
+    read:      false,
+  });
+});
+
+    // 4. Low stock check (outside transaction — non-critical)
+    if (inventoryDoc) {
+      const refreshed = await getDoc(doc(db, 'physicalInventory', inventoryDoc.id));
+      const inv       = refreshed.data();
+      if (inv && (inv.currentStock === 0 || inv.currentStock / inv.totalConsignment <= 0.2)) {
+        await addDoc(collection(db, 'notifications'), {
+          userId:           inv.sellerId || sellerId,
+          type:             'physical_low_stock',
+          title:            inv.currentStock === 0
+                              ? `🚨 Out of stock: ${order.bookTitle}`
+                              : `⚠️ Low stock: ${order.bookTitle}`,
+          message:          inv.currentStock === 0
+                              ? `All copies of "${order.bookTitle}" have been collected. Please bring more to the Abuja Registry.`
+                              : `Only ${inv.currentStock} of ${inv.totalConsignment} copies remain.`,
+          currentStock:     inv.currentStock,
+          totalConsignment: inv.totalConsignment,
+          assetId:          inv.assetId || '',
+          createdAt:        serverTimestamp(),
+          read:             false,
+        });
+      }
+    }
+
+    setPaymentConfirmed(prev => ({ ...prev, [order.id]: false }));
+    await fetchPhysicalOrders();
+    alert(`✅ Collected. Seller credited ₦${payout.toLocaleString()}`);
+
+  } catch (e) {
+    console.error('Collected error:', e);
+    alert('Failed: ' + e.message);
+  }
+}}
+          className="btn btn-success"
+          style={{
+            padding: '5px 10px', fontSize: 11, gap: 4,
+            opacity: paymentConfirmed[order.id] ? 1 : 0.4,
+            cursor: paymentConfirmed[order.id] ? 'pointer' : 'not-allowed',
+          }}
+        >
+          <CheckCircle size={11} /> Mark Collected & Credit Seller
+        </button>
+
+        {/* Cancel */}
+        <button
+          onClick={async () => {
+            const reason = prompt('Cancellation reason (shown to student):');
+            if (!reason?.trim()) return;
+            try {
+              await updateDoc(doc(db, 'physicalOrders', order.id), {
+                status:       'cancelled',
+                cancelledAt:  serverTimestamp(),
+                cancelReason: reason,
+                cancelledBy:  user.email,
+              });
+              await addDoc(collection(db, 'notifications'), {
+                userId:    order.userId,
+                type:      'withdrawal_rejected',
+                title:     `Physical order cancelled`,
+                message:   `Your order for "${order.bookTitle}" was cancelled. Reason: ${reason}`,
+                createdAt: serverTimestamp(),
+                read:      false,
+              });
+              await fetchPhysicalOrders();
+            } catch (e) { alert('Failed: ' + e.message); }
+          }}
+          className="btn btn-danger"
+          style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}
+        >
+          <X size={11} /> Cancel
+        </button>
+      </div>
+    </div>
+  )}
+
+  {order.status === 'collected' && (
+    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+      {order.collectedAt ? formatDate(order.collectedAt).split(',')[0] : 'Done'}
+    </span>
+  )}
+</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
         </div>
       </div>
 

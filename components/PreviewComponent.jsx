@@ -8,11 +8,11 @@ import {
 import { auth, db } from "@/lib/firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { booksData } from "@/lib/booksData";
-import {
-  Download, Share2, Bookmark, MoreVertical, Lock, Menu, X,
+import { Download, Share2, Bookmark, MoreVertical, Lock, Menu, X,
   Eye, FileText, ChevronRight, Layers, ThumbsUp, Flag,
   CheckCircle, Upload, HelpCircle, ShoppingBag, Users,
   ExternalLink, Sparkles, ArrowLeft, TrendingUp,
+  Package, MapPin, AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { fetchBookDetails } from "@/utils/bookUtils";
@@ -61,6 +61,8 @@ export default function BookPreviewPage() {
   const [loadingLecturers,      setLoadingLecturers]      = useState(false);
   const [followingIds,          setFollowingIds]          = useState(new Set());
   const [followLoadingIds,      setFollowLoadingIds]      = useState(new Set());
+  const [physicalInventory,     setPhysicalInventory]     = useState(null);
+  const [loadingPhysical,       setLoadingPhysical]       = useState(true);
 
   const getThumbnailUrl = (book) => {
     if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
@@ -120,6 +122,29 @@ export default function BookPreviewPage() {
   }, [bookId]);
 
   useEffect(() => {
+  if (!bookId) return;
+  const fetchPhysicalInventory = async () => {
+    try {
+      setLoadingPhysical(true);
+      const variants = [
+        bookId,
+        bookId.replace("firestore-", ""),
+        `firestore-${bookId.replace("firestore-", "")}`,
+      ];
+      let found = null;
+      for (const id of variants) {
+        const q    = query(collection(db, "physicalInventory"), where("bookId", "==", id));
+        const snap = await getDocs(q);
+        if (!snap.empty) { found = { id: snap.docs[0].id, ...snap.docs[0].data() }; break; }
+      }
+      setPhysicalInventory(found);
+    } catch {}
+    finally { setLoadingPhysical(false); }
+  };
+  fetchPhysicalInventory();
+}, [bookId]);
+
+  useEffect(() => {
     if (!bookId) return;
     const fetchRatings = async () => {
       try {
@@ -175,6 +200,11 @@ export default function BookPreviewPage() {
     };
     fetchFollowing();
   }, [user]);
+
+  const handleBuyPhysical = () => {
+  const cId = bookId?.replace("firestore-", "") || book?.firestoreId || bookId;
+  router.push(`/book/buy-physical?bookId=${cId}`);
+};
 
   const handleFollowLecturer = async (e, lecturerId, lecturerName) => {
     e.preventDefault();
@@ -362,6 +392,94 @@ export default function BookPreviewPage() {
   };
 
   const formatViews = n => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : n.toString();
+
+  /* ── Physical Stock Badge ── */
+const PhysicalStockBadge = () => {
+  if (loadingPhysical) return (
+    <div style={{ margin: "0 16px 0", padding: "14px 16px", background: "#fff", border: "0.5px solid #e5ddd0", display: "flex", alignItems: "center", gap: "10px" }}>
+      <div style={{ width: "16px", height: "16px", border: `2px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
+      <span style={{ fontSize: "11px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>Checking physical availability…</span>
+    </div>
+  );
+
+  /* State 3: No deposit at all */
+  if (!physicalInventory) return (
+    <div style={{ margin: "0 16px 0", padding: "14px 16px", background: "#fff", border: "0.5px solid #e5ddd0", display: "flex", alignItems: "center", gap: "12px" }}>
+      <div style={{ width: "36px", height: "36px", background: "#f5f1ea", border: "0.5px solid #e5ddd0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <HelpCircle size={16} style={{ color: "#ccc" }} />
+      </div>
+      <div>
+        <p style={{ fontSize: "11px", fontWeight: 700, color: "#aaa", margin: "0 0 2px", fontFamily: "'Lato',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Physical Copy</p>
+        <p style={{ fontSize: "12px", color: "#bbb", margin: 0, fontFamily: "'Lato',sans-serif" }}>No physical deposit yet for this research</p>
+      </div>
+    </div>
+  );
+
+  const stock   = physicalInventory.currentStock || 0;
+  const shelf   = physicalInventory.shelfLocation || "";
+  const section = physicalInventory.section || "";
+
+  /* State 2: Out of stock */
+  if (stock === 0) return (
+    <div style={{ margin: "0 16px 0", padding: "14px 16px", background: "#fff", border: "0.5px solid #f0ebe0" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{ width: "36px", height: "36px", background: "#fff5f5", border: "0.5px solid #fecaca", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <AlertCircle size={16} style={{ color: "#f87171" }} />
+        </div>
+        <div>
+          <p style={{ fontSize: "11px", fontWeight: 700, color: "#f87171", margin: "0 0 2px", fontFamily: "'Lato',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Out of Stock</p>
+          <p style={{ fontSize: "12px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>Physical copies currently out of stock at LAN Head Office Abuja</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* State 1: Available — gold pulse border */
+  return (
+    <>
+      <style>{`
+        @keyframes goldPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(184,150,62,0.4); }
+          50%       { box-shadow: 0 0 0 6px rgba(184,150,62,0); }
+        }
+        .physical-available { animation: goldPulse 2.4s ease-in-out infinite; }
+      `}</style>
+      <div className="physical-available" style={{ margin: "0 16px 0", padding: "16px", background: "#fff", border: `1.5px solid ${GOLD}` }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+          <div style={{ width: "38px", height: "38px", background: NAVY, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Package size={17} style={{ color: GOLD }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "10px", fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif", textTransform: "uppercase", letterSpacing: "0.1em" }}>Physical Copy Available</span>
+              <span style={{ background: "rgba(34,197,94,0.12)", border: "0.5px solid rgba(34,197,94,0.3)", color: "#16a34a", fontSize: "9px", fontWeight: 700, padding: "2px 7px", fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em" }}>{stock} in stock</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "3px" }}>
+              <MapPin size={11} style={{ color: GOLD, flexShrink: 0 }} />
+              <span style={{ fontSize: "12px", color: NAVY, fontWeight: 700, fontFamily: "'Lato',sans-serif" }}>LAN Head Office — Abuja Registry</span>
+            </div>
+            {(shelf || section) && (
+              <p style={{ fontSize: "11px", color: "#888", margin: "0 0 10px", fontFamily: "'Lato',sans-serif" }}>
+                {section && <span>Section: <strong style={{ color: NAVY }}>{section}</strong></span>}
+                {section && shelf && <span> &nbsp;·&nbsp; </span>}
+                {shelf && <span>Shelf: <strong style={{ color: NAVY }}>{shelf}</strong></span>}
+              </p>
+            )}
+            <button
+              onClick={handleBuyPhysical}
+              style={{ display: "flex", alignItems: "center", gap: "6px", background: NAVY, color: "#fff", padding: "9px 16px", border: "none", fontSize: "11px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em", transition: "background 0.18s" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#1a3a6e"}
+              onMouseLeave={e => e.currentTarget.style.background = NAVY}
+            >
+              <ShoppingBag size={13} />
+              Get Physical Copy — ₦{book.price?.toLocaleString()}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
 
   /* ── PDF Viewer ── */
   const PdfViewer = ({ heightClass = "600px", fullHeight = "900px" }) => (
@@ -1830,6 +1948,8 @@ export default function BookPreviewPage() {
                     </button>
                   </div>
                 </div>
+                  <PhysicalStockBadge />
+
                 <PdfViewer heightClass="400px" fullHeight="900px" />
               </div>
 
@@ -1837,7 +1957,7 @@ export default function BookPreviewPage() {
               <div
                 className="lg-hide"
                 style={{
-                  background: "#fff",
+                  background: "#fff", 
                   border: "0.5px solid #e5ddd0",
                   padding: "20px",
                 }}
