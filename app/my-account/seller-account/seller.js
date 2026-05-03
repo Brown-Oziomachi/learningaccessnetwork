@@ -620,17 +620,21 @@ export default function SellerAccountClient() {
             );
             const physicalSalesSnap = await getDocs(physicalSalesQuery);
             const physicalSalesList = physicalSalesSnap.docs.map(d => {
-            const data = d.data();
-            return {
-                id: d.id,
-                ...data,
-                bookTitle: `📦 ${data.bookTitle} (Registry Pickup)`,
-                buyerName: data.studentName || "Student",
-                amount: data.salePrice,
-                sellerAmount: data.sellerPayout,
-                createdAtDate: data.soldAt?.toDate?.() || new Date(),
-                type: "physical_sale",
-            };
+                const data = d.data();
+                const fullPrice = data.salePrice || data.price || 0;
+                const payout = data.sellerPayout || 0;
+                const fee = data.platformFee || 0;
+
+                return {
+                    ...data,
+                    bookTitle: `📦 ${data.bookTitle} (Registry Pickup)`,
+                    buyerName: data.studentName || data.buyerName || "Student",
+                    amount: fullPrice,       
+                    sellerAmount: payout,     
+                    platformFee: fee,         
+                    createdAtDate: data.soldAt?.toDate?.() || new Date(),
+                    type: "physical_sale",
+                };
             });
             allTransactions = [...allTransactions, ...transfersList, ...incomingList, ...physicalSalesList];
             allTransactions.sort((a, b) => b.createdAtDate - a.createdAtDate);
@@ -1066,10 +1070,17 @@ export default function SellerAccountClient() {
                                                 </div>
                                             </div>
                                             <div style={{ background: CREAM, border: '0.5px solid #f0ebe0', padding: '10px 12px' }}>
-                                                {[['Buyer', txn.buyerName], ['Price', `₦${txn.amount?.toLocaleString()}`], ['Country', txn.buyerCountry ? `${getCountryFlag(txn.buyerCountry)} ${txn.buyerCountry}` : '—'], ['Platform Fee (20%)', `-₦${((txn.amount || 0) * 0.20).toLocaleString()}`]].map(([k, v]) => (
+                                                {[
+                                                    ['Buyer', txn.buyerName || txn.studentName || '—'],
+                                                    ['Price', `₦${(txn.amount || txn.salePrice || 0).toLocaleString()}`],
+                                                    ['Country', txn.buyerCountry ? `${getCountryFlag(txn.buyerCountry)} ${txn.buyerCountry}` : '—'],
+                                                    ['Your Payout (80%)', `+₦${(txn.sellerAmount || txn.sellerPayout || (txn.amount * 0.80) || 0).toLocaleString()}`],
+                                                    ['Platform Fee (20%)', `-₦${(txn.platformFee || txn.fee || ((txn.amount || txn.salePrice || 0) * 0.20)).toLocaleString()}`],
+                                                ].map(([k, v]) => (
                                                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0' }}>
                                                         <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{k}</span>
-                                                        <span style={{ fontWeight: 700, color: k.includes('Fee') ? '#ef4444' : NAVY, fontFamily: "'Lato',sans-serif" }}>{v}</span>
+                                                        <span style={{
+                                                            fontWeight: 700, color: k.includes('Fee') ? '#ef4444' : k.includes('Payout') ? '#16a34a' : NAVY, fontFamily: "'Lato',sans-serif" }}>{v}</span>
                                                     </div>
                                                 ))}
                                             </div>

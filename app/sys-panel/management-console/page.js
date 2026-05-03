@@ -425,6 +425,7 @@ export default function ComprehensiveAdminPanel() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [physicalOrders, setPhysicalOrders] = useState([]);
   const [paymentConfirmed, setPaymentConfirmed] = useState({});
+  const [sellersData, setSellersData] = useState([]);
   const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
 
   useEffect(() => {
@@ -434,6 +435,13 @@ export default function ComprehensiveAdminPanel() {
     });
     return () => unsubscribe();
   }, []);
+
+  const fetchSellers = async () => {
+    try {
+      const s = await getDocs(query(collection(db, 'users'), where('isSeller', '==', true)));
+      setSellersData(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
+  };
 
   const checkAdminStatus = async (currentUser) => {
     try {
@@ -461,17 +469,17 @@ export default function ComprehensiveAdminPanel() {
 };
 
   const fetchAllData = async () => {
-  setLoading(true);
-  try {
-    await Promise.all([
-      fetchAdvertisements(), fetchSupportTickets(), fetchBookReports(),
-      fetchTransactions(), fetchUsers(), fetchWithdrawals(),
-      fetchSchoolApplications(), fetchSchoolDocuments(),
-      fetchFeedbacks(), fetchArticleFeedbacks(),
-      fetchPhysicalOrders(), 
-    ]);
-  } catch (error) { console.error(error); } finally { setLoading(false); }
-};
+    setLoading(true);
+    try {
+      await Promise.all([
+        fetchAdvertisements(), fetchSupportTickets(), fetchBookReports(),
+        fetchTransactions(), fetchUsers(), fetchWithdrawals(),
+        fetchSchoolApplications(), fetchSchoolDocuments(),
+        fetchFeedbacks(), fetchArticleFeedbacks(),
+        fetchPhysicalOrders(), fetchSellers(), // ← must be here
+      ]);
+    } catch (error) { console.error(error); } finally { setLoading(false); }
+  };
 
   const fetchSellerFullDetails = async (sellerId) => {
     setLoadingSellerDetails(true);
@@ -843,8 +851,59 @@ export default function ComprehensiveAdminPanel() {
               </div>
 
               {/* Flutterwave widget */}
-              <div style={{ marginBottom: 20 }}><FlwBalanceWidget /></div>
-
+<div style={{ marginBottom: 20 }}>
+  <div className="card">
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+      <div style={{ width: 40, height: 40, background: 'rgba(16,185,129,0.12)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <DollarSign size={18} color="#34d399" />
+      </div>
+      <div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Platform Wallets</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>All Seller Balances</div>
+      </div>
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      {[
+                      {
+                        label: 'Total Seller Balances',
+                        value: sellersData.length === 0
+                          ? 'Loading…'
+                          : `₦${sellersData
+                            .filter(s => s.id !== 'LAN_LIBRARY_PLATFORM')
+                            .reduce((sum, s) => sum + (Number(s.accountBalance) || 0), 0)
+                            .toLocaleString()}`,
+                        color: '#34d399',
+                        sub: `${sellersData.filter(s => s.id !== 'LAN_LIBRARY_PLATFORM').length} sellers`,
+                      },
+        {
+          label: 'Total Platform Fees',
+          value: `₦${transactions.reduce((sum, t) => sum + ((t.amount || 0) * 0.2), 0).toLocaleString()}`,
+          color: '#60a5fa',
+          sub: 'Across all sales'
+        },
+        {
+          label: 'Total Withdrawn',
+          value: `₦${withdrawals.filter(w => w.status === 'completed').reduce((sum, w) => sum + (w.amount || 0), 0).toLocaleString()}`,
+          color: '#f87171',
+          sub: `${withdrawals.filter(w => w.status === 'completed').length} completed`
+        },
+        {
+          label: 'Pending Withdrawals',
+          value: `₦${withdrawals.filter(w => w.status === 'pending').reduce((sum, w) => sum + (w.amount || 0), 0).toLocaleString()}`,
+          color: '#fbbf24',
+          sub: `${withdrawals.filter(w => w.status === 'pending').length} pending`
+        },
+      ].map(({ label, value, color, sub }) => (
+        <div key={label} style={{ background: 'var(--surface)', borderRadius: 10, padding: '14px 16px', border: '1px solid var(--card-border)' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, marginBottom: 6 }}>{label}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color, marginBottom: 3 }}>{value}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{sub}</div>
+        </div>
+      ))}
+    </div>
+  </div>
+</div>
+              
               {/* Grid: Alerts + Activity */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
                 {/* Pending alerts */}
@@ -1544,8 +1603,8 @@ export default function ComprehensiveAdminPanel() {
         <button
           disabled={!paymentConfirmed[order.id]}
         onClick={async () => {
-  if (!confirm(`Mark order for ${order.userName} as COLLECTED?\n\nThis will:\n• Mark order collected\n• Decrement shelf stock\n• Credit seller ₦${(Number(order.price) * 0.8).toLocaleString()} (80%)\n• Notify student and seller`)) return;
-  try {
+          if (!confirm(`Mark order for ${order.userName} as COLLECTED?\n\nThis will:\n• Mark order collected\n• Decrement shelf stock\n• Credit seller ₦${(Number(order.price) * 0.8).toLocaleString()} (80%)\n• Credit LAN platform ₦${(Number(order.price) * 0.2).toLocaleString()} (20%)\n• Notify student and seller`)) return;
+          try {
 
     // 1. Resolve sellerId — use order field or look up from book
     let sellerId   = order.sellerId   || null;
@@ -1589,90 +1648,131 @@ export default function ComprehensiveAdminPanel() {
     const payout = price * 0.8;
 
     // 3. Transaction — all or nothing
-   await runTransaction(db, async (txn) => {
-  // ── ALL READS FIRST ──
-  const sellerRef      = doc(db, 'sellers', sellerId);
-  const sellerSnap     = await txn.get(sellerRef);
-  const userSellerRef  = doc(db, 'users', sellerId);
-  const userSellerSnap = await txn.get(userSellerRef);
+    await runTransaction(db, async (txn) => {
+      // ── ALL READS FIRST ──
+      const sellerRef = doc(db, 'sellers', sellerId);
+      const sellerSnap = await txn.get(sellerRef);
+      const userSellerRef = doc(db, 'users', sellerId);
+      const userSellerSnap = await txn.get(userSellerRef);
+      const platformRef = doc(db, 'sellers', 'LAN_LIBRARY_PLATFORM'); // ← ADD
+      const platformSnap = await txn.get(platformRef);                  // ← ADD
 
-  // ── ALL WRITES AFTER ──
+      // ── ALL WRITES AFTER ──
+      const price = Number(order.price) || 0;
+      const payout = price * 0.8;  // seller gets 80%
+      const platformFee = price * 0.2; // LAN gets 20%  ← ADD
 
-  // 1. Mark order collected
-  txn.update(doc(db, 'physicalOrders', order.id), {
-    status:      'collected',
-    collectedAt: serverTimestamp(),
-    collectedBy: user.email,
-    sellerId:    sellerId,
-  });
+      // 1. Mark order collected
+      txn.update(doc(db, 'physicalOrders', order.id), {
+        status: 'collected',
+        collectedAt: serverTimestamp(),
+        collectedBy: user.email,
+        sellerId: sellerId,
+      });
 
-  // 2. Decrement inventory
-  let newStock = 0;
-  if (inventoryDoc) {
-    const inv = inventoryDoc.data();
-    newStock = Math.max(0, (inv.currentStock || 1) - 1);
-    txn.update(doc(db, 'physicalInventory', inventoryDoc.id), {
-      currentStock: newStock,
-      soldCount:    (inv.soldCount || 0) + 1,
-      updatedAt:    serverTimestamp(),
+      // 2. Decrement inventory
+      let newStock = 0;
+      if (inventoryDoc) {
+        const inv = inventoryDoc.data();
+        newStock = Math.max(0, (inv.currentStock || 1) - 1);
+        txn.update(doc(db, 'physicalInventory', inventoryDoc.id), {
+          currentStock: newStock,
+          soldCount: (inv.soldCount || 0) + 1,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      // 3. Credit seller 80%
+      if (sellerSnap.exists()) {
+        txn.update(sellerRef, {
+          accountBalance: (sellerSnap.data().accountBalance || 0) + payout,
+          totalEarnings: (sellerSnap.data().totalEarnings || 0) + payout,
+          booksSold: (sellerSnap.data().booksSold || 0) + 1,
+          updatedAt: serverTimestamp(),
+        });
+      } else if (userSellerSnap.exists()) {
+        txn.update(userSellerRef, {
+          accountBalance: (userSellerSnap.data().accountBalance || 0) + payout,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      // 4. Credit platform 20%  ← ADD THIS BLOCK
+      if (platformSnap.exists()) {
+        txn.update(platformRef, {
+          accountBalance: (platformSnap.data().accountBalance || 0) + platformFee,
+          totalFeesCollected: (platformSnap.data().totalFeesCollected || 0) + platformFee,
+          totalEarnings: (platformSnap.data().totalEarnings || 0) + platformFee,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        txn.set(platformRef, {
+          accountBalance: platformFee,
+          totalFeesCollected: platformFee,
+          totalEarnings: platformFee,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      // 5. Platform fee ledger record  ← ADD THIS
+      txn.set(doc(collection(db, 'platformFees')), {
+        source: 'physical_order',
+        orderId: order.id,
+        bookId: order.bookId,
+        bookTitle: order.bookTitle,
+        sellerId: sellerId,
+        sellerName: sellerName || order.sellerName || '',
+        studentName: order.userName || '',
+        salePrice: price,
+        fee: platformFee,
+        sellerPayout: payout,
+        disbursedToFlutterwave: false,
+        createdAt: serverTimestamp(),
+        recordedBy: user.email,
+      });
+
+      // 6. Physical sales ledger
+      txn.set(doc(collection(db, 'physicalSales')), {
+        assetId: inventoryDoc?.data()?.assetId || order.assetId || '',
+        bookId: order.bookId,
+        bookTitle: order.bookTitle,
+        sellerId: sellerId,
+        sellerName: sellerName || order.sellerName || '',
+        studentName: order.userName || 'Unknown Student',
+        studentEmail: order.userEmail || '',
+        userId: order.userId,
+        orderId: order.id,
+        price: price,
+        sellerPayout: payout,
+        platformFee: platformFee,   // ← also record it here
+        stockAfter: newStock,
+        soldAt: serverTimestamp(),
+        collectedBy: user.email,
+      });
+
+      // 7. Student notification
+      txn.set(doc(collection(db, 'notifications')), {
+        userId: order.userId,
+        type: 'physical_sale',
+        title: `Copy collected: ${order.bookTitle} ✅`,
+        message: `You collected your physical copy at LAN Head Office, Abuja. Enjoy your reading!`,
+        createdAt: serverTimestamp(),
+        read: false,
+      });
+
+      // 8. Seller notification
+      txn.set(doc(collection(db, 'notifications')), {
+        userId: sellerId,
+        type: 'physical_sale',
+        title: `Copy collected — ${order.bookTitle}`,
+        message: `${order.userName || 'A student'} collected their copy. ₦${payout.toLocaleString()} credited (20% platform fee: ₦${platformFee.toLocaleString()}).`,
+        amount: payout,
+        assetId: inventoryDoc?.data()?.assetId || '',
+        createdAt: serverTimestamp(),
+        read: false,
+      });
     });
-  }
-
-  // 3. Credit seller balance
-  if (sellerSnap.exists()) {
-    txn.update(sellerRef, {
-      accountBalance: (sellerSnap.data().accountBalance || 0) + payout,
-      totalEarnings:  (sellerSnap.data().totalEarnings  || 0) + payout,
-      booksSold:      (sellerSnap.data().booksSold      || 0) + 1,
-      updatedAt:      serverTimestamp(),
-    });
-  } else if (userSellerSnap.exists()) {
-    txn.update(userSellerRef, {
-      accountBalance: (userSellerSnap.data().accountBalance || 0) + payout,
-      updatedAt:      serverTimestamp(),
-    });
-  }
-
-  // 4. ✅ Write to physicalSales — this is what the repository page reads
-  txn.set(doc(collection(db, 'physicalSales')), {
-    assetId:       inventoryDoc?.data()?.assetId || order.assetId || '',
-    bookId:        order.bookId,
-    bookTitle:     order.bookTitle,
-    sellerId:      sellerId,
-    sellerName:    sellerName || order.sellerName || '',
-    studentName:   order.userName  || 'Unknown Student',
-    studentEmail:  order.userEmail || '',
-    userId:        order.userId,
-    orderId:       order.id,
-    price:         Number(order.price) || 0,
-    sellerPayout:  payout,
-    stockAfter:    newStock,
-    soldAt:        serverTimestamp(),
-    collectedBy:   user.email,
-  });
-
-  // 5. Student notification
-  txn.set(doc(collection(db, 'notifications')), {
-    userId:    order.userId,
-    type:      'physical_sale',
-    title:     `Copy collected: ${order.bookTitle} ✅`,
-    message:   `You collected your physical copy at LAN Head Office, Abuja. Enjoy your reading!`,
-    createdAt: serverTimestamp(),
-    read:      false,
-  });
-
-  // 6. Seller notification
-  txn.set(doc(collection(db, 'notifications')), {
-    userId:    sellerId,
-    type:      'physical_sale',
-    title:     `Copy collected — ${order.bookTitle}`,
-    message:   `${order.userName || 'A student'} collected their copy. ₦${payout.toLocaleString()} credited.`,
-    amount:    payout,
-    assetId:   inventoryDoc?.data()?.assetId || '',
-    createdAt: serverTimestamp(),
-    read:      false,
-  });
-});
 
     // 4. Low stock check (outside transaction — non-critical)
     if (inventoryDoc) {

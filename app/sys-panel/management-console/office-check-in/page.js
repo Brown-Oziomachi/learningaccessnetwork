@@ -520,7 +520,7 @@ export default function AdminOfficeCheckInPage() {
                     {sellerResults.map(s => (
                       <div key={s.uid} className="lec-row" onClick={() => handleSelectSeller(s)}>
                         <div style={{ width: "40px", height: "40px", background: "linear-gradient(135deg,var(--accent),#8b5cf6)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          {s.photoBase64 ? <img src={s.photoBase64} style={{ width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover" }} alt="" /> : <span style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>{(s.firstName?.[0] || "?")(s.surname?.[0] || "")}</span>}
+                          {s.photoBase64 ? <img src={s.photoBase64} style={{ width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover" }} alt="" /> : <span style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>{(s.firstName?.[0] || "?")+(s.surname?.[0] || "")}</span>}
                         </div>
                         <div style={{ flex: 1 }}>
                           <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 2px" }}>{s.firstName} {s.surname}</p>
