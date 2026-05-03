@@ -16,7 +16,7 @@ import {
 import { db, auth } from "@/lib/firebaseConfig";
 
 const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(",") || [];
-const PLATFORM_FEE = 0.20; // LAN takes 10%
+const PLATFORM_FEE = 0.20;  // LAN takes 20%, seller gets 80%
 
 /* ─── Debounce ───────────────────────────────────────────────── */
 function useDebounce(value, delay) {
@@ -46,8 +46,8 @@ function SaleReceipt({ data, onClose, onNewSale }) {
             ["Student",         data.studentName],
             ["Student Email",   data.studentEmail],
             ["Sale Price",      `₦${Number(data.salePrice).toLocaleString()}`],
-            ["Seller Payout",   `₦${Number(data.sellerPayout).toLocaleString()} (90%)`],
-            ["LAN Fee",         `₦${Number(data.lanFee).toLocaleString()} (10%)`],
+            ["Seller Payout", `₦${Number(data.sellerPayout).toLocaleString()} (80%)`],
+            ["LAN Fee", `₦${Number(data.lanFee).toLocaleString()} (20%)`],
             ["Stock Remaining", `${data.stockAfter} copies`],
           ].map(([k, v]) => (
             <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
@@ -536,8 +536,8 @@ export default function RegistryCheckout() {
                   {salePrice && parseFloat(salePrice) > 0 && (
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "10px" }}>
                       {[
-                        { label: "Seller gets (90%)", val: `₦${(parseFloat(salePrice) * 0.9).toLocaleString()}`, color: "#34d399" },
-                        { label: "LAN fee (10%)",     val: `₦${(parseFloat(salePrice) * 0.1).toLocaleString()}`, color: "#f87171" },
+                        { label: "Seller gets (80%)", val: `₦${(parseFloat(salePrice) * (1 - PLATFORM_FEE)).toLocaleString()}`, color: "#34d399" },
+                        { label: "LAN fee (20%)", val: `₦${(parseFloat(salePrice) * PLATFORM_FEE).toLocaleString()}`, color: "#f87171" },
                       ].map(({ label, val, color }) => (
                         <div key={label} style={{ background: "var(--surface)", borderRadius: "6px", padding: "8px 10px" }}>
                           <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-muted)", margin: "0 0 2px" }}>{label}</p>

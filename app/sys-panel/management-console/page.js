@@ -1422,9 +1422,9 @@ export default function ComprehensiveAdminPanel() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      {['Student', 'Book', 'Pickup Code', 'Price', 'Shelf', 'Date', 'Status', ''].map(h => (
-                        <th key={h}>{h}</th>
-                      ))}
+                          {['Student', 'Book', 'Asset ID', 'Pickup Code', 'Price', 'Shelf', 'Date', 'Status', ''].map(h => (
+                            <th key={h}>{h}</th>
+                          ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -1445,6 +1445,64 @@ export default function ComprehensiveAdminPanel() {
                             <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.bookTitle}</div>
                             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{order.bookAuthor}</div>
                           </td>
+                          {/* Asset ID — copyable */}
+                          <td>
+                            {order.assetId ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{
+                                  fontFamily: 'monospace', fontWeight: 700, fontSize: 12,
+                                  color: '#d4aa5a', background: 'rgba(184,150,62,0.1)',
+                                  border: '1px solid rgba(184,150,62,0.3)',
+                                  padding: '3px 8px', borderRadius: 4, letterSpacing: '0.04em'
+                                }}>
+                                  {order.assetId}
+                                </span>
+                                <button
+                                  onClick={() => { navigator.clipboard.writeText(order.assetId); alert(`✅ Copied: ${order.assetId}`); }}
+                                  title="Copy Asset ID"
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 2, display: 'flex', alignItems: 'center' }}
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
+                                {order.bookId && (
+                                  <button
+                                    onClick={async () => {
+                                      const variants = [
+                                        order.bookId,
+                                        order.bookId?.replace('firestore-', ''),
+                                        `firestore-${order.bookId?.replace('firestore-', '')}`,
+                                      ].filter(Boolean);
+                                      for (const id of variants) {
+                                        const snap = await getDocs(
+                                          query(collection(db, 'physicalInventory'), where('bookId', '==', id), limit(1))
+                                        );
+                                        if (!snap.empty) {
+                                          const assetId = snap.docs[0].data().assetId;
+                                          await updateDoc(doc(db, 'physicalOrders', order.id), { assetId });
+                                          alert(`✅ Asset ID patched: ${assetId}`);
+                                          await fetchPhysicalOrders();
+                                          return;
+                                        }
+                                      }
+                                      alert('❌ No inventory record found for this book.');
+                                    }}
+                                    className="btn btn-ghost"
+                                    style={{ fontSize: 10, padding: '3px 8px' }}
+                                  >
+                                    Lookup ID
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Pickup Code */}
                           <td>
                             <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: '#d4aa5a', background: 'rgba(184,150,62,0.1)', border: '1px solid rgba(184,150,62,0.3)', padding: '3px 8px', borderRadius: 4 }}>
                               {order.pickupCode}

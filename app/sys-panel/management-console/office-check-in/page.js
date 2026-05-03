@@ -223,35 +223,85 @@ export default function AdminOfficeCheckInPage() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const bookTitle  = isNewPhysical ? newBookTitle  : selectedBook.bookTitle;
+      const bookTitle = isNewPhysical ? newBookTitle : selectedBook.bookTitle;
       const courseCode = isNewPhysical ? newCourseCode : (selectedBook.course || "");
-      const bookId     = isNewPhysical ? null : selectedBook.id;
-      const qty        = parseInt(quantity);
+      const bookId = isNewPhysical ? null : selectedBook.id;
+      const qty = parseInt(quantity);
+
       let existingDocRef = null, existingData = null, isRestock = false;
       if (bookId) {
-        const es = await getDocs(query(collection(db, "physicalInventory"), where("sellerId", "==", selectedSeller.uid), where("bookId", "==", bookId), limit(1)));
+        const es = await getDocs(query(collection(db, 'physicalInventory'), where('sellerId', '==', selectedSeller.uid), where('bookId', '==', bookId), limit(1)));
         if (!es.empty) { existingDocRef = es.docs[0].ref; existingData = es.docs[0].data(); isRestock = true; }
       }
+
+      // ✅ Use existing assetId on restock, new one only for first-time
+      const finalAssetId = isRestock ? existingData.assetId : assetId;
+
       await runTransaction(db, async (txn) => {
         if (isRestock && existingDocRef) {
-          txn.update(existingDocRef, { totalConsignment: existingData.totalConsignment + qty, currentStock: existingData.currentStock + qty, lastRestockDate: serverTimestamp(), shelfLocation: shelfLocation || existingData.shelfLocation, adminNotes: adminNotes || existingData.adminNotes, updatedAt: serverTimestamp() });
+          txn.update(existingDocRef, {
+            totalConsignment: existingData.totalConsignment + qty,
+            currentStock: existingData.currentStock + qty,
+            lastRestockDate: serverTimestamp(),
+            lastRestockQty: qty,
+            shelfLocation: shelfLocation || existingData.shelfLocation,
+            adminNotes: adminNotes || existingData.adminNotes,
+            updatedAt: serverTimestamp(),
+          });
         } else {
-          const newRef = doc(collection(db, "physicalInventory"));
-          txn.set(newRef, { assetId, sellerId: selectedSeller.uid, sellerName: `${selectedSeller.firstName} ${selectedSeller.surname}`, sellerEmail: selectedSeller.email, bookId: bookId || null, bookTitle, courseCode, totalConsignment: qty, currentStock: qty, soldCount: 0, shelfLocation: shelfLocation || "Unassigned", adminNotes: adminNotes || "", status: "in_stock", isNewPhysical, checkedInAt: serverTimestamp(), lastRestockDate: serverTimestamp(), updatedAt: serverTimestamp() });
+          const newRef = doc(collection(db, 'physicalInventory'));
+          txn.set(newRef, {
+            assetId,   // ← new asset ID only for first-time
+            sellerId: selectedSeller.uid,
+            sellerName: `${selectedSeller.firstName} ${selectedSeller.surname}`,
+            sellerEmail: selectedSeller.email,
+            bookId: bookId || null,
+            bookTitle, courseCode,
+            totalConsignment: qty, currentStock: qty,
+            soldCount: 0,
+            shelfLocation: shelfLocation || 'Unassigned',
+            adminNotes: adminNotes || '',
+            status: 'in_stock', isNewPhysical,
+            checkedInAt: serverTimestamp(),
+            lastRestockDate: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
         }
-        if (bookId) { try { txn.update(doc(db, "advertMyBook", bookId), { hasPhysicalCopies: true, physicalAssetId: assetId, updatedAt: serverTimestamp() }); } catch {} }
+        if (bookId) {
+          try {
+            txn.update(doc(db, 'advertMyBook', bookId), {
+              hasPhysicalCopies: true,
+              physicalAssetId: finalAssetId,  // ← use finalAssetId
+              updatedAt: serverTimestamp(),
+            });
+          } catch { }
+        }
       });
-      /* Fire intake notification to seller */
-      await addDoc(collection(db, "notifications"), {
-        userId:    selectedSeller.uid,
-        type:      "physical_intake",
-        title:     isRestock ? `Restock confirmed: ${bookTitle}` : `${qty} copies checked in: ${bookTitle}`,
-        message:   `${qty} physical ${isRestock ? "additional " : ""}copies of "${bookTitle}" have been received at the Abuja Registry. Asset ID: ${assetId}.`,
-        assetId,
+
+      /* Notification — use finalAssetId */
+      await addDoc(collection(db, 'notifications'), {
+        userId: selectedSeller.uid,
+        type: 'physical_intake',
+        title: isRestock ? `Restock confirmed: ${bookTitle}` : `${qty} copies checked in: ${bookTitle}`,
+        message: `${qty} physical ${isRestock ? 'additional ' : ''}copies of "${bookTitle}" have been received at the Abuja Registry. Asset ID: ${finalAssetId}.`,
+        assetId: finalAssetId,  // ← use finalAssetId
         createdAt: serverTimestamp(),
-        read:      false,
+        read: false,
       });
-      const receipt = { assetId, sellerId: selectedSeller.uid, sellerName: `${selectedSeller.firstName} ${selectedSeller.surname}`, sellerEmail: selectedSeller.email, bookTitle, courseCode, totalConsignment: qty, currentStock: qty, shelfLocation: shelfLocation || "Unassigned", checkedInAt: new Date().toISOString(), isRestock, previousStock: isRestock ? existingData?.currentStock : 0 };
+
+      const receipt = {
+        assetId: finalAssetId,  // ← use finalAssetId
+        sellerId: selectedSeller.uid,
+        sellerName: `${selectedSeller.firstName} ${selectedSeller.surname}`,
+        sellerEmail: selectedSeller.email,
+        bookTitle, courseCode,
+        totalConsignment: qty,
+        currentStock: qty,
+        shelfLocation: shelfLocation || 'Unassigned',
+        checkedInAt: new Date().toISOString(),
+        isRestock,
+        previousStock: isRestock ? existingData?.currentStock : 0,
+      };
       setConsignmentData(receipt);
       setRecentCheckins(prev => [receipt, ...prev.slice(0, 4)]);
       setShowReceipt(true);

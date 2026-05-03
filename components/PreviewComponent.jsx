@@ -126,24 +126,33 @@ export default function BookPreviewPage() {
   const fetchPhysicalInventory = async () => {
     try {
       setLoadingPhysical(true);
-      const variants = [
-        bookId,
-        bookId.replace("firestore-", ""),
-        `firestore-${bookId.replace("firestore-", "")}`,
-      ];
+      const cleanId = bookId.replace("firestore-", "");
+      
+      // Full collection scan — no index needed
+      const allSnap = await getDocs(collection(db, "physicalInventory"));
       let found = null;
-      for (const id of variants) {
-        const q    = query(collection(db, "physicalInventory"), where("bookId", "==", id));
-        const snap = await getDocs(q);
-        if (!snap.empty) { found = { id: snap.docs[0].id, ...snap.docs[0].data() }; break; }
-      }
+      
+      allSnap.forEach(d => {
+        const data = d.data();
+        if (
+          data.bookId === cleanId ||
+          data.bookId === bookId ||
+          data.bookId === `firestore-${cleanId}`
+        ) {
+          found = { id: d.id, ...data };
+        }
+      });
+
       setPhysicalInventory(found);
-    } catch {}
-    finally { setLoadingPhysical(false); }
+    } catch(e) {
+      console.error("fetchPhysicalInventory failed:", e);
+    } finally {
+      setLoadingPhysical(false);
+    }
   };
   fetchPhysicalInventory();
-}, [bookId]);
-
+  }, [bookId]);
+  
   useEffect(() => {
     if (!bookId) return;
     const fetchRatings = async () => {

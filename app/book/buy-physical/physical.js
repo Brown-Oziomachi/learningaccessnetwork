@@ -84,9 +84,10 @@ export default function BuyPhysicalClient() {
   userId:        user.uid,
   userEmail:     user.email        || "",
   userName:      user.displayName  || user.email?.split("@")[0] || "Student",
-  sellerId:      book.userId       || book.sellerId  || book.uploadedBy || "", // ← ADD
-  sellerName:    book.sellerName   || book.author    || "",                    // ← ADD
-  inventoryId:   inventoryDocId,
+  sellerId:      book.userId       || book.sellerId  || book.uploadedBy || "",
+  sellerName:    book.sellerName   || book.author    || "",                  
+    assetId: inventory.assetId || '',  
+    inventoryId: inventoryDocId,
   shelfLocation: inventory.shelfLocation || "",
   section:       inventory.section       || "",
   status:        "pending_pickup",

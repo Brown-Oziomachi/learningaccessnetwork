@@ -135,7 +135,6 @@ function StockPill({ current, total }) {
 ════════════════════════════════════════════════════════════════ */
 export default function NotificationBell({ userId }) {
   const [notifications,   setNotifications]   = useState([]);
-  const [adminReplies,    setAdminReplies]     = useState([]);
   const [repliedReports,  setRepliedReports]   = useState([]);
   const [readAdminReplies, setReadAdminReplies] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem("readAdminReplies") || "[]")); }
@@ -176,18 +175,7 @@ export default function NotificationBell({ userId }) {
     );
   }, [userId]);
 
-  /* ── 3. adminReplies collection ── */
-  useEffect(() => {
-    if (!userId) return;
-    const q = query(
-      collection(db, "adminReplies"),
-      where("userId", "==", userId),
-      orderBy("repliedAt", "desc"),
-    );
-    return onSnapshot(q, (snap) =>
-      setAdminReplies(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
-    );
-  }, [userId]);
+
 
   /* ── Close on outside click ── */
   useEffect(() => {
