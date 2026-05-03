@@ -1,11 +1,11 @@
 "use client"
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   collection, query, where, getDocs, getDoc,
   doc, updateDoc, deleteDoc, addDoc,
   serverTimestamp, increment, orderBy,
   runTransaction, limit,      // ← these two are the ones most likely missing
-  writeBatch,
+  writeBatch, onSnapshot
 } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -357,9 +357,9 @@ const NAV_SECTIONS = [
       { id: 'schools', icon: Building, label: 'Schools', badgeKey: 'pendingSchools' },
       { id: 'school-documents', icon: FileText, label: 'School Docs', badgeKey: 'pendingSchoolDocs' },
       { id: 'physical-orders', icon: ShoppingBag, label: 'Physical Orders', badgeKey: 'pendingPhysicalOrders', badgeType: 'warn' },
-      { id: 'office-checkin',  icon: Package,  label: 'Office Check-In'   },
-      { id: 'registry-checkout', icon: Receipt, label: 'Registry Checkout' },   
-         ]
+      { id: 'office-checkin', icon: Package, label: 'Office Check-In' },
+      { id: 'registry-checkout', icon: Receipt, label: 'Registry Checkout' },
+    ]
   },
   {
     label: 'Finance',
@@ -385,6 +385,138 @@ const NAV_SECTIONS = [
     ]
   }
 ];
+
+
+// ── paste this ABOVE the `export default function ComprehensiveAdminPanel` line ──
+
+function AdminNotificationBell({ setActiveSection }) {
+  const [open, setOpen] = useState(false);
+  const [notifs, setNotifs] = useState([]);
+  const [unread, setUnread] = useState(0);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, "adminNotifications"),
+      orderBy("createdAt", "desc"),
+      limit(30)
+    );
+    const unsub = onSnapshot(q, snap => {
+      const docs = snap.docs.map(d => ({
+        id: d.id, ...d.data(),
+        createdAt: d.data().createdAt?.toDate?.() || new Date()
+      }));
+      setNotifs(docs);
+      setUnread(docs.filter(n => !n.read).length);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const handler = e => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const markAllRead = async () => {
+    const unreadDocs = notifs.filter(n => !n.read);
+    await Promise.all(
+      unreadDocs.map(n => updateDoc(doc(db, "adminNotifications", n.id), { read: true }))
+    );
+  };
+
+  const typeIcon = (type) => ({
+    consignment_intent: "📦",
+    physical_low_stock: "⚠️",
+    withdrawal_request: "💸",
+  }[type] || "🔔");
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        onClick={() => { setOpen(o => !o); if (!open) markAllRead(); }}
+        className="icon-btn"
+        style={{ position: "relative" }}
+      >
+        <Bell size={15} />
+        {unread > 0 && (
+          <span style={{
+            position: "absolute", top: "5px", right: "5px",
+            width: "8px", height: "8px", background: "#ef4444",
+            borderRadius: "50%", border: "2px solid #0d1b2e"
+          }} />
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute", top: "44px", right: 0, width: "360px",
+          background: "var(--card-bg)", border: "1px solid var(--card-border)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.4)", zIndex: 200
+        }}>
+          {/* Header */}
+          <div style={{
+            padding: "14px 18px", borderBottom: "1px solid var(--card-border)",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            background: "var(--surface)"
+          }}>
+            <div>
+              <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-primary)", margin: 0, letterSpacing: "0.06em", textTransform: "uppercase" }}>Notifications</p>
+              {unread > 0 && <p style={{ fontSize: "10px", color: "#fbbf24", margin: "2px 0 0" }}>{unread} unread</p>}
+            </div>
+            <button onClick={() => setOpen(false)} className="icon-btn" style={{ width: 24, height: 24 }}>
+              <X size={12} />
+            </button>
+          </div>
+
+          {/* List */}
+          <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+            {notifs.length === 0 ? (
+              <div style={{ padding: "32px 16px", textAlign: "center" }}>
+                <Bell size={24} style={{ color: "var(--text-muted)", margin: "0 auto 8px", display: "block" }} />
+                <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>No notifications</p>
+              </div>
+            ) : notifs.map(n => (
+              <div key={n.id} style={{
+                padding: "13px 18px", borderBottom: "1px solid rgba(255,255,255,0.04)",
+                background: n.read ? "transparent" : "rgba(245,158,11,0.06)",
+                display: "flex", gap: "10px", alignItems: "flex-start"
+              }}>
+                <span style={{ fontSize: "16px", flexShrink: 0 }}>{typeIcon(n.type)}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 3px" }}>{n.title}</p>
+                  <p style={{ fontSize: "11px", color: "var(--text-secondary)", margin: "0 0 5px", lineHeight: 1.5 }}>{n.message}</p>
+                  {n.type === "consignment_intent" && (
+                    <button
+                      onClick={() => { setActiveSection("office-checkin"); setOpen(false); }}
+                      style={{
+                        fontSize: "10px", fontWeight: 700, color: "#fbbf24",
+                        background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.2)",
+                        padding: "3px 10px", cursor: "pointer", borderRadius: "4px", marginBottom: "4px"
+                      }}
+                    >
+                      Open Check-In Form →
+                    </button>
+                  )}
+                  <p style={{ fontSize: "10px", color: "var(--text-muted)", margin: 0 }}>
+                    {n.createdAt?.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
+                    {" · "}
+                    {n.createdAt?.toLocaleDateString("en-NG", { day: "2-digit", month: "short" })}
+                  </p>
+                </div>
+                {!n.read && (
+                  <div style={{ width: "7px", height: "7px", background: "#fbbf24", borderRadius: "50%", flexShrink: 0, marginTop: "4px" }} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ── Main Component ─────────────────────────────────────────────────────── */
 export default function ComprehensiveAdminPanel() {
@@ -461,12 +593,12 @@ export default function ComprehensiveAdminPanel() {
   };
 
   const fetchPhysicalOrders = async () => {
-  try {
-    const q = query(collection(db, 'physicalOrders'), orderBy('createdAt', 'desc'));
-    const s = await getDocs(q);
-    setPhysicalOrders(s.docs.map(d => ({ id: d.id, ...d.data() })));
-  } catch (e) { console.error(e); }
-};
+    try {
+      const q = query(collection(db, 'physicalOrders'), orderBy('createdAt', 'desc'));
+      const s = await getDocs(q);
+      setPhysicalOrders(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
+  };
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -614,7 +746,7 @@ export default function ComprehensiveAdminPanel() {
 
     await updateDoc(doc(db, 'users', userId), updateData);
     fetchUsers();
-  };  const deleteUserAccount = async (userId) => { if (!confirm('DELETE this user? Cannot undo!')) return; try { await deleteDoc(doc(db, 'users', userId)); fetchUsers(); setShowModal(false); } catch (e) { alert('Failed: ' + e.message); } };
+  }; const deleteUserAccount = async (userId) => { if (!confirm('DELETE this user? Cannot undo!')) return; try { await deleteDoc(doc(db, 'users', userId)); fetchUsers(); setShowModal(false); } catch (e) { alert('Failed: ' + e.message); } };
   const deleteFeedback = async (feedbackId) => { if (!confirm('Delete this feedback?')) return; try { await deleteDoc(doc(db, 'bookFeedbacks', feedbackId)); setFeedbacks(feedbacks.filter(f => f.id !== feedbackId)); } catch (e) { alert('Failed: ' + e.message); } };
 
   const processFlutterwaveTransfer = async (withdrawal) => {
@@ -675,43 +807,43 @@ export default function ComprehensiveAdminPanel() {
     } catch (error) { alert('Failed: ' + error.message); }
   };
 
- const sendEmailReply = async () => {
-  if (!replyMessage.trim() || !selectedItem) { alert('Please write a message'); return; }
-  setSending(true);
-  try {
-    const collectionName = activeSection === 'support' ? 'supportTickets' : 'bookReports';
-    const updateData = {
-      adminNotes: replyMessage,
-      adminResponse: replyMessage,
-      status: 'resolved',
-      resolvedAt: serverTimestamp(),
-    };
-    await updateDoc(doc(db, collectionName, selectedItem.id), updateData);
+  const sendEmailReply = async () => {
+    if (!replyMessage.trim() || !selectedItem) { alert('Please write a message'); return; }
+    setSending(true);
+    try {
+      const collectionName = activeSection === 'support' ? 'supportTickets' : 'bookReports';
+      const updateData = {
+        adminNotes: replyMessage,
+        adminResponse: replyMessage,
+        status: 'resolved',
+        resolvedAt: serverTimestamp(),
+      };
+      await updateDoc(doc(db, collectionName, selectedItem.id), updateData);
 
-    // Send notification to the user who made the report/ticket
-    const reporterId = selectedItem.reportedBy || selectedItem.userId || null;
-    if (reporterId) {
-      await addDoc(collection(db, 'notifications'), {
-        userId: reporterId,
-        type: 'admin_reply',
-        title: `Re: ${selectedItem.reason || selectedItem.subject || 'Your report'}`,
-        message: replyMessage,
-        createdAt: serverTimestamp(),
-        read: false,
-      });
+      // Send notification to the user who made the report/ticket
+      const reporterId = selectedItem.reportedBy || selectedItem.userId || null;
+      if (reporterId) {
+        await addDoc(collection(db, 'notifications'), {
+          userId: reporterId,
+          type: 'admin_reply',
+          title: `Re: ${selectedItem.reason || selectedItem.subject || 'Your report'}`,
+          message: replyMessage,
+          createdAt: serverTimestamp(),
+          read: false,
+        });
+      }
+
+      setShowModal(false);
+      setReplyMessage('');
+      setSelectedItem(null);
+      if (activeSection === 'support') await fetchSupportTickets();
+      else await fetchBookReports();
+    } catch (error) {
+      alert(`Failed: ${error.message}`);
+    } finally {
+      setSending(false);
     }
-
-    setShowModal(false);
-    setReplyMessage('');
-    setSelectedItem(null);
-    if (activeSection === 'support') await fetchSupportTickets();
-    else await fetchBookReports();
-  } catch (error) {
-    alert(`Failed: ${error.message}`);
-  } finally {
-    setSending(false);
-  }
-};
+  };
 
   const openModal = (type, item) => { setModalType(type); setSelectedItem(item); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setModalType(''); setSelectedItem(null); setReplyMessage(''); setPdfUrl(''); };
@@ -812,7 +944,7 @@ export default function ComprehensiveAdminPanel() {
           </div>
           <div className="topbar-right">
             <button onClick={fetchAllData} className="icon-btn" title="Refresh"><RefreshCw size={15} /></button>
-            <div className="icon-btn"><Bell size={15} /></div>
+            <AdminNotificationBell setActiveSection={setActiveSection} />
             <div className="avatar">{user.email?.[0]?.toUpperCase() || 'A'}</div>
           </div>
         </header>
@@ -851,19 +983,19 @@ export default function ComprehensiveAdminPanel() {
               </div>
 
               {/* Flutterwave widget */}
-<div style={{ marginBottom: 20 }}>
-  <div className="card">
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-      <div style={{ width: 40, height: 40, background: 'rgba(16,185,129,0.12)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <DollarSign size={18} color="#34d399" />
-      </div>
-      <div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Platform Wallets</div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>All Seller Balances</div>
-      </div>
-    </div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-      {[
+              <div style={{ marginBottom: 20 }}>
+                <div className="card">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                    <div style={{ width: 40, height: 40, background: 'rgba(16,185,129,0.12)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <DollarSign size={18} color="#34d399" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Platform Wallets</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>All Seller Balances</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                    {[
                       {
                         label: 'Total Seller Balances',
                         value: sellersData.length === 0
@@ -875,35 +1007,35 @@ export default function ComprehensiveAdminPanel() {
                         color: '#34d399',
                         sub: `${sellersData.filter(s => s.id !== 'LAN_LIBRARY_PLATFORM').length} sellers`,
                       },
-        {
-          label: 'Total Platform Fees',
-          value: `₦${transactions.reduce((sum, t) => sum + ((t.amount || 0) * 0.2), 0).toLocaleString()}`,
-          color: '#60a5fa',
-          sub: 'Across all sales'
-        },
-        {
-          label: 'Total Withdrawn',
-          value: `₦${withdrawals.filter(w => w.status === 'completed').reduce((sum, w) => sum + (w.amount || 0), 0).toLocaleString()}`,
-          color: '#f87171',
-          sub: `${withdrawals.filter(w => w.status === 'completed').length} completed`
-        },
-        {
-          label: 'Pending Withdrawals',
-          value: `₦${withdrawals.filter(w => w.status === 'pending').reduce((sum, w) => sum + (w.amount || 0), 0).toLocaleString()}`,
-          color: '#fbbf24',
-          sub: `${withdrawals.filter(w => w.status === 'pending').length} pending`
-        },
-      ].map(({ label, value, color, sub }) => (
-        <div key={label} style={{ background: 'var(--surface)', borderRadius: 10, padding: '14px 16px', border: '1px solid var(--card-border)' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, marginBottom: 6 }}>{label}</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color, marginBottom: 3 }}>{value}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{sub}</div>
-        </div>
-      ))}
-    </div>
-  </div>
-</div>
-              
+                      {
+                        label: 'Total Platform Fees',
+                        value: `₦${transactions.reduce((sum, t) => sum + ((t.amount || 0) * 0.2), 0).toLocaleString()}`,
+                        color: '#60a5fa',
+                        sub: 'Across all sales'
+                      },
+                      {
+                        label: 'Total Withdrawn',
+                        value: `₦${withdrawals.filter(w => w.status === 'completed').reduce((sum, w) => sum + (w.amount || 0), 0).toLocaleString()}`,
+                        color: '#f87171',
+                        sub: `${withdrawals.filter(w => w.status === 'completed').length} completed`
+                      },
+                      {
+                        label: 'Pending Withdrawals',
+                        value: `₦${withdrawals.filter(w => w.status === 'pending').reduce((sum, w) => sum + (w.amount || 0), 0).toLocaleString()}`,
+                        color: '#fbbf24',
+                        sub: `${withdrawals.filter(w => w.status === 'pending').length} pending`
+                      },
+                    ].map(({ label, value, color, sub }) => (
+                      <div key={label} style={{ background: 'var(--surface)', borderRadius: 10, padding: '14px 16px', border: '1px solid var(--card-border)' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, marginBottom: 6 }}>{label}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700, color, marginBottom: 3 }}>{value}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{sub}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               {/* Grid: Alerts + Activity */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
                 {/* Pending alerts */}
@@ -1326,7 +1458,7 @@ export default function ComprehensiveAdminPanel() {
                 <div className="section-title"><Package size={18} />Office Check-In</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Step 1 — Seller brings copies to Abuja Registry</div>
               </div>
- 
+
               {/* Quick-link card */}
               <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '24px 28px', marginBottom: 20 }}>
                 <div style={{ width: 52, height: 52, background: 'var(--accent-glow)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1342,7 +1474,7 @@ export default function ComprehensiveAdminPanel() {
                   <Package size={15} /> Open Form
                 </a>
               </div>
- 
+
               {/* How it works */}
               <div className="card" style={{ padding: '20px 24px' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 14 }}>What this does</div>
@@ -1361,14 +1493,14 @@ export default function ComprehensiveAdminPanel() {
               </div>
             </div>
           )}
- 
+
           {activeSection === 'registry-checkout' && (
             <div>
               <div className="section-header">
                 <div className="section-title"><Receipt size={18} />Registry Checkout</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Step 2 — Student walks in to collect their copy</div>
               </div>
- 
+
               {/* Quick-link card */}
               <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '24px 28px', marginBottom: 20 }}>
                 <div style={{ width: 52, height: 52, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1384,17 +1516,17 @@ export default function ComprehensiveAdminPanel() {
                   <Receipt size={15} /> Open Checkout
                 </a>
               </div>
- 
+
               {/* Flow diagram */}
               <div className="card" style={{ padding: '20px 24px', marginBottom: 16 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 14 }}>What happens when you record a sale</div>
                 {[
-                  ['📦', 'physicalInventory.currentStock   −1',      'rgba(59,130,246,0.12)',  '#60a5fa'],
-                  ['💰', 'sellers.accountBalance   +90% of price',   'rgba(16,185,129,0.12)', '#34d399'],
-                  ['📋', 'New row added to physicalSales ledger',     'rgba(139,92,246,0.12)', '#a78bfa'],
-                  ['🔔', 'Bell notification → seller dashboard',      'rgba(245,158,11,0.12)', '#fbbf24'],
-                  ['📧', 'Email via /api/physical-sale-email',        'rgba(239,68,68,0.12)',  '#f87171'],
-                  ['⚠️', 'Low-stock alert if copies ≤ 20% remain',   'rgba(245,158,11,0.08)', '#fbbf24'],
+                  ['📦', 'physicalInventory.currentStock   −1', 'rgba(59,130,246,0.12)', '#60a5fa'],
+                  ['💰', 'sellers.accountBalance   +90% of price', 'rgba(16,185,129,0.12)', '#34d399'],
+                  ['📋', 'New row added to physicalSales ledger', 'rgba(139,92,246,0.12)', '#a78bfa'],
+                  ['🔔', 'Bell notification → seller dashboard', 'rgba(245,158,11,0.12)', '#fbbf24'],
+                  ['📧', 'Email via /api/physical-sale-email', 'rgba(239,68,68,0.12)', '#f87171'],
+                  ['⚠️', 'Low-stock alert if copies ≤ 20% remain', 'rgba(245,158,11,0.08)', '#fbbf24'],
                 ].map(([emoji, text, bg, color]) => (
                   <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, background: bg, borderRadius: 8, padding: '8px 12px' }}>
                     <span style={{ fontSize: 14, flexShrink: 0 }}>{emoji}</span>
@@ -1402,27 +1534,27 @@ export default function ComprehensiveAdminPanel() {
                   </div>
                 ))}
               </div>
- 
+
               {/* The flow */}
               <div className="card" style={{ padding: '16px 24px' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>Full Registry Flow</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap' }}>
                   {[
-                    { step: '1', label: 'Seller Check-In',   sub: 'office-check-in', color: '#3b82f6' },
-                    { step: '→', label: '',                   sub: '',                color: 'var(--text-muted)' },
-                    { step: '2', label: 'Asset ID Issued',    sub: 'LAN-ABJ-2026-XXXX', color: '#b8963e' },
-                    { step: '→', label: '',                   sub: '',                color: 'var(--text-muted)' },
-                    { step: '3', label: 'Student Pickup',     sub: 'registry-checkout', color: '#10b981' },
-                    { step: '→', label: '',                   sub: '',                color: 'var(--text-muted)' },
-                    { step: '4', label: 'Seller Notified',    sub: 'bell + email',    color: '#8b5cf6' },
+                    { step: '1', label: 'Seller Check-In', sub: 'office-check-in', color: '#3b82f6' },
+                    { step: '→', label: '', sub: '', color: 'var(--text-muted)' },
+                    { step: '2', label: 'Asset ID Issued', sub: 'LAN-ABJ-2026-XXXX', color: '#b8963e' },
+                    { step: '→', label: '', sub: '', color: 'var(--text-muted)' },
+                    { step: '3', label: 'Student Pickup', sub: 'registry-checkout', color: '#10b981' },
+                    { step: '→', label: '', sub: '', color: 'var(--text-muted)' },
+                    { step: '4', label: 'Seller Notified', sub: 'bell + email', color: '#8b5cf6' },
                   ].map(({ step, label, sub, color }) => (
                     step === '→'
                       ? <div key={sub + Math.random()} style={{ fontSize: 18, color: 'var(--text-muted)', margin: '0 8px' }}>→</div>
                       : <div key={label} style={{ background: 'var(--surface)', border: `1px solid ${color}22`, borderRadius: 8, padding: '10px 14px', textAlign: 'center', minWidth: 110 }}>
-                          <div style={{ fontSize: 18, fontWeight: 700, color, marginBottom: 2 }}>{step}</div>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{label}</div>
-                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>
-                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color, marginBottom: 2 }}>{step}</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{label}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>
+                      </div>
                   ))}
                 </div>
               </div>
@@ -1430,438 +1562,468 @@ export default function ComprehensiveAdminPanel() {
           )}
 
           {activeSection === 'physical-orders' && (
-          <div>
-            {/* Pre-order warning banner */}
-          <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10 }}>
-            <AlertTriangle size={14} color="#fbbf24" style={{ flexShrink: 0, marginTop: 1 }} />
-            <p style={{ fontSize: 12, color: '#fbbf24', margin: 0, lineHeight: 1.6 }}>
-              <strong>These are online pre-orders only.</strong> Click "Mark Collected" only when the student physically arrives and picks up their copy.
-              For walk-in students with no pre-order, use{' '}
-              <a href="/sys-panel/management-console/registry-checkout" style={{ color: '#fbbf24', fontWeight: 700 }}>
-                Registry Checkout
-              </a> instead.
-            </p>
-          </div>
-            <div className="section-header">
-              <div>
-                <div className="section-title"><ShoppingBag size={18} />Physical Orders</div>
-                <div className="section-sub">Online orders placed by students — pending pickup at Abuja Registry</div>
+            <div>
+              {/* Pre-order warning banner */}
+              <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10 }}>
+                <AlertTriangle size={14} color="#fbbf24" style={{ flexShrink: 0, marginTop: 1 }} />
+                <p style={{ fontSize: 12, color: '#fbbf24', margin: 0, lineHeight: 1.6 }}>
+                  <strong>These are online pre-orders only.</strong> Click "Mark Collected" only when the student physically arrives and picks up their copy.
+                  For walk-in students with no pre-order, use{' '}
+                  <a href="/sys-panel/management-console/registry-checkout" style={{ color: '#fbbf24', fontWeight: 700 }}>
+                    Registry Checkout
+                  </a> instead.
+                </p>
               </div>
-              <button onClick={fetchPhysicalOrders} className="btn btn-ghost"><RefreshCw size={13} />Refresh</button>
-            </div>
-
-            {/* Stats row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
-              {[
-                { label: 'Pending Pickup', count: physicalOrders.filter(o => o.status === 'pending_pickup').length, color: '#f59e0b' },
-                { label: 'Collected',      count: physicalOrders.filter(o => o.status === 'collected').length,      color: '#10b981' },
-                { label: 'Cancelled',      count: physicalOrders.filter(o => o.status === 'cancelled').length,      color: '#ef4444' },
-                { label: 'Total Orders',   count: physicalOrders.length,                                             color: '#3b82f6' },
-              ].map(({ label, count, color }) => (
-                <div key={label} className="card-sm">
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color }}>{count}</div>
+              <div className="section-header">
+                <div>
+                  <div className="section-title"><ShoppingBag size={18} />Physical Orders</div>
+                  <div className="section-sub">Online orders placed by students — pending pickup at Abuja Registry</div>
                 </div>
-              ))}
-            </div>
-
-            {/* Search */}
-            <div style={{ marginBottom: 14 }}>
-              <input className="input-dark" placeholder="Search by student name, email or pickup code…"
-                value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-            </div>
-
-            {physicalOrders.length === 0 ? (
-              <div className="card" style={{ textAlign: 'center', padding: 48 }}>
-                <ShoppingBag size={32} color="var(--text-muted)" style={{ margin: '0 auto 12px' }} />
-                <div style={{ color: 'var(--text-muted)' }}>No physical orders yet</div>
+                <button onClick={fetchPhysicalOrders} className="btn btn-ghost"><RefreshCw size={13} />Refresh</button>
               </div>
-            ) : (
-              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                          {['Student', 'Book', 'Asset ID', 'Pickup Code', 'Price', 'Shelf', 'Date', 'Status', ''].map(h => (
-                            <th key={h}>{h}</th>
-                          ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {physicalOrders
-                      .filter(o =>
-                        o.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        o.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        o.pickupCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        o.bookTitle?.toLowerCase().includes(searchTerm.toLowerCase())
-                      )
-                      .map(order => (
-                        <tr key={order.id}>
-                          <td>
-                            <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>{order.userName || 'Unknown'}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{order.userEmail}</div>
-                          </td>
-                          <td style={{ color: 'var(--text-primary)', fontWeight: 500, maxWidth: 180 }}>
-                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.bookTitle}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{order.bookAuthor}</div>
-                          </td>
-                          {/* Asset ID — copyable */}
-                          <td>
-                            {order.assetId ? (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{
-                                  fontFamily: 'monospace', fontWeight: 700, fontSize: 12,
-                                  color: '#d4aa5a', background: 'rgba(184,150,62,0.1)',
-                                  border: '1px solid rgba(184,150,62,0.3)',
-                                  padding: '3px 8px', borderRadius: 4, letterSpacing: '0.04em'
-                                }}>
-                                  {order.assetId}
-                                </span>
-                                <button
-                                  onClick={() => { navigator.clipboard.writeText(order.assetId); alert(`✅ Copied: ${order.assetId}`); }}
-                                  title="Copy Asset ID"
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 2, display: 'flex', alignItems: 'center' }}
-                                >
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ) : (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
-                                {order.bookId && (
+
+              {/* Stats row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+                {[
+                  { label: 'Pending Pickup', count: physicalOrders.filter(o => o.status === 'pending_pickup').length, color: '#f59e0b' },
+                  { label: 'Collected', count: physicalOrders.filter(o => o.status === 'collected').length, color: '#10b981' },
+                  { label: 'Cancelled', count: physicalOrders.filter(o => o.status === 'cancelled').length, color: '#ef4444' },
+                  { label: 'Total Orders', count: physicalOrders.length, color: '#3b82f6' },
+                ].map(({ label, count, color }) => (
+                  <div key={label} className="card-sm">
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color }}>{count}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Search */}
+              <div style={{ marginBottom: 14 }}>
+                <input className="input-dark" placeholder="Search by student name, email or pickup code…"
+                  value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              </div>
+
+              {physicalOrders.length === 0 ? (
+                <div className="card" style={{ textAlign: 'center', padding: 48 }}>
+                  <ShoppingBag size={32} color="var(--text-muted)" style={{ margin: '0 auto 12px' }} />
+                  <div style={{ color: 'var(--text-muted)' }}>No physical orders yet</div>
+                </div>
+              ) : (
+                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        {['Student', 'Book', 'Asset ID', 'Pickup Code', 'Price', 'Shelf', 'Date', 'Status', ''].map(h => (
+                          <th key={h}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {physicalOrders
+                        .filter(o =>
+                          o.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          o.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          o.pickupCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          o.bookTitle?.toLowerCase().includes(searchTerm.toLowerCase())
+                        )
+                        .map(order => (
+                          <tr key={order.id}>
+                            <td>
+                              <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>{order.userName || 'Unknown'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{order.userEmail}</div>
+                            </td>
+                            <td style={{ color: 'var(--text-primary)', fontWeight: 500, maxWidth: 180 }}>
+                              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.bookTitle}</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{order.bookAuthor}</div>
+                            </td>
+                            {/* Asset ID — copyable */}
+                            <td>
+                              {order.assetId ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{
+                                    fontFamily: 'monospace', fontWeight: 700, fontSize: 12,
+                                    color: '#d4aa5a', background: 'rgba(184,150,62,0.1)',
+                                    border: '1px solid rgba(184,150,62,0.3)',
+                                    padding: '3px 8px', borderRadius: 4, letterSpacing: '0.04em'
+                                  }}>
+                                    {order.assetId}
+                                  </span>
                                   <button
-                                    onClick={async () => {
-                                      const variants = [
-                                        order.bookId,
-                                        order.bookId?.replace('firestore-', ''),
-                                        `firestore-${order.bookId?.replace('firestore-', '')}`,
-                                      ].filter(Boolean);
-                                      for (const id of variants) {
-                                        const snap = await getDocs(
-                                          query(collection(db, 'physicalInventory'), where('bookId', '==', id), limit(1))
-                                        );
-                                        if (!snap.empty) {
-                                          const assetId = snap.docs[0].data().assetId;
-                                          await updateDoc(doc(db, 'physicalOrders', order.id), { assetId });
-                                          alert(`✅ Asset ID patched: ${assetId}`);
-                                          await fetchPhysicalOrders();
-                                          return;
-                                        }
-                                      }
-                                      alert('❌ No inventory record found for this book.');
-                                    }}
-                                    className="btn btn-ghost"
-                                    style={{ fontSize: 10, padding: '3px 8px' }}
+                                    onClick={() => { navigator.clipboard.writeText(order.assetId); alert(`✅ Copied: ${order.assetId}`); }}
+                                    title="Copy Asset ID"
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 2, display: 'flex', alignItems: 'center' }}
                                   >
-                                    Lookup ID
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                                    </svg>
                                   </button>
-                                )}
-                              </div>
-                            )}
-                          </td>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
+                                  {order.bookId && (
+                                    <button
+                                      onClick={async () => {
+                                        const variants = [
+                                          order.bookId,
+                                          order.bookId?.replace('firestore-', ''),
+                                          `firestore-${order.bookId?.replace('firestore-', '')}`,
+                                        ].filter(Boolean);
+                                        for (const id of variants) {
+                                          const snap = await getDocs(
+                                            query(collection(db, 'physicalInventory'), where('bookId', '==', id), limit(1))
+                                          );
+                                          if (!snap.empty) {
+                                            const assetId = snap.docs[0].data().assetId;
+                                            await updateDoc(doc(db, 'physicalOrders', order.id), { assetId });
+                                            alert(`✅ Asset ID patched: ${assetId}`);
+                                            await fetchPhysicalOrders();
+                                            return;
+                                          }
+                                        }
+                                        alert('❌ No inventory record found for this book.');
+                                      }}
+                                      className="btn btn-ghost"
+                                      style={{ fontSize: 10, padding: '3px 8px' }}
+                                    >
+                                      Lookup ID
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </td>
 
-                          {/* Pickup Code */}
-                          <td>
-                            <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: '#d4aa5a', background: 'rgba(184,150,62,0.1)', border: '1px solid rgba(184,150,62,0.3)', padding: '3px 8px', borderRadius: 4 }}>
-                              {order.pickupCode}
-                            </span>
-                          </td>
-                          <td style={{ color: '#34d399', fontWeight: 700 }}>₦{Number(order.price).toLocaleString()}</td>
-                          <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                            {[order.section, order.shelfLocation].filter(Boolean).join(' · ') || '—'}
-                          </td>
-                          <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatDate(order.createdAt)}</td>
-                          <td>
-                            <span className={`pill ${
-                              order.status === 'collected'      ? 'pill-success' :
-                              order.status === 'pending_pickup' ? 'pill-warn'    :
-                              order.status === 'cancelled'      ? 'pill-danger'  : 'pill-gray'
-                            }`}>
-                              <span className="pill-dot" />
-                              {order.status === 'pending_pickup' ? 'Pending' :
-                              order.status === 'collected'      ? 'Collected' :
-                              order.status === 'cancelled'      ? 'Cancelled' : order.status}
-                            </span>
-                          </td>
-                        <td>
-  {order.status === 'pending_pickup' && (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {/* Pickup Code */}
+                            <td>
+                              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: '#d4aa5a', background: 'rgba(184,150,62,0.1)', border: '1px solid rgba(184,150,62,0.3)', padding: '3px 8px', borderRadius: 4 }}>
+                                {order.pickupCode}
+                              </span>
+                            </td>
+                            <td style={{ color: '#34d399', fontWeight: 700 }}>₦{Number(order.price).toLocaleString()}</td>
+                            <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                              {[order.section, order.shelfLocation].filter(Boolean).join(' · ') || '—'}
+                            </td>
+                            <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatDate(order.createdAt)}</td>
+                            <td>
+                              <span className={`pill ${order.status === 'collected' ? 'pill-success' :
+                                order.status === 'pending_pickup' ? 'pill-warn' :
+                                  order.status === 'cancelled' ? 'pill-danger' : 'pill-gray'
+                                }`}>
+                                <span className="pill-dot" />
+                                {order.status === 'pending_pickup' ? 'Pending' :
+                                  order.status === 'collected' ? 'Collected' :
+                                    order.status === 'cancelled' ? 'Cancelled' : order.status}
+                              </span>
+                            </td>
+                            <td>
+                              {order.status === 'pending_pickup' && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-      {/* Payment confirmation checkbox */}
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: '#fbbf24' }}>
-        <input
-          type="checkbox"
-          checked={!!paymentConfirmed[order.id]}
-          onChange={e => setPaymentConfirmed(prev => ({ ...prev, [order.id]: e.target.checked }))}
-          style={{ cursor: 'pointer' }}
-        />
-        Cash / transfer received
-      </label>
+                                  {/* Payment confirmation checkbox */}
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: '#fbbf24' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={!!paymentConfirmed[order.id]}
+                                      onChange={e => setPaymentConfirmed(prev => ({ ...prev, [order.id]: e.target.checked }))}
+                                      style={{ cursor: 'pointer' }}
+                                    />
+                                    Cash / transfer received
+                                  </label>
 
-      <div style={{ display: 'flex', gap: 6 }}>
-        <button
-          disabled={!paymentConfirmed[order.id]}
-        onClick={async () => {
-          if (!confirm(`Mark order for ${order.userName} as COLLECTED?\n\nThis will:\n• Mark order collected\n• Decrement shelf stock\n• Credit seller ₦${(Number(order.price) * 0.8).toLocaleString()} (80%)\n• Credit LAN platform ₦${(Number(order.price) * 0.2).toLocaleString()} (20%)\n• Notify student and seller`)) return;
-          try {
+                                  <div style={{ display: 'flex', gap: 6 }}>
+                                    <button
+                                      disabled={!paymentConfirmed[order.id]}
+                                      onClick={async () => {
+                                        if (!confirm(`Mark order for ${order.userName} as COLLECTED?\n\nThis will:\n• Mark order collected\n• Decrement shelf stock\n• Credit seller ₦${(Number(order.price) * 0.8).toLocaleString()} (80%)\n• Credit LAN platform ₦${(Number(order.price) * 0.2).toLocaleString()} (20%)\n• Notify student and seller`)) return;
+                                        try {
 
-    // 1. Resolve sellerId — use order field or look up from book
-    let sellerId   = order.sellerId   || null;
-    let sellerName = order.sellerName || null;
+                                          // 1. Resolve sellerId — use order field or look up from book
+                                          let sellerId = order.sellerId || null;
+                                          let sellerName = order.sellerName || null;
 
-    if (!sellerId && order.bookId) {
-      try {
-        const cleanId  = order.bookId.replace('firestore-', '');
-        const bookSnap = await getDoc(doc(db, 'advertMyBook', cleanId));
-        if (bookSnap.exists()) {
-          const bData = bookSnap.data();
-          sellerId   = bData.userId || bData.sellerId || bData.uploadedBy || null;
-          sellerName = bData.sellerName || bData.author || null;
-        }
-      } catch (lookupErr) {
-        console.warn('Seller lookup failed:', lookupErr.message);
-      }
-    }
+                                          if (!sellerId && order.bookId) {
+                                            try {
+                                              const cleanId = order.bookId.replace('firestore-', '');
+                                              const bookSnap = await getDoc(doc(db, 'advertMyBook', cleanId));
+                                              if (bookSnap.exists()) {
+                                                const bData = bookSnap.data();
+                                                sellerId = bData.userId || bData.sellerId || bData.uploadedBy || null;
+                                                sellerName = bData.sellerName || bData.author || null;
+                                              }
+                                            } catch (lookupErr) {
+                                              console.warn('Seller lookup failed:', lookupErr.message);
+                                            }
+                                          }
 
-    if (!sellerId) {
-      alert('❌ Cannot find seller for this order. Check the book record in Firestore.');
-      return;
-    }
+                                          if (!sellerId) {
+                                            alert('❌ Cannot find seller for this order. Check the book record in Firestore.');
+                                            return;
+                                          }
 
-    // 2. Find physicalInventory record
-    const variants = [
-      order.bookId,
-      order.bookId?.replace('firestore-', ''),
-      `firestore-${order.bookId?.replace('firestore-', '')}`,
-    ].filter(Boolean);
+                                          // 2. Find physicalInventory record
+                                          const variants = [
+                                            order.bookId,
+                                            order.bookId?.replace('firestore-', ''),
+                                            `firestore-${order.bookId?.replace('firestore-', '')}`,
+                                          ].filter(Boolean);
 
-    let inventoryDoc = null;
-    for (const id of variants) {
-      const snap = await getDocs(
-        query(collection(db, 'physicalInventory'), where('bookId', '==', id), limit(1))
-      );
-      if (!snap.empty) { inventoryDoc = snap.docs[0]; break; }
-    }
+                                          let inventoryDoc = null;
+                                          for (const id of variants) {
+                                            const snap = await getDocs(
+                                              query(collection(db, 'physicalInventory'), where('bookId', '==', id), limit(1))
+                                            );
+                                            if (!snap.empty) { inventoryDoc = snap.docs[0]; break; }
+                                          }
 
-    const price  = Number(order.price) || 0;
-    const payout = price * 0.8;
+                                          const price = Number(order.price) || 0;
+                                          const payout = price * 0.8;
 
-    // 3. Transaction — all or nothing
-    await runTransaction(db, async (txn) => {
-      // ── ALL READS FIRST ──
-      const sellerRef = doc(db, 'sellers', sellerId);
-      const sellerSnap = await txn.get(sellerRef);
-      const userSellerRef = doc(db, 'users', sellerId);
-      const userSellerSnap = await txn.get(userSellerRef);
-      const platformRef = doc(db, 'sellers', 'LAN_LIBRARY_PLATFORM'); // ← ADD
-      const platformSnap = await txn.get(platformRef);                  // ← ADD
+                                          // 3. Transaction — all or nothing
+                                          await runTransaction(db, async (txn) => {
+                                            // ── ALL READS FIRST ──
+                                            const sellerRef = doc(db, 'sellers', sellerId);
+                                            const sellerSnap = await txn.get(sellerRef);
+                                            const userSellerRef = doc(db, 'users', sellerId);
+                                            const userSellerSnap = await txn.get(userSellerRef);
+                                            const platformRef = doc(db, 'sellers', 'LAN_LIBRARY_PLATFORM'); // ← ADD
+                                            const platformSnap = await txn.get(platformRef);                  // ← ADD
 
-      // ── ALL WRITES AFTER ──
-      const price = Number(order.price) || 0;
-      const payout = price * 0.8;  // seller gets 80%
-      const platformFee = price * 0.2; // LAN gets 20%  ← ADD
+                                            // ── ALL WRITES AFTER ──
+                                            const price = Number(order.price) || 0;
+                                            const payout = price * 0.8;  // seller gets 80%
+                                            const platformFee = price * 0.2; // LAN gets 20%  ← ADD
 
-      // 1. Mark order collected
-      txn.update(doc(db, 'physicalOrders', order.id), {
-        status: 'collected',
-        collectedAt: serverTimestamp(),
-        collectedBy: user.email,
-        sellerId: sellerId,
-      });
+                                            // 1. Mark order collected
+                                            txn.update(doc(db, 'physicalOrders', order.id), {
+                                              status: 'collected',
+                                              collectedAt: serverTimestamp(),
+                                              collectedBy: user.email,
+                                              sellerId: sellerId,
+                                            });
 
-      // 2. Decrement inventory
-      let newStock = 0;
-      if (inventoryDoc) {
-        const inv = inventoryDoc.data();
-        newStock = Math.max(0, (inv.currentStock || 1) - 1);
-        txn.update(doc(db, 'physicalInventory', inventoryDoc.id), {
-          currentStock: newStock,
-          soldCount: (inv.soldCount || 0) + 1,
-          updatedAt: serverTimestamp(),
-        });
-      }
+                                            // 2. Decrement inventory
+                                            let newStock = 0;
+                                            if (inventoryDoc) {
+                                              const inv = inventoryDoc.data();
+                                              newStock = inv.currentStock || 0;
+                                              txn.update(doc(db, 'physicalInventory', inventoryDoc.id), {
+                                                reservedStock: Math.max(0, (inv.reservedStock || 1) - 1),
+                                                soldCount: (inv.soldCount || 0) + 1,
+                                                updatedAt: serverTimestamp(),
+                                              });
+                                            }
 
-      // 3. Credit seller 80%
-      if (sellerSnap.exists()) {
-        txn.update(sellerRef, {
-          accountBalance: (sellerSnap.data().accountBalance || 0) + payout,
-          totalEarnings: (sellerSnap.data().totalEarnings || 0) + payout,
-          booksSold: (sellerSnap.data().booksSold || 0) + 1,
-          updatedAt: serverTimestamp(),
-        });
-      } else if (userSellerSnap.exists()) {
-        txn.update(userSellerRef, {
-          accountBalance: (userSellerSnap.data().accountBalance || 0) + payout,
-          updatedAt: serverTimestamp(),
-        });
-      }
+                                            // 3. Credit seller 80%
+                                            if (sellerSnap.exists()) {
+                                              txn.update(sellerRef, {
+                                                accountBalance: (sellerSnap.data().accountBalance || 0) + payout,
+                                                totalEarnings: (sellerSnap.data().totalEarnings || 0) + payout,
+                                                booksSold: (sellerSnap.data().booksSold || 0) + 1,
+                                                updatedAt: serverTimestamp(),
+                                              });
+                                            } else if (userSellerSnap.exists()) {
+                                              txn.update(userSellerRef, {
+                                                accountBalance: (userSellerSnap.data().accountBalance || 0) + payout,
+                                                updatedAt: serverTimestamp(),
+                                              });
+                                            }
 
-      // 4. Credit platform 20%  ← ADD THIS BLOCK
-      if (platformSnap.exists()) {
-        txn.update(platformRef, {
-          accountBalance: (platformSnap.data().accountBalance || 0) + platformFee,
-          totalFeesCollected: (platformSnap.data().totalFeesCollected || 0) + platformFee,
-          totalEarnings: (platformSnap.data().totalEarnings || 0) + platformFee,
-          updatedAt: serverTimestamp(),
-        });
-      } else {
-        txn.set(platformRef, {
-          accountBalance: platformFee,
-          totalFeesCollected: platformFee,
-          totalEarnings: platformFee,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-      }
+                                            // 4. Credit platform 20%  ← ADD THIS BLOCK
+                                            if (platformSnap.exists()) {
+                                              txn.update(platformRef, {
+                                                accountBalance: (platformSnap.data().accountBalance || 0) + platformFee,
+                                                totalFeesCollected: (platformSnap.data().totalFeesCollected || 0) + platformFee,
+                                                totalEarnings: (platformSnap.data().totalEarnings || 0) + platformFee,
+                                                updatedAt: serverTimestamp(),
+                                              });
+                                            } else {
+                                              txn.set(platformRef, {
+                                                accountBalance: platformFee,
+                                                totalFeesCollected: platformFee,
+                                                totalEarnings: platformFee,
+                                                createdAt: serverTimestamp(),
+                                                updatedAt: serverTimestamp(),
+                                              });
+                                            }
 
-      // 5. Platform fee ledger record  ← ADD THIS
-      txn.set(doc(collection(db, 'platformFees')), {
-        source: 'physical_order',
-        orderId: order.id,
-        bookId: order.bookId,
-        bookTitle: order.bookTitle,
-        sellerId: sellerId,
-        sellerName: sellerName || order.sellerName || '',
-        studentName: order.userName || '',
-        salePrice: price,
-        fee: platformFee,
-        sellerPayout: payout,
-        disbursedToFlutterwave: false,
-        createdAt: serverTimestamp(),
-        recordedBy: user.email,
-      });
+                                            // 5. Platform fee ledger record  ← ADD THIS
+                                            txn.set(doc(collection(db, 'platformFees')), {
+                                              source: 'physical_order',
+                                              orderId: order.id,
+                                              bookId: order.bookId,
+                                              bookTitle: order.bookTitle,
+                                              sellerId: sellerId,
+                                              sellerName: sellerName || order.sellerName || '',
+                                              studentName: order.userName || '',
+                                              salePrice: price,
+                                              fee: platformFee,
+                                              sellerPayout: payout,
+                                              disbursedToFlutterwave: false,
+                                              createdAt: serverTimestamp(),
+                                              recordedBy: user.email,
+                                            });
 
-      // 6. Physical sales ledger
-      txn.set(doc(collection(db, 'physicalSales')), {
-        assetId: inventoryDoc?.data()?.assetId || order.assetId || '',
-        bookId: order.bookId,
-        bookTitle: order.bookTitle,
-        sellerId: sellerId,
-        sellerName: sellerName || order.sellerName || '',
-        studentName: order.userName || 'Unknown Student',
-        studentEmail: order.userEmail || '',
-        userId: order.userId,
-        orderId: order.id,
-        price: price,
-        sellerPayout: payout,
-        platformFee: platformFee,   // ← also record it here
-        stockAfter: newStock,
-        soldAt: serverTimestamp(),
-        collectedBy: user.email,
-      });
+                                            // 6. Physical sales ledger
+                                            txn.set(doc(collection(db, 'physicalSales')), {
+                                              assetId: inventoryDoc?.data()?.assetId || order.assetId || '',
+                                              bookId: order.bookId,
+                                              bookTitle: order.bookTitle,
+                                              sellerId: sellerId,
+                                              sellerName: sellerName || order.sellerName || '',
+                                              studentName: order.userName || 'Unknown Student',
+                                              studentEmail: order.userEmail || '',
+                                              userId: order.userId,
+                                              orderId: order.id,
+                                              price: price,
+                                              sellerPayout: payout,
+                                              platformFee: platformFee,   // ← also record it here
+                                              stockAfter: newStock,
+                                              soldAt: serverTimestamp(),
+                                              collectedBy: user.email,
+                                            });
 
-      // 7. Student notification
-      txn.set(doc(collection(db, 'notifications')), {
-        userId: order.userId,
-        type: 'physical_sale',
-        title: `Copy collected: ${order.bookTitle} ✅`,
-        message: `You collected your physical copy at LAN Head Office, Abuja. Enjoy your reading!`,
-        createdAt: serverTimestamp(),
-        read: false,
-      });
+                                            // 7. Student notification
+                                            txn.set(doc(collection(db, 'notifications')), {
+                                              userId: order.userId,
+                                              type: 'physical_sale',
+                                              title: `Copy collected: ${order.bookTitle} ✅`,
+                                              message: `You collected your physical copy at LAN Head Office, Abuja. Enjoy your reading!`,
+                                              createdAt: serverTimestamp(),
+                                              read: false,
+                                            });
 
-      // 8. Seller notification
-      txn.set(doc(collection(db, 'notifications')), {
-        userId: sellerId,
-        type: 'physical_sale',
-        title: `Copy collected — ${order.bookTitle}`,
-        message: `${order.userName || 'A student'} collected their copy. ₦${payout.toLocaleString()} credited (20% platform fee: ₦${platformFee.toLocaleString()}).`,
-        amount: payout,
-        assetId: inventoryDoc?.data()?.assetId || '',
-        createdAt: serverTimestamp(),
-        read: false,
-      });
-    });
+                                            // 8. Seller notification
+                                            txn.set(doc(collection(db, 'notifications')), {
+                                              userId: sellerId,
+                                              type: 'physical_sale',
+                                              title: `Copy collected — ${order.bookTitle}`,
+                                              message: `${order.userName || 'A student'} collected their copy. ₦${payout.toLocaleString()} credited (20% platform fee: ₦${platformFee.toLocaleString()}).`,
+                                              amount: payout,
+                                              assetId: inventoryDoc?.data()?.assetId || '',
+                                              createdAt: serverTimestamp(),
+                                              read: false,
+                                            });
+                                          });
 
-    // 4. Low stock check (outside transaction — non-critical)
-    if (inventoryDoc) {
-      const refreshed = await getDoc(doc(db, 'physicalInventory', inventoryDoc.id));
-      const inv       = refreshed.data();
-      if (inv && (inv.currentStock === 0 || inv.currentStock / inv.totalConsignment <= 0.2)) {
-        await addDoc(collection(db, 'notifications'), {
-          userId:           inv.sellerId || sellerId,
-          type:             'physical_low_stock',
-          title:            inv.currentStock === 0
-                              ? `🚨 Out of stock: ${order.bookTitle}`
-                              : `⚠️ Low stock: ${order.bookTitle}`,
-          message:          inv.currentStock === 0
-                              ? `All copies of "${order.bookTitle}" have been collected. Please bring more to the Abuja Registry.`
-                              : `Only ${inv.currentStock} of ${inv.totalConsignment} copies remain.`,
-          currentStock:     inv.currentStock,
-          totalConsignment: inv.totalConsignment,
-          assetId:          inv.assetId || '',
-          createdAt:        serverTimestamp(),
-          read:             false,
-        });
-      }
-    }
+                                          // 4. Low stock check (outside transaction — non-critical)
+                                          if (inventoryDoc) {
+                                            const refreshed = await getDoc(doc(db, 'physicalInventory', inventoryDoc.id));
+                                            const inv = refreshed.data();
+                                            if (inv && (inv.currentStock === 0 || inv.currentStock / inv.totalConsignment <= 0.2)) {
+                                              await addDoc(collection(db, 'notifications'), {
+                                                userId: inv.sellerId || sellerId,
+                                                type: 'physical_low_stock',
+                                                title: inv.currentStock === 0
+                                                  ? `🚨 Out of stock: ${order.bookTitle}`
+                                                  : `⚠️ Low stock: ${order.bookTitle}`,
+                                                message: inv.currentStock === 0
+                                                  ? `All copies of "${order.bookTitle}" have been collected. Please bring more to the Abuja Registry.`
+                                                  : `Only ${inv.currentStock} of ${inv.totalConsignment} copies remain.`,
+                                                currentStock: inv.currentStock,
+                                                totalConsignment: inv.totalConsignment,
+                                                assetId: inv.assetId || '',
+                                                createdAt: serverTimestamp(),
+                                                read: false,
+                                              });
+                                            }
+                                          }
 
-    setPaymentConfirmed(prev => ({ ...prev, [order.id]: false }));
-    await fetchPhysicalOrders();
-    alert(`✅ Collected. Seller credited ₦${payout.toLocaleString()}`);
+                                          setPaymentConfirmed(prev => ({ ...prev, [order.id]: false }));
+                                          await fetchPhysicalOrders();
+                                          alert(`✅ Collected. Seller credited ₦${payout.toLocaleString()}`);
 
-  } catch (e) {
-    console.error('Collected error:', e);
-    alert('Failed: ' + e.message);
-  }
-}}
-          className="btn btn-success"
-          style={{
-            padding: '5px 10px', fontSize: 11, gap: 4,
-            opacity: paymentConfirmed[order.id] ? 1 : 0.4,
-            cursor: paymentConfirmed[order.id] ? 'pointer' : 'not-allowed',
-          }}
-        >
-          <CheckCircle size={11} /> Mark Collected & Credit Seller
-        </button>
+                                        } catch (e) {
+                                          console.error('Collected error:', e);
+                                          alert('Failed: ' + e.message);
+                                        }
+                                      }}
+                                      className="btn btn-success"
+                                      style={{
+                                        padding: '5px 10px', fontSize: 11, gap: 4,
+                                        opacity: paymentConfirmed[order.id] ? 1 : 0.4,
+                                        cursor: paymentConfirmed[order.id] ? 'pointer' : 'not-allowed',
+                                      }}
+                                    >
+                                      <CheckCircle size={11} /> Mark Collected & Credit Seller
+                                    </button>
 
-        {/* Cancel */}
-        <button
-          onClick={async () => {
-            const reason = prompt('Cancellation reason (shown to student):');
-            if (!reason?.trim()) return;
-            try {
-              await updateDoc(doc(db, 'physicalOrders', order.id), {
-                status:       'cancelled',
-                cancelledAt:  serverTimestamp(),
-                cancelReason: reason,
-                cancelledBy:  user.email,
-              });
-              await addDoc(collection(db, 'notifications'), {
-                userId:    order.userId,
-                type:      'withdrawal_rejected',
-                title:     `Physical order cancelled`,
-                message:   `Your order for "${order.bookTitle}" was cancelled. Reason: ${reason}`,
-                createdAt: serverTimestamp(),
-                read:      false,
-              });
-              await fetchPhysicalOrders();
-            } catch (e) { alert('Failed: ' + e.message); }
-          }}
-          className="btn btn-danger"
-          style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}
-        >
-          <X size={11} /> Cancel
-        </button>
-      </div>
-    </div>
-  )}
+                                    {/* Cancel */}
+                                    <button
+                                      onClick={async () => {
+                                        const reason = prompt('Cancellation reason (shown to student):');
+                                        if (!reason?.trim()) return;
+                                        try {
+                                          // 1. Cancel the order
+                                          await updateDoc(doc(db, 'physicalOrders', order.id), {
+                                            status: 'cancelled',
+                                            cancelledAt: serverTimestamp(),
+                                            cancelReason: reason,
+                                            cancelledBy: user.email,
+                                          });
 
-  {order.status === 'collected' && (
-    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-      {order.collectedAt ? formatDate(order.collectedAt).split(',')[0] : 'Done'}
-    </span>
-  )}
-</td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+                                          // 2. Restore stock — reverse the reservation made at order time
+                                          if (order.inventoryId) {
+                                            await updateDoc(doc(db, 'physicalInventory', order.inventoryId), {
+                                              currentStock: increment(1),  // give the copy back
+                                              reservedStock: increment(-1), // release the reservation
+                                            });
+                                          } else if (order.bookId) {
+                                            // fallback — look up inventory by bookId
+                                            const variants = [
+                                              order.bookId,
+                                              order.bookId?.replace('firestore-', ''),
+                                              `firestore-${order.bookId?.replace('firestore-', '')}`,
+                                            ].filter(Boolean);
+                                            for (const id of variants) {
+                                              const snap = await getDocs(
+                                                query(collection(db, 'physicalInventory'), where('bookId', '==', id), limit(1))
+                                              );
+                                              if (!snap.empty) {
+                                                await updateDoc(doc(db, 'physicalInventory', snap.docs[0].id), {
+                                                  currentStock: increment(1),
+                                                  reservedStock: increment(-1),
+                                                });
+                                                break;
+                                              }
+                                            }
+                                          }
+
+                                          // 3. Notify student
+                                          await addDoc(collection(db, 'notifications'), {
+                                            userId: order.userId,
+                                            type: 'order_cancelled',
+                                            title: `Physical order cancelled`,
+                                            message: `Your order for "${order.bookTitle}" was cancelled. Reason: ${reason}`,
+                                            createdAt: serverTimestamp(),
+                                            read: false,
+                                          });
+
+                                          await fetchPhysicalOrders();
+                                        } catch (e) { alert('Failed: ' + e.message); }
+                                      }}
+                                      className="btn btn-danger"
+                                      style={{ padding: '5px 10px', fontSize: 11, gap: 4 }}
+                                    >
+                                      <X size={11} /> Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {order.status === 'collected' && (
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                  {order.collectedAt ? formatDate(order.collectedAt).split(',')[0] : 'Done'}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

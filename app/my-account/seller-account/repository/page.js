@@ -17,6 +17,7 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
+import ConsignmentModal from "@/components/ConsignmentModal";
 
 /* ─── colour tokens ──────────────────────────────────────────── */
 const NAVY  = "#0d2244";
@@ -457,6 +458,7 @@ export default function SellerRepository() {
   const [filter,        setFilter]        = useState("all");
   const [view,          setView]          = useState("inventory"); // "inventory" | "ledger"
   const [selectedAsset, setSelectedAsset] = useState(null);
+  const [showConsign, setShowConsign] = useState(false);  // ← ADD THIS
   const router = useRouter();
 
   /* ── Auth ── */
@@ -687,9 +689,9 @@ export default function SellerRepository() {
                   {assets.length === 0 ? "Visit the Abuja Registry to consign your physical copies." : "Try a different search or filter."}
                 </p>
                 {assets.length === 0 && (
-                  <Link href="/admin/office-check-in" style={{ background: NAVY, color: "#fff", padding: "12px 24px", textDecoration: "none", fontSize: "12px", fontWeight: 700, fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em" }}>
+                  <button onClick={() => setShowConsign(true)} style={{ background: NAVY, color: "#fff", padding: "12px 24px", fontSize: "12px", fontWeight: 700, fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em", border: "none", cursor: "pointer" }}>
                     Contact Registry
-                  </Link>
+                  </button>
                 )}
               </div>
             ) : (
@@ -778,6 +780,9 @@ export default function SellerRepository() {
           onClose={() => setSelectedAsset(null)}
         />
       )}
+
+      {showConsign && <ConsignmentModal user={user} onClose={() => setShowConsign(false)} />}
+
     </>
   );
 }

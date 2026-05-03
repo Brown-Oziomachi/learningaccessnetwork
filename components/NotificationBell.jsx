@@ -143,6 +143,7 @@ export default function NotificationBell({ userId }) {
   const [open,     setOpen]     = useState(false);
   const [showAll,  setShowAll]  = useState(false);
   const dropdownRef = useRef(null);
+  const [dropPos, setDropPos] = useState({ top: 0, left: 0, width: 360 });
 
   /* ── 1. Main notifications — includes physical_* types ── */
   useEffect(() => {
@@ -332,21 +333,53 @@ const physicalTypes = new Set(["physical_sale", "physical_low_stock", "physical_
       `}</style>
 
       <div style={{ position: "relative" }} ref={dropdownRef}>
-
         {/* ── Bell Button ── */}
-        <button className="nb-bell" onClick={() => setOpen((p) => !p)} title="Notifications">
+        <button
+          className="nb-bell"
+          onClick={() => {
+            if (!open) {
+              const rect = dropdownRef.current?.getBoundingClientRect();
+              if (rect) {
+                const viewportWidth = window.innerWidth;
+                const dropWidth = Math.min(360, viewportWidth - 32);
+                let left = rect.right - dropWidth;
+                left = Math.max(16, left);
+                if (left + dropWidth > viewportWidth - 16) {
+                  left = viewportWidth - dropWidth - 16;
+                }
+                setDropPos({
+                  top: rect.bottom + 10,
+                  left,
+                  width: dropWidth,
+                });
+              }
+            }
+            setOpen((o) => !o);
+          }}
+          title="Notifications"
+        >
           <Bell size={18} style={{ color: NAVY }} />
           {unreadCount > 0 && (
-            <span style={{
-              position: "absolute", top: "-6px", right: "-6px",
-              minWidth: "18px", height: "18px",
-              background: physicalUnread > 0 ? "#d97706" : "#dc2626",
-              color: "#fff", fontSize: "9px", fontWeight: 700,
-              borderRadius: "999px", display: "flex",
-              alignItems: "center", justifyContent: "center",
-              padding: "0 4px", fontFamily: "'Lato',sans-serif",
-              border: "1.5px solid #fff",
-            }}>
+            <span
+              style={{
+                position: "absolute",
+                top: "-6px",
+                right: "-6px",
+                minWidth: "18px",
+                height: "18px",
+                background: physicalUnread > 0 ? "#d97706" : "#dc2626",
+                color: "#fff",
+                fontSize: "9px",
+                fontWeight: 700,
+                borderRadius: "999px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "0 4px",
+                fontFamily: "'Lato',sans-serif",
+                border: "1.5px solid #fff",
+              }}
+            >
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
@@ -354,115 +387,223 @@ const physicalTypes = new Set(["physical_sale", "physical_low_stock", "physical_
 
         {/* ── Dropdown ── */}
         {open && (
-          <div className="nb-dropdown" style={{
-            position: "fixed", right: "16px", top: "70px",
-            width: "min(calc(100vw - 32px), 400px)",
-            background: "#fff", border: "0.5px solid #e5ddd0",
-            boxShadow: "0 24px 64px rgba(13,34,68,0.2)",
-            zIndex: 999, overflow: "hidden",
-          }}>
-
+          <div
+            className="nb-dropdown"
+            style={{
+              position: "fixed",
+              top: dropPos.top,
+              left: dropPos.left,
+              width: dropPos.width,
+              background: "#fff",
+              border: "0.5px solid #e5ddd0",
+              boxShadow: "0 24px 64px rgba(13,34,68,0.2)",
+              zIndex: 99999,
+              overflow: "hidden",
+            }}
+          >
             {/* Header */}
-            <div style={{
-              background: NAVY,
-              backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)",
-              backgroundSize: "20px 20px", padding: "16px 18px",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div
+              style={{
+                background: NAVY,
+                backgroundImage:
+                  "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)",
+                backgroundSize: "20px 20px",
+                padding: "16px 18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              >
                 <Bell size={14} style={{ color: GOLD }} />
-                <p style={{
-                  fontFamily: "'Playfair Display',serif", fontSize: "15px",
-                  fontWeight: 700, color: "#fff", margin: 0,
-                }}>Notifications</p>
+                <p
+                  style={{
+                    fontFamily: "'Playfair Display',serif",
+                    fontSize: "15px",
+                    fontWeight: 700,
+                    color: "#fff",
+                    margin: 0,
+                  }}
+                >
+                  Notifications
+                </p>
                 {unreadCount > 0 && (
-                  <span style={{
-                    background: physicalUnread > 0 ? "#d97706" : "#dc2626",
-                    color: "#fff", fontSize: "9px", fontWeight: 700,
-                    padding: "2px 7px", fontFamily: "'Lato',sans-serif",
-                    letterSpacing: "0.04em"
-                  }}>{unreadCount} new</span>
+                  <span
+                    style={{
+                      background: physicalUnread > 0 ? "#d97706" : "#dc2626",
+                      color: "#fff",
+                      fontSize: "9px",
+                      fontWeight: 700,
+                      padding: "2px 7px",
+                      fontFamily: "'Lato',sans-serif",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    {unreadCount} new
+                  </span>
                 )}
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "10px" }}
+              >
                 {unreadCount > 0 && (
-                  <button onClick={markAllAsRead} style={{
-                    fontSize: "10px", fontWeight: 700, color: GOLDD,
-                    background: "transparent", border: "none", cursor: "pointer",
-                    fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                  }}>Mark all read</button>
+                  <button
+                    onClick={markAllAsRead}
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      color: GOLDD,
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      fontFamily: "'Lato',sans-serif",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Mark all read
+                  </button>
                 )}
                 {allNotifications.length > 0 && (
-                  <button onClick={clearAll} style={{
-                    fontSize: "10px", color: "rgba(255,255,255,0.35)",
-                    background: "transparent", border: "none", cursor: "pointer",
-                    fontFamily: "'Lato',sans-serif",
-                  }}>Clear all</button>
+                  <button
+                    onClick={clearAll}
+                    style={{
+                      fontSize: "10px",
+                      color: "rgba(255,255,255,0.35)",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      fontFamily: "'Lato',sans-serif",
+                    }}
+                  >
+                    Clear all
+                  </button>
                 )}
-                <button onClick={() => setOpen(false)} style={{
-                  width: "28px", height: "28px",
-                  border: "0.5px solid rgba(255,255,255,0.2)",
-                  background: "transparent", display: "flex",
-                  alignItems: "center", justifyContent: "center",
-                  cursor: "pointer", color: "rgba(255,255,255,0.6)",
-                }}><X size={14} /></button>
+                <button
+                  onClick={() => setOpen(false)}
+                  style={{
+                    width: "28px",
+                    height: "28px",
+                    border: "0.5px solid rgba(255,255,255,0.2)",
+                    background: "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    color: "rgba(255,255,255,0.6)",
+                  }}
+                >
+                  <X size={14} />
+                </button>
               </div>
             </div>
 
             {/* Physical updates sub-header (if any physical unread) */}
             {physicalUnread > 0 && (
-              <div style={{
-                background: "rgba(184,150,62,0.06)", borderBottom: "0.5px solid rgba(184,150,62,0.2)",
-                padding: "9px 16px", display: "flex", alignItems: "center", gap: "8px"
-              }}>
+              <div
+                style={{
+                  background: "rgba(184,150,62,0.06)",
+                  borderBottom: "0.5px solid rgba(184,150,62,0.2)",
+                  padding: "9px 16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
                 <Package size={12} style={{ color: GOLD }} />
-                <span style={{
-                  fontSize: "10px", fontWeight: 700, color: NAVY,
-                  fontFamily: "'Lato',sans-serif", flex: 1
-                }}>
-                  {physicalUnread} new physical update{physicalUnread > 1 ? "s" : ""} from Abuja Registry
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: NAVY,
+                    fontFamily: "'Lato',sans-serif",
+                    flex: 1,
+                  }}
+                >
+                  {physicalUnread} new physical update
+                  {physicalUnread > 1 ? "s" : ""} from Abuja Registry
                 </span>
-                <a href="/dashboard/repository" onClick={() => setOpen(false)} style={{
-                  fontSize: "10px", fontWeight: 700, color: GOLD,
-                  textDecoration: "none", fontFamily: "'Lato',sans-serif",
-                  display: "flex", alignItems: "center", gap: "3px"
-                }}>
+                <a
+                  href="/my-account/seller-account/repository"
+                  onClick={() => setOpen(false)}
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: GOLD,
+                    textDecoration: "none",
+                    fontFamily: "'Lato',sans-serif",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "3px",
+                  }}
+                >
                   View Repository <ChevronRight size={10} />
                 </a>
               </div>
             )}
 
             {/* Body */}
-            <div style={{ maxHeight: "440px", overflowY: "auto", scrollbarWidth: "none" }}>
+            <div
+              style={{
+                maxHeight: "440px",
+                overflowY: "auto",
+                scrollbarWidth: "none",
+              }}
+            >
               {allNotifications.length === 0 ? (
                 <div style={{ padding: "48px 24px", textAlign: "center" }}>
-                  <div style={{
-                    width: "56px", height: "56px", border: "0.5px solid #e5ddd0",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    margin: "0 auto 14px", background: CREAM,
-                  }}>
+                  <div
+                    style={{
+                      width: "56px",
+                      height: "56px",
+                      border: "0.5px solid #e5ddd0",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      margin: "0 auto 14px",
+                      background: CREAM,
+                    }}
+                  >
                     <Bell size={22} style={{ color: "#ccc" }} />
                   </div>
-                  <p style={{
-                    fontFamily: "'Playfair Display',serif", fontSize: "15px",
-                    fontWeight: 700, color: NAVY, margin: "0 0 4px",
-                  }}>All quiet here</p>
-                  <p style={{ fontSize: "12px", color: "#aaa", fontFamily: "'Lato',sans-serif", margin: 0 }}>
+                  <p
+                    style={{
+                      fontFamily: "'Playfair Display',serif",
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      color: NAVY,
+                      margin: "0 0 4px",
+                    }}
+                  >
+                    All quiet here
+                  </p>
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      color: "#aaa",
+                      fontFamily: "'Lato',sans-serif",
+                      margin: 0,
+                    }}
+                  >
                     No notifications yet
                   </p>
                 </div>
               ) : (
                 displayed.map((n, idx) => {
-                  const cfg       = getConfig(n.type);
-                  const Icon      = cfg.icon;
+                  const cfg = getConfig(n.type);
+                  const Icon = cfg.icon;
                   const isPhysical = physicalTypes.has(n.type);
 
                   /* Section divider: show "Physical Updates" header before first physical notification */
                   let sectionHeader = null;
                   if (isPhysical && !lastWasPhysical) {
                     sectionHeader = (
-                      <div key={`phys-header-${idx}`} className="nb-section-header">
+                      <div
+                        key={`phys-header-${idx}`}
+                        className="nb-section-header"
+                      >
                         <Package size={10} /> Abuja Registry Updates
                       </div>
                     );
@@ -477,73 +618,152 @@ const physicalTypes = new Set(["physical_sale", "physical_low_stock", "physical_
                       style={{ background: n.read ? "#fff" : cfg.bg }}
                     >
                       {!n.read && (
-                        <div style={{
-                          position: "absolute", left: 0, top: 0, bottom: 0,
-                          width: "3px", background: cfg.barColor,
-                        }} />
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: "3px",
+                            background: cfg.barColor,
+                          }}
+                        />
                       )}
-                      <div style={{
-                        width: "34px", height: "34px", flexShrink: 0,
-                        border: `0.5px solid ${cfg.border}`,
-                        background: n.read ? CREAM : cfg.bg,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>
+                      <div
+                        style={{
+                          width: "34px",
+                          height: "34px",
+                          flexShrink: 0,
+                          border: `0.5px solid ${cfg.border}`,
+                          background: n.read ? CREAM : cfg.bg,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
                         <Icon size={15} style={{ color: cfg.iconColor }} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          display: "flex", alignItems: "flex-start",
-                          justifyContent: "space-between", gap: "8px",
-                        }}>
-                          <div style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: 0 }}>
-                            <p style={{
-                              fontSize: "12px", fontWeight: 700,
-                              color: n.read ? "#888" : NAVY, margin: 0,
-                              fontFamily: "'Lato',sans-serif", lineHeight: 1.4,
-                            }}>{n.title}</p>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            justifyContent: "space-between",
+                            gap: "8px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "3px",
+                              minWidth: 0,
+                            }}
+                          >
+                            <p
+                              style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: n.read ? "#888" : NAVY,
+                                margin: 0,
+                                fontFamily: "'Lato',sans-serif",
+                                lineHeight: 1.4,
+                              }}
+                            >
+                              {n.title}
+                            </p>
                             {cfg.label && (
-                              <span className="nb-type-badge" style={{
-                                alignSelf: "flex-start",
-                                background: cfg.bg,
-                                color: cfg.iconColor,
-                                border: `0.5px solid ${cfg.border}`,
-                              }}>{cfg.label}</span>
+                              <span
+                                className="nb-type-badge"
+                                style={{
+                                  alignSelf: "flex-start",
+                                  background: cfg.bg,
+                                  color: cfg.iconColor,
+                                  border: `0.5px solid ${cfg.border}`,
+                                }}
+                              >
+                                {cfg.label}
+                              </span>
                             )}
                           </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
-                            <span style={{
-                              fontSize: "10px", color: "#bbb",
-                              fontFamily: "'Lato',sans-serif", whiteSpace: "nowrap",
-                            }}>{formatTime(n.createdAt)}</span>
-                            <button className="nb-del" onClick={(e) => deleteNotification(e, n)} title="Dismiss">
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                color: "#bbb",
+                                fontFamily: "'Lato',sans-serif",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {formatTime(n.createdAt)}
+                            </span>
+                            <button
+                              className="nb-del"
+                              onClick={(e) => deleteNotification(e, n)}
+                              title="Dismiss"
+                            >
                               <Trash2 size={11} />
                             </button>
                           </div>
                         </div>
 
                         {n.message && (
-                          <p style={{
-                            fontSize: "11px", color: n.read ? "#aaa" : "#666",
-                            margin: "4px 0 0", fontFamily: "'Lato',sans-serif", lineHeight: 1.5,
-                            display: "-webkit-box", WebkitLineClamp: 3,
-                            WebkitBoxOrient: "vertical", overflow: "hidden",
-                          }}>{n.message}</p>
+                          <p
+                            style={{
+                              fontSize: "11px",
+                              color: n.read ? "#aaa" : "#666",
+                              margin: "4px 0 0",
+                              fontFamily: "'Lato',sans-serif",
+                              lineHeight: 1.5,
+                              display: "-webkit-box",
+                              WebkitLineClamp: 3,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                            }}
+                          >
+                            {n.message}
+                          </p>
                         )}
 
                         {/* Stock pill for low-stock notifications */}
-                        {n.type === "physical_low_stock" && n.currentStock !== undefined && (
-                          <StockPill current={n.currentStock} total={n.totalConsignment} />
-                        )}
+                        {n.type === "physical_low_stock" &&
+                          n.currentStock !== undefined && (
+                            <StockPill
+                              current={n.currentStock}
+                              total={n.totalConsignment}
+                            />
+                          )}
 
                         {/* Amount chip for physical_sale */}
                         {n.type === "physical_sale" && n.amount && (
-                          <div style={{
-                            display: "inline-flex", alignItems: "center", gap: "4px",
-                            background: "#f0fdf4", border: "0.5px solid rgba(22,163,74,0.3)",
-                            padding: "2px 8px", marginTop: "5px"
-                          }}>
-                            <span style={{ fontSize: "10px", fontWeight: 700, color: "#16a34a", fontFamily: "'Lato',sans-serif" }}>
-                              +₦{Number(n.amount).toLocaleString()} added to balance
+                          <div
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              background: "#f0fdf4",
+                              border: "0.5px solid rgba(22,163,74,0.3)",
+                              padding: "2px 8px",
+                              marginTop: "5px",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                color: "#16a34a",
+                                fontFamily: "'Lato',sans-serif",
+                              }}
+                            >
+                              +₦{Number(n.amount).toLocaleString()} added to
+                              balance
                             </span>
                           </div>
                         )}
@@ -558,20 +778,42 @@ const physicalTypes = new Set(["physical_sale", "physical_low_stock", "physical_
 
             {/* Footer */}
             {allNotifications.length > 6 && (
-              <div style={{ borderTop: "0.5px solid #f0ebe0", padding: "10px 16px", background: CREAM }}>
-                <button onClick={() => setShowAll((p) => !p)} style={{
-                  width: "100%", display: "flex", alignItems: "center",
-                  justifyContent: "center", gap: "4px", fontSize: "10px",
-                  fontWeight: 700, color: NAVY, background: "transparent",
-                  border: "none", cursor: "pointer",
-                  fontFamily: "'Lato',sans-serif",
-                  letterSpacing: "0.08em", textTransform: "uppercase",
-                }}>
-                  {showAll ? "Show less" : `View all ${allNotifications.length} notifications`}
-                  <ChevronRight size={11} style={{
-                    transform: showAll ? "rotate(90deg)" : "none",
-                    transition: "transform 0.2s",
-                  }} />
+              <div
+                style={{
+                  borderTop: "0.5px solid #f0ebe0",
+                  padding: "10px 16px",
+                  background: CREAM,
+                }}
+              >
+                <button
+                  onClick={() => setShowAll((p) => !p)}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "4px",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: NAVY,
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: "'Lato',sans-serif",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {showAll
+                    ? "Show less"
+                    : `View all ${allNotifications.length} notifications`}
+                  <ChevronRight
+                    size={11}
+                    style={{
+                      transform: showAll ? "rotate(90deg)" : "none",
+                      transition: "transform 0.2s",
+                    }}
+                  />
                 </button>
               </div>
             )}

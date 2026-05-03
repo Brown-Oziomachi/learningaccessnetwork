@@ -533,9 +533,8 @@ export default function LandingPage() {
                 Our payment system is designed for sellers who need fast, reliable access to their earnings.
               </p>
             </div>
-
-         <div style={{ display:"grid", gridTemplateColumns:"repeat(2,minmax(0,1fr))", gap:16 }}>
-  {SERVICES.map(({ emoji, title, body }) => (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 16 }}>
+              {BENEFITS.map(({ emoji, title, body }) => (
                 <div key={title} className="ben-card">
                   <div style={{ width:72, height:72, border:`0.5px solid rgba(184,150,62,0.25)`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", fontSize:32 }}>
                     {emoji}

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     BookOpen, Heart, User, LogOut, Store, Search, Plus,
-    Eye, Sparkles, GraduationCap, MessageSquare,
+    Eye, Sparkles, GraduationCap, MessageSquare, 
     BookMarked, Zap, Users, ArrowRight, FileText,
     BookCopy, LayoutDashboard, LibraryBig,
     BarChart2, Activity, ChevronRight, Bell, X,
@@ -17,6 +17,7 @@ import {
 import { onAuthStateChanged } from 'firebase/auth';
 import Link from 'next/link';
 import Navbar from '@/components/NavBar';
+import NotificationBell from '@/components/NotificationBell';
 
 /* ─── Design tokens ─── */
 const NAVY  = "#0d2244";
@@ -1100,10 +1101,11 @@ export default function StudentDashboardClient() {
                     </div>
 
                     {/* Bell in sidebar */}
-                    <div style={{padding:'8px 16px',borderBottom:'0.5px solid #f0ebe0',marginBottom:6,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                        <span style={{fontSize:11,color:'#888',fontWeight:700,fontFamily:"'Lato',sans-serif"}}>Messages</span>
-                        {user?.uid && <MessageBell userId={user.uid}/>}
-                    </div>
+                        {/* Notifications in sidebar */}
+                        <div style={{ padding: '8px 16px', borderBottom: '0.5px solid #f0ebe0', marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 11, color: '#888', fontWeight: 700, fontFamily: "'Lato',sans-serif" }}>Notifications</span>
+                            {user?.uid && <NotificationBell userId={user.uid} />}
+                        </div>
 
                     {[
                         {id:'home',    icon:LayoutDashboard, label:'Home'},
@@ -1143,8 +1145,8 @@ export default function StudentDashboardClient() {
                             </div>
                         </div>
                         <div style={{display:'flex',alignItems:'center',gap:6}}>
-                            {user?.uid && <MessageBell userId={user.uid}/>}
-                            <Link href="/my-account">
+                                {user?.uid && <NotificationBell userId={user.uid} />}
+                                <Link href="/my-account">
                                 <div style={{width:30,height:30,borderRadius:'50%',background:CREAM,border:'0.5px solid #e5ddd0',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
                                     <User size={14} style={{color:NAVY}}/>
                                 </div>

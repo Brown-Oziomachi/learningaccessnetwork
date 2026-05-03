@@ -341,7 +341,6 @@ export default function RegistryCheckout() {
         </div>
         <h2 style={{ color: "#e2e8f0", fontSize: "20px", fontWeight: 700, margin: "0 0 8px" }}>Admin Access Only</h2>
         <p style={{ color: "#64748b", fontSize: "13px", lineHeight: 1.6, margin: "0 0 24px" }}>The Registry Checkout is restricted to LAN administrators.</p>
-        <a href="/auth/signin" style={{ background: "#3b82f6", color: "#fff", padding: "12px 24px", borderRadius: "8px", textDecoration: "none", fontSize: "13px", fontWeight: 600, display: "block" }}>Sign In as Admin</a>
       </div>
     </div>
   );
