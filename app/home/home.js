@@ -391,6 +391,90 @@ export default function HomeClient() {
                 </section>
 
                 {/* ══════════════════════════════════════════════════════════
+    UNIVERSITY HUBS
+══════════════════════════════════════════════════════════ */}
+<section style={{ background: "#fff", padding: "72px 24px", borderTop: "0.5px solid #e5ddd0" }}>
+  <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+
+    {/* Header */}
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "36px", flexWrap: "wrap", gap: 12 }}>
+      <div>
+        <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: "8px", fontFamily: "'Lato', sans-serif" }}>
+          Find Your Institution
+        </p>
+        <h2 className="lan-serif" style={{ fontSize: "clamp(26px, 4vw, 40px)", fontWeight: 700, color: NAVY, margin: 0 }}>
+          University Hubs
+        </h2>
+        <p style={{ fontSize: "13px", color: "#888", margin: "8px 0 0", fontWeight: 300, fontFamily: "'Lato',sans-serif" }}>
+          Course materials sorted by your exact institution/Uploaded by Lecturers
+        </p>
+      </div>
+      <Link href="/uni"
+        style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "12px", fontWeight: 700, color: NAVY, textDecoration: "none", letterSpacing: "0.04em", border: "0.5px solid #e5ddd0", padding: "9px 16px", whiteSpace: "nowrap" }}>
+        All Universities <ArrowRight size={13} />
+      </Link>
+    </div>
+
+    {/* University Picker Grid */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px" }}>
+      {[
+        { slug: "uniabuja",  name: "University of Abuja",            short: "UniAbuja", state: "FCT" },
+        { slug: "unilag",    name: "University of Lagos",            short: "UNILAG",   state: "Lagos" },
+        { slug: "ui",        name: "University of Ibadan",           short: "UI",       state: "Oyo" },
+        { slug: "uniben",    name: "University of Benin",            short: "UNIBEN",   state: "Edo" },
+        { slug: "oau",       name: "Obafemi Awolowo University",     short: "OAU",      state: "Osun" },
+        { slug: "unn",       name: "University of Nigeria, Nsukka",  short: "UNN",      state: "Enugu" },
+        { slug: "abu",       name: "Ahmadu Bello University",        short: "ABU",      state: "Kaduna" },
+        { slug: "futa",      name: "Fed. Uni. of Tech., Akure",      short: "FUTA",     state: "Ondo" },
+        { slug: "covenant",  name: "Covenant University",            short: "CU",       state: "Ogun" },
+        { slug: "babcock",   name: "Babcock University",             short: "Babcock",  state: "Ogun" },
+      ].map(uni => (
+        <Link key={uni.slug} href={`/uni/${uni.slug}`}
+          style={{ textDecoration: "none", display: "block" }}>
+          <div className="trend-card" style={{ padding: "18px 16px", cursor: "pointer" }}>
+            {/* Short name badge */}
+            <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: NAVY, padding: "4px 10px", marginBottom: "12px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", color: GOLD, fontFamily: "'Lato',sans-serif" }}>{uni.short}</span>
+            </div>
+            {/* Full name */}
+            <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 5px", lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+              {uni.name}
+            </h3>
+            {/* State */}
+            <p style={{ fontSize: "10px", color: "#bbb", fontFamily: "'Lato',sans-serif", margin: "0 0 14px", display: "flex", alignItems: "center", gap: 4 }}>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              {uni.state}
+            </p>
+            {/* CTA */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "0.5px solid #f0ebe0", paddingTop: "12px" }}>
+              <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, fontFamily: "'Lato',sans-serif" }}>Browse Hub</span>
+              <ChevronRight size={13} style={{ color: GOLD }} />
+            </div>
+          </div>
+        </Link>
+      ))}
+    </div>
+
+    {/* Bottom CTA strip */}
+    <div style={{ marginTop: "24px", background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", padding: "20px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14 }}>
+      <div>
+        <p style={{ fontSize: "12px", fontWeight: 700, color: "#fff", fontFamily: "'Lato',sans-serif", margin: "0 0 3px" }}>
+          Don't see your university?
+        </p>
+        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontFamily: "'Lato',sans-serif", margin: 0 }}>
+          We're adding more institutions every week.
+        </p>
+      </div>
+      <Link href="/uni"
+        style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", background: GOLD, color: NAVY, fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato',sans-serif", whiteSpace: "nowrap" }}>
+        View All Hubs <ArrowRight size={12} />
+      </Link>
+    </div>
+
+  </div>
+</section>
+                
+                {/* ══════════════════════════════════════════════════════════
             LATEST DOCUMENTS GRID
         ══════════════════════════════════════════════════════════ */}
                 <section style={{ background: "#fff", padding: "72px 24px" }}>

@@ -112,11 +112,15 @@ export default function SearchClient() {
       trackSearch(q);
       try {
         const platformResults = booksData
-          .filter(b =>
-            b.title?.toLowerCase().includes(q) ||
-            b.author?.toLowerCase().includes(q) ||
-            b.category?.toLowerCase().includes(q)
-          )
+          .filter(b => {
+            const searchableText = [
+              b.title, b.author, b.category, b.courseCode,
+              b.university, b.department, b.faculty,
+              b.resourceType, b.description, b.subject, b.level,
+              ...(b.tags || []),
+            ].filter(Boolean).join(" ").toLowerCase();
+            return searchableText.includes(q);
+          })
           .map(b => ({ ...b, image: getThumbnailUrl(b), source: "platform" }));
 
         const firestoreResults = [];
@@ -124,11 +128,22 @@ export default function SearchClient() {
           const snap = await getDocs(query(collection(db, "advertMyBook"), where("status", "==", "approved")));
           snap.forEach(d => {
             const data = d.data();
-            if (
-              (data.bookTitle || "").toLowerCase().includes(q) ||
-              (data.author || "").toLowerCase().includes(q) ||
-              (data.category || "").toLowerCase().includes(q)
-            ) {
+            const searchableText = [
+              data.bookTitle,
+              data.author,
+              data.category,
+              data.courseCode,
+              data.university,
+              data.department,
+              data.faculty,
+              data.resourceType,
+              data.description,
+              data.tags?.join(" "),
+              data.subject,
+              data.level,
+            ].filter(Boolean).join(" ").toLowerCase();
+
+            if (searchableText.includes(q)) {
               const b = {
                 id: `firestore-${d.id}`, firestoreId: d.id,
                 title: data.bookTitle, author: data.author, category: data.category,
@@ -136,6 +151,15 @@ export default function SearchClient() {
                 description: data.description, driveFileId: data.driveFileId,
                 pdfUrl: data.pdfUrl, previewUrl: data.previewUrl, embedUrl: data.embedUrl,
                 isFromFirestore: true, source: "firestore",
+                // ← ADD THESE:
+                courseCode: data.courseCode || "",
+                university: data.university || "",
+                department: data.department || "",
+                faculty: data.faculty || "",
+                resourceType: data.resourceType || "",
+                subject: data.subject || "",
+                level: data.level || "",
+                tags: data.tags || [],
               };
               b.image = getThumbnailUrl(b);
               firestoreResults.push(b);
@@ -202,6 +226,26 @@ export default function SearchClient() {
           <p style={{ fontSize: "11px", color: "#888", margin: "0 0 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato', sans-serif" }}>
             {book.author}
           </p>
+          {/* University / dept / course meta */}
+          {(book.university || book.department || book.courseCode) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
+              {book.courseCode && (
+                <span style={{ fontSize: "9px", fontWeight: 700, background: "rgba(13,34,68,0.08)", color: NAVY, padding: "2px 6px", letterSpacing: "0.06em", fontFamily: "'Lato',sans-serif" }}>
+                  {book.courseCode}
+                </span>
+              )}
+              {book.university && (
+                <span style={{ fontSize: "9px", color: "#888", fontFamily: "'Lato',sans-serif", padding: "2px 0" }}>
+                  {book.university}
+                </span>
+              )}
+            </div>
+          )}
+          {book.resourceType && (
+            <span style={{ fontSize: "9px", fontWeight: 700, color: GOLD, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", display: "block", marginBottom: "4px" }}>
+              {book.resourceType}
+            </span>
+          )}
           {book.price && (
             <p style={{ fontSize: "12px", fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato', sans-serif" }}>
               ₦{Number(book.price).toLocaleString()}
@@ -388,27 +432,38 @@ export default function SearchClient() {
           )}
 
           {/* Results */}
-          {!loading && !showMostSearched && searchResults.length > 0 && (
-            <>
-              {/* Purchased */}
-              {searchResults.filter(b => isPurchased(b.id)).length > 0 && (
-                <BookSection
-                  title="Purchased Documents"
-                  books={searchResults.filter(b => isPurchased(b.id))}
-                  count={searchResults.filter(b => isPurchased(b.id)).length}
-                />
-              )}
+          {!loading && !showMostSearched && searchResults.length > 0 && (() => {
+            const purchased = searchResults.filter(b => isPurchased(b.id));
+            const unpurchased = searchResults.filter(b => !isPurchased(b.id));
 
-              {/* Other results */}
-              {searchResults.filter(b => !isPurchased(b.id)).length > 0 && (
-                <BookSection
-                  title={searchResults.filter(b => isPurchased(b.id)).length > 0 ? "Other Documents" : "All Results"}
-                  books={searchResults.filter(b => !isPurchased(b.id))}
-                  count={searchResults.filter(b => !isPurchased(b.id)).length}
-                />
-              )}
-            </>
-          )}
+            // group unpurchased by resourceType
+            const groups = {};
+            unpurchased.forEach(b => {
+              const key = b.resourceType || b.category || "Other Documents";
+              if (!groups[key]) groups[key] = [];
+              groups[key].push(b);
+            });
+
+            return (
+              <>
+                {purchased.length > 0 && (
+                  <BookSection
+                    title="Your Purchased Documents"
+                    books={purchased}
+                    count={purchased.length}
+                  />
+                )}
+                {Object.entries(groups).map(([type, books]) => (
+                  <BookSection
+                    key={type}
+                    title={type}
+                    books={books}
+                    count={books.length}
+                  />
+                ))}
+              </>
+            );
+          })()}
         </div>
       </div>
 
