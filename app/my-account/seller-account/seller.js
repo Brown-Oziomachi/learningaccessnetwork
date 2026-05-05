@@ -19,6 +19,8 @@ const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
 const BG = "#f5f1ea";
 
+const FACULTY_TITLES = ["Dr.", "Prof.", "Mr.", "Mrs.", "Ms.", "Engr.", "Pharm.", "Barr.", "Lecturer"];
+
 const nigerianBanks = [
     { name: "Access Bank", code: "044" },
     { name: "Citibank", code: "023" },
@@ -501,7 +503,7 @@ export default function SellerAccountClient() {
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [accountBalance, setAccountBalance] = useState(50);
+    const [accountBalance, setAccountBalance] = useState(0);
     const [totalEarnings, setTotalEarnings] = useState(0);
     const [booksSold, setBooksSold] = useState(0);
     const [transactions, setTransactions] = useState([]);
@@ -766,7 +768,8 @@ export default function SellerAccountClient() {
                                 </p>
                                 <div className="gold-pill" style={{ marginTop: '4px' }}>
                                     <div className="pulse-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
-                                    <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: GOLD, fontFamily: "'Lato',sans-serif" }}>Verified Seller</span>
+                                    <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: GOLD, fontFamily: "'Lato',sans-serif" }}>
+                                        {user?.isLecturer || FACULTY_TITLES.includes(seller?.title) ? 'Verified Faculty' : 'Verified Seller'}                                    </span>
                                 </div>
                             </div>
                         </button>
@@ -1002,7 +1005,7 @@ export default function SellerAccountClient() {
                                         <div style={{ width: '36px', height: '36px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}><Settings size={18} style={{ color: NAVY }} /></div>
                                         <span style={{ fontSize: '13px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>Other Information</span>
                                     </div>
-                                    {[['Email', user?.email], ['Date of Birth', user?.dateOfBirth || 'Not set'], ['Address', user?.address || 'Not set'], ['Country', user?.country || 'Not set'], ['Account Type', 'Verified Seller']].map(([k, v]) => (
+                                    {[['Email', user?.email], ['Date of Birth', user?.dateOfBirth || 'Not set'], ['Address', user?.address || 'Not set'], ['Country', user?.country || 'Not set'], ['Account Type', user?.isLecturer || FACULTY_TITLES.includes(seller?.title) ? 'Verified Faculty' : 'Verified Seller']].map(([k, v]) => (
                                         <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '8px 0', borderBottom: '0.5px solid #f0ebe0' }}>
                                             <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{k}</span>
                                             <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", textAlign: 'right', maxWidth: '60%' }}>{v}</span>
@@ -1010,7 +1013,7 @@ export default function SellerAccountClient() {
                                     ))}
                                 </div>
 
-                                {seller?.title === "Lecturer" && (
+                                {FACULTY_TITLES.includes(seller?.title) && (
                                     <button onClick={() => { setShowProfileModal(false); setShowExportModal(true); }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', border: '0.5px solid #e5ddd0', background: '#fff', marginBottom: '6px', cursor: 'pointer', transition: 'all 0.15s' }}
                                         onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.background = CREAM; }}
                                         onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5ddd0'; e.currentTarget.style.background = '#fff'; }}>

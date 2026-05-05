@@ -12,6 +12,7 @@ import {
     getDoc,
     runTransaction
 } from 'firebase/firestore';
+import { qualifyReferral } from '@/lib/referralUtils';
 
 const calculatePaymentDistribution = (book) => {
     const isPlatformBook = book.source === 'platform' || book.isPlatformBook === true;
@@ -183,6 +184,7 @@ export const usePayment = (book, formData, sellerDetails) => {
                 });
             }
 
+            await qualifyReferral(currentUser.uid, book.price);
             return transactionRef.id;
         } catch (err) {
             throw err;

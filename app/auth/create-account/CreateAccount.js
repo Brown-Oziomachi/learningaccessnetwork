@@ -137,25 +137,34 @@ const STYLES = `
   .lan-auth-card { animation:fadeUp 0.5s cubic-bezier(0.4,0,0.2,1) both; }
 `;
 
+
+
 export default function CreateAccountNameClient() {
     const router      = useRouter();
     const searchParams = useSearchParams();
     const prefilledEmail = searchParams.get('email');
     const refFromUrl     = searchParams.get('referral_code');
 
-    if (refFromUrl) sessionStorage.setItem('referredBy', refFromUrl);
+    const [formData, setFormData] = useState({
+        firstName: '',
+        surname: ''
+    });
 
-    const [formData, setFormData]       = useState({ firstName: '', surname: '' });
-    const [errors, setErrors]           = useState({});
+    const [errors, setErrors] = useState({});
     const [selectedRole, setSelectedRole]     = useState('');
     const [studentSubRole, setStudentSubRole] = useState('');
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         const role = sessionStorage.getItem('userRole');
         if (role) setSelectedRole(role);
+
         const subRole = sessionStorage.getItem('studentSubRole');
         if (subRole) setStudentSubRole(subRole);
-        if (refFromUrl) sessionStorage.setItem('referredBy', refFromUrl);
+
+        if (refFromUrl) {
+            sessionStorage.setItem('referredBy', refFromUrl);
+        }
     }, [refFromUrl]);
 
     const subRoleLabels = {
@@ -167,24 +176,30 @@ export default function CreateAccountNameClient() {
 
     const handleNext = () => {
         const validation = validateName(formData.firstName, formData.surname);
+            console.log('validation result:', validation); 
         if (!validation.isValid) { setErrors(validation.errors); return; }
 
+        setLoading(true);
+
         const ref = sessionStorage.getItem('referredBy') || refFromUrl || '';
-        const params = new URLSearchParams({ firstName: formData.firstName, surname: formData.surname });
+        const params = new URLSearchParams({
+            firstName: formData.firstName,
+            surname: formData.surname,
+        });
 
         if (prefilledEmail) params.append('email', prefilledEmail);
         if (ref) params.append('referral_code', ref);
         if (selectedRole) params.append('role', selectedRole);
 
         const studentSubRoleVal = sessionStorage.getItem('studentSubRole');
-        const studyLevel        = sessionStorage.getItem('studyLevel');
-        const fieldOfStudy      = sessionStorage.getItem('fieldOfStudy');
-        const institution       = sessionStorage.getItem('institution');
+        const studyLevel = sessionStorage.getItem('studyLevel');
+        const fieldOfStudy = sessionStorage.getItem('fieldOfStudy');
+        const institution = sessionStorage.getItem('institution');
 
         if (studentSubRoleVal) params.append('studentSubRole', studentSubRoleVal);
-        if (studyLevel)        params.append('studyLevel', studyLevel);
-        if (fieldOfStudy)      params.append('fieldOfStudy', fieldOfStudy);
-        if (institution)       params.append('institution', institution);
+        if (studyLevel) params.append('studyLevel', studyLevel);
+        if (fieldOfStudy) params.append('fieldOfStudy', fieldOfStudy);
+        if (institution) params.append('institution', institution);
 
         router.push(`/auth/create-account/dob?${params.toString()}`);
     };
@@ -246,10 +261,10 @@ export default function CreateAccountNameClient() {
 
                     <button
                         onClick={handleNext}
-                        disabled={!formData.firstName || !formData.surname}
+                        disabled={loading || !formData.firstName.trim() || !formData.surname.trim()}
                         className="lan-btn"
                     >
-                        Next <ArrowRight size={13} />
+                        {loading ? "Loading..." : <>Next <ArrowRight size={13} /></>}
                     </button>
 
                     {/* bottom crest note */}

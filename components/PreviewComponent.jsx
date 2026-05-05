@@ -63,7 +63,7 @@ export default function BookPreviewPage() {
   const [followLoadingIds,      setFollowLoadingIds]      = useState(new Set());
   const [physicalInventory,     setPhysicalInventory]     = useState(null);
   const [loadingPhysical,       setLoadingPhysical]       = useState(true);
-
+  const [sellerInfo,            setSellerInfo]             = useState(null);
   const getThumbnailUrl = (book) => {
     if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
     if (book.embedUrl) {
@@ -103,6 +103,53 @@ export default function BookPreviewPage() {
     }
   }, [book]);
 
+
+  useEffect(() => {
+    if (!book?.userId && !book?.sellerId) return;
+    const fetchSellerInfo = async () => {
+      try {
+        const sellerId = book.userId || book.sellerId;
+        const sellerDoc = await getDoc(doc(db, "sellers", sellerId));
+        if (sellerDoc.exists()) {
+          const data = sellerDoc.data();
+          const FACULTY_TITLES = [
+            "lecturer",
+            "dr.",
+            "prof.",
+            "professor",
+            "mrs.",
+            "mrs",
+            "mr.",
+            "mr",
+            "ms.",
+            "ms",
+            "engr.",
+            "engr",
+            "pharm.",
+            "pharm",
+            "barr.",
+            "barr",
+          ];
+          const title = (data.title || "").toLowerCase().trim();
+          const isFaculty = FACULTY_TITLES.some((t) => title.includes(t));
+          if (isFaculty) {
+            setSellerInfo({
+              name:
+                data.sellerName ||
+                data.displayName ||
+                book.sellerName ||
+                "Unknown",
+              title: data.title || "",
+              institution:
+                data.institution || data.university || data.school || "",
+              sellerId,
+            });
+          }
+        }
+      } catch {}
+    };
+    fetchSellerInfo();
+  }, [book]);
   useEffect(() => {
     if (!bookId) return;
     const trackView = async () => {
@@ -183,24 +230,54 @@ export default function BookPreviewPage() {
         setLoadingLecturers(true);
         const snap = await getDocs(collection(db, "sellers"));
         const list = [];
-        snap.forEach(ds => {
-          const data  = ds.data();
+        snap.forEach((ds) => {
+          const data = ds.data();
           const title = (data.title || "").toLowerCase();
-          if (!["lecturer", "dr.", "prof.", "professor", "mrs", "mr"].some(t => title.includes(t))) return;
-          list.push({ sellerId: ds.id, sellerName: data.sellerName || data.displayName || "Unknown", title: data.title || "", uploadedBooks: 0 });
+          if (
+            ![
+              "lecturer",
+              "dr.",
+              "prof.",
+              "professor",
+              "mrs",
+              "mr",
+              "ms.",
+              "engr.",
+              "pharm.",
+              "barr.",
+            ].some((t) => title.includes(t))
+          )
+            return;
+          list.push({
+            sellerId: ds.id,
+            sellerName: data.sellerName || data.displayName || "Unknown",
+            title: data.title || "",
+            institution:
+              data.institution || data.university || data.school || "", // ← ADD
+            uploadedBooks: 0,
+          });
         });
-        await Promise.all(list.map(async l => {
-          const bs = await getDocs(query(collection(db, "advertMyBook"), where("userId", "==", l.sellerId), where("status", "==", "approved")));
-          l.uploadedBooks = bs.size;
-        }));
+        await Promise.all(
+          list.map(async (l) => {
+            const bs = await getDocs(
+              query(
+                collection(db, "advertMyBook"),
+                where("userId", "==", l.sellerId),
+                where("status", "==", "approved"),
+              ),
+            );
+            l.uploadedBooks = bs.size;
+          }),
+        );
         list.sort((a, b) => b.uploadedBooks - a.uploadedBooks);
         setLecturers(list.slice(0, 6));
-      } catch {}
-      finally { setLoadingLecturers(false); }
+      } catch {
+      } finally {
+        setLoadingLecturers(false);
+      }
     };
     fetchLecturers();
   }, []);
-
   useEffect(() => {
     const fetchFollowing = async () => {
       if (!user) return;
@@ -1457,99 +1534,192 @@ const PhysicalStockBadge = () => {
                       <div
                         key={lec.sellerId}
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                          marginBottom: "12px",
+                          marginBottom: "14px",
+                          padding: "12px",
+                          border: "0.5px solid #f0ebe0",
+                          background: CREAM,
                         }}
                       >
-                        <Link
-                          href={`/seller-profile?sellerId=${lec.sellerId}`}
+                        {/* Top row: avatar + name + follow */}
+                        <div
                           style={{
-                            width: "32px",
-                            height: "32px",
-                            borderRadius: "50%",
-                            background: NAVY,
                             display: "flex",
                             alignItems: "center",
-                            justifyContent: "center",
-                            color: GOLD,
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            textDecoration: "none",
-                            flexShrink: 0,
+                            gap: "10px",
+                            marginBottom: "8px",
                           }}
                         >
-                          {lec.sellerName?.charAt(0)?.toUpperCase() || "?"}
-                        </Link>
-                        <Link
-                          href={`/seller-profile?sellerId=${lec.sellerId}`}
-                          style={{
-                            flex: 1,
-                            minWidth: 0,
-                            textDecoration: "none",
-                          }}
-                        >
-                          <p
+                          <Link
+                            href={`/seller-profile?sellerId=${lec.sellerId}`}
                             style={{
-                              fontSize: "11px",
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "50%",
+                              background: NAVY,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: GOLD,
+                              fontSize: "12px",
                               fontWeight: 700,
-                              color: NAVY,
-                              margin: 0,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                              fontFamily: "'Lato',sans-serif",
+                              textDecoration: "none",
+                              flexShrink: 0,
                             }}
                           >
-                            {lec.title
-                              ? `${lec.title} ${lec.sellerName}`
-                              : lec.sellerName}
-                          </p>
-                          <p
+                            {lec.sellerName?.charAt(0)?.toUpperCase() || "?"}
+                          </Link>
+                          <Link
+                            href={`/seller-profile?sellerId=${lec.sellerId}`}
                             style={{
-                              fontSize: "10px",
-                              color: "#aaa",
-                              margin: 0,
-                              fontFamily: "'Lato',sans-serif",
+                              flex: 1,
+                              minWidth: 0,
+                              textDecoration: "none",
                             }}
                           >
-                            {lec.uploadedBooks} files
-                          </p>
-                        </Link>
-                        <button
-                          onClick={(e) =>
-                            handleFollowLecturer(
-                              e,
-                              lec.sellerId,
-                              lec.sellerName,
-                            )
-                          }
-                          disabled={followLoadingIds.has(lec.sellerId)}
+                            <p
+                              style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: NAVY,
+                                margin: 0,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                fontFamily: "'Lato',sans-serif",
+                              }}
+                            >
+                              {lec.title
+                                ? `${lec.title} ${lec.sellerName}`
+                                : lec.sellerName}
+                            </p>
+                            <p
+                              style={{
+                                fontSize: "10px",
+                                color: "#aaa",
+                                margin: 0,
+                                fontFamily: "'Lato',sans-serif",
+                              }}
+                            >
+                              {lec.uploadedBooks} files uploaded
+                            </p>
+                          </Link>
+                          <button
+                            onClick={(e) =>
+                              handleFollowLecturer(
+                                e,
+                                lec.sellerId,
+                                lec.sellerName,
+                              )
+                            }
+                            disabled={followLoadingIds.has(lec.sellerId)}
+                            style={{
+                              fontSize: "9px",
+                              fontWeight: 700,
+                              padding: "4px 10px",
+                              border: `0.5px solid ${followingIds.has(lec.sellerId) ? "#86efac" : GOLD}`,
+                              background: followingIds.has(lec.sellerId)
+                                ? "rgba(22,163,74,0.08)"
+                                : "#fff",
+                              color: followingIds.has(lec.sellerId)
+                                ? "#16a34a"
+                                : NAVY,
+                              cursor: "pointer",
+                              fontFamily: "'Lato',sans-serif",
+                              letterSpacing: "0.04em",
+                              transition: "all 0.18s",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {followLoadingIds.has(lec.sellerId)
+                              ? "…"
+                              : followingIds.has(lec.sellerId)
+                                ? "✓ Following"
+                                : "+ Follow"}
+                          </button>
+                        </div>
+
+                        {/* Verified Faculty badge */}
+                        <div
                           style={{
-                            fontSize: "9px",
-                            fontWeight: 700,
-                            padding: "4px 10px",
-                            border: `0.5px solid ${followingIds.has(lec.sellerId) ? "#86efac" : GOLD}`,
-                            background: followingIds.has(lec.sellerId)
-                              ? "rgba(22,163,74,0.08)"
-                              : CREAM,
-                            color: followingIds.has(lec.sellerId)
-                              ? "#16a34a"
-                              : NAVY,
-                            cursor: "pointer",
-                            fontFamily: "'Lato',sans-serif",
-                            letterSpacing: "0.04em",
-                            transition: "all 0.18s",
-                            flexShrink: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            flexWrap: "wrap",
                           }}
                         >
-                          {followLoadingIds.has(lec.sellerId)
-                            ? "…"
-                            : followingIds.has(lec.sellerId)
-                              ? "✓ Following"
-                              : "+ Follow"}
-                        </button>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              background: NAVY,
+                              color: GOLD,
+                              fontSize: "8px",
+                              fontWeight: 700,
+                              padding: "3px 8px",
+                              fontFamily: "'Lato',sans-serif",
+                              letterSpacing: "0.08em",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            ✦ Verified Faculty
+                          </span>
+                          {lec.title && (
+                            <span
+                              style={{
+                                fontSize: "9px",
+                                color: "#888",
+                                fontFamily: "'Lato',sans-serif",
+                                background: "#fff",
+                                border: "0.5px solid #e5ddd0",
+                                padding: "3px 8px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {lec.title}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Institution row */}
+                        {lec.institution && (
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "5px",
+                              marginTop: "6px",
+                              padding: "5px 8px",
+                              background: "#fff",
+                              border: "0.5px solid rgba(184,150,62,0.2)",
+                            }}
+                          >
+                            <svg
+                              width="10"
+                              height="10"
+                              fill="none"
+                              stroke={GOLD}
+                              strokeWidth="2"
+                              viewBox="0 0 24 24"
+                              style={{ flexShrink: 0 }}
+                            >
+                              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                            </svg>
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                color: NAVY,
+                                fontWeight: 700,
+                                fontFamily: "'Lato',sans-serif",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {lec.institution}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
@@ -1957,8 +2127,189 @@ const PhysicalStockBadge = () => {
                     </button>
                   </div>
                 </div>
-                  <PhysicalStockBadge />
+                {/* ── Faculty Banner ── */}
+                {sellerInfo && (
+                  <div
+                    style={{
+                      margin: "0 16px 0",
+                      background: NAVY,
+                      backgroundImage:
+                        "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)",
+                      backgroundSize: "20px 20px",
+                      border: `1px solid ${GOLD}`,
+                      padding: "14px 16px",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "12px",
+                      position: "relative",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {/* corner decoration */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "-16px",
+                        right: "-16px",
+                        width: "60px",
+                        height: "60px",
+                        border: "0.5px solid rgba(184,150,62,0.25)",
+                        transform: "rotate(45deg)",
+                      }}
+                    />
 
+                    {/* Avatar */}
+                    <div
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        borderRadius: "50%",
+                        background: GOLD,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: NAVY,
+                        fontSize: "14px",
+                        fontWeight: 700,
+                        flexShrink: 0,
+                        fontFamily: "'Lato',sans-serif",
+                      }}
+                    >
+                      {sellerInfo.name?.charAt(0)?.toUpperCase() || "?"}
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Verified Faculty pill */}
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          background: "rgba(184,150,62,0.15)",
+                          border: "0.5px solid rgba(184,150,62,0.4)",
+                          padding: "2px 8px",
+                          marginBottom: "6px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: "5px",
+                            height: "5px",
+                            borderRadius: "50%",
+                            background: GOLD,
+                            display: "inline-block",
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: "8px",
+                            fontWeight: 700,
+                            color: GOLDD,
+                            letterSpacing: "0.14em",
+                            textTransform: "uppercase",
+                            fontFamily: "'Lato',sans-serif",
+                          }}
+                        >
+                          Verified Faculty
+                        </span>
+                      </div>
+
+                      {/* Name + title */}
+                      <p
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          color: "#fff",
+                          margin: "0 0 2px",
+                          fontFamily: "'Lato',sans-serif",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {sellerInfo.title
+                          ? `${sellerInfo.title} ${sellerInfo.name}`
+                          : sellerInfo.name}
+                      </p>
+
+                      {/* Institution */}
+                      {sellerInfo.institution ? (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            marginTop: "4px",
+                          }}
+                        >
+                          <svg
+                            width="10"
+                            height="10"
+                            fill="none"
+                            stroke={GOLD}
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                            style={{ flexShrink: 0 }}
+                          >
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                          </svg>
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              color: "rgba(255,255,255,0.7)",
+                              fontFamily: "'Lato',sans-serif",
+                              fontWeight: 600,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {sellerInfo.institution}
+                          </span>
+                        </div>
+                      ) : (
+                        <p
+                          style={{
+                            fontSize: "10px",
+                            color: "rgba(255,255,255,0.4)",
+                            margin: "3px 0 0",
+                            fontFamily: "'Lato',sans-serif",
+                          }}
+                        >
+                          Faculty member · LAN Library
+                        </p>
+                      )}
+                    </div>
+
+                    {/* View profile link */}
+                    <Link
+                      href={`/seller-profile?sellerId=${sellerInfo.sellerId}`}
+                      style={{
+                        fontSize: "9px",
+                        fontWeight: 700,
+                        color: GOLD,
+                        textDecoration: "none",
+                        fontFamily: "'Lato',sans-serif",
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        border: "0.5px solid rgba(184,150,62,0.4)",
+                        padding: "5px 10px",
+                        flexShrink: 0,
+                        background: "rgba(184,150,62,0.1)",
+                        transition: "background 0.18s",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      Profile <ChevronRight size={10} />
+                    </Link>
+                  </div>
+                )}
+
+                <PhysicalStockBadge />
                 <PdfViewer heightClass="400px" fullHeight="900px" />
               </div>
 
@@ -1966,7 +2317,7 @@ const PhysicalStockBadge = () => {
               <div
                 className="lg-hide"
                 style={{
-                  background: "#fff", 
+                  background: "#fff",
                   border: "0.5px solid #e5ddd0",
                   padding: "20px",
                 }}
@@ -2700,18 +3051,18 @@ const PhysicalStockBadge = () => {
                 >
                   By {book.author}
                 </p>
-              <p
-                style={{
-                  fontSize: "13px",
-                  color: "#555",
-                  lineHeight: 1.75,
-                  fontFamily: "'Lato',sans-serif",
-                  margin: 0,
-                  whiteSpace: "pre-line",
-                }}
-              >
-                {book.message}
-              </p>
+                <p
+                  style={{
+                    fontSize: "13px",
+                    color: "#555",
+                    lineHeight: 1.75,
+                    fontFamily: "'Lato',sans-serif",
+                    margin: 0,
+                    whiteSpace: "pre-line",
+                  }}
+                >
+                  {book.message}
+                </p>
               </div>
             </div>
           </>
@@ -3025,3 +3376,4 @@ const PhysicalStockBadge = () => {
     </>
   );
 }
+

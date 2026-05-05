@@ -128,8 +128,7 @@ export default function ReferralClient() {
         claimedEarnings: 0, unclaimedEarnings: 0,
     });
 
-    const rawUid      = user?.uid || currentUser?.uid || '';
-    const shortCode   = generateShortCode(rawUid);
+    const shortCode = user?.referralCode || '';
     const referralLink = shortCode && typeof window !== 'undefined'
         ? `${window.location.origin}/auth/signup?referral_code=${shortCode}` : '';
 
@@ -141,8 +140,17 @@ export default function ReferralClient() {
                 if (userDoc.exists()) {
                     const userData = userDoc.data();
                     setUser({ uid: firebaseUser.uid, ...userData });
-                    if (!userData.referralCode) {
-                        await updateDoc(doc(db, 'users', firebaseUser.uid), { referralCode: generateShortCode(firebaseUser.uid) });
+
+                    // ✅ Fix: normalize referralCode to lowercase if wrong
+                    const storedCode = userData.referralCode || '';
+                    const correctCode = generateShortCode(firebaseUser.uid); // always lowercase
+
+                    if (!storedCode || storedCode !== storedCode.toLowerCase()) {
+                        // Update to correct lowercase version
+                        await updateDoc(doc(db, 'users', firebaseUser.uid), {
+                            referralCode: correctCode
+                        });
+                        setUser(prev => ({ ...prev, referralCode: correctCode }));
                     }
                 }
                 await fetchReferralStats(firebaseUser.uid);
@@ -152,109 +160,127 @@ export default function ReferralClient() {
         return () => unsubscribe();
     }, []);
 
-  // Replace fetchReferralStats and handleClaim in ReferralClient.jsx
 
-const fetchReferralStats = async (uid) => {
-    try {
-        const snap = await getDocs(
-            query(collection(db, 'referrals'), where('referrerId', '==', uid))
-        );
-        const referrals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        const successful   = referrals.filter(r => r.status === 'completed');
-        const claimed      = successful.filter(r => r.claimed === true);
-        const unclaimed    = successful.filter(r => r.claimed !== true);
-        const pending      = referrals.filter(r => r.status === 'pending');
-
-        setReferralStats({
-            totalEarnings:      successful.reduce((s, r) => s + (r.reward || 500), 0),
-            claimedEarnings:    claimed.reduce((s, r) => s + (r.reward || 500), 0),
-            unclaimedEarnings:  unclaimed.reduce((s, r) => s + (r.reward || 500), 0),
-            totalReferrals:     referrals.length,
-            successfulReferrals: successful.length,
-            pendingEarnings:    pending.length * 500,
-        });
-    } catch (err) {
-        console.error('fetchReferralStats error:', err);
-    }
-};
-
-const handleClaim = async () => {
-    if (referralStats.unclaimedEarnings <= 0) return;
-    setClaimError('');
-    setClaiming(true);
-
-    try {
-        const uid = user?.uid;
-        if (!uid) throw new Error('Not authenticated');
-
-        // Fetch all unclaimed completed referrals for this user
-        const snap = await getDocs(
-            query(
-                collection(db, 'referrals'),
-                where('referrerId', '==', uid),
-                where('status', '==', 'completed'),
-                where('claimed', '==', false)    // ✅ this now works because we write claimed:false on creation
-            )
-        );
-
-        if (snap.empty) {
-            setClaimError('No unclaimed rewards found.');
-            setClaiming(false);
-            return;
-        }
-
-        const claimAmount = snap.docs.reduce((s, d) => s + (d.data().reward || 500), 0);
-
-        await runTransaction(db, async (transaction) => {
-            // Mark each referral doc as claimed
-            snap.docs.forEach(d =>
-                transaction.update(d.ref, {
-                    claimed: true,
-                    claimedAt: serverTimestamp()
-                })
+    const fetchReferralStats = async (uid) => {
+        try {
+            const snap = await getDocs(
+                query(collection(db, 'referrals'), where('referrerId', '==', uid))
             );
 
-            // Log the credit
-            transaction.set(doc(collection(db, 'referralCredits')), {
-                userId: uid,
-                amount: claimAmount,
-                referralCount: snap.docs.length,
-                createdAt: serverTimestamp(),
-                status: 'completed'
+            let totalEarnings = 0;
+            let claimedEarnings = 0;
+            let unclaimedEarnings = 0;
+            let pendingEarnings = 0;
+            let successfulReferrals = 0;
+
+            snap.docs.forEach(d => {
+                const data = d.data();
+                const reward = data.reward || 500;
+
+                if (data.status === 'completed') {
+                    successfulReferrals++;
+                    totalEarnings += reward;
+                    if (data.claimed) {
+                        claimedEarnings += reward;
+                    } else {
+                        unclaimedEarnings += reward;
+                    }
+                } else {
+                    pendingEarnings += reward;
+                }
             });
 
-            // ✅ Credit the USERS wallet (consistent with where createUserAccount debits)
-            const userRef = doc(db, 'users', uid);
-            transaction.update(userRef, {
-                accountBalance: increment(claimAmount),
-                updatedAt: serverTimestamp()
+            setReferralStats({
+                totalEarnings,
+                pendingEarnings,
+                totalReferrals: snap.size,
+                successfulReferrals,
+                claimedEarnings,
+                unclaimedEarnings,
             });
 
-            // Also credit sellers doc if it exists (best-effort, non-blocking)
-            const sellerRef = doc(db, 'sellers', uid);
-            const sellerDoc = await transaction.get(sellerRef);
-            if (sellerDoc.exists()) {
-                transaction.update(sellerRef, {
+        } catch (err) {
+            console.error('fetchReferralStats ERROR:', err.code, err.message);
+        }
+    };
+
+    const handleClaim = async () => {
+        if (referralStats.unclaimedEarnings <= 0) return;
+        setClaimError('');
+        setClaiming(true);
+
+        try {
+            const uid = user?.uid;
+            if (!uid) throw new Error('Not authenticated');
+
+            const snap = await getDocs(
+                query(
+                    collection(db, 'referrals'),
+                    where('referrerId', '==', uid),
+                    where('status', '==', 'completed'),
+                    where('claimed', '==', false)
+                )
+            );
+
+            if (snap.empty) {
+                setClaimError('No unclaimed rewards found.');
+                setClaiming(false);
+                return;
+            }
+
+            const claimAmount = snap.docs.reduce((s, d) => s + (d.data().reward || 500), 0);
+
+            // ✅ Create the ref BEFORE the transaction
+            const creditRef = doc(collection(db, 'referralCredits'));
+
+            await runTransaction(db, async (transaction) => {
+                // ALL READS FIRST
+                const sellerRef = doc(db, 'sellers', uid);
+                const sellerDoc = await transaction.get(sellerRef);
+
+                // ALL WRITES AFTER
+                snap.docs.forEach(d =>
+                    transaction.update(d.ref, {
+                        claimed: true,
+                        claimedAt: serverTimestamp()
+                    })
+                );
+
+                transaction.set(creditRef, {   // ✅ use pre-created ref
+                    userId: uid,
+                    amount: claimAmount,
+                    referralCount: snap.docs.length,
+                    createdAt: serverTimestamp(),
+                    status: 'completed'
+                });
+
+                const userRef = doc(db, 'users', uid);
+                transaction.update(userRef, {
                     accountBalance: increment(claimAmount),
-                    referralEarnings: increment(claimAmount),
                     updatedAt: serverTimestamp()
                 });
-            }
-        });
 
-        await fetchReferralStats(uid);
-        setClaimSuccessAmount(claimAmount);
-        setClaimSuccess(true);
-        setTimeout(() => setClaimSuccess(false), 4000);
+                if (sellerDoc.exists()) {
+                    transaction.update(sellerRef, {
+                        accountBalance: increment(claimAmount),
+                        referralEarnings: increment(claimAmount),
+                        updatedAt: serverTimestamp()
+                    });
+                }
+            });
 
-    } catch (err) {
-        console.error('handleClaim error:', err);
-        setClaimError('Failed to claim reward. Please try again.');
-    } finally {
-        setClaiming(false);
-    }
-};
+            await fetchReferralStats(uid);
+            setClaimSuccessAmount(claimAmount);
+            setClaimSuccess(true);
+            setTimeout(() => setClaimSuccess(false), 4000);
+
+        } catch (err) {
+            console.error('handleClaim error:', err);
+            setClaimError('Failed to claim reward. Please try again.');
+        } finally {
+            setClaiming(false);
+        }
+    };
 
     const handleCopy = async () => {
         if (!referralLink) return;

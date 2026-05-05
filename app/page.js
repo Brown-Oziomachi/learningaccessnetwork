@@ -722,7 +722,7 @@ export default function LandingPage() {
           </div>
 
           <div style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap:48, borderTop:"0.5px solid rgba(184,150,62,0.2)", paddingTop:40 }}>
-            {[{ val:"85%", label:"Revenue Share" }, { val:"90M+", label:"Global Reach" }, { val:"24/7", label:"Support" }].map(({ val, label }) => (
+            {[{ val:"80%", label:"Revenue Share" }, { val:"90M+", label:"Global Reach" }, { val:"24/7", label:"Support" }].map(({ val, label }) => (
               <div key={label} style={{ textAlign:"center" }}>
                 <div className="lan-serif" style={{ fontSize:40, fontWeight:900, color:"#fff" }}>{val}</div>
                 <div style={{ fontSize:11, fontWeight:700, letterSpacing:".12em", textTransform:"uppercase", color:"rgba(184,150,62,0.6)", marginTop:4, fontFamily:"'Lato',sans-serif" }}>{label}</div>

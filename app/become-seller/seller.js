@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
-import { doc, getDoc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, writeBatch, serverTimestamp, addDoc, collection } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
 export default function BecomeSellerClient() {
@@ -58,13 +58,13 @@ export default function BecomeSellerClient() {
     const isAcademic = ["Lecturer", "Dr.", "Prof.", "Professor"].includes(formData.title);
     const set = (key, val) => setFormData(p => ({ ...p, [key]: val }));
 
-    useEffect(() => {
-        const unsub = onAuthStateChanged(auth, async (cu) => {
-            if (cu) await fetchUserData(cu.uid);
-            else router.push("/auth/signin");
-        });
-        return () => unsub();
-    }, [router]);
+        useEffect(() => {
+            const unsub = onAuthStateChanged(auth, async (cu) => {
+                if (!cu) { router.push("/auth/signin"); return; }
+                await fetchUserData(cu.uid); 
+            });
+            return () => unsub();
+        }, [router]);
 
     const fetchUserData = async (uid) => {
         try {
@@ -79,8 +79,11 @@ export default function BecomeSellerClient() {
                     ...p,
                     firstName: d.firstName || "",
                     surname: d.surname || "",
-                    email: d.email || auth.currentUser?.email || "",
+                    email: d.email || "",
                     phoneNumber: d.phoneNumber || "",
+                    title: d.lecturerTitle || "",           // ← pre-fill from signup
+                    university: d.selectedUniversity || "", // ← pre-fill
+                    department: d.department || "",         // ← pre-fill
                 }));
             } else {
                 setUser({ uid, email: auth.currentUser?.email || "", firstName: "", surname: "" });
@@ -133,8 +136,10 @@ export default function BecomeSellerClient() {
 
             const batch = writeBatch(db);
             batch.update(doc(db, "users", user.uid), {
-                isSeller: true, phoneNumber: formData.phoneNumber,
-                flutterwaveSubaccountId, updatedAt: serverTimestamp(),
+                isSeller: true,
+                phoneNumber: formData.phoneNumber,
+                flutterwaveSubaccountId,
+                updatedAt: serverTimestamp(),
             });
             batch.set(doc(db, "sellers", user.uid), {
                 accountBalance: 0, totalEarnings: 0, booksSold: 0,
@@ -155,9 +160,35 @@ export default function BecomeSellerClient() {
                 flutterwaveSubaccountId,
             });
             await batch.commit();
+
+            // ✅ Fire notification separately — don't let it block or crash the flow
+            addDoc(collection(db, "notifications"), {
+                userId: user.uid,
+                type: "welcome_seller",
+                title: "🛒 Welcome to LAN Library, Seller!",
+                message: `Hi ${formData.firstName}! Your seller account is now active. Upload documents and earn 80% on every sale. Minimum withdrawal is ₦1,000.`,
+                link: "/my-account/seller-account",
+                createdAt: serverTimestamp(),
+                read: false,
+            }).catch(err => console.error("Notification failed (non-blocking):", err));
+
+            // ✅ Redirect immediately — don't wait for notification
             showToast("Seller account created successfully! 🎉", "success");
-            setTimeout(() => router.push("/my-account/seller-account"), 2000);
+            setTimeout(() => router.push("/my-account/seller-account"), 1500);
+
         } catch (error) {
+            console.error("handleSubmit error:", error);
+
+            // ✅ If batch already committed (isSeller is true), just redirect
+            try {
+                const snap = await getDoc(doc(db, "users", user.uid));
+                if (snap.exists() && snap.data().isSeller === true) {
+                    showToast("Account already created! Redirecting…", "success");
+                    setTimeout(() => router.push("/my-account/seller-account"), 1500);
+                    return;
+                }
+            } catch { /* ignore */ }
+
             let msg = `Setup failed: ${error.message}`;
             if (error.message.includes("permission")) msg = "Setup failed: Permission denied. Contact support.";
             else if (error.message.includes("account")) msg = "We couldn't verify your account number. Please check and retry.";
@@ -246,64 +277,30 @@ export default function BecomeSellerClient() {
                                 </div>
                             </div>
 
-                            {/* Title / Profession */}
-                            <div className="lsb-field" style={{ marginTop: 16 }}>
-                                <div className="lsb-label-row">
-                                    <label className="lsb-label">Title / Profession</label>
-                                    <button type="button" onClick={() => setShowLecturerInfo(true)} className="lsb-info-btn">
-                                        <Info size={11} /> Why?
-                                    </button>
+                           {isAcademic && (
+                            <div className="lsb-grid2" style={{ marginTop: 14 }}>
+                                <div className="lsb-field">
+                                    <label className="lsb-label">University</label>
+                                    <input
+                                        value={formData.university}
+                                        onChange={e => set("university", e.target.value)}
+                                        placeholder="e.g. University of Lagos"
+                                        className={`lsb-input${user?.selectedUniversity ? " lsb-input-disabled" : ""}`}
+                                        disabled={!!user?.selectedUniversity} // read-only if already set
+                                    />
                                 </div>
-                                <select
-                                    value={formData.title}
-                                    onChange={e => set("title", e.target.value)}
-                                    className="lsb-input lsb-select"
-                                >
-                                    <option value="">Select title (optional)</option>
-                                    <option value="Lecturer">Lecturer</option>
-                                    <option value="Dr.">Dr.</option>
-                                    <option value="Prof.">Prof.</option>
-                                    <option value="Professor">Professor</option>
-                                </select>
+                                <div className="lsb-field">
+                                    <label className="lsb-label">Department</label>
+                                    <input
+                                        value={formData.department}
+                                        onChange={e => set("department", e.target.value)}
+                                        placeholder="e.g. Computer Science"
+                                        className={`lsb-input${user?.department ? " lsb-input-disabled" : ""}`}
+                                        disabled={!!user?.department}
+                                    />
+                                </div>
                             </div>
-
-                            {isAcademic && (
-                                <>
-                                    <div className="lsb-academic-banner">
-                                        <div className="lsb-academic-icon"><GraduationCap size={18} /></div>
-                                        <div>
-                                            <p className="lsb-academic-title">Academic Profile Activated 🎓</p>
-                                            <p className="lsb-academic-sub">
-                                                As <strong>{formData.title}</strong>, you'll be featured in our University Lecturers directory — students can discover your materials by department and university.
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="lsb-grid2" style={{ marginTop: 14 }}>
-                                        <div className="lsb-field">
-                                            <label className="lsb-label">University</label>
-                                            <input
-                                                type="text"
-                                                value={formData.university}
-                                                onChange={e => set("university", e.target.value)}
-                                                placeholder="e.g. University of Lagos"
-                                                required
-                                                className="lsb-input"
-                                            />
-                                        </div>
-                                        <div className="lsb-field">
-                                            <label className="lsb-label">Department</label>
-                                            <input
-                                                type="text"
-                                                value={formData.department}
-                                                onChange={e => set("department", e.target.value)}
-                                                placeholder="e.g. Computer Science"
-                                                required
-                                                className="lsb-input"
-                                            />
-                                        </div>
-                                    </div>
-                                </>
-                            )}
+                        )}
                         </div>
 
                         {/* STEP 2 – Bank Details */}

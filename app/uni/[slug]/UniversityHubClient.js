@@ -457,23 +457,67 @@ export default function UniversityHubClient({
                 <Navbar />
 
                 {/* ══ HERO ══════════════════════════════════════════════ */}
-                <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "28px 28px", padding: "56px 24px 48px", position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "relative", overflow: "hidden", minHeight: 420 }}>
+
+                    {/* Campus background image */}
+                    <div style={{
+                        position: "absolute", inset: 0,
+                        backgroundImage: `url(https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?w=1400&q=80)`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center 30%",
+                        filter: "brightness(0.98) saturate(0.0)",
+                    }} />
+
+                    {/* Navy gradient overlay */}
+                    <div style={{
+                        position: "absolute", inset: 0,
+                        background: `linear-gradient(10deg, ${NAVY}f0 20%, ${NAVY}cc 10%, rgba(3,3,8,0.5) 100%)`,
+                    }} />
+
+                    {/* Dot pattern */}
+                    <div style={{
+                        position: "absolute", inset: 0,
+                        backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px, transparent 1px)",
+                        backgroundSize: "28px 28px",
+                    }} />
+
+                    {/* Decorative corners */}
                     <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, border: "0.5px solid rgba(184,150,62,0.12)", transform: "rotate(45deg)" }} />
                     <div style={{ position: "absolute", bottom: -40, left: -40, width: 160, height: 160, border: "0.5px solid rgba(184,150,62,0.08)", transform: "rotate(45deg)" }} />
 
-                    <div style={{ maxWidth: 1100, margin: "0 auto", position: "relative", zIndex: 1 }}>
+                    {/* Content */}
+                    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "56px 24px 48px", position: "relative", zIndex: 1 }}>
 
-                        {/* Breadcrumb */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-                            <Link href="/home" style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, fontFamily: "'Lato',sans-serif", textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>
-                                <ArrowLeft size={12} /> Home
-                            </Link>
-                            <ChevronRight size={12} style={{ color: "rgba(255,255,255,0.2)" }} />
-                            <Link href="/uni" style={{ color: GOLDD, fontSize: 12, fontFamily: "'Lato',sans-serif", textDecoration: "none" }}>University Hubs</Link>
-                            {uni && <>
+                        {/* ── Top bar: LAN logo + breadcrumb ── */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
+
+                            {/* Breadcrumb */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <Link href="/home" style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, fontFamily: "'Lato',sans-serif", textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>
+                                    <ArrowLeft size={12} /> Home
+                                </Link>
                                 <ChevronRight size={12} style={{ color: "rgba(255,255,255,0.2)" }} />
-                                <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, fontFamily: "'Lato',sans-serif" }}>{uni.short}</span>
-                            </>}
+                                <Link href="/uni" style={{ color: GOLDD, fontSize: 12, fontFamily: "'Lato',sans-serif", textDecoration: "none" }}>University Hubs</Link>
+                                {uni && <>
+                                    <ChevronRight size={12} style={{ color: "rgba(255,255,255,0.2)" }} />
+                                    <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, fontFamily: "'Lato',sans-serif" }}>{uni.short}</span>
+                                </>}
+                            </div>
+
+                            {/* LAN Library logo */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.06)", border: "0.5px solid rgba(184,150,62,0.25)", padding: "8px 14px" }}>
+                                <div style={{
+                                    width: 28, height: 28, background: GOLD,
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    flexShrink: 0,
+                                }}>
+                                    <BookOpen size={15} color={NAVY} strokeWidth={2.5} />
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", fontFamily: "'Playfair Display',serif", letterSpacing: "0.04em", lineHeight: 1 }}>LAN Library</div>
+                                    <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: GOLD, fontFamily: "'Lato',sans-serif", marginTop: 2 }}>Academic Hub</div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Badge */}
@@ -496,6 +540,7 @@ export default function UniversityHubClient({
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 24 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "rgba(255,255,255,0.5)", fontFamily: "'Lato',sans-serif" }}>
                                     <MapPin size={12} style={{ color: GOLD }} /> {uni.state}
+                                    {uni.country && <span style={{ color: "rgba(255,255,255,0.25)" }}>· {uni.country}</span>}
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "rgba(255,255,255,0.5)", fontFamily: "'Lato',sans-serif" }}>
                                     <GraduationCap size={12} style={{ color: GOLD }} /> Est. {uni.founded}

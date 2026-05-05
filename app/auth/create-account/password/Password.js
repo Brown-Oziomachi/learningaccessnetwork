@@ -155,7 +155,11 @@ export default function PasswordClient() {
             studentSubRole: searchParams.get('studentSubRole') || '',
             studyLevel:     searchParams.get('studyLevel')     || '',
             fieldOfStudy:   searchParams.get('fieldOfStudy')  || '',
-            institution:    searchParams.get('institution')    || '',
+            institution: searchParams.get('institution') || '',
+            institutionSlug: searchParams.get('institutionSlug') || sessionStorage.getItem('institutionSlug') || '',
+            department: searchParams.get('department') || sessionStorage.getItem('department') || '',
+            lecturerTitle: searchParams.get('lecturerTitle') || sessionStorage.getItem('lecturerTitle') || '',
+            selectedUniversity: searchParams.get('selectedUniversity') || sessionStorage.getItem('selectedUniversity') || '',
         });
     }, [searchParams]);
 
@@ -177,7 +181,7 @@ export default function PasswordClient() {
         if (!validation.isValid) { setErrors(validation.errors); return; }
         const ref    = searchParams.get('referral_code') || sessionStorage.getItem('referredBy') || '';
         const params = new URLSearchParams({ ...formData, password });
-        if (ref) params.append('ref', ref);
+        if (ref) params.append('referral_code', ref);
         router.push(`/auth/create-account/confirm?${params.toString()}`);
     };
 

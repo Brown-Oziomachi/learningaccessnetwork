@@ -184,16 +184,12 @@ export default function PaymentClient() {
     }, [bookId]);
 
     useEffect(() => {
-        if (paymentSuccess && !referralCompleted) {
-            setReferralCompleted(true);
-            const buyerUid = auth.currentUser?.uid;
-            completeReferralOnPurchase(buyerUid).finally(() => {
-                setTimeout(() => {
-                    router.push(`/book/preview?id=${bookId}&purchased=true`);
-                }, 3000);
-            });
+        if (paymentSuccess) {
+            setTimeout(() => {
+                router.push(`/book/preview?id=${bookId}&purchased=true`);
+            }, 3000);
         }
-    }, [paymentSuccess, bookId, router, referralCompleted]);
+    }, [paymentSuccess, bookId, router]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -513,14 +509,14 @@ export default function PaymentClient() {
                                 {book.source === 'platform' && (
                                     <span style={{ display: 'inline-block', background: CREAM, border: '0.5px solid rgba(184,150,62,0.3)', color: NAVY, fontSize: '9px', fontWeight: 700, padding: '3px 8px', letterSpacing: '0.08em', fontFamily: "'Lato',sans-serif" }}>PLATFORM BOOK</span>
                                 )}
+                            </div>
+                        </div>
                                 {book.description && (
                                     <div style={{ marginTop: '14px', background: CREAM, border: '0.5px solid rgba(184,150,62,0.15)', padding: '12px 14px' }}>
                                         <p style={{ fontSize: '10px', fontWeight: 700, color: GOLD, letterSpacing: '0.12em', textTransform: 'uppercase', margin: '0 0 4px' }}>Description</p>
                                         <p style={{ fontSize: '12px', color: '#666', lineHeight: 1.65, margin: 0 }}>{book.description}</p>
                                     </div>
                                 )}
-                            </div>
-                        </div>
                     </div>
 
                     {/* Promo bar */}
@@ -551,7 +547,7 @@ export default function PaymentClient() {
                                 {/* Referral strip */}
                                 <div style={{ marginTop: '16px', background: CREAM, border: '0.5px solid rgba(184,150,62,0.2)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <p style={{ fontSize: '12px', color: NAVY, fontWeight: 700, margin: 0 }}>Invite friends & earn ₦500</p>
-                                    <Link href="/referrals" style={{ fontSize: '11px', fontWeight: 700, color: GOLD, textDecoration: 'none', fontFamily: "'Lato',sans-serif" }}>Get link →</Link>
+                                    <Link href="/referral" style={{ fontSize: '11px', fontWeight: 700, color: GOLD, textDecoration: 'none', fontFamily: "'Lato',sans-serif" }}>Get link →</Link>
                                 </div>
                             </div>
                         </div>

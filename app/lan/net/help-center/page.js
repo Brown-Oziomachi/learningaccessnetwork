@@ -228,7 +228,7 @@ export default function HelpCenterPage() {
                             >
                                 Contact Support
                             </Link>
-                            <Link href="/faq"
+                            <Link href="/lan/faqs"
                                 style={{ display:"flex", alignItems:"center", gap:"8px", padding:"12px 24px", border:`0.5px solid ${NAVY}`, color: NAVY, fontSize:"13px", fontWeight:700, fontFamily:"'Lato',sans-serif", textDecoration:"none", letterSpacing:"0.04em", transition:"background 0.15s" }}
                                 onMouseEnter={e => e.currentTarget.style.background="rgba(13,34,68,0.05)"}
                                 onMouseLeave={e => e.currentTarget.style.background="transparent"}

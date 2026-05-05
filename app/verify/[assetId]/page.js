@@ -2,14 +2,22 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-    ShieldCheck, BookOpen, MapPin, Package,
-    Hash, Calendar, RefreshCw, AlertTriangle,
-    Loader2, ArrowLeft, Copy, ExternalLink, CheckCircle,
-    ClipboardList, BookMarked, Barcode
+    ShieldCheck, AlertTriangle, Loader2, ArrowLeft,
+    Copy, CheckCircle, ExternalLink, RefreshCw,
+    MapPin, BookOpen, Calendar, Package, User, Hash,
+    Printer, ChevronRight, Star
 } from "lucide-react";
 import { collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 import { QRCodeSVG } from "qrcode.react";
+import Link from "next/link";
+
+/* ─── design tokens (matching home page) ─────────────────────── */
+const NAVY = "#0d2244";
+const GOLD = "#b8963e";
+const GOLDD = "#d4aa5a";
+const CREAM = "#f5f0e8";
+const BG = "#f5f1ea";
 
 /* ─── helpers ─────────────────────────────────────────────────── */
 const fmtDate = (ts) => {
@@ -17,37 +25,24 @@ const fmtDate = (ts) => {
     const d = ts?.toDate ? ts.toDate() : new Date(ts);
     return d.toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" });
 };
-
 const fmtDateTime = (ts) => {
     if (!ts) return "—";
     const d = ts?.toDate ? ts.toDate() : new Date(ts);
-    return d.toLocaleString("en-NG", {
-        day: "2-digit", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit",
-    });
+    return d.toLocaleString("en-NG", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 };
-
-const stockColor = (pct) =>
-    pct > 50 ? "text-green-600" : pct > 20 ? "text-amber-500" : "text-red-500";
-
-const stockBg = (pct) =>
-    pct > 50 ? "bg-green-500" : pct > 20 ? "bg-amber-400" : "bg-red-500";
-
 const statusMeta = (s) => ({
-    in_stock: { label: "In Stock", cls: "text-green-600 bg-green-50 border-green-200" },
-    low_stock: { label: "Low Stock", cls: "text-amber-600 bg-amber-50 border-amber-200" },
-    out_of_stock: { label: "Out of Stock", cls: "text-red-600 bg-red-50 border-red-200" },
-}[s] || { label: "Active Deposit", cls: "text-green-600 bg-green-50 border-green-200" });
+    in_stock: { label: "In Stock", dot: "#22c55e", bg: "rgba(34,197,94,0.1)", text: "#16a34a" },
+    low_stock: { label: "Low Stock", dot: "#f59e0b", bg: "rgba(245,158,11,0.1)", text: "#d97706" },
+    out_of_stock: { label: "Out of Stock", dot: "#ef4444", bg: "rgba(239,68,68,0.1)", text: "#dc2626" },
+}[s] || { label: "Active", dot: "#22c55e", bg: "rgba(34,197,94,0.1)", text: "#16a34a" });
 
 const orderStatusMeta = (s) => ({
-    collected: { label: "Collected", cls: "text-green-600 bg-green-50 border-green-200" },
-    pending: { label: "Pending", cls: "text-amber-600 bg-amber-50 border-amber-200" },
-    cancelled: { label: "Cancelled", cls: "text-red-500 bg-red-50 border-red-200" },
-}[s] || { label: s, cls: "text-slate-500 bg-slate-50 border-slate-200" });
+    collected: { label: "Collected", bg: "rgba(22,163,74,0.1)", text: "#16a34a" },
+    pending: { label: "Pending", bg: "rgba(217,119,6,0.1)", text: "#d97706" },
+    cancelled: { label: "Cancelled", bg: "rgba(220,38,38,0.1)", text: "#dc2626" },
+}[s] || { label: s, bg: "rgba(13,34,68,0.06)", text: "#666" });
 
-/* ═══════════════════════════════════════════════════════════════
-   MAIN PAGE
-═══════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════ */
 export default function VerifyAssetPage() {
     const params = useParams();
     const router = useRouter();
@@ -62,7 +57,6 @@ export default function VerifyAssetPage() {
         ? `${window.location.origin}/verify/${assetId}`
         : `https://learningaccessnetwork.vercel.app/verify/${assetId}`;
 
-    /* ── Fetch ── */
     useEffect(() => {
         if (!assetId) return;
         (async () => {
@@ -73,19 +67,16 @@ export default function VerifyAssetPage() {
                 if (invSnap.empty) { setState("notfound"); return; }
                 const invData = { id: invSnap.docs[0].id, ...invSnap.docs[0].data() };
                 setInv(invData);
-
                 try {
                     const ordSnap = await getDocs(
-                        query(
-                            collection(db, "physicalOrders"),
-                            where("assetId", "==", assetId),
-                            orderBy("createdAt", "desc"),
-                            limit(5)
-                        )
+                        query(collection(db, "physicalOrders"), where("assetId", "==", assetId), orderBy("createdAt", "desc"), limit(5))
                     );
                     setOrders(ordSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-                } catch { /* orders optional */ }
-
+                } catch (e) {
+                    if (e?.code === "permission-denied") {
+                        console.warn("Orders not accessible — skipping.");
+                    }
+                }
                 setState("found");
             } catch (e) {
                 console.error(e);
@@ -94,7 +85,6 @@ export default function VerifyAssetPage() {
         })();
     }, [assetId]);
 
-    /* ── Copy URL ── */
     const handleCopy = () => {
         navigator.clipboard?.writeText(verifyUrl).then(() => {
             setCopied(true);
@@ -102,419 +92,365 @@ export default function VerifyAssetPage() {
         });
     };
 
-    /* ══════════ LOADING ══════════ */
+    /* shared styles injected once */
+    const Styles = () => (
+        <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+
+            .lan-verify { font-family:'Lato',sans-serif; background:${BG}; min-height:100vh; }
+            .lan-serif  { font-family:'Playfair Display',Georgia,serif; }
+
+            .verify-hero-bg {
+                background-color: ${NAVY};
+                background-image:
+                    radial-gradient(rgba(184,150,62,0.06) 1px, transparent 1px),
+                    radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+                background-size: 28px 28px, 14px 14px;
+                background-position: 0 0, 7px 7px;
+            }
+
+            .dot-grid-cream {
+                background-color: ${CREAM};
+                background-image: radial-gradient(rgba(13,34,68,0.05) 1px, transparent 1px);
+                background-size: 22px 22px;
+            }
+
+            .verify-card {
+                background:#fff;
+                border:0.5px solid #e5ddd0;
+                transition: box-shadow 0.25s;
+            }
+
+            .order-row {
+                border-bottom: 0.5px solid #f0ebe0;
+                padding-bottom: 14px;
+                margin-bottom: 14px;
+            }
+            .order-row:last-child { border-bottom:none; padding-bottom:0; margin-bottom:0; }
+
+            .gold-line { display:flex; align-items:center; gap:14px; }
+            .gold-line::before,.gold-line::after { content:""; flex:1; height:1px; background:rgba(184,150,62,0.3); }
+
+            .lan-btn-primary {
+                display:inline-flex; align-items:center; justify-content:center; gap:8px;
+                background:${NAVY}; color:#fff;
+                font-size:13px; font-weight:700; font-family:'Lato',sans-serif;
+                letter-spacing:0.04em; padding:13px 28px;
+                border:none; cursor:pointer;
+                transition:background 0.18s;
+                text-decoration:none; width:100%;
+            }
+            .lan-btn-primary:hover { background:#162f5c; }
+
+            .lan-btn-ghost {
+                display:inline-flex; align-items:center; justify-content:center; gap:8px;
+                background:transparent; color:${NAVY};
+                font-size:13px; font-weight:700; font-family:'Lato',sans-serif;
+                letter-spacing:0.04em; padding:13px 28px;
+                border:0.5px solid ${NAVY}; cursor:pointer;
+                transition:background 0.18s;
+                text-decoration:none; width:100%;
+            }
+            .lan-btn-ghost:hover { background:rgba(13,34,68,0.05); }
+
+            @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+            .anim-up   { animation:fadeUp 0.55s cubic-bezier(0.4,0,0.2,1) both; }
+            .anim-up-2 { animation:fadeUp 0.55s 0.1s cubic-bezier(0.4,0,0.2,1) both; }
+            .anim-up-3 { animation:fadeUp 0.55s 0.2s cubic-bezier(0.4,0,0.2,1) both; }
+            .anim-up-4 { animation:fadeUp 0.55s 0.3s cubic-bezier(0.4,0,0.2,1) both; }
+
+            @keyframes spin { to { transform:rotate(360deg); } }
+            .spin { animation:spin 0.9s linear infinite; }
+
+            @media print {
+                .no-print { display:none !important; }
+                .lan-verify { background:#fff !important; }
+            }
+        `}</style>
+    );
+
+    /* ── LOADING ── */
     if (state === "loading") return (
-        <div className="min-h-screen bg-blue-950 flex flex-col items-center justify-center p-4">
-            <div className="flex flex-col items-center gap-4">
-                <div className="bg-blue-900 p-5 rounded-full">
-                    <Loader2 className="text-yellow-400 w-10 h-10 animate-spin" />
-                </div>
-                <p className="text-blue-300 text-sm font-medium tracking-widest uppercase">
-                    Checking Registry…
-                </p>
+        <div className="lan-verify verify-hero-bg" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+            <Styles />
+            <div style={{ textAlign: "center" }}>
+                <div style={{ width: 48, height: 48, border: `2px solid rgba(184,150,62,0.3)`, borderTopColor: GOLD, borderRadius: "50%", margin: "0 auto 20px" }} className="spin" />
+                <p className="lan-serif" style={{ color: "rgba(245,240,232,0.6)", fontSize: 15 }}>Checking registry…</p>
             </div>
         </div>
     );
 
-    /* ══════════ NOT FOUND ══════════ */
+    /* ── NOT FOUND ── */
     if (state === "notfound") return (
-        <div className="min-h-screen bg-blue-950 flex flex-col items-center justify-center p-4">
-            <div className="w-full max-w-md bg-white rounded-3xl overflow-hidden shadow-2xl border-t-8 border-red-500">
-                <div className="p-8 text-center">
-                    <div className="flex justify-center mb-4">
-                        <div className="bg-red-50 p-4 rounded-full">
-                            <AlertTriangle className="text-red-500 w-12 h-12" />
-                        </div>
-                    </div>
-                    <h1 className="text-2xl font-black text-blue-950 uppercase tracking-tight">Not Found</h1>
-                    <p className="text-gray-500 text-sm mb-2">No registry record for:</p>
-                    <p className="font-mono font-bold text-blue-900 bg-slate-100 rounded-lg px-4 py-2 mb-6 text-sm inline-block">
-                        {assetId}
-                    </p>
-                    <p className="text-xs text-gray-400 mb-6 leading-relaxed">
-                        This asset ID does not exist in the LAN Library Registry.
-                        If you believe this is an error, please contact the Abuja office.
-                    </p>
-                    <button
-                        onClick={() => router.back()}
-                        className="w-full bg-blue-950 text-white font-bold py-4 rounded-xl hover:bg-blue-900 transition-colors flex items-center justify-center gap-2"
-                    >
-                        <ArrowLeft size={16} /> Go Back
-                    </button>
-                    <p className="mt-4 text-[10px] text-gray-400 italic uppercase tracking-widest">
-                        Official LAN Library Secured Document
-                    </p>
+        <div className="lan-verify verify-hero-bg" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", padding: 24 }}>
+            <Styles />
+            <div className="anim-up" style={{ maxWidth: 420, width: "100%", background: "#fff", border: `0.5px solid #e5ddd0`, padding: "48px 40px", textAlign: "center" }}>
+                <div style={{ width: 56, height: 56, background: "rgba(239,68,68,0.08)", border: `0.5px solid rgba(239,68,68,0.2)`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", transform: "rotate(45deg)" }}>
+                    <AlertTriangle size={22} style={{ color: "#dc2626", transform: "rotate(-45deg)" }} />
                 </div>
-            </div>
-        </div>
-    );
-
-    /* ══════════ ERROR ══════════ */
-    if (state === "error") return (
-        <div className="min-h-screen bg-blue-950 flex flex-col items-center justify-center p-4">
-            <div className="w-full max-w-md bg-white rounded-3xl overflow-hidden shadow-2xl border-t-8 border-amber-400">
-                <div className="p-8 text-center">
-                    <div className="flex justify-center mb-4">
-                        <div className="bg-amber-50 p-4 rounded-full">
-                            <AlertTriangle className="text-amber-500 w-12 h-12" />
-                        </div>
-                    </div>
-                    <h1 className="text-2xl font-black text-blue-950 uppercase tracking-tight">Registry Error</h1>
-                    <p className="text-gray-500 text-sm mb-6">
-                        Could not reach the LAN Library Registry. Please check your connection and try again.
-                    </p>
-                    <button
-                        onClick={() => window.location.reload()}
-                        className="w-full bg-blue-950 text-white font-bold py-4 rounded-xl hover:bg-blue-900 transition-colors flex items-center justify-center gap-2"
-                    >
-                        <RefreshCw size={16} /> Retry
-                    </button>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, marginBottom: 10, fontFamily: "'Lato',sans-serif" }}>
+                    Registry Notice
+                </p>
+                <h1 className="lan-serif" style={{ fontSize: 28, fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>Asset Not Found</h1>
+                <p style={{ fontSize: 13, color: "#888", lineHeight: 1.7, marginBottom: 20, fontWeight: 300 }}>
+                    No record exists for this asset ID in the LAN Library Registry.
+                </p>
+                <div style={{ background: BG, border: `0.5px solid #e5ddd0`, padding: "10px 16px", marginBottom: 24, display: "inline-block" }}>
+                    <span style={{ fontFamily: "monospace", fontSize: 12, color: NAVY, fontWeight: 700 }}>{assetId}</span>
                 </div>
-            </div>
-        </div>
-    );
-
-    /* ══════════ FOUND ══════════ */
-    const sm = statusMeta(inv.status);
-    const pct = inv.totalConsignment > 0
-        ? Math.round((inv.currentStock / inv.totalConsignment) * 100)
-        : 0;
-    const totalOrders = orders.length;
-    const collectedCount = orders.filter(o => o.status === "collected").length;
-
-    return (
-        <div className="min-h-screen bg-blue-950 flex flex-col items-center justify-start p-4 py-10">
-
-            {/* ── Back button ── */}
-            <div className="w-full max-w-5xl mb-4">
-                <button
-                    onClick={() => router.back()}
-                    className="flex items-center gap-2 text-blue-300 hover:text-white text-sm font-medium transition-colors"
-                >
-                    <ArrowLeft size={14} /> Back
+                <p style={{ fontSize: 12, color: "#aaa", lineHeight: 1.6, marginBottom: 28 }}>
+                    If you believe this is an error, contact the LAN Abuja office with this ID.
+                </p>
+                <button onClick={() => router.back()} className="lan-btn-primary">
+                    <ArrowLeft size={14} /> Go Back
                 </button>
             </div>
+        </div>
+    );
 
-            {/* ══════════ LAYOUT WRAPPER ══════════
-                Mobile  → single column  (max-w-md centred)
-                Desktop → two columns    (card left | sidebar right)
-            ════════════════════════════════════ */}
-            <div className="w-full max-w-md lg:max-w-5xl flex flex-col lg:flex-row gap-6 items-start">
+    /* ── ERROR ── */
+    if (state === "error") return (
+        <div className="lan-verify verify-hero-bg" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", padding: 24 }}>
+            <Styles />
+            <div className="anim-up" style={{ maxWidth: 420, width: "100%", background: "#fff", border: `0.5px solid #e5ddd0`, padding: "48px 40px", textAlign: "center" }}>
+                <div style={{ width: 56, height: 56, background: "rgba(245,158,11,0.08)", border: `0.5px solid rgba(245,158,11,0.2)`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", transform: "rotate(45deg)" }}>
+                    <AlertTriangle size={22} style={{ color: "#d97706", transform: "rotate(-45deg)" }} />
+                </div>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, marginBottom: 10, fontFamily: "'Lato',sans-serif" }}>
+                    Connection Issue
+                </p>
+                <h1 className="lan-serif" style={{ fontSize: 28, fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>Registry Unreachable</h1>
+                <p style={{ fontSize: 13, color: "#888", lineHeight: 1.7, marginBottom: 32, fontWeight: 300 }}>
+                    Could not reach the LAN Library Registry. Please check your connection and try again.
+                </p>
+                <button onClick={() => window.location.reload()} className="lan-btn-primary">
+                    <RefreshCw size={14} /> Retry
+                </button>
+            </div>
+        </div>
+    );
 
-                {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                    LEFT — main card
-                    (identical look to original mobile card)
-                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-                <div className="w-full lg:flex-1 bg-white rounded-3xl overflow-hidden shadow-2xl border-t-8 border-yellow-500">
-                    <div className="p-8">
+    /* ── FOUND ── */
+    const sm = statusMeta(inv.status);
+    const pct = inv.totalConsignment > 0 ? Math.round((inv.currentStock / inv.totalConsignment) * 100) : 0;
+    const collectedCount = orders.filter(o => o.status === "collected").length;
+    const initials = (inv.sellerName || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
-                        {/* ── Verified Header ── */}
-                        <div className="text-center mb-6">
-                            <div className="flex justify-center mb-4">
-                                <div className="bg-green-100 p-4 rounded-full">
-                                    <ShieldCheck className="text-green-600 w-12 h-12" />
-                                </div>
-                            </div>
-                            <h1 className="text-2xl font-black text-blue-950 uppercase tracking-tight">
-                                Verified Original
-                            </h1>
-                            <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">
-                                LAN Library Registry Certification
+    const DetailRow = ({ icon: Icon, label, value }) => value ? (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", borderBottom: "0.5px solid #f5f0e8" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Icon size={12} style={{ color: GOLD, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>{label}</span>
+            </div>
+            <span style={{ fontSize: 13, color: NAVY, fontWeight: 700, fontFamily: "'Lato',sans-serif", textAlign: "right", maxWidth: "55%", lineHeight: 1.4 }}>{value}</span>
+        </div>
+    ) : null;
+
+    return (
+        <div className="lan-verify">
+            <Styles />
+
+            {/* ── Hero Banner ─────────────────────────────────── */}
+            <div className="verify-hero-bg anim-up" style={{ padding: "52px 24px 0" }}>
+                {/* Back */}
+                <div style={{ maxWidth: 760, margin: "0 auto 36px" }} className="no-print">
+                    <button onClick={() => router.back()} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "rgba(245,240,232,0.5)", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", fontFamily: "'Lato',sans-serif", textTransform: "uppercase", transition: "color 0.18s", padding: 0 }}
+                        onMouseEnter={e => e.currentTarget.style.color = "rgba(245,240,232,0.9)"}
+                        onMouseLeave={e => e.currentTarget.style.color = "rgba(245,240,232,0.5)"}
+                    >
+                        <ArrowLeft size={13} /> Back
+                    </button>
+                </div>
+
+                <div style={{ maxWidth: 760, margin: "0 auto" }}>
+                    {/* Eyebrow */}
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(184,150,62,0.14)", border: `1px solid rgba(184,150,62,0.3)`, borderRadius: 999, padding: "7px 16px", marginBottom: 24 }}>
+                        <ShieldCheck size={13} style={{ color: GOLD }} />
+                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: GOLDD, fontFamily: "'Lato',sans-serif" }}>
+                            LAN Library Registry · Verified
+                        </span>
+                    </div>
+
+                    {/* Title */}
+                    <h1 className="lan-serif anim-up-2" style={{ fontSize: "clamp(30px,5vw,52px)", fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: "-1px", margin: "0 0 12px" }}>
+                        {inv.bookTitle}
+                    </h1>
+
+                    <p className="anim-up-3" style={{ fontSize: 14, color: "rgba(245,240,232,0.55)", fontWeight: 300, marginBottom: 0 }}>
+                        {inv.courseCode && <><span style={{ color: GOLD, fontWeight: 700 }}>{inv.courseCode}</span> · </>}
+                        {inv.publisher} {inv.edition && `· ${inv.edition}`}
+                    </p>
+
+                    {/* Status + Asset ID strip */}
+                    <div className="anim-up-4" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, borderTop: "0.5px solid rgba(184,150,62,0.2)", marginTop: 32, paddingTop: 20, paddingBottom: 28 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: "50%", background: sm.dot, display: "inline-block", boxShadow: `0 0 8px ${sm.dot}` }} />
+                            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(245,240,232,0.7)", fontFamily: "'Lato',sans-serif" }}>{sm.label}</span>
+                        </div>
+                        <div style={{ fontFamily: "monospace", fontSize: 11, color: "rgba(184,150,62,0.7)", background: "rgba(184,150,62,0.08)", border: "0.5px solid rgba(184,150,62,0.2)", padding: "5px 12px", letterSpacing: "0.1em" }}>
+                            {assetId}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Main content ────────────────────────────────── */}
+            <div style={{ maxWidth: 760, margin: "0 auto", padding: "28px 24px 64px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
+
+                    {/* ── Book Details card ── */}
+                    <div className="verify-card anim-up-2" style={{ padding: "28px 28px 20px" }}>
+                        <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: 20, fontFamily: "'Lato',sans-serif" }}>
+                            Book Details
+                        </p>
+                        <DetailRow icon={Hash} label="ISBN" value={inv.isbn} />
+                        <DetailRow icon={BookOpen} label="Publisher" value={inv.publisher} />
+                        <DetailRow icon={BookOpen} label="Edition" value={inv.edition} />
+                        <DetailRow icon={MapPin} label="Location" value={inv.shelfLocation || "Abuja Head Office"} />
+                        <DetailRow icon={Calendar} label="Checked In" value={fmtDate(inv.checkedInAt)} />
+                    </div>
+
+                    {/* ── Stock + Seller side-by-side on wider screens ── */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+
+                        {/* Stock */}
+                        <div className="verify-card anim-up-3" style={{ padding: 28 }}>
+                            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: 20, fontFamily: "'Lato',sans-serif" }}>
+                                Stock Level
                             </p>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+                                <span className="lan-serif" style={{ fontSize: 32, fontWeight: 700, color: NAVY }}>{inv.currentStock}</span>
+                                <span style={{ fontSize: 12, color: "#bbb", fontFamily: "'Lato',sans-serif" }}>of {inv.totalConsignment} total</span>
+                            </div>
+                            <div style={{ width: "100%", height: 4, background: "#f0ebe0", borderRadius: 2, overflow: "hidden", marginBottom: 10 }}>
+                                <div style={{
+                                    height: "100%", borderRadius: 2,
+                                    width: `${pct}%`,
+                                    background: pct > 50 ? "#22c55e" : pct > 20 ? "#f59e0b" : "#ef4444",
+                                    transition: "width 0.8s cubic-bezier(0.4,0,0.2,1)"
+                                }} />
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", color: "#aaa", fontFamily: "'Lato',sans-serif", textTransform: "uppercase" }}>Remaining</span>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{pct}%</span>
+                            </div>
                         </div>
 
-                        {/* ── Book Details ── */}
-                        <div className="bg-slate-50 rounded-2xl p-5 text-left mb-5 border border-slate-200">
-                            <div className="flex items-start gap-3 mb-4 text-blue-900 font-bold border-b border-slate-200 pb-3">
-                                <BookOpen size={18} className="flex-shrink-0 mt-0.5" />
-                                <span className="text-sm leading-snug">{inv.bookTitle}</span>
-                            </div>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-400 flex items-center gap-1.5">
-                                        <Hash size={11} /> Asset ID
-                                    </span>
-                                    <span className="font-mono font-bold text-blue-950 text-xs">{inv.assetId}</span>
+                        {/* Seller */}
+                        <div className="verify-card anim-up-3" style={{ padding: 28 }}>
+                            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: 20, fontFamily: "'Lato',sans-serif" }}>
+                                Registered Seller
+                            </p>
+                            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                                <div style={{ width: 44, height: 44, background: NAVY, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                    <span style={{ fontSize: 14, fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif" }}>{initials}</span>
                                 </div>
-                                {inv.courseCode && (
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-gray-400">Course</span>
-                                        <span className="font-bold text-blue-950">{inv.courseCode}</span>
+                                <div>
+                                    <p style={{ fontSize: 15, fontWeight: 700, color: NAVY, margin: "0 0 3px", fontFamily: "'Playfair Display',serif" }}>{inv.sellerName || "—"}</p>
+                                    <p style={{ fontSize: 11, color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                                        Since {fmtDate(inv.registeredAt || inv.createdAt || inv.checkedInAt)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── Orders ── */}
+                    {orders.length > 0 && (
+                        <div className="verify-card anim-up-3" style={{ padding: 28 }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                                    Order History
+                                </p>
+                                <div style={{ display: "flex", gap: 16, fontSize: 11, fontFamily: "'Lato',sans-serif" }}>
+                                    <span style={{ color: "#aaa" }}>{orders.length} orders</span>
+                                    <span style={{ color: "#16a34a", fontWeight: 700 }}>{collectedCount} collected</span>
+                                </div>
+                            </div>
+                            {orders.map(o => {
+                                const om = orderStatusMeta(o.status);
+                                return (
+                                    <div key={o.id} className="order-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                                        <div>
+                                            <p style={{ fontFamily: "monospace", fontSize: 12, color: NAVY, fontWeight: 700, margin: "0 0 3px" }}>{o.pickupCode || "—"}</p>
+                                            <p style={{ fontSize: 10, color: "#bbb", margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                                                <Package size={9} style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }} />
+                                                {o.collectedAt ? fmtDateTime(o.collectedAt) : fmtDateTime(o.createdAt)}
+                                            </p>
+                                        </div>
+                                        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "4px 10px", background: om.bg, color: om.text, fontFamily: "'Lato',sans-serif", whiteSpace: "nowrap" }}>
+                                            {om.label}
+                                        </span>
                                     </div>
-                                )}
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-400">Status</span>
-                                    <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full border ${sm.cls}`}>
-                                        {sm.label}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-start">
-                                    <span className="text-gray-400 flex items-center gap-1.5">
-                                        <MapPin size={11} /> Location
-                                    </span>
-                                    <span className="text-blue-950 font-medium text-xs text-right max-w-[55%] leading-snug">
-                                        {inv.shelfLocation || "Abuja Head Office"}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-400 flex items-center gap-1.5">
-                                        <Calendar size={11} /> Checked In
-                                    </span>
-                                    <span className="text-blue-950 font-medium text-xs">{fmtDate(inv.checkedInAt)}</span>
-                                </div>
-                            </div>
+                                );
+                            })}
                         </div>
+                    )}
 
-                        {/* ── Stock Bar ── */}
-                        <div className="bg-slate-50 rounded-2xl p-4 mb-5 border border-slate-200">
-                            <div className="flex justify-between items-center mb-2">
-                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                                    <Package size={11} /> Stock Level
-                                </span>
-                                <span className={`text-sm font-black ${stockColor(pct)}`}>
-                                    {inv.currentStock} / {inv.totalConsignment}
-                                </span>
-                            </div>
-                            <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
-                                <div
-                                    className={`h-full rounded-full transition-all duration-700 ${stockBg(pct)}`}
-                                    style={{ width: `${pct}%` }}
-                                />
-                            </div>
-                            <p className="text-[10px] text-gray-400 mt-1.5 text-right">{pct}% remaining</p>
+                    {/* ── QR + Link card ── */}
+                    <div className="anim-up-4" style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", padding: "36px 28px", display: "flex", flexWrap: "wrap", gap: 32, alignItems: "center", justifyContent: "center" }}>
+                        {/* QR */}
+                        <div style={{ background: "#fff", padding: 14, display: "inline-block" }}>
+                            <QRCodeSVG value={verifyUrl} size={120} fgColor={NAVY} level="H" includeMargin={false} />
                         </div>
-
-                        {/* ── Seller (email removed) ── */}
-                        <div className="bg-slate-50 rounded-2xl p-4 mb-5 border border-slate-200">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Seller</p>
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="w-10 h-10 rounded-full bg-blue-950 flex items-center justify-center text-yellow-400 font-black text-sm flex-shrink-0">
-                                    {(inv.sellerName || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-blue-950 truncate">{inv.sellerName || "—"}</p>
-                                    <p className="text-[10px] text-gray-400 mt-0.5">Registered Seller</p>
-                                </div>
-                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border text-blue-700 bg-blue-50 border-blue-200 flex-shrink-0">
-                                    Seller
-                                </span>
+                        {/* right side */}
+                        <div style={{ flex: 1, minWidth: 200 }}>
+                            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: 12, fontFamily: "'Lato',sans-serif" }}>
+                                Scan to Verify
+                            </p>
+                            <p className="lan-serif" style={{ fontSize: 18, fontWeight: 700, color: "#fff", margin: "0 0 16px", lineHeight: 1.3 }}>
+                                Share this verification link
+                            </p>
+                            <div style={{ background: "rgba(255,255,255,0.06)", border: "0.5px solid rgba(184,150,62,0.2)", padding: "10px 14px", marginBottom: 14 }}>
+                                <span style={{ fontFamily: "monospace", fontSize: 10, color: "rgba(245,240,232,0.5)", wordBreak: "break-all", lineHeight: 1.6 }}>{verifyUrl}</span>
                             </div>
-                            {/* Date registered row (replaces email) */}
-                            <div className="border-t border-slate-200 pt-3 flex justify-between items-center text-sm">
-                                <span className="text-gray-400 flex items-center gap-1.5">
-                                    <Calendar size={11} /> Date Registered
-                                </span>
-                                <span className="text-blue-950 font-medium text-xs">
-                                    {fmtDate(inv.registeredAt || inv.createdAt || inv.checkedInAt)}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* ── QR Code — mobile only ── */}
-                        <div className="flex flex-col items-center bg-slate-50 rounded-2xl p-5 mb-5 border border-slate-200 gap-3 lg:hidden">
-                            <div className="bg-white p-3 rounded-xl border border-slate-200">
-                                <QRCodeSVG value={verifyUrl} size={110} fgColor="#172554" level="H" includeMargin={false} />
-                            </div>
-                            <p className="text-[10px] text-gray-400 text-center font-mono break-all px-2">{verifyUrl}</p>
                             <button
                                 onClick={handleCopy}
-                                className="flex items-center gap-2 text-xs font-bold text-blue-700 hover:text-blue-900 transition-colors"
+                                style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(184,150,62,0.15)", border: `0.5px solid rgba(184,150,62,0.3)`, padding: "8px 16px", cursor: "pointer", fontSize: 11, fontWeight: 700, color: GOLDD, fontFamily: "'Lato',sans-serif", letterSpacing: "0.08em", transition: "background 0.18s" }}
+                                onMouseEnter={e => e.currentTarget.style.background = "rgba(184,150,62,0.25)"}
+                                onMouseLeave={e => e.currentTarget.style.background = "rgba(184,150,62,0.15)"}
                             >
                                 {copied
-                                    ? <><CheckCircle size={13} className="text-green-500" /> Copied!</>
-                                    : <><Copy size={13} /> Copy Verify URL</>
+                                    ? <><CheckCircle size={12} style={{ color: "#22c55e" }} /> Copied!</>
+                                    : <><Copy size={12} /> Copy Link</>
                                 }
                             </button>
                         </div>
+                    </div>
 
-                        {/* ── Recent Orders — mobile only ── */}
-                        {orders.length > 0 && (
-                            <div className="bg-slate-50 rounded-2xl p-4 mb-5 border border-slate-200 lg:hidden">
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-                                    Recent Orders ({orders.length})
-                                </p>
-                                <div className="space-y-2">
-                                    {orders.map((o) => {
-                                        const om = orderStatusMeta(o.status);
-                                        return (
-                                            <div key={o.id} className="flex items-center justify-between gap-2">
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-[10px] text-gray-400 font-mono">{o.pickupCode}</p>
-                                                </div>
-                                                <div className="text-right flex-shrink-0">
-                                                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${om.cls}`}>
-                                                        {om.label}
-                                                    </span>
-                                                    <p className="text-[10px] text-gray-400 mt-0.5">
-                                                        {o.collectedAt ? fmtDateTime(o.collectedAt) : fmtDateTime(o.createdAt)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── CTAs ── */}
+                    {/* ── Actions ── */}
+                    <div className="anim-up-4 no-print" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 10 }}>
                         <button
                             onClick={() => window.open(`/book/preview?id=${String(inv.bookId).replace("firestore-", "")}`, "_blank")}
-                            className="w-full bg-blue-950 text-yellow-400 font-black py-4 rounded-xl hover:bg-blue-900 transition-colors shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 text-sm uppercase tracking-wide"
+                            className="lan-btn-primary"
                         >
-                            <ExternalLink size={15} /> View Digital Version
+                            <ExternalLink size={14} /> View Digital Version
                         </button>
-
-                        <button
-                            onClick={() => window.print()}
-                            className="w-full mt-3 bg-white text-blue-950 font-bold py-3 rounded-xl border-2 border-blue-950 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 text-sm"
-                        >
-                            Print / Save Label
-                        </button>
-
-                        <p className="mt-5 text-[10px] text-gray-400 italic uppercase tracking-widest text-center">
-                            Official LAN Library Secured Document
-                        </p>
-                    </div>
-                </div>
-
-                {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                    RIGHT COLUMN — desktop only
-                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-                <div className="hidden lg:flex flex-col gap-5 w-80 flex-shrink-0">
-
-                    {/* QR Code */}
-                    <div className="bg-white rounded-3xl shadow-2xl border-t-8 border-yellow-500 p-6 flex flex-col items-center gap-4">
-                        <p className="text-xs font-black text-blue-950 uppercase tracking-widest">Scan to Verify</p>
-                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                            <QRCodeSVG value={verifyUrl} size={160} fgColor="#172554" level="H" includeMargin={false} />
-                        </div>
-                        <p className="text-[10px] text-gray-400 text-center font-mono break-all">{verifyUrl}</p>
-                        <button
-                            onClick={handleCopy}
-                            className="flex items-center gap-2 text-xs font-bold text-blue-700 hover:text-blue-900 transition-colors"
-                        >
-                            {copied
-                                ? <><CheckCircle size={13} className="text-green-500" /> Copied!</>
-                                : <><Copy size={13} /> Copy Verify URL</>
-                            }
+                        <button onClick={() => window.print()} className="lan-btn-ghost">
+                            <Printer size={14} /> Print / Save Label
                         </button>
                     </div>
 
-                    {/* Publisher / ISBN / Date Registered */}
-                    <div className="bg-white rounded-3xl shadow-xl p-6 border border-slate-100">
-                        <p className="text-xs font-black text-blue-950 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <BookMarked size={13} /> Publication Details
-                        </p>
-                        <div className="space-y-3 text-sm">
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-400 flex items-center gap-1.5">
-                                    <Barcode size={11} /> ISBN
-                                </span>
-                                <span className="font-mono font-bold text-blue-950 text-xs">
-                                    {inv.isbn || "—"}
-                                </span>
+                    {/* ── Footer stamp ── */}
+                    <div style={{ borderTop: "0.5px solid #e5ddd0", paddingTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div style={{ width: 28, height: 28, border: `1.5px solid ${NAVY}`, display: "flex", alignItems: "center", justifyContent: "center", transform: "rotate(45deg)" }}>
+                                <ShieldCheck size={12} style={{ color: NAVY, transform: "rotate(-45deg)" }} />
                             </div>
-                            <div className="flex justify-between items-start">
-                                <span className="text-gray-400">Publisher</span>
-                                <span className="font-bold text-blue-950 text-xs text-right max-w-[55%] leading-snug">
-                                    {inv.publisher || "—"}
-                                </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-400">Edition</span>
-                                <span className="font-bold text-blue-950 text-xs">{inv.edition || "—"}</span>
-                            </div>
-                            <div className="flex justify-between items-center border-t border-slate-100 pt-3">
-                                <span className="text-gray-400 flex items-center gap-1.5">
-                                    <Calendar size={11} /> Date Registered
-                                </span>
-                                <span className="font-bold text-blue-950 text-xs">
-                                    {fmtDate(inv.registeredAt || inv.createdAt || inv.checkedInAt)}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Order Stats */}
-                    <div className="bg-white rounded-3xl shadow-xl p-6 border border-slate-100">
-                        <p className="text-xs font-black text-blue-950 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <ClipboardList size={13} /> Order Summary
-                        </p>
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                            <div className="bg-slate-50 rounded-2xl p-3 text-center border border-slate-100">
-                                <p className="text-2xl font-black text-blue-950">{totalOrders}</p>
-                                <p className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">Total Orders</p>
-                            </div>
-                            <div className="bg-green-50 rounded-2xl p-3 text-center border border-green-100">
-                                <p className="text-2xl font-black text-green-600">{collectedCount}</p>
-                                <p className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">Collected</p>
-                            </div>
-                        </div>
-
-                        {orders.length > 0 ? (
                             <div>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Recent Activity</p>
-                                <div className="space-y-2">
-                                    {orders.map((o) => {
-                                        const om = orderStatusMeta(o.status);
-                                        return (
-                                            <div key={o.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-50 last:border-0">
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-[10px] text-gray-600 font-mono font-bold truncate">{o.pickupCode || "—"}</p>
-                                                    <p className="text-[10px] text-gray-400">
-                                                        {o.collectedAt ? fmtDateTime(o.collectedAt) : fmtDateTime(o.createdAt)}
-                                                    </p>
-                                                </div>
-                                                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border flex-shrink-0 ${om.cls}`}>
-                                                    {om.label}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                <p style={{ fontSize: 10, fontWeight: 700, color: NAVY, margin: "0 0 1px", fontFamily: "'Lato',sans-serif", letterSpacing: "0.08em", textTransform: "uppercase" }}>Official LAN Document</p>
+                                <p style={{ fontSize: 9, color: "#bbb", margin: 0, fontFamily: "'Lato',sans-serif" }}>Learning Access Network · Abuja</p>
                             </div>
-                        ) : (
-                            <p className="text-xs text-gray-400 text-center py-2">No orders recorded yet.</p>
-                        )}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <Star size={10} style={{ color: GOLD, fill: GOLD }} />
+                            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "#ccc", fontFamily: "'Lato',sans-serif" }}>Secured Registry</span>
+                            <Star size={10} style={{ color: GOLD, fill: GOLD }} />
+                        </div>
                     </div>
 
-                    {/* Quick Actions */}
-                    <div className="bg-white rounded-3xl shadow-xl p-6 border border-slate-100">
-                        <p className="text-xs font-black text-blue-950 uppercase tracking-widest mb-4">Quick Actions</p>
-                        <div className="flex flex-col gap-3">
-                            <button
-                                onClick={() => window.open(`/book/preview?id=${String(inv.bookId).replace("firestore-", "")}`, "_blank")}
-                                className="w-full bg-blue-950 text-yellow-400 font-black py-3 rounded-xl hover:bg-blue-900 transition-colors shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 text-xs uppercase tracking-wide"
-                            >
-                                <ExternalLink size={13} /> View Digital Version
-                            </button>
-                            <button
-                                onClick={() => window.print()}
-                                className="w-full bg-white text-blue-950 font-bold py-3 rounded-xl border-2 border-blue-950 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 text-xs"
-                            >
-                                Print / Save Label
-                            </button>
-                        </div>
-                        <p className="mt-4 text-[10px] text-gray-400 italic uppercase tracking-widest text-center">
-                            Official LAN Library Secured Document
-                        </p>
-                    </div>
                 </div>
             </div>
-
-            {/* ── Footer ── */}
-            <p className="mt-6 text-blue-700 text-xs text-center">
-                LAN Library — Abuja Registry &nbsp;·&nbsp; lan.ng
-            </p>
-
-            {/* ── Print styles ── */}
-            <style jsx global>{`
-                @media print {
-                    body { background: white !important; }
-                    button, nav { display: none !important; }
-                    .shadow-2xl { box-shadow: none !important; }
-                }
-            `}</style>
         </div>
     );
 }

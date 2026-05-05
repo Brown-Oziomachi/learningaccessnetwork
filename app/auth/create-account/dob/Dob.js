@@ -97,7 +97,11 @@ export default function DOBClient() {
             studentSubRole: searchParams.get('studentSubRole') || '',
             studyLevel:     searchParams.get('studyLevel') || '',
             fieldOfStudy:   searchParams.get('fieldOfStudy') || '',
-            institution:    searchParams.get('institution') || '',
+            institution: searchParams.get('institution') || '',
+            institutionSlug: searchParams.get('institutionSlug') || sessionStorage.getItem('institutionSlug') || '',
+            department: searchParams.get('department') || sessionStorage.getItem('department') || '',
+            lecturerTitle: searchParams.get('lecturerTitle') || sessionStorage.getItem('lecturerTitle') || '',
+            selectedUniversity: searchParams.get('selectedUniversity') || sessionStorage.getItem('selectedUniversity') || '',
         });
     }, [searchParams]);
 

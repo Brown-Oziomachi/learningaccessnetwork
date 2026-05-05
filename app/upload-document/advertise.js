@@ -15,7 +15,7 @@ import {
     ArrowLeft,
     ArrowRight
 } from "lucide-react";
-
+import { UNIVERSITIES_BY_COUNTRY, UNIVERSITY_COUNTRIES } from "@/lib/africanUniversities";
 // ─── ALL DOCUMENT TYPES ───────────────────────────────────────────────────────
 const documentTypes = [
     // Core Academic
@@ -316,7 +316,8 @@ export default function AdvertiseClient() {
         isbn: '', courseCode: '', semester: '', session: '',
         docType: '', price: '', format: 'PDF', level: '100',
         pages: '', description: '', message: '', driveLink: '',
-        coverImagePreview: null,
+        coverImagePreview: null, university: '',
+        universityCountry: '',
     });
 
     // Auth
@@ -451,7 +452,7 @@ export default function AdvertiseClient() {
                 docType: formData.docType, level: formData.level,
                 price: Number(formData.price), format: formData.format, pages: Number(formData.pages),
                 description: formData.description, message: formData.message,
-                pdfLink: pdfUrl, pdfUrl, embedUrl, driveFileId: driveFileId || null,
+                pdfLink: pdfUrl, pdfUrl, embedUrl, driveFileId: driveFileId || null, university: formData.university || null, universityCountry: formData.universityCountry || null,
                 uploadMethod: selectedFile ? 'direct_upload' : 'drive_link',
                 status: 'pending', views: 0, purchases: 0,
                 createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
@@ -607,6 +608,38 @@ export default function AdvertiseClient() {
                                             </Select>
                                         </Field>
 
+                                        {/* University selector */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Field label="Country">
+                                                <Select
+                                                    name="universityCountry"
+                                                    value={formData.universityCountry}
+                                                    onChange={e => { set('universityCountry', e.target.value); set('university', ''); }}
+                                                >
+                                                    <option value="">— All Countries —</option>
+                                                    {UNIVERSITY_COUNTRIES.map(c => (
+                                                        <option key={c} value={c}>{c}</option>
+                                                    ))}
+                                                </Select>
+                                            </Field>
+
+                                            <Field label="University" hint="The school this material is for">
+                                                <Select
+                                                    name="university"
+                                                    value={formData.university}
+                                                    onChange={handle}
+                                                    disabled={!formData.universityCountry}
+                                                >
+                                                    <option value="">— Select University —</option>
+                                                    {(formData.universityCountry
+                                                        ? (UNIVERSITIES_BY_COUNTRY[formData.universityCountry] || [])
+                                                        : []
+                                                    ).map(u => (
+                                                        <option key={u.name} value={u.name}>{u.name}</option>
+                                                    ))}
+                                                </Select>
+                                            </Field>
+                                        </div>
                                         {/* ISBN */}
                                         <Field label="ISBN" hint="Leave blank for lecture notes, past questions, or student-authored materials">
                                             <Input name="isbn" value={formData.isbn} onChange={handle} placeholder="978-1234567890" />

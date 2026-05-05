@@ -258,7 +258,7 @@ function ConsignmentNote({ data, onClose, onPrint }) {
                   color: "#0d2244",
                   lineHeight: 1,
                 }}>
-                  LANLibraryAdmin
+                  LANRegistryABJ
                 </span>
               </div>
               <p style={{ fontSize: "10px", color: "#aaa", margin: "5px 0 0" }}>LAN Admin Signature</p>

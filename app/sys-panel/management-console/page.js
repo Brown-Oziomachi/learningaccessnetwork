@@ -375,6 +375,7 @@ const NAV_SECTIONS = [
       { id: 'users', icon: Users, label: 'All Users' },
       { id: 'support', icon: MessageSquare, label: 'Support', badgeKey: 'openTickets', badgeType: 'danger' },
       { id: 'reports', icon: Flag, label: 'Reports', badgeKey: 'pendingReports', badgeType: 'danger' },
+      { id: 'contact', icon: Mail, label: 'Contact Messages', badgeKey: 'openContactMessages', badgeType: 'danger' },
     ]
   },
   {
@@ -558,6 +559,7 @@ export default function ComprehensiveAdminPanel() {
   const [physicalOrders, setPhysicalOrders] = useState([]);
   const [paymentConfirmed, setPaymentConfirmed] = useState({});
   const [sellersData, setSellersData] = useState([]);
+  const [contactMessages, setContactMessages] = useState([]);
   const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
 
   useEffect(() => {
@@ -572,6 +574,14 @@ export default function ComprehensiveAdminPanel() {
     try {
       const s = await getDocs(query(collection(db, 'users'), where('isSeller', '==', true)));
       setSellersData(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchContactMessages = async () => {
+    try {
+      const q = query(collection(db, 'contactMessages'), orderBy('createdAt', 'desc'));
+      const s = await getDocs(q);
+      setContactMessages(s.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
   };
 
@@ -608,7 +618,7 @@ export default function ComprehensiveAdminPanel() {
         fetchTransactions(), fetchUsers(), fetchWithdrawals(),
         fetchSchoolApplications(), fetchSchoolDocuments(),
         fetchFeedbacks(), fetchArticleFeedbacks(),
-        fetchPhysicalOrders(), fetchSellers(), // ← must be here
+        fetchPhysicalOrders(), fetchSellers(), fetchContactMessages(), // ← must be here
       ]);
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
@@ -871,6 +881,7 @@ export default function ComprehensiveAdminPanel() {
     pendingSchoolDocs: schoolDocuments?.filter(d => d.status === 'pending').length || 0,
     pendingWithdrawals: withdrawals?.filter(w => w.status === 'pending').length || 0,
     pendingPhysicalOrders: physicalOrders?.filter(o => o.status === 'pending_pickup').length || 0, // ← ADD
+    openContactMessages: contactMessages?.filter(m => m.status === 'open').length || 0,
   };
 
   if (checkingAdmin) return (
@@ -1208,6 +1219,107 @@ export default function ComprehensiveAdminPanel() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'contact' && (
+            <div>
+              <div className="section-header">
+                <div>
+                  <div className="section-title"><Mail size={18} />Contact Messages</div>
+                  <div className="section-sub">{contactMessages.length} total · {contactMessages.filter(m => m.status === 'open').length} open</div>
+                </div>
+                <button onClick={fetchContactMessages} className="btn btn-ghost"><RefreshCw size={13} />Refresh</button>
+              </div>
+
+              {/* Stats row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+                {[
+                  { label: 'Open', count: contactMessages.filter(m => m.status === 'open').length, color: '#f59e0b' },
+                  { label: 'Resolved', count: contactMessages.filter(m => m.status === 'resolved').length, color: '#10b981' },
+                  { label: 'Total', count: contactMessages.length, color: '#3b82f6' },
+                  {
+                    label: 'Today', count: contactMessages.filter(m => {
+                      const d = m.createdAt?.toDate?.();
+                      return d && new Date().toDateString() === d.toDateString();
+                    }).length, color: '#8b5cf6'
+                  },
+                ].map(({ label, count, color }) => (
+                  <div key={label} className="card-sm">
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color }}>{count}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Search */}
+              <div style={{ marginBottom: 14 }}>
+                <input className="input-dark" placeholder="Search by name, email or subject…"
+                  value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px,1fr))', gap: 14 }}>
+                {contactMessages
+                  .filter(m =>
+                    m.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    m.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    m.subject?.toLowerCase().includes(searchTerm.toLowerCase())
+                  )
+                  .map(msg => (
+                    <div key={msg.id} className="card" style={{ borderLeft: `3px solid ${msg.status === 'open' ? '#f59e0b' : '#10b981'}` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{msg.name}</div>
+                          <div style={{ fontSize: 11, color: '#60a5fa', marginTop: 2 }}>{msg.email}</div>
+                        </div>
+                        <span className={`pill ${msg.status === 'open' ? 'pill-warn' : 'pill-success'}`}>
+                          <span className="pill-dot" />{msg.status}
+                        </span>
+                      </div>
+
+                      {/* Type tag */}
+                      <span style={{
+                        display: 'inline-block', fontSize: 10, fontWeight: 700,
+                        letterSpacing: '0.08em', textTransform: 'uppercase',
+                        background: 'var(--surface)', color: 'var(--text-muted)',
+                        border: '1px solid var(--card-border)',
+                        padding: '2px 8px', borderRadius: 4, marginBottom: 8
+                      }}>{msg.type || 'general'}</span>
+
+                      {msg.subject && (
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>{msg.subject}</div>
+                      )}
+                      <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 10, background: 'var(--surface)', borderRadius: 8, padding: '8px 10px' }}>
+                        {msg.message}
+                      </p>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
+                        {formatDate(msg.createdAt)}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={() => { setSelectedItem(msg); setModalType('reply'); setShowModal(true); }}
+                          className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }}>
+                          <Mail size={12} />Reply
+                        </button>
+                        {msg.status === 'open' && (
+                          <button
+                            onClick={async () => {
+                              await updateDoc(doc(db, 'contactMessages', msg.id), {
+                                status: 'resolved',
+                                resolvedAt: serverTimestamp(),
+                                resolvedBy: user.email,
+                              });
+                              fetchContactMessages();
+                            }}
+                            className="btn btn-success" style={{ flex: 1, justifyContent: 'center' }}>
+                            <Check size={12} />Resolve
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
               </div>
             </div>
           )}

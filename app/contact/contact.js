@@ -7,9 +7,10 @@ import {
 } from 'lucide-react';
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from 'next/navigation';
-import { auth } from "@/lib/firebaseConfig";
+import { auth, db } from "@/lib/firebaseConfig";
 import Navbar from '@/components/NavBar';
 import Footer from '@/components/FooterComp';
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 
 // ── IN-VIEW HOOK ──────────────────────────────────────────────────────────────
 function useInView(threshold = 0.15) {
@@ -119,18 +120,33 @@ export default function ContactClient() {
         return () => unsub();
     }, [router]);
 
-    const handleSubmit = () => {
+    // Replace the fake handleSubmit
+    const handleSubmit = async () => {
         if (!formData.name || !formData.email || !formData.message) {
             alert('Please fill in all required fields.');
             return;
         }
         setSending(true);
-        setTimeout(() => {
-            setSending(false);
+        try {
+            await addDoc(collection(db, 'contactMessages'), {
+                name: formData.name,
+                email: formData.email,
+                subject: formData.subject || '',
+                message: formData.message,
+                type: formData.type,
+                userId: user?.uid || null,
+                userEmail: user?.email || null,
+                status: 'open',
+                createdAt: serverTimestamp(),
+            });
             setSent(true);
             setFormData({ name: '', email: '', subject: '', message: '', type: 'general' });
             setTimeout(() => setSent(false), 6000);
-        }, 1600);
+        } catch (err) {
+            alert('Failed to send message: ' + err.message);
+        } finally {
+            setSending(false);
+        }
     };
 
     if (checkingAuth) {
@@ -468,14 +484,14 @@ export default function ContactClient() {
                                     {
                                         icon: Phone,
                                         label: 'Phone',
-                                        primary: '+234 800 123 4567',
+                                        primary: '+234 81 429 95114',
                                         secondary: null,
                                         note: 'Mon–Fri, 9am–6pm West Africa Time',
                                     },
                                     {
                                         icon: MapPin,
-                                        label: 'Office',
-                                        primary: '123 Knowledge Street, Abuja',
+                                        label: 'Head Office',
+                                        primary: 'Gbazango Abuja Destrict/ LAN Library Head Office',
                                         secondary: 'FCT 900001, Nigeria',
                                         note: 'Walk-ins by appointment only',
                                     },

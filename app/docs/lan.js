@@ -14,6 +14,7 @@ const TOC = [
     { id: "community", label: "Community & Growth" },
     { id: "future", label: "The Future" },
     { id: "about-lan", label: "The L.A.N Network", subs: ["Purpose of L.A.N", "Core Values", "Key Features", "Benefits of Joining"] },
+    { id: "seller-titles", label: "Seller Titles & Roles", subs: ["Faculty Titles", "Who Qualifies", "Benefits"] },
 ];
 
 // ── SEARCH INDEX ──────────────────────────────────────────────────────────────
@@ -38,6 +39,8 @@ const SEARCH_INDEX = [
     { title: "Wallet System", section: "Platform", path: "Platform › Wallet", id: "what-makes-special", desc: "Managed wallet system where every transaction is tracked, verified, and protected." },
     { title: "Content Protection", section: "Platform", path: "Platform › Protection", id: "security", desc: "Digital watermarking and tracking systems prevent unauthorized sharing and copyright violations." },
     { title: "Seller Verification", section: "Platform", path: "Platform › Verification", id: "security", desc: "Every seller goes through a verification process ensuring only genuine content reaches the marketplace." },
+    { title: "Seller Titles & Verified Faculty", section: "For Sellers", path: "For Sellers › Titles & Roles", id: "seller-titles", desc: "LAN Library recognises professional titles like Dr., Prof., Engr., Barr. and more as Verified Faculty sellers." },
+    { title: "Verified Faculty Badge", section: "For Sellers", path: "For Sellers › Verification", id: "seller-titles", desc: "Educators, lawyers, engineers, pharmacists and lecturers receive a Verified Faculty badge on their seller profile." },
     { title: "Terms of Service", section: "Reference", path: "Reference › Legal", id: "security", desc: "Transparent terms so everyone knows how the system works and their rights." },
     { title: "Refund Policy", section: "Reference", path: "Reference › Refunds", id: "security", desc: "Our refund policy protects buyers while maintaining fairness for content creators." },
     { title: "Commission Structure", section: "Reference", path: "Reference › Commission", id: "what-makes-special", desc: "The platform takes a small commission to maintain operations — more money goes to creators." },
@@ -60,6 +63,7 @@ const SIDEBAR = [
             { label: "Quick Start Guide", href: "#how-it-works" },
             { label: "Creating Your Account", href: "#how-it-works" },
             { label: "Platform Overview", href: "#overview" },
+            { label: "Seller Titles & Roles", href: "#seller-titles" },
         ],
     },
     {
@@ -584,6 +588,55 @@ export default function LANDocsClient() {
                         <Para>Every uploaded document goes through a verification process to ensure it meets our quality standards. We check for originality, relevance, and appropriateness. Sellers who consistently provide high-quality content earn badges and featured placement.</Para>
                     </section>
 
+                    {/* ── 6b. Seller Titles ── */}
+                    <section id="seller-titles" className="py-11 border-b border-white/[0.08]">
+                        <SectionTitle id="seller-titles">Seller Titles & Verified Roles</SectionTitle>
+                        <ImgPlaceholder label="Verified Faculty & Professional Sellers" />
+                        <Para>
+                            LAN Library recognises that many of its sellers are not just everyday content creators — they are
+                            <strong className="text-[#e8e8f0] font-semibold"> qualified professionals, academics, and licensed practitioners</strong> whose
+                            credentials add real credibility and value to the documents they publish. To reflect this, the platform
+                            assigns a <strong className="text-[#e8e8f0] font-semibold">Verified Faculty</strong> badge to sellers who hold recognised professional or academic titles.
+                        </Para>
+                        <Callout label="✦ What is Verified Faculty?">
+                            When a seller's profile carries a recognised professional title — such as Dr., Prof., Engr., or Barr. —
+                            their account is automatically designated <strong className="text-[#e8e8f0] font-semibold">Verified Faculty</strong> instead of the standard
+                            Verified Seller label. This signals to buyers that the content comes from a credentialed source.
+                        </Callout>
+                        <SubTitle>Faculty Titles Recognised on LAN Library</SubTitle>
+                        <Para>The following professional and academic titles qualify a seller for the Verified Faculty designation:</Para>
+                        <Badges items={[
+                            "Dr. — Doctor",
+                            "Prof. — Professor",
+                            "Mr. — Male Professional",
+                            "Mrs. — Female Professional",
+                            "Ms. — Female Professional",
+                            "Engr. — Engineer",
+                            "Pharm. — Pharmacist",
+                            "Barr. — Barrister / Legal Practitioner",
+                            "Lecturer",
+                        ]} />
+                        <SubTitle>Who Qualifies</SubTitle>
+                        <AudienceGrid items={[
+                            { icon: "🎓", name: "Academics & Professors", body: "University lecturers, professors, and academic researchers who publish course materials, textbooks, and research findings." },
+                            { icon: "⚖️", name: "Legal Practitioners", body: "Barristers and legal professionals who share case studies, legal guides, law notes, and examination resources." },
+                            { icon: "⚙️", name: "Engineers", body: "Certified engineers across disciplines — civil, electrical, mechanical, software — sharing technical manuals and study materials." },
+                            { icon: "💊", name: "Pharmacists & Medical Professionals", body: "Healthcare practitioners publishing clinical guides, pharmacology references, and professional study resources." },
+                            { icon: "🏫", name: "Lecturers", body: "Teaching staff at colleges, polytechnics, and universities who upload structured course content, lecture notes, and syllabi." },
+                            { icon: "👔", name: "General Professionals", body: "Any verified professional using a recognised title — Mr., Mrs., or Ms. — whose content reflects their field of expertise." },
+                        ]} />
+                        <SubTitle>Benefits of the Verified Faculty Badge</SubTitle>
+                        <Steps items={[
+                            { title: "Increased Buyer Trust", body: "Buyers can immediately see that content comes from a credentialed professional, making them more confident in their purchase decision." },
+                            { title: "Featured Visibility", body: "Verified Faculty sellers may receive priority placement in search results and featured sections across the platform." },
+                            { title: "Export & Analytics Tools", body: "Faculty sellers gain access to additional tools such as the Student List Export feature, allowing them to download CSV reports of buyers for their content." },
+                            { title: "Professional Identity", body: "Your seller profile reflects your real-world credentials — your title appears alongside your name and content across the marketplace." },
+                        ]} />
+                        <Para>
+                            Whether you are a professor publishing lecture notes, a barrister sharing legal study materials, or an engineer
+                            uploading technical references — LAN Library ensures your credentials are visible and your contribution is valued.
+                        </Para>
+                    </section>
                     {/* ── 7. Security ── */}
                     <section id="security" className="py-11 border-b border-white/[0.08]">
                         <SectionTitle id="security">Security and Trust</SectionTitle>
