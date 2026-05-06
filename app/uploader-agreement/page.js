@@ -410,7 +410,7 @@ export default function UploaderAgreement() {
                                 <span className="text-[13px]">✦</span>
                             </div>
                             <div>
-                                <p className="text-[12px] font-bold text-[#60a5fa] uppercase tracking-wider mb-1">Note from LAN Library AI</p>
+                                <p className="text-[12px] font-bold text-[#60a5fa] uppercase tracking-wider mb-1">Note from LAN Library</p>
                                 <p className="text-[13px] text-[#64748b] leading-[1.7]">
                                      I recommend reviewing the full legal documentation on the LAN Library website or contacting the team via the <Link href="/lan/net/help-center" className="text-[#3b82f6] hover:text-[#60a5fa] no-underline">Support Ticket system</Link> if you have specific legal questions. This document is updated periodically — always confirm you are reading the latest version.
                                 </p>

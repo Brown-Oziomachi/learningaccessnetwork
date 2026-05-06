@@ -155,7 +155,7 @@ export default function EmailClient() {
                         <Mail size={15} className="lan-input-icon" />
                         <input
                             type="email"
-                            placeholder="yourname@gmail.com"
+                            placeholder="yourname@gmail.com or name@university.edu.ng"
                             value={email}
                             onChange={e => { setEmail(e.target.value.toLowerCase().trim()); setErrors({}); setAccountExists(false); }}
                             className="lan-input"

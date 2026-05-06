@@ -191,11 +191,51 @@ export default function FAQClient() {
                         </div>
 
                         {/* right image */}
-                        <div style={{ flex:"1 1 280px", position:"relative", minHeight:"320px", overflow:"hidden" }}>
-                            <img src="/earn.png" alt="Students sharing knowledge" style={{ width:"100%", height:"400px", objectFit:"cover", display:"block" }} />
+                        <div style={{
+                            flex: "1 1 280px",
+                            position: "relative",
+                            minHeight: "320px",
+                            overflow: "hidden",
+                        }}>
+                            <style>{`
+    @media (max-width: 768px) {
+      .share-img {
+        height: 300px !important;
+        object-position: center top !important;
+      }
+    }
+  `}</style>
+
+                            <img
+                                src="/share.png"
+                                alt="Students sharing knowledge"
+                                className="share-img"
+                                style={{
+                                    width: "100%",
+                                    height: "650px",
+                                    objectFit: "cover",
+                                    display: "block",
+                                }}
+                            />
+
                             {/* gold corner accent */}
-                            <div style={{ position:"absolute", bottom:0, left:0, right:0, height:"80px", background:`linear-gradient(to top, ${NAVY}, transparent)` }} />
-                            <div style={{ position:"absolute", top:"12px", right:"12px", width:"40px", height:"40px", border:`2px solid ${GOLD}`, transform:"rotate(45deg)" }} />
+                            <div style={{
+                                position: "absolute",
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                height: "80px",
+                                background: `linear-gradient(to top, ${NAVY}, transparent)`,
+                            }} />
+                            <div style={{
+                                position: "absolute",
+                                top: "12px",
+                                right: "12px",
+                                width: "40px",
+                                height: "40px",
+                                border: `2px solid ${GOLD}`,
+                                transform: "rotate(45deg)",
+                            }} />
                         </div>
                     </div>
 

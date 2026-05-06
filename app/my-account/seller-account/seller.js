@@ -11,6 +11,7 @@ import NotificationBell from "@/components/NotificationBell";
 import { usePayment } from "@/app/hooks/usePayment";
 import { addStudentRoleToExistingUser } from "@/lib/auth/authHelpers";
 import ExportStudentsModal from "@/components/Exportstudentsmodal";
+import { uploadImageToCloudinary } from "@/lib/uploadImageToCloudinary";
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -662,10 +663,20 @@ export default function SellerAccountClient() {
     };
 
     const handleImageUpload = (e) => {
-        const file = e.target.files[0]; if (!file || !file.type.startsWith("image/")) return;
-        const reader = new FileReader(); setUploading(true);
-        reader.onloadend = async () => { try { await updateDoc(doc(db, "users", user.uid), { photoBase64: reader.result }); setUser(prev => ({ ...prev, photoBase64: reader.result })); } catch { alert("Failed to update image"); } finally { setUploading(false); } };
-        reader.readAsDataURL(file);
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setUploading(true);
+        uploadImageToCloudinary(file, 'profiles')
+            .then(async (url) => {
+                await updateDoc(doc(db, 'users', user.uid), {
+                    photoURL: url,
+                    photoBase64: url  // keep photoBase64 in sync since seller page uses this field
+                });
+                setUser(prev => ({ ...prev, photoURL: url, photoBase64: url }));
+            })
+            .catch(err => alert('Failed to update image: ' + err.message))
+            .finally(() => setUploading(false));
     };
 
     const handleSave = async () => {
@@ -761,7 +772,7 @@ export default function SellerAccountClient() {
                     {/* ── Top Header Bar ── */}
                     <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '16px 24px', marginBottom: '24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                         <button onClick={() => setShowProfileModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
-                            <img src={user?.photoBase64 || "/lan-logo.png"} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}` }} alt="Profile" />
+                            <img src={user?.photoURL || user?.photoBase64 || "/lan-logo.png"} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}` }} alt="Profile" />
                             <div style={{ textAlign: 'left' }}>
                                 <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '16px', fontWeight: 700, color: NAVY, margin: 0 }}>
                                     {user?.firstName || 'Seller'} {user?.surname}

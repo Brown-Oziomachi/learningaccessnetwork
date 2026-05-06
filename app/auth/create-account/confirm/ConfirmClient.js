@@ -179,7 +179,6 @@ const detailItems = [
     ...(formData.fieldOfStudy ? [{ label: 'Field of Study', value: formData.fieldOfStudy }] : []),
     ...(formData.institution ? [{ label: 'Institution', value: formData.institution }] : []),
     ...(formData.department ? [{ label: 'Department', value: formData.department }] : []),
-    ...(formData.selectedUniversity ? [{ label: 'University', value: formData.selectedUniversity }] : []),
     ...(formData.lecturerTitle ? [{ label: 'Title', value: formData.lecturerTitle }] : []),
 ];
 

@@ -179,10 +179,21 @@ export default function PasswordClient() {
     const handleNext = () => {
         const validation = validatePassword(password);
         if (!validation.isValid) { setErrors(validation.errors); return; }
-        const ref    = searchParams.get('referral_code') || sessionStorage.getItem('referredBy') || '';
+
+        const ref = searchParams.get('referral_code') || sessionStorage.getItem('referredBy') || '';
         const params = new URLSearchParams({ ...formData, password });
         if (ref) params.append('referral_code', ref);
-        router.push(`/auth/create-account/confirm?${params.toString()}`);
+
+        const role = formData.role || searchParams.get('role') || '';
+        const lecturerTitle = sessionStorage.getItem('lecturerTitle') || '';
+        const FACULTY_TITLES = ["Dr.", "Prof.", "Mr.", "Mrs.", "Ms.", "Engr.", "Pharm.", "Barr.", "Lecturer"];
+
+        // Route faculty/lecturers to verification step, everyone else to confirm
+        if (role === 'lecturer' || role === 'seller' || FACULTY_TITLES.includes(lecturerTitle)) {
+            router.push(`/auth/create-account/verify-faculty?${params.toString()}`);
+        } else {
+            router.push(`/auth/create-account/confirm?${params.toString()}`);
+        }
     };
 
     const backPath = `/auth/create-account/email?${new URLSearchParams(formData).toString()}`;

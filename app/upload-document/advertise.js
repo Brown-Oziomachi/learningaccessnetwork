@@ -115,7 +115,7 @@ const categories = [
     'History', 'Arts & Culture', 'Relationship', 'Self-Help', 'Finance',
     'Marketing', 'Programming', 'Psychology', 'Fiction', 'Non-Fiction',
     'Philosophy', 'Travel', 'Cooking', 'Religion & Spirituality',
-    'Sex Education', 'Social Media', 'Cooking',
+    'Sex Education', 'Social Media',
 ];
 
 const institutionalCategories = [
@@ -185,9 +185,8 @@ function SearchableSelect({ label, required, value, onChange, placeholder, optio
             <button
                 type="button"
                 onClick={() => setOpen(!open)}
-                className={`w-full flex items-center justify-between px-4 py-3 border text-left transition-all text-sm ${
-                    open ? 'border-[#1a3a5c] ring-2 ring-[#1a3a5c]/10' : 'border-gray-200 hover:border-gray-400'
-                } bg-white rounded-lg`}
+                className={`w-full flex items-center justify-between px-4 py-3 border text-left transition-all text-sm ${open ? 'border-[#1a3a5c] ring-2 ring-[#1a3a5c]/10' : 'border-gray-200 hover:border-gray-400'
+                    } bg-white rounded-lg`}
             >
                 <span className={value ? 'text-gray-900 font-medium' : 'text-gray-400'}>{display}</span>
                 <ChevronDown size={15} className={`text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -218,9 +217,8 @@ function SearchableSelect({ label, required, value, onChange, placeholder, optio
                                             key={item.name}
                                             type="button"
                                             onClick={() => { onChange(item.name); setOpen(false); setQ(''); }}
-                                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#1a3a5c]/5 transition-colors flex items-center justify-between ${
-                                                value === item.name ? 'text-[#1a3a5c] font-semibold bg-[#1a3a5c]/5' : 'text-gray-700'
-                                            }`}
+                                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#1a3a5c]/5 transition-colors flex items-center justify-between ${value === item.name ? 'text-[#1a3a5c] font-semibold bg-[#1a3a5c]/5' : 'text-gray-700'
+                                                }`}
                                         >
                                             {item.name}
                                             {value === item.name && <Check size={13} />}
@@ -236,9 +234,8 @@ function SearchableSelect({ label, required, value, onChange, placeholder, optio
                                     key={opt}
                                     type="button"
                                     onClick={() => { onChange(opt); setOpen(false); setQ(''); }}
-                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#1a3a5c]/5 transition-colors flex items-center justify-between ${
-                                        value === opt ? 'text-[#1a3a5c] font-semibold bg-[#1a3a5c]/5' : 'text-gray-700'
-                                    }`}
+                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#1a3a5c]/5 transition-colors flex items-center justify-between ${value === opt ? 'text-[#1a3a5c] font-semibold bg-[#1a3a5c]/5' : 'text-gray-700'
+                                        }`}
                                 >
                                     {opt}
                                     {value === opt && <Check size={13} />}
@@ -367,35 +364,62 @@ export default function AdvertiseClient() {
         if (!file) return null;
         if (file.type !== 'application/pdf') { alert('PDF only'); return null; }
         if (file.size > 50 * 1024 * 1024) { alert('Max 50MB'); return null; }
+
         try {
             setUploadingFile(true);
-            const storageRef = ref(storage, `books/${user.uid}/${Date.now()}_${file.name}`);
-            const task = uploadBytesResumable(storageRef, file);
-            return new Promise((res, rej) => {
-                task.on('state_changed',
-                    s => { const p = Math.round((s.bytesTransferred / s.totalBytes) * 100); setUploadPercentage(p); setUploadProgress(`Uploading PDF: ${p}%`); },
-                    e => { setUploadingFile(false); rej(e); },
-                    async () => { const url = await getDownloadURL(task.snapshot.ref); setUploadingFile(false); setUploadProgress(''); res(url); }
+            setUploadProgress('Uploading PDF…');
+
+            const timestamp = Date.now();
+            const fileName = `${timestamp}_${file.name.replace(/\s+/g, '_')}`;
+            const storageRef = ref(storage, `books/${user.uid}/${fileName}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            return await new Promise((resolve, reject) => {
+                uploadTask.on(
+                    'state_changed',
+                    (snapshot) => {
+                        const pct = Math.round(
+                            (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+                        );
+                        setUploadPercentage(pct);
+                        setUploadProgress(`Uploading PDF: ${pct}%`);
+                    },
+                    (error) => reject(error),
+                    async () => {
+                        const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                        resolve(downloadUrl);
+                    }
                 );
             });
-        } catch { setUploadingFile(false); setUploadProgress(''); alert('Upload failed'); return null; }
+
+        } catch (e) {
+            alert(e.message || 'Upload failed');
+            return null;
+        } finally {
+            setUploadingFile(false);
+            setUploadProgress('');
+        }
     };
 
     const handleCoverImageUpload = async (file) => {
         if (!file) return null;
-        if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) { alert('JPG/PNG/WEBP only'); return null; }
+        if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) {
+            alert('JPG/PNG/WEBP only'); return null;
+        }
         if (file.size > 5 * 1024 * 1024) { alert('Max 5MB'); return null; }
+
         try {
-            const storageRef = ref(storage, `covers/${user.uid}/${Date.now()}_${file.name}`);
-            const task = uploadBytesResumable(storageRef, file);
-            return new Promise((res, rej) => {
-                task.on('state_changed',
-                    s => setUploadProgress(`Uploading cover: ${Math.round((s.bytesTransferred / s.totalBytes) * 100)}%`),
-                    e => { setUploadProgress(''); rej(e); },
-                    async () => { const url = await getDownloadURL(task.snapshot.ref); setUploadProgress(''); res(url); }
-                );
+            setUploadProgress('Uploading cover…');
+            const url = await uploadToCloudinary(file, 'covers', (pct) => {
+                setUploadProgress(`Uploading cover: ${pct}%`);
             });
-        } catch { setUploadProgress(''); alert('Cover upload failed'); return null; }
+            setUploadProgress('');
+            return url;
+        } catch (e) {
+            setUploadProgress('');
+            alert(e.message || 'Cover upload failed');
+            return null;
+        }
     };
 
     const handleFileSelect = (e) => {
@@ -497,7 +521,7 @@ export default function AdvertiseClient() {
                     </div>
                     <span className="text-white/40 text-sm mx-2">›</span>
                     <a href="/uploader-agreement" className="text-white/70 text-sm underline">Uploader Agreement
-                    <ArrowRight size={12} className="inline-block -rotate-90 ml-1" />
+                        <ArrowRight size={12} className="inline-block -rotate-90 ml-1" />
                     </a>
                 </div>
                 <button onClick={() => router.back()} className="text-white/60 hover:text-white text-sm flex items-center gap-1 transition-colors">
@@ -743,11 +767,10 @@ export default function AdvertiseClient() {
                                                         key={f}
                                                         type="button"
                                                         onClick={() => set('format', f)}
-                                                        className={`py-3 rounded-lg border-2 text-sm font-semibold transition-all ${
-                                                            formData.format === f
+                                                        className={`py-3 rounded-lg border-2 text-sm font-semibold transition-all ${formData.format === f
                                                                 ? 'border-[#1a3a5c] bg-[#1a3a5c] text-white'
                                                                 : 'border-gray-200 text-gray-600 hover:border-gray-400'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {f}
                                                     </button>

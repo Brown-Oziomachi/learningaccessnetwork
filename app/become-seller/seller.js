@@ -55,7 +55,7 @@ export default function BecomeSellerClient() {
 
     ];
 
-    const isAcademic = ["Lecturer", "Dr.", "Prof.", "Professor"].includes(formData.title);
+    const isAcademic = ["Dr.", "Prof.", "Engr.", "Pharm.", "Barr.", "Lecturer"].includes(formData.title);
     const set = (key, val) => setFormData(p => ({ ...p, [key]: val }));
 
         useEffect(() => {
@@ -229,7 +229,7 @@ export default function BecomeSellerClient() {
                         <ArrowLeft size={13} /> Back
                     </button>
                     <ChevronRight size={12} className="lsb-bread-sep" />
-                    <span className="lsb-bread-link">My Account</span>
+                    <a href="/my-account" className="lsb-bread-link">My Account</a>
                     <ChevronRight size={12} className="lsb-bread-sep" />
                     <span className="lsb-bread-active">Become a Seller</span>
                 </div>

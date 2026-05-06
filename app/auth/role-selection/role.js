@@ -147,18 +147,19 @@ router.push(`/auth/create-account${buildQuery({ role: "seller" })}`);
   const handleLecturerContinue = () => {
     if (!selectedUniversity || !lecturerDepartment) return;
 
-    /* Persist to sessionStorage so create-account page can read these */
     sessionStorage.setItem("userRole", "lecturer");
     sessionStorage.setItem("isLecturer", "true");
     sessionStorage.setItem("institutionSlug", lecturerUniSlug);
     sessionStorage.setItem("department", lecturerDepartment);
-    sessionStorage.setItem("selectedUniversity", selectedUniversity); 
+    sessionStorage.setItem("selectedUniversity", selectedUniversity);
+    sessionStorage.setItem("institution", selectedUniversity); // ✅ ADD THIS
     if (lecturerTitle) sessionStorage.setItem("lecturerTitle", lecturerTitle);
     if (refParam) sessionStorage.setItem("referredBy", refParam);
 
     router.push(
       `/auth/create-account${buildQuery({
         role: "lecturer",
+        institution: selectedUniversity, // ✅ ADD THIS
         institutionSlug: lecturerUniSlug,
         department: lecturerDepartment,
         lecturerTitle: lecturerTitle,
@@ -799,7 +800,7 @@ router.push(`/auth/create-account${buildQuery({ role: "seller" })}`);
                       </label>
                       <select className="rs-select" value={lecturerTitle} onChange={e => setLecturerTitle(e.target.value)}>
                         <option value="">Select…</option>
-                        {["Dr.", "Prof.", "Mr.", "Mrs.", "Ms.", "Engr.", "Pharm.", "Barr.", "Lecturer"].map(t => (
+                        {["Dr.", "Prof.", "Engr.", "Pharm.", "Barr.", "Lecturer"].map(t => (
                           <option key={t}>{t}</option>
                         ))}
                       </select>

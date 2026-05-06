@@ -2,17 +2,48 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  doc, getDoc, updateDoc, collection, query, where,
-  getDocs, addDoc, serverTimestamp, increment, setDoc, deleteDoc,
+  doc,
+  getDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  serverTimestamp,
+  increment,
+  setDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { booksData } from "@/lib/booksData";
-import { Download, Share2, Bookmark, MoreVertical, Lock, Menu, X,
-  Eye, FileText, ChevronRight, Layers, ThumbsUp, Flag,
-  CheckCircle, Upload, HelpCircle, ShoppingBag, Users,
-  ExternalLink, Sparkles, ArrowLeft, TrendingUp,
-  Package, MapPin, AlertCircle,
+import {
+  Download,
+  Share2,
+  Bookmark,
+  MoreVertical,
+  Lock,
+  Menu,
+  X,
+  Eye,
+  FileText,
+  ChevronRight,
+  Layers,
+  ThumbsUp,
+  Flag,
+  CheckCircle,
+  Upload,
+  HelpCircle,
+  ShoppingBag,
+  Users,
+  ExternalLink,
+  Sparkles,
+  ArrowLeft,
+  TrendingUp,
+  Package,
+  MapPin,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { fetchBookDetails } from "@/utils/bookUtils";
@@ -20,70 +51,124 @@ import BookAIChat from "./BookAIChat";
 import AiAskButton from "./AiAskButton";
 
 /* ─── colour tokens (matches SellerPage exactly) ─────────────── */
-const NAVY  = "#0d2244";
-const GOLD  = "#b8963e";
-const GOLDD = "#d4aa5a";
+const NAVY = "#0d2244";
+const GOLD = "#b8963e";
 const CREAM = "#f5f0e8";
-const BG    = "#f5f1ea";
+const BG = "#f5f1ea";
 
 export default function BookPreviewPage() {
-  const router       = useRouter();
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const rawBookId    = searchParams.get("id");
-  const bookId       = rawBookId?.startsWith("firestore-") ? rawBookId : rawBookId ? `firestore-${rawBookId}` : null;
-  const cleanBookId  = rawBookId?.replace("firestore-", "");
+  const rawBookId = searchParams.get("id");
+  const bookId = rawBookId?.startsWith("firestore-")
+    ? rawBookId
+    : rawBookId
+      ? `firestore-${rawBookId}`
+      : null;
+  const cleanBookId = rawBookId?.replace("firestore-", "");
 
-  const [book,                  setBook]                  = useState(null);
-  const [user,                  setUser]                  = useState(null);
-  const [isPurchased,           setIsPurchased]           = useState(false);
-  const [loading,               setLoading]               = useState(true);
-  const [showNavMenu,           setShowNavMenu]           = useState(false);
-  const [showOptionsModal,      setShowOptionsModal]      = useState(false);
-  const [isSaved,               setIsSaved]               = useState(false);
-  const [showToast,             setShowToast]             = useState(false);
-  const [toastMessage,          setToastMessage]          = useState("");
-  const [expandedCategory,      setExpandedCategory]      = useState(null);
-  const [previewContent,        setPreviewContent]        = useState("");
-  const [checkingSeller,        setCheckingSeller]        = useState(true);
-  const [isSeller,              setIsSeller]              = useState(false);
-  const [allBooks,              setAllBooks]              = useState([]);
-  const [showOverview,          setShowOverview]          = useState(false);
-  const [showSummary,           setShowSummary]           = useState(false);
-  const [bookSalesCount,        setBookSalesCount]        = useState({});
-  const [showFeedbackModal,     setShowFeedbackModal]     = useState(false);
-  const [feedbackText,          setFeedbackText]          = useState("");
-  const [isSubmittingFeedback,  setIsSubmittingFeedback]  = useState(false);
-  const [bookFeedbackCount,     setBookFeedbackCount]     = useState(0);
-  const [viewCount,             setViewCount]             = useState(0);
+  const [book, setBook] = useState(null);
+  const [user, setUser] = useState(null);
+  const [isPurchased, setIsPurchased] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [showNavMenu, setShowNavMenu] = useState(false);
+  const [showOptionsModal, setShowOptionsModal] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [expandedCategory, setExpandedCategory] = useState(null);
+  const [previewContent, setPreviewContent] = useState("");
+  const [checkingSeller, setCheckingSeller] = useState(true);
+  const [isSeller, setIsSeller] = useState(false);
+  const [allBooks, setAllBooks] = useState([]);
+  const [showOverview, setShowOverview] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [bookSalesCount, setBookSalesCount] = useState({});
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [bookFeedbackCount, setBookFeedbackCount] = useState(0);
+  const [viewCount, setViewCount] = useState(0);
   const [positiveRatingPercent, setPositiveRatingPercent] = useState(null);
-  const [totalRatings,          setTotalRatings]          = useState(0);
-  const [lecturers,             setLecturers]             = useState([]);
-  const [loadingLecturers,      setLoadingLecturers]      = useState(false);
-  const [followingIds,          setFollowingIds]          = useState(new Set());
-  const [followLoadingIds,      setFollowLoadingIds]      = useState(new Set());
-  const [physicalInventory,     setPhysicalInventory]     = useState(null);
-  const [loadingPhysical,       setLoadingPhysical]       = useState(true);
-  const [sellerInfo,            setSellerInfo]             = useState(null);
-  const getThumbnailUrl = (book) => {
-    if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
-    if (book.embedUrl) {
-      const m = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
-      if (m) { const id = m[1] || m[2] || m[3]; if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`; }
-    }
-    if (book.pdfUrl?.includes("drive.google.com")) {
-      const m = book.pdfUrl.match(/[-\w]{25,}/);
-      if (m) return `https://drive.google.com/thumbnail?id=${m[0]}&sz=w400`;
-    }
-    return book.image || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-  };
+  const [totalRatings, setTotalRatings] = useState(0);
+  const [lecturers, setLecturers] = useState([]);
+  const [loadingLecturers, setLoadingLecturers] = useState(false);
+  const [followingIds, setFollowingIds] = useState(new Set());
+  const [followLoadingIds, setFollowLoadingIds] = useState(new Set());
+  const [physicalInventory, setPhysicalInventory] = useState(null);
+  const [loadingPhysical, setLoadingPhysical] = useState(true);
+const getThumbnailUrl = (book) => {
+  const direct = book.coverImage || book.image;
+
+  // Already resolved to lh3 or unsplash — use as-is
+  if (
+    direct &&
+    (direct.includes("lh3.googleusercontent.com") ||
+      direct.includes("unsplash.com"))
+  ) {
+    return direct;
+  }
+
+  if (direct && !direct.includes("drive.google.com")) return direct;
+
+  let fileId = book.driveFileId;
+  if (!fileId && book.embedUrl) {
+    const m = book.embedUrl.match(/\/d\/([\w-]{25,})|id=([\w-]{25,})/);
+    if (m) fileId = m[1] || m[2];
+  }
+  if (!fileId && book.pdfUrl?.includes("drive.google.com")) {
+    const m = book.pdfUrl.match(/\/d\/([\w-]{25,})|id=([\w-]{25,})/);
+    if (m) fileId = m[1] || m[2];
+  }
+  if (!fileId && direct?.includes("drive.google.com")) {
+    const m = direct.match(/\/d\/([\w-]{25,})|id=([\w-]{25,})/);
+    if (m) fileId = m[1] || m[2];
+  }
+
+  if (fileId) {
+    return `https://lh3.googleusercontent.com/d/${fileId}=w400`;
+  }
+
+  return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+};
 
   const categories = [
-    { name: "Education",   books: booksData.filter(b => b.category?.toLowerCase().includes("education")).slice(0, 5) },
-    { name: "Business",    books: booksData.filter(b => b.category?.toLowerCase().includes("business")).slice(0, 5) },
-    { name: "Technology",  books: booksData.filter(b => b.category?.toLowerCase().includes("technology")).slice(0, 5) },
-    { name: "Science",     books: booksData.filter(b => b.category?.toLowerCase().includes("science")).slice(0, 5) },
-    { name: "Personal Development", books: booksData.filter(b => b.category?.toLowerCase().includes("personal")).slice(0, 5) },
-    { name: "Arts & Culture",       books: booksData.filter(b => b.category?.toLowerCase().includes("arts")).slice(0, 5) },
+    {
+      name: "Education",
+      books: booksData
+        .filter((b) => b.category?.toLowerCase().includes("education"))
+        .slice(0, 5),
+    },
+    {
+      name: "Business",
+      books: booksData
+        .filter((b) => b.category?.toLowerCase().includes("business"))
+        .slice(0, 5),
+    },
+    {
+      name: "Technology",
+      books: booksData
+        .filter((b) => b.category?.toLowerCase().includes("technology"))
+        .slice(0, 5),
+    },
+    {
+      name: "Science",
+      books: booksData
+        .filter((b) => b.category?.toLowerCase().includes("science"))
+        .slice(0, 5),
+    },
+    {
+      name: "Personal Development",
+      books: booksData
+        .filter((b) => b.category?.toLowerCase().includes("personal"))
+        .slice(0, 5),
+    },
+    {
+      name: "Arts & Culture",
+      books: booksData
+        .filter((b) => b.category?.toLowerCase().includes("arts"))
+        .slice(0, 5),
+    },
   ];
 
   const handleReport = () => router.push(`/report/book?bookId=${bookId}`);
@@ -93,75 +178,46 @@ export default function BookPreviewPage() {
       setCheckingSeller(true);
       const ud = await getDoc(doc(db, "users", userId));
       setIsSeller(ud.exists() ? ud.data().isSeller === true : false);
-    } catch { setIsSeller(false); }
-    finally { setCheckingSeller(false); }
+    } catch {
+      setIsSeller(false);
+    } finally {
+      setCheckingSeller(false);
+    }
   };
 
   useEffect(() => {
     if (book) {
-      setPreviewContent([book.description, book.introduction, book.message].filter(Boolean).join("\n\n").slice(0, 1500));
+      setPreviewContent(
+        [book.description, book.introduction, book.message]
+          .filter(Boolean)
+          .join("\n\n")
+          .slice(0, 1500),
+      );
     }
   }, [book]);
 
+  
 
-  useEffect(() => {
-    if (!book?.userId && !book?.sellerId) return;
-    const fetchSellerInfo = async () => {
-      try {
-        const sellerId = book.userId || book.sellerId;
-        const sellerDoc = await getDoc(doc(db, "sellers", sellerId));
-        if (sellerDoc.exists()) {
-          const data = sellerDoc.data();
-          const FACULTY_TITLES = [
-            "lecturer",
-            "dr.",
-            "prof.",
-            "professor",
-            "mrs.",
-            "mrs",
-            "mr.",
-            "mr",
-            "ms.",
-            "ms",
-            "engr.",
-            "engr",
-            "pharm.",
-            "pharm",
-            "barr.",
-            "barr",
-          ];
-          const title = (data.title || "").toLowerCase().trim();
-          const isFaculty = FACULTY_TITLES.some((t) => title.includes(t));
-          if (isFaculty) {
-            setSellerInfo({
-              name:
-                data.sellerName ||
-                data.displayName ||
-                book.sellerName ||
-                "Unknown",
-              title: data.title || "",
-              institution:
-                data.institution || data.university || data.school || "",
-              sellerId,
-            });
-          }
-        }
-      } catch {}
-    };
-    fetchSellerInfo();
-  }, [book]);
+
   useEffect(() => {
     if (!bookId) return;
     const trackView = async () => {
       try {
-        const viewRef  = doc(db, "bookViews", bookId);
+        const viewRef = doc(db, "bookViews", bookId);
         const viewSnap = await getDoc(viewRef);
         if (viewSnap.exists()) {
           setViewCount((viewSnap.data().count || 0) + 1);
-          await updateDoc(viewRef, { count: increment(1), lastViewed: serverTimestamp() });
+          await updateDoc(viewRef, {
+            count: increment(1),
+            lastViewed: serverTimestamp(),
+          });
         } else {
           setViewCount(1);
-          await setDoc(viewRef, { bookId, count: 1, lastViewed: serverTimestamp() });
+          await setDoc(viewRef, {
+            bookId,
+            count: 1,
+            lastViewed: serverTimestamp(),
+          });
         }
       } catch {}
     };
@@ -169,55 +225,70 @@ export default function BookPreviewPage() {
   }, [bookId]);
 
   useEffect(() => {
-  if (!bookId) return;
-  const fetchPhysicalInventory = async () => {
-    try {
-      setLoadingPhysical(true);
-      const cleanId = bookId.replace("firestore-", "");
-      
-      // Full collection scan — no index needed
-      const allSnap = await getDocs(collection(db, "physicalInventory"));
-      let found = null;
-      
-      allSnap.forEach(d => {
-        const data = d.data();
-        if (
-          data.bookId === cleanId ||
-          data.bookId === bookId ||
-          data.bookId === `firestore-${cleanId}`
-        ) {
-          found = { id: d.id, ...data };
-        }
-      });
+    if (!bookId) return;
+    const fetchPhysicalInventory = async () => {
+      try {
+        setLoadingPhysical(true);
+        const cleanId = bookId.replace("firestore-", "");
 
-      setPhysicalInventory(found);
-    } catch(e) {
-      console.error("fetchPhysicalInventory failed:", e);
-    } finally {
-      setLoadingPhysical(false);
-    }
-  };
-  fetchPhysicalInventory();
+        // Full collection scan — no index needed
+        const allSnap = await getDocs(collection(db, "physicalInventory"));
+        let found = null;
+
+        allSnap.forEach((d) => {
+          const data = d.data();
+          if (
+            data.bookId === cleanId ||
+            data.bookId === bookId ||
+            data.bookId === `firestore-${cleanId}`
+          ) {
+            found = { id: d.id, ...data };
+          }
+        });
+
+        setPhysicalInventory(found);
+      } catch (e) {
+        console.error("fetchPhysicalInventory failed:", e);
+      } finally {
+        setLoadingPhysical(false);
+      }
+    };
+    fetchPhysicalInventory();
   }, [bookId]);
-  
+
   useEffect(() => {
     if (!bookId) return;
     const fetchRatings = async () => {
       try {
-        const variants = [bookId, bookId.replace("firestore-", ""), `firestore-${bookId.replace("firestore-", "")}`];
+        const variants = [
+          bookId,
+          bookId.replace("firestore-", ""),
+          `firestore-${bookId.replace("firestore-", "")}`,
+        ];
         let allFeedbacks = [];
         for (const id of variants) {
-          const snap = await getDocs(query(collection(db, "bookFeedbacks"), where("bookId", "==", id)));
-          snap.forEach(d => allFeedbacks.push(d.data()));
+          const snap = await getDocs(
+            query(collection(db, "bookFeedbacks"), where("bookId", "==", id)),
+          );
+          snap.forEach((d) => allFeedbacks.push(d.data()));
         }
         const seen = new Set();
-        allFeedbacks = allFeedbacks.filter(f => { if (seen.has(f.userId)) return false; seen.add(f.userId); return true; });
+        allFeedbacks = allFeedbacks.filter((f) => {
+          if (seen.has(f.userId)) return false;
+          seen.add(f.userId);
+          return true;
+        });
         const total = allFeedbacks.length;
-        setTotalRatings(total); setBookFeedbackCount(total);
+        setTotalRatings(total);
+        setBookFeedbackCount(total);
         if (total > 0) {
-          const positive = allFeedbacks.filter(f => f.feedback?.trim().length > 0).length;
+          const positive = allFeedbacks.filter(
+            (f) => f.feedback?.trim().length > 0,
+          ).length;
           const pct = Math.round((positive / total) * 100);
-          setPositiveRatingPercent(pct > 0 ? pct : Math.min(75 + Math.floor(total * 2), 98));
+          setPositiveRatingPercent(
+            pct > 0 ? pct : Math.min(75 + Math.floor(total * 2), 98),
+          );
         }
       } catch {}
     };
@@ -253,7 +324,8 @@ export default function BookPreviewPage() {
             sellerName: data.sellerName || data.displayName || "Unknown",
             title: data.title || "",
             institution:
-              data.institution || data.university || data.school || "", // ← ADD
+              data.institution || data.university || data.school || "",
+            photoURL: data.photoURL || data.photoBase64 || null, // ← ADD THIS
             uploadedBooks: 0,
           });
         });
@@ -281,78 +353,124 @@ export default function BookPreviewPage() {
   useEffect(() => {
     const fetchFollowing = async () => {
       if (!user) return;
-      const snap = await getDocs(query(collection(db, "follows"), where("followerId", "==", user.uid)));
-      setFollowingIds(new Set(snap.docs.map(d => d.data().lecturerId)));
+      const snap = await getDocs(
+        query(collection(db, "follows"), where("followerId", "==", user.uid)),
+      );
+      setFollowingIds(new Set(snap.docs.map((d) => d.data().lecturerId)));
     };
     fetchFollowing();
   }, [user]);
 
   const handleBuyPhysical = () => {
-  const cId = bookId?.replace("firestore-", "") || book?.firestoreId || bookId;
-  router.push(`/book/buy-physical?bookId=${cId}`);
-};
+    const cId =
+      bookId?.replace("firestore-", "") || book?.firestoreId || bookId;
+    router.push(`/book/buy-physical?bookId=${cId}`);
+  };
 
   const handleFollowLecturer = async (e, lecturerId, lecturerName) => {
     e.preventDefault();
-    if (!user) { router.push("/auth/signin"); return; }
+    if (!user) {
+      router.push("/auth/signin");
+      return;
+    }
     if (followLoadingIds.has(lecturerId)) return;
-    setFollowLoadingIds(prev => new Set([...prev, lecturerId]));
-    const followRef  = doc(db, "follows", `${user.uid}_${lecturerId}`);
-    const sellerRef  = doc(db, "sellers", lecturerId);
+    setFollowLoadingIds((prev) => new Set([...prev, lecturerId]));
+    const followRef = doc(db, "follows", `${user.uid}_${lecturerId}`);
+    const sellerRef = doc(db, "sellers", lecturerId);
     try {
       if (followingIds.has(lecturerId)) {
         await deleteDoc(followRef);
-        try { await updateDoc(sellerRef, { followersCount: increment(-1) }); } catch {}
-        setFollowingIds(prev => { const n = new Set(prev); n.delete(lecturerId); return n; });
+        try {
+          await updateDoc(sellerRef, { followersCount: increment(-1) });
+        } catch {}
+        setFollowingIds((prev) => {
+          const n = new Set(prev);
+          n.delete(lecturerId);
+          return n;
+        });
       } else {
-        await setDoc(followRef, { followerId: user.uid, lecturerId, lecturerName: lecturerName || "", createdAt: serverTimestamp() });
-        try { await updateDoc(sellerRef, { followersCount: increment(1) }); }
-        catch { await setDoc(sellerRef, { followersCount: 1 }, { merge: true }); }
-        setFollowingIds(prev => new Set([...prev, lecturerId]));
+        await setDoc(followRef, {
+          followerId: user.uid,
+          lecturerId,
+          lecturerName: lecturerName || "",
+          createdAt: serverTimestamp(),
+        });
+        try {
+          await updateDoc(sellerRef, { followersCount: increment(1) });
+        } catch {
+          await setDoc(sellerRef, { followersCount: 1 }, { merge: true });
+        }
+        setFollowingIds((prev) => new Set([...prev, lecturerId]));
       }
-    } catch {}
-    finally { setFollowLoadingIds(prev => { const n = new Set(prev); n.delete(lecturerId); return n; }); }
+    } catch {
+    } finally {
+      setFollowLoadingIds((prev) => {
+        const n = new Set(prev);
+        n.delete(lecturerId);
+        return n;
+      });
+    }
   };
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async cu => {
+    const unsub = onAuthStateChanged(auth, async (cu) => {
       if (cu) {
         setUser(cu);
         await checkSellerStatus(cu.uid);
         await checkPurchaseStatus(cu.uid);
         await checkSavedStatus(cu.uid);
-      } else { router.push("/auth/signin"); }
+      } else {
+        router.push("/auth/signin");
+      }
     });
     return () => unsub();
   }, [router]);
 
   const HandleClick = () => {
-    if (!user) { router.push("/auth/signin"); return; }
+    if (!user) {
+      router.push("/auth/signin");
+      return;
+    }
     router.push(isSeller ? "/upload-document" : "/become-seller");
   };
 
   const handleMyAccountClick = async () => {
-    if (!user) { router.push("/auth/signin"); return; }
+    if (!user) {
+      router.push("/auth/signin");
+      return;
+    }
     try {
       const snap = await getDoc(doc(db, "users", user.uid));
-      if (!snap.exists()) { router.push("/role-selection"); return; }
+      if (!snap.exists()) {
+        router.push("/role-selection");
+        return;
+      }
       const data = snap.data();
-      if (!data.role || data.role === "") { router.push("/role-selection"); return; }
+      if (!data.role || data.role === "") {
+        router.push("/role-selection");
+        return;
+      }
       if (data.role === "student") router.push("/student/dashboard");
-      else if (data.role === "seller" || data.isSeller) router.push("/my-account/seller-account");
+      else if (data.role === "seller" || data.isSeller)
+        router.push("/my-account/seller-account");
       else router.push("/student/dashboard");
-    } catch { router.push("/student/dashboard"); }
+    } catch {
+      router.push("/student/dashboard");
+    }
   };
 
   useEffect(() => {
     const fetchSales = async () => {
       try {
         const snap = await getDocs(collection(db, "users"));
-        const map  = {};
-        snap.docs.forEach(u => {
-          Object.values(u.data().purchasedBooks || {}).forEach(p => {
+        const map = {};
+        snap.docs.forEach((u) => {
+          Object.values(u.data().purchasedBooks || {}).forEach((p) => {
             const id = p.bookId || p.id || p.firestoreId;
-            if (id) { map[id] = (map[id] || 0) + 1; map[`firestore-${id}`] = (map[`firestore-${id}`] || 0) + 1; }
+            if (id) {
+              map[id] = (map[id] || 0) + 1;
+              map[`firestore-${id}`] = (map[`firestore-${id}`] || 0) + 1;
+            }
           });
         });
         setBookSalesCount(map);
@@ -362,12 +480,17 @@ export default function BookPreviewPage() {
   }, []);
 
   useEffect(() => {
-    const handleVisibility = async () => { if (!document.hidden && user) await checkPurchaseStatus(user.uid); };
+    const handleVisibility = async () => {
+      if (!document.hidden && user) await checkPurchaseStatus(user.uid);
+    };
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibility);
   }, [user, bookId]);
 
-  useEffect(() => { if (user && bookId) checkPurchaseStatus(user.uid); }, [user, bookId]);
+  useEffect(() => {
+    if (user && bookId) checkPurchaseStatus(user.uid);
+  }, [user, bookId]);
 
   useEffect(() => {
     const fetchBook = async () => {
@@ -376,10 +499,17 @@ export default function BookPreviewPage() {
         const bookData = await fetchBookDetails(bookId);
         if (bookData) {
           setBook({ ...bookData, image: getThumbnailUrl(bookData) });
-          setPreviewContent(bookData.previewText || bookData.introduction || bookData.message || bookData.description);
+          setPreviewContent(
+            bookData.previewText ||
+              bookData.introduction ||
+              bookData.message ||
+              bookData.description,
+          );
         }
-      } catch {}
-      finally { setLoading(false); }
+      } catch {
+      } finally {
+        setLoading(false);
+      }
     };
     if (bookId) fetchBook();
   }, [bookId]);
@@ -387,20 +517,47 @@ export default function BookPreviewPage() {
   useEffect(() => {
     const fetchAllBooks = async () => {
       try {
-        const processed = booksData.map(b => ({ ...b, image: getThumbnailUrl(b) }));
+        const processed = booksData.map((b) => ({
+          ...b,
+          image: getThumbnailUrl(b),
+        }));
         setAllBooks(processed);
         try {
-          const snap = await getDocs(query(collection(db, "advertMyBook"), where("status", "==", "approved")));
-          const fb   = [];
-          snap.forEach(d => {
+          const snap = await getDocs(
+            query(
+              collection(db, "advertMyBook"),
+              where("status", "==", "approved"),
+            ),
+          );
+          const fb = [];
+          snap.forEach((d) => {
             const data = d.data();
-            const b = { id: `firestore-${d.id}`, firestoreId: d.id, title: data.bookTitle, author: data.author, category: data.category, price: data.price, pages: data.pages, format: data.format || "PDF", description: data.description, driveFileId: data.driveFileId, pdfUrl: data.pdfUrl, previewUrl: data.previewUrl, embedUrl: data.embedUrl, isFromFirestore: true };
+            const b = {
+              id: `firestore-${d.id}`,
+              firestoreId: d.id,
+              title: data.bookTitle,
+              author: data.author,
+              category: data.category,
+              price: data.price,
+              pages: data.pages,
+              format: data.format || "PDF",
+              description: data.description,
+              driveFileId: data.driveFileId,
+              pdfUrl: data.pdfUrl,
+              previewUrl: data.previewUrl,
+              embedUrl: data.embedUrl,
+              isFromFirestore: true,
+            };
             b.image = getThumbnailUrl(b);
             fb.push(b);
           });
           setAllBooks([...processed, ...fb].sort(() => Math.random() - 0.5));
         } catch {}
-      } catch { setAllBooks(booksData.map(b => ({ ...b, image: getThumbnailUrl(b) }))); }
+      } catch {
+        setAllBooks(
+          booksData.map((b) => ({ ...b, image: getThumbnailUrl(b) })),
+        );
+      }
     };
     fetchAllBooks();
   }, []);
@@ -412,14 +569,22 @@ export default function BookPreviewPage() {
         const pb = ud.data().purchasedBooks || {};
         const cId = bookId?.replace("firestore-", "");
         let purchased = pb[bookId] || pb[cId] || pb[`firestore-${cId}`];
-        if (!purchased) purchased = Object.keys(pb).some(key => { const ck = key.replace("firestore-", ""); return key === bookId || key === cId || ck === bookId || ck === cId; });
+        if (!purchased)
+          purchased = Object.keys(pb).some((key) => {
+            const ck = key.replace("firestore-", "");
+            return key === bookId || key === cId || ck === bookId || ck === cId;
+          });
         setIsPurchased(!!purchased);
         if (purchased && searchParams.get("purchased") === "true") {
           showToastMessage("Purchase successful! You now have full access.");
-          const url = new URL(window.location); url.searchParams.delete("purchased"); window.history.replaceState({}, "", url);
+          const url = new URL(window.location);
+          url.searchParams.delete("purchased");
+          window.history.replaceState({}, "", url);
         }
       } else setIsPurchased(false);
-    } catch { setIsPurchased(false); }
+    } catch {
+      setIsPurchased(false);
+    }
   };
 
   const checkSavedStatus = async (userId) => {
@@ -427,207 +592,684 @@ export default function BookPreviewPage() {
       const ud = await getDoc(doc(db, "users", userId));
       if (ud.exists()) {
         const saved = ud.data().savedBooks || [];
-        setIsSaved(Array.isArray(saved) ? saved.some(b => b.id === bookId) : saved[bookId] !== undefined);
+        setIsSaved(
+          Array.isArray(saved)
+            ? saved.some((b) => b.id === bookId)
+            : saved[bookId] !== undefined,
+        );
       }
     } catch {}
   };
 
   const handleSaveForLater = async () => {
     try {
-      if (!user) { alert("Please sign in to save books"); return; }
-      const ref  = doc(db, "users", user.uid);
+      if (!user) {
+        alert("Please sign in to save books");
+        return;
+      }
+      const ref = doc(db, "users", user.uid);
       const snap = await getDoc(ref);
-      let arr    = snap.exists() ? snap.data().savedBooks || [] : [];
+      let arr = snap.exists() ? snap.data().savedBooks || [] : [];
       if (isSaved) {
-        arr = arr.filter(b => b.id !== bookId);
-        setIsSaved(false); showToastMessage("Removed from saved books");
+        arr = arr.filter((b) => b.id !== bookId);
+        setIsSaved(false);
+        showToastMessage("Removed from saved books");
       } else {
-        arr.push({ id: book.id, title: book.title, author: book.author, price: book.price, savedAt: new Date().toISOString() });
-        setIsSaved(true); showToastMessage("Saved for later!");
+        arr.push({
+          id: book.id,
+          title: book.title,
+          author: book.author,
+          price: book.price,
+          savedAt: new Date().toISOString(),
+        });
+        setIsSaved(true);
+        showToastMessage("Saved for later!");
       }
       await updateDoc(ref, { savedBooks: arr });
       setShowOptionsModal(false);
-    } catch { alert("Error saving book. Please try again."); }
+    } catch {
+      alert("Error saving book. Please try again.");
+    }
   };
 
   const showToastMessage = (msg) => {
-    setToastMessage(msg); setShowToast(true);
+    setToastMessage(msg);
+    setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
 
   const handlePurchase = () => {
-    const cId = bookId?.replace("firestore-", "") || book?.firestoreId || bookId;
+    const cId =
+      bookId?.replace("firestore-", "") || book?.firestoreId || bookId;
     router.push(`/payment?bookId=${cId}`);
   };
 
   const handleShare = () => {
-    if (navigator.share) navigator.share({ title: `LAN Library | ${book.title}`, text: `Check out "${book.title}" by ${book.author}`, url: window.location.href });
-    else { navigator.clipboard.writeText(window.location.href); showToastMessage("Link copied to clipboard!"); }
+    if (navigator.share)
+      navigator.share({
+        title: `LAN Library | ${book.title}`,
+        text: `Check out "${book.title}" by ${book.author}`,
+        url: window.location.href,
+      });
+    else {
+      navigator.clipboard.writeText(window.location.href);
+      showToastMessage("Link copied to clipboard!");
+    }
     setShowOptionsModal(false);
   };
 
   const submitFeedback = async () => {
     try {
       setIsSubmittingFeedback(true);
-      await addDoc(collection(db, "bookFeedbacks"), { bookId, bookTitle: book?.title || "Unknown Book", bookAuthor: book?.author || "Unknown Author", userId: user?.uid, userEmail: user?.email, userName: user?.displayName || user?.email?.split("@")[0] || "Anonymous", feedback: feedbackText.trim(), createdAt: serverTimestamp() });
-      setFeedbackText(""); setShowFeedbackModal(false); setBookFeedbackCount(prev => prev + 1);
+      await addDoc(collection(db, "bookFeedbacks"), {
+        bookId,
+        bookTitle: book?.title || "Unknown Book",
+        bookAuthor: book?.author || "Unknown Author",
+        userId: user?.uid,
+        userEmail: user?.email,
+        userName:
+          user?.displayName || user?.email?.split("@")[0] || "Anonymous",
+        feedback: feedbackText.trim(),
+        createdAt: serverTimestamp(),
+      });
+      setFeedbackText("");
+      setShowFeedbackModal(false);
+      setBookFeedbackCount((prev) => prev + 1);
       showToastMessage("Feedback submitted! Redirecting...");
       setTimeout(() => router.push(`/book/feedbacks?bookId=${bookId}`), 1000);
-    } catch { showToastMessage("Error submitting feedback. Try again."); }
-    finally { setIsSubmittingFeedback(false); }
+    } catch {
+      showToastMessage("Error submitting feedback. Try again.");
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
   };
 
-  const formatViews = n => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : n.toString();
+  const formatViews = (n) =>
+    n >= 1000000
+      ? `${(n / 1000000).toFixed(1)}M`
+      : n >= 1000
+        ? `${(n / 1000).toFixed(1)}K`
+        : n.toString();
 
   /* ── Physical Stock Badge ── */
-const PhysicalStockBadge = () => {
-  if (loadingPhysical) return (
-    <div style={{ margin: "0 16px 0", padding: "14px 16px", background: "#fff", border: "0.5px solid #e5ddd0", display: "flex", alignItems: "center", gap: "10px" }}>
-      <div style={{ width: "16px", height: "16px", border: `2px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
-      <span style={{ fontSize: "11px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>Checking physical availability…</span>
-    </div>
-  );
-
-  /* State 3: No deposit at all */
-  if (!physicalInventory) return (
-    <div style={{ margin: "0 16px 0", padding: "14px 16px", background: "#fff", border: "0.5px solid #e5ddd0", display: "flex", alignItems: "center", gap: "12px" }}>
-      <div style={{ width: "36px", height: "36px", background: "#f5f1ea", border: "0.5px solid #e5ddd0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <HelpCircle size={16} style={{ color: "#ccc" }} />
-      </div>
-      <div>
-        <p style={{ fontSize: "11px", fontWeight: 700, color: "#aaa", margin: "0 0 2px", fontFamily: "'Lato',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Physical Copy</p>
-        <p style={{ fontSize: "12px", color: "#bbb", margin: 0, fontFamily: "'Lato',sans-serif" }}>No physical deposit yet for this research</p>
-      </div>
-    </div>
-  );
-
-  const stock   = physicalInventory.currentStock || 0;
-  const shelf   = physicalInventory.shelfLocation || "";
-  const section = physicalInventory.section || "";
-
-  /* State 2: Out of stock */
-  if (stock === 0) return (
-    <div style={{ margin: "0 16px 0", padding: "14px 16px", background: "#fff", border: "0.5px solid #f0ebe0" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-        <div style={{ width: "36px", height: "36px", background: "#fff5f5", border: "0.5px solid #fecaca", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <AlertCircle size={16} style={{ color: "#f87171" }} />
+  const PhysicalStockBadge = () => {
+    if (loadingPhysical)
+      return (
+        <div
+          style={{
+            margin: "0 16px 0",
+            padding: "14px 16px",
+            background: "#fff",
+            border: "0.5px solid #e5ddd0",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+          }}
+        >
+          <div
+            style={{
+              width: "16px",
+              height: "16px",
+              border: `2px solid ${GOLD}`,
+              borderTopColor: "transparent",
+              borderRadius: "50%",
+              animation: "spin 0.8s linear infinite",
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{
+              fontSize: "11px",
+              color: "#aaa",
+              fontFamily: "'Lato',sans-serif",
+            }}
+          >
+            Checking physical availability…
+          </span>
         </div>
-        <div>
-          <p style={{ fontSize: "11px", fontWeight: 700, color: "#f87171", margin: "0 0 2px", fontFamily: "'Lato',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Out of Stock</p>
-          <p style={{ fontSize: "12px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>Physical copies currently out of stock at LAN Head Office Abuja</p>
-        </div>
-      </div>
-    </div>
-  );
+      );
 
-  /* State 1: Available — gold pulse border */
-  return (
-    <>
-      <style>{`
+    /* State 3: No deposit at all */
+    if (!physicalInventory)
+      return (
+        <div
+          style={{
+            margin: "0 16px 0",
+            padding: "14px 16px",
+            background: "#fff",
+            border: "0.5px solid #e5ddd0",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+          }}
+        >
+          <div
+            style={{
+              width: "36px",
+              height: "36px",
+              background: "#f5f1ea",
+              border: "0.5px solid #e5ddd0",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <HelpCircle size={16} style={{ color: "#ccc" }} />
+          </div>
+          <div>
+            <p
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#aaa",
+                margin: "0 0 2px",
+                fontFamily: "'Lato',sans-serif",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
+            >
+              Physical Copy
+            </p>
+            <p
+              style={{
+                fontSize: "12px",
+                color: "#bbb",
+                margin: 0,
+                fontFamily: "'Lato',sans-serif",
+              }}
+            >
+              No physical deposit yet for this research
+            </p>
+          </div>
+        </div>
+      );
+
+    const stock = physicalInventory.currentStock || 0;
+    const shelf = physicalInventory.shelfLocation || "";
+    const section = physicalInventory.section || "";
+
+    /* State 2: Out of stock */
+    if (stock === 0)
+      return (
+        <div
+          style={{
+            margin: "0 16px 0",
+            padding: "14px 16px",
+            background: "#fff",
+            border: "0.5px solid #f0ebe0",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                background: "#fff5f5",
+                border: "0.5px solid #fecaca",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <AlertCircle size={16} style={{ color: "#f87171" }} />
+            </div>
+            <div>
+              <p
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: "#f87171",
+                  margin: "0 0 2px",
+                  fontFamily: "'Lato',sans-serif",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Out of Stock
+              </p>
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "#aaa",
+                  margin: 0,
+                  fontFamily: "'Lato',sans-serif",
+                }}
+              >
+                Physical copies currently out of stock at LAN Head Office Abuja
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+
+    /* State 1: Available — gold pulse border */
+    return (
+      <>
+        <style>{`
         @keyframes goldPulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(184,150,62,0.4); }
           50%       { box-shadow: 0 0 0 6px rgba(184,150,62,0); }
         }
         .physical-available { animation: goldPulse 2.4s ease-in-out infinite; }
       `}</style>
-      <div className="physical-available" style={{ margin: "0 16px 0", padding: "16px", background: "#fff", border: `1.5px solid ${GOLD}` }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-          <div style={{ width: "38px", height: "38px", background: NAVY, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <Package size={17} style={{ color: GOLD }} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "10px", fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif", textTransform: "uppercase", letterSpacing: "0.1em" }}>Physical Copy Available</span>
-              <span style={{ background: "rgba(34,197,94,0.12)", border: "0.5px solid rgba(34,197,94,0.3)", color: "#16a34a", fontSize: "9px", fontWeight: 700, padding: "2px 7px", fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em" }}>{stock} in stock</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "3px" }}>
-              <MapPin size={11} style={{ color: GOLD, flexShrink: 0 }} />
-              <span style={{ fontSize: "12px", color: NAVY, fontWeight: 700, fontFamily: "'Lato',sans-serif" }}>LAN Head Office — Abuja Registry</span>
-            </div>
-            {(shelf || section) && (
-              <p style={{ fontSize: "11px", color: "#888", margin: "0 0 10px", fontFamily: "'Lato',sans-serif" }}>
-                {section && <span>Section: <strong style={{ color: NAVY }}>{section}</strong></span>}
-                {section && shelf && <span> &nbsp;·&nbsp; </span>}
-                {shelf && <span>Shelf: <strong style={{ color: NAVY }}>{shelf}</strong></span>}
-              </p>
-            )}
-            <button
-              onClick={handleBuyPhysical}
-              style={{ display: "flex", alignItems: "center", gap: "6px", background: NAVY, color: "#fff", padding: "9px 16px", border: "none", fontSize: "11px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em", transition: "background 0.18s" }}
-              onMouseEnter={e => e.currentTarget.style.background = "#1a3a6e"}
-              onMouseLeave={e => e.currentTarget.style.background = NAVY}
+        <div
+          className="physical-available"
+          style={{
+            margin: "0 16px 0",
+            padding: "16px",
+            background: "#fff",
+            border: `1.5px solid ${GOLD}`,
+          }}
+        >
+          <div
+            style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}
+          >
+            <div
+              style={{
+                width: "38px",
+                height: "38px",
+                background: NAVY,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
             >
-              <ShoppingBag size={13} />
-              Get Physical Copy — ₦{book.price?.toLocaleString()}
-            </button>
+              <Package size={17} style={{ color: GOLD }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "4px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: GOLD,
+                    fontFamily: "'Lato',sans-serif",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                  }}
+                >
+                  Physical Copy Available
+                </span>
+                <span
+                  style={{
+                    background: "rgba(34,197,94,0.12)",
+                    border: "0.5px solid rgba(34,197,94,0.3)",
+                    color: "#16a34a",
+                    fontSize: "9px",
+                    fontWeight: 700,
+                    padding: "2px 7px",
+                    fontFamily: "'Lato',sans-serif",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  {stock} in stock
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  marginBottom: "3px",
+                }}
+              >
+                <MapPin size={11} style={{ color: GOLD, flexShrink: 0 }} />
+                <span
+                  style={{
+                    fontSize: "12px",
+                    color: NAVY,
+                    fontWeight: 700,
+                    fontFamily: "'Lato',sans-serif",
+                  }}
+                >
+                  LAN Head Office — Abuja Registry
+                </span>
+              </div>
+              {(shelf || section) && (
+                <p
+                  style={{
+                    fontSize: "11px",
+                    color: "#888",
+                    margin: "0 0 10px",
+                    fontFamily: "'Lato',sans-serif",
+                  }}
+                >
+                  {section && (
+                    <span>
+                      Section:{" "}
+                      <strong style={{ color: NAVY }}>{section}</strong>
+                    </span>
+                  )}
+                  {section && shelf && <span> &nbsp;·&nbsp; </span>}
+                  {shelf && (
+                    <span>
+                      Shelf: <strong style={{ color: NAVY }}>{shelf}</strong>
+                    </span>
+                  )}
+                </p>
+              )}
+              <button
+                onClick={handleBuyPhysical}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  background: NAVY,
+                  color: "#fff",
+                  padding: "9px 16px",
+                  border: "none",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "'Lato',sans-serif",
+                  letterSpacing: "0.06em",
+                  transition: "background 0.18s",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "#1a3a6e")
+                }
+                onMouseLeave={(e) => (e.currentTarget.style.background = NAVY)}
+              >
+                <ShoppingBag size={13} />
+                Get Physical Copy — ₦{book.price?.toLocaleString()}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </>
-  );
-};
+      </>
+    );
+  };
 
   /* ── PDF Viewer ── */
   const PdfViewer = ({ heightClass = "600px", fullHeight = "900px" }) => (
     <div style={{ background: BG }}>
       {isPurchased ? (
-        <div style={{ padding: '16px' }}>
+        <div style={{ padding: "16px" }}>
           {book.embedUrl ? (
-            <div style={{ position: 'relative' }}>
-              <iframe src={book.embedUrl} style={{ width: '100%', height: fullHeight, border: 'none', display: 'block' }} title={book.title} allow="autoplay" />
-              <div style={{ position: 'absolute', top: 0, right: 0, height: '76px', width: '220px', background: '#323639', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 20px', gap: '8px' }} onContextMenu={e => e.preventDefault()}>
-                <span style={{ color: GOLD, fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: "'Lato',sans-serif" }}>LAN Library</span>
-                <Lock size={14} style={{ color: '#888' }} />
+            <div style={{ position: "relative" }}>
+              <iframe
+                src={book.embedUrl}
+                style={{
+                  width: "100%",
+                  height: fullHeight,
+                  border: "none",
+                  display: "block",
+                }}
+                title={book.title}
+                allow="autoplay"
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  height: "76px",
+                  width: "220px",
+                  background: "#323639",
+                  zIndex: 10,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  padding: "0 20px",
+                  gap: "8px",
+                }}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                <span
+                  style={{
+                    color: GOLD,
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    fontFamily: "'Lato',sans-serif",
+                  }}
+                >
+                  LAN Library
+                </span>
+                <Lock size={14} style={{ color: "#888" }} />
               </div>
             </div>
           ) : book.pdfUrl ? (
-            <div style={{ position: 'relative' }}>
-              <iframe src={`${book.pdfUrl}#view=FitH`} style={{ width: '100%', height: fullHeight, border: 'none', display: 'block' }} title={book.title} />
-              <div style={{ position: 'absolute', top: 0, right: 0, height: '56px', width: '220px', background: '#323639', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 20px', gap: '8px' }} onContextMenu={e => e.preventDefault()}>
-                <span style={{ color: GOLD, fontSize: '10px', fontWeight: 700, fontFamily: "'Lato',sans-serif" }}>LAN Library</span>
-                <Lock size={14} style={{ color: '#888' }} />
+            <div style={{ position: "relative" }}>
+              <iframe
+                src={`${book.pdfUrl}#view=FitH`}
+                style={{
+                  width: "100%",
+                  height: fullHeight,
+                  border: "none",
+                  display: "block",
+                }}
+                title={book.title}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  height: "56px",
+                  width: "220px",
+                  background: "#323639",
+                  zIndex: 10,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  padding: "0 20px",
+                  gap: "8px",
+                }}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                <span
+                  style={{
+                    color: GOLD,
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    fontFamily: "'Lato',sans-serif",
+                  }}
+                >
+                  LAN Library
+                </span>
+                <Lock size={14} style={{ color: "#888" }} />
               </div>
             </div>
           ) : (
-            <div style={{ background: '#fff', padding: '24px', border: '0.5px solid #e5ddd0' }}>
-              <div style={{ background: '#f0fdf4', border: '0.5px solid #86efac', padding: '14px 18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <CheckCircle size={20} style={{ color: '#16a34a', flexShrink: 0 }} />
+            <div
+              style={{
+                background: "#fff",
+                padding: "24px",
+                border: "0.5px solid #e5ddd0",
+              }}
+            >
+              <div
+                style={{
+                  background: "#f0fdf4",
+                  border: "0.5px solid #86efac",
+                  padding: "14px 18px",
+                  marginBottom: "20px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                }}
+              >
+                <CheckCircle
+                  size={20}
+                  style={{ color: "#16a34a", flexShrink: 0 }}
+                />
                 <div>
-                  <p style={{ fontWeight: 700, color: '#15803d', margin: '0 0 2px', fontSize: '13px', fontFamily: "'Lato',sans-serif" }}>Full Access Granted</p>
-                  <p style={{ fontSize: '12px', color: '#166534', margin: 0, fontFamily: "'Lato',sans-serif" }}>You have full access to {book.title}</p>
+                  <p
+                    style={{
+                      fontWeight: 700,
+                      color: "#15803d",
+                      margin: "0 0 2px",
+                      fontSize: "13px",
+                      fontFamily: "'Lato',sans-serif",
+                    }}
+                  >
+                    Full Access Granted
+                  </p>
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      color: "#166534",
+                      margin: 0,
+                      fontFamily: "'Lato',sans-serif",
+                    }}
+                  >
+                    You have full access to {book.title}
+                  </p>
                 </div>
               </div>
-              <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '20px', fontWeight: 700, color: NAVY, margin: '0 0 12px' }}>{book.title}</h3>
-              <p style={{ fontSize: '13px', color: '#666', lineHeight: 1.75 }}>{book.description}</p>
+              <h3
+                style={{
+                  fontFamily: "'Playfair Display',serif",
+                  fontSize: "20px",
+                  fontWeight: 700,
+                  color: NAVY,
+                  margin: "0 0 12px",
+                }}
+              >
+                {book.title}
+              </h3>
+              <p style={{ fontSize: "13px", color: "#666", lineHeight: 1.75 }}>
+                {book.description}
+              </p>
             </div>
           )}
         </div>
       ) : (
         <div>
-          <div style={{ position: 'relative', overflow: 'hidden', height: heightClass }}>
+          <div
+            style={{
+              position: "relative",
+              overflow: "hidden",
+              height: heightClass,
+            }}
+          >
             {book.embedUrl ? (
-              <iframe src={book.embedUrl} style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }} title={`${book.title} - Preview`} scrolling="no" />
+              <iframe
+                src={book.embedUrl}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  border: "none",
+                  pointerEvents: "none",
+                }}
+                title={`${book.title} - Preview`}
+                scrolling="no"
+              />
             ) : book.pdfUrl ? (
-              <iframe src={`${book.pdfUrl}#view=FitH&page=1&toolbar=0`} style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none' }} title={`${book.title} - Preview`} scrolling="no" />
+              <iframe
+                src={`${book.pdfUrl}#view=FitH&page=1&toolbar=0`}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  border: "none",
+                  pointerEvents: "none",
+                }}
+                title={`${book.title} - Preview`}
+                scrolling="no"
+              />
             ) : (
-              <div style={{ padding: '32px', background: '#fff', height: '100%' }}>
-                <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '20px', fontWeight: 700, color: NAVY, margin: '0 0 16px' }}>{book.title}</h3>
-                <p style={{ fontSize: '13px', color: '#666', lineHeight: 1.75 }}>{book.introduction?.slice(0, 800) || book.description}</p>
+              <div
+                style={{ padding: "32px", background: "#fff", height: "100%" }}
+              >
+                <h3
+                  style={{
+                    fontFamily: "'Playfair Display',serif",
+                    fontSize: "20px",
+                    fontWeight: 700,
+                    color: NAVY,
+                    margin: "0 0 16px",
+                  }}
+                >
+                  {book.title}
+                </h3>
+                <p
+                  style={{ fontSize: "13px", color: "#666", lineHeight: 1.75 }}
+                >
+                  {book.introduction?.slice(0, 800) || book.description}
+                </p>
               </div>
             )}
           </div>
           {/* Purchase CTA */}
-          <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', margin: '16px', padding: '32px 24px', textAlign: 'center' }}>
-            <div style={{ width: '56px', height: '56px', border: `0.5px solid #e5ddd0`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', background: CREAM }}>
+          <div
+            style={{
+              background: "#fff",
+              border: "0.5px solid #e5ddd0",
+              margin: "16px",
+              padding: "32px 24px",
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                width: "56px",
+                height: "56px",
+                border: `0.5px solid #e5ddd0`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 16px",
+                background: CREAM,
+              }}
+            >
               <Lock size={22} style={{ color: NAVY }} />
             </div>
-            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '18px', fontWeight: 700, color: NAVY, margin: '0 0 6px' }}>Purchase to unlock full access</p>
-            <p style={{ fontSize: '12px', color: '#888', marginBottom: '20px', fontFamily: "'Lato',sans-serif" }}>Get instant access to all {book.pages} pages</p>
-            <button onClick={handlePurchase}
-              style={{ width: '100%', background: NAVY, color: '#fff', padding: '14px 24px', border: 'none', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", letterSpacing: '0.04em', transition: 'background 0.18s' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#1a3a6e'}
-              onMouseLeave={e => e.currentTarget.style.background = NAVY}
-            >Purchase for ₦{book.price?.toLocaleString()}</button>
+            <p
+              style={{
+                fontFamily: "'Playfair Display',serif",
+                fontSize: "18px",
+                fontWeight: 700,
+                color: NAVY,
+                margin: "0 0 6px",
+              }}
+            >
+              Purchase to unlock full access
+            </p>
+            <p
+              style={{
+                fontSize: "12px",
+                color: "#888",
+                marginBottom: "20px",
+                fontFamily: "'Lato',sans-serif",
+              }}
+            >
+              Get instant access to all {book.pages} pages
+            </p>
+            <button
+              onClick={handlePurchase}
+              style={{
+                width: "100%",
+                background: NAVY,
+                color: "#fff",
+                padding: "14px 24px",
+                border: "none",
+                fontSize: "14px",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "'Lato',sans-serif",
+                letterSpacing: "0.04em",
+                transition: "background 0.18s",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "#1a3a6e")
+              }
+              onMouseLeave={(e) => (e.currentTarget.style.background = NAVY)}
+            >
+              Purchase for ₦{book.price?.toLocaleString()}
+            </button>
           </div>
         </div>
       )}
@@ -635,34 +1277,97 @@ const PhysicalStockBadge = () => {
   );
 
   /* ── Loading ── */
-  if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: '56px', height: '56px', border: `3px solid ${GOLD}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
-        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '18px', color: NAVY }}>Loading…</p>
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+  if (loading)
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: BG,
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              width: "56px",
+              height: "56px",
+              border: `3px solid ${GOLD}`,
+              borderTopColor: "transparent",
+              borderRadius: "50%",
+              animation: "spin 0.8s linear infinite",
+              margin: "0 auto 16px",
+            }}
+          />
+          <p
+            style={{
+              fontFamily: "'Playfair Display',serif",
+              fontSize: "18px",
+              color: NAVY,
+            }}
+          >
+            Loading…
+          </p>
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        </div>
       </div>
-    </div>
-  );
+    );
 
-  if (!book) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG }}>
-      <div style={{ textAlign: 'center' }}>
-        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '22px', fontWeight: 700, color: NAVY, marginBottom: '12px' }}>Book Not Found</p>
-        <Link href="/home" style={{ color: GOLD, fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>Return to Home</Link>
+  if (!book)
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: BG,
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <p
+            style={{
+              fontFamily: "'Playfair Display',serif",
+              fontSize: "22px",
+              fontWeight: 700,
+              color: NAVY,
+              marginBottom: "12px",
+            }}
+          >
+            Book Not Found
+          </p>
+          <Link
+            href="/home"
+            style={{
+              color: GOLD,
+              fontFamily: "'Lato',sans-serif",
+              fontWeight: 700,
+            }}
+          >
+            Return to Home
+          </Link>
+        </div>
       </div>
-    </div>
-  );
+    );
 
-  const suggestedBooks = (allBooks.length > 0 ? allBooks : booksData).filter(b => b.id !== bookId).slice(0, 12);
+  const suggestedBooks = (allBooks.length > 0 ? allBooks : booksData)
+    .filter((b) => b.id !== bookId)
+    .slice(0, 12);
   const sold = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
 
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
-        .lan-root  { font-family:'Lato',sans-serif; background:${BG}; }
-        .lan-serif { font-family:'Playfair Display',Georgia,serif; }
+// REPLACE the two .lan-root rules with ONE clean rule:
+.lan-root {
+  font-family:'Lato',sans-serif;
+  background:${BG};
+  overflow-x: hidden;
+  max-width: 100vw;
+  box-sizing: border-box;
+}        .lan-serif { font-family:'Playfair Display',Georgia,serif; }
         .action-btn { display:flex; flex-direction:column; align-items:center; gap:5px; background:transparent; border:none; cursor:pointer; color:${NAVY}; font-family:'Lato',sans-serif; transition:opacity 0.18s; }
         .action-btn:hover { opacity:0.7; }
         .action-btn span { font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; }
@@ -682,6 +1387,8 @@ const PhysicalStockBadge = () => {
         @keyframes pulse2 { 0%,100%{opacity:1} 50%{opacity:0.4} }
         @media(min-width:1024px){ .lg-grid { grid-template-columns:280px 1fr 240px !important; } .lg-hide { display:none !important; } .lg-show { display:block !important; } }
         .lg-show { display:none; }
+        *, *::before, *::after { box-sizing: border-box; }
+        body { overflow-x: hidden; }
       `}</style>
 
       <div className="lan-root" style={{ minHeight: "100vh" }}>
@@ -1099,10 +1806,23 @@ const PhysicalStockBadge = () => {
                         objectFit: "cover",
                         display: "block",
                       }}
-                      onError={(e) => {
-                        e.target.src =
-                          "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-                      }}
+               onError={(e) => {
+                  const src = e.target.src;
+                  if (src.includes('lh3.googleusercontent.com')) {
+                    // lh3 failed too — use Unsplash
+                    e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+                  } else if (src.includes('drive.google.com')) {
+                    // Chrome-only thumbnail failed — try lh3 (cross-browser)
+                    const m = src.match(/id=([\w-]{25,})/);
+                    if (m) {
+                      e.target.src = `https://lh3.googleusercontent.com/d/${m[1]}=w400`;
+                      return;
+                    }
+                    e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+                  } else {
+                    e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+                  }
+                }}
                     />
                     {/* LIVE badge */}
                     <div
@@ -1541,6 +2261,7 @@ const PhysicalStockBadge = () => {
                         }}
                       >
                         {/* Top row: avatar + name + follow */}
+                        {/* Top row: avatar + name + follow */}
                         <div
                           style={{
                             display: "flex",
@@ -1549,6 +2270,7 @@ const PhysicalStockBadge = () => {
                             marginBottom: "8px",
                           }}
                         >
+                          {/* SINGLE avatar link — shows photo if available, else initial */}
                           <Link
                             href={`/seller-profile?sellerId=${lec.sellerId}`}
                             style={{
@@ -1564,10 +2286,32 @@ const PhysicalStockBadge = () => {
                               fontWeight: 700,
                               textDecoration: "none",
                               flexShrink: 0,
+                              overflow: "hidden",
                             }}
                           >
-                            {lec.sellerName?.charAt(0)?.toUpperCase() || "?"}
+                            {lec.photoURL ? (
+                              <img
+                                src={lec.photoURL}
+                                alt={lec.sellerName}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                  borderRadius: "50%",
+                                }}
+                                onError={(e) => {
+                                  e.target.style.display = "none";
+                                  e.target.parentElement.textContent =
+                                    lec.sellerName?.charAt(0)?.toUpperCase() ||
+                                    "?";
+                                }}
+                              />
+                            ) : (
+                              lec.sellerName?.charAt(0)?.toUpperCase() || "?"
+                            )}
                           </Link>
+
+                          {/* Name + files count */}
                           <Link
                             href={`/seller-profile?sellerId=${lec.sellerId}`}
                             style={{
@@ -1603,6 +2347,8 @@ const PhysicalStockBadge = () => {
                               {lec.uploadedBooks} files uploaded
                             </p>
                           </Link>
+
+                          {/* Follow button */}
                           <button
                             onClick={(e) =>
                               handleFollowLecturer(
@@ -2126,188 +2872,8 @@ const PhysicalStockBadge = () => {
                       Summary
                     </button>
                   </div>
-                </div>
-                {/* ── Faculty Banner ── */}
-                {sellerInfo && (
-                  <div
-                    style={{
-                      margin: "0 16px 0",
-                      background: NAVY,
-                      backgroundImage:
-                        "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)",
-                      backgroundSize: "20px 20px",
-                      border: `1px solid ${GOLD}`,
-                      padding: "14px 16px",
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: "12px",
-                      position: "relative",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {/* corner decoration */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "-16px",
-                        right: "-16px",
-                        width: "60px",
-                        height: "60px",
-                        border: "0.5px solid rgba(184,150,62,0.25)",
-                        transform: "rotate(45deg)",
-                      }}
-                    />
-
-                    {/* Avatar */}
-                    <div
-                      style={{
-                        width: "40px",
-                        height: "40px",
-                        borderRadius: "50%",
-                        background: GOLD,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: NAVY,
-                        fontSize: "14px",
-                        fontWeight: 700,
-                        flexShrink: 0,
-                        fontFamily: "'Lato',sans-serif",
-                      }}
-                    >
-                      {sellerInfo.name?.charAt(0)?.toUpperCase() || "?"}
-                    </div>
-
-                    {/* Info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      {/* Verified Faculty pill */}
-                      <div
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          background: "rgba(184,150,62,0.15)",
-                          border: "0.5px solid rgba(184,150,62,0.4)",
-                          padding: "2px 8px",
-                          marginBottom: "6px",
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: "5px",
-                            height: "5px",
-                            borderRadius: "50%",
-                            background: GOLD,
-                            display: "inline-block",
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontSize: "8px",
-                            fontWeight: 700,
-                            color: GOLDD,
-                            letterSpacing: "0.14em",
-                            textTransform: "uppercase",
-                            fontFamily: "'Lato',sans-serif",
-                          }}
-                        >
-                          Verified Faculty
-                        </span>
-                      </div>
-
-                      {/* Name + title */}
-                      <p
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#fff",
-                          margin: "0 0 2px",
-                          fontFamily: "'Lato',sans-serif",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {sellerInfo.title
-                          ? `${sellerInfo.title} ${sellerInfo.name}`
-                          : sellerInfo.name}
-                      </p>
-
-                      {/* Institution */}
-                      {sellerInfo.institution ? (
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "5px",
-                            marginTop: "4px",
-                          }}
-                        >
-                          <svg
-                            width="10"
-                            height="10"
-                            fill="none"
-                            stroke={GOLD}
-                            strokeWidth="2"
-                            viewBox="0 0 24 24"
-                            style={{ flexShrink: 0 }}
-                          >
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                          </svg>
-                          <span
-                            style={{
-                              fontSize: "11px",
-                              color: "rgba(255,255,255,0.7)",
-                              fontFamily: "'Lato',sans-serif",
-                              fontWeight: 600,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {sellerInfo.institution}
-                          </span>
-                        </div>
-                      ) : (
-                        <p
-                          style={{
-                            fontSize: "10px",
-                            color: "rgba(255,255,255,0.4)",
-                            margin: "3px 0 0",
-                            fontFamily: "'Lato',sans-serif",
-                          }}
-                        >
-                          Faculty member · LAN Library
-                        </p>
-                      )}
-                    </div>
-
-                    {/* View profile link */}
-                    <Link
-                      href={`/seller-profile?sellerId=${sellerInfo.sellerId}`}
-                      style={{
-                        fontSize: "9px",
-                        fontWeight: 700,
-                        color: GOLD,
-                        textDecoration: "none",
-                        fontFamily: "'Lato',sans-serif",
-                        letterSpacing: "0.08em",
-                        textTransform: "uppercase",
-                        border: "0.5px solid rgba(184,150,62,0.4)",
-                        padding: "5px 10px",
-                        flexShrink: 0,
-                        background: "rgba(184,150,62,0.1)",
-                        transition: "background 0.18s",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
-                    >
-                      Profile <ChevronRight size={10} />
-                    </Link>
-                  </div>
-                )}
+                </div>            
+                
 
                 <PhysicalStockBadge />
                 <PdfViewer heightClass="400px" fullHeight="900px" />
@@ -3376,4 +3942,3 @@ const PhysicalStockBadge = () => {
     </>
   );
 }
-

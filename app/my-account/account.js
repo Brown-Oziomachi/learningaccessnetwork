@@ -12,6 +12,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
+import { uploadImageToCloudinary } from "@/lib/uploadImageToCloudinary";
 
 /* ─── colour tokens (identical to home page) ────────────────── */
 const NAVY  = "#0d2244";
@@ -70,22 +71,25 @@ export default function MyAccountClient() {
     }
   };
 
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5 MB"); return; }
-    try {
-      setUploading(true);
-      const storage  = getStorage();
-      const imgRef   = ref(storage, `profile-images/${user.uid}_${Date.now()}.jpg`);
-      await uploadBytes(imgRef, file);
-      const url = await getDownloadURL(imgRef);
-      await updateDoc(doc(db, "users", user.uid), { photoURL: url });
-      setUser(p => ({ ...p, photoURL: url }));
-    } catch (e) {
-      alert("Upload failed: " + e.message);
-    } finally { setUploading(false); }
-  };
+ const handleImageUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    setUploading(true);
+    const url = await uploadImageToCloudinary(file, 'profiles');
+    // Write BOTH fields so seller page stays in sync
+    await updateDoc(doc(db, 'users', user.uid), { 
+      photoURL: url,
+      photoBase64: url  // <-- add this
+    });
+    setUser(p => ({ ...p, photoURL: url, photoBase64: url }));
+  } catch (e) {
+    alert('Upload failed: ' + e.message);
+  } finally {
+    setUploading(false);
+  }
+};
 
   const handleSave = async () => {
     try {
@@ -227,7 +231,7 @@ export default function MyAccountClient() {
               <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
                 <div style={{ position: "relative", flexShrink: 0 }}>
                   {user.photoURL ? (
-                    <img src={user.photoURL} alt="avatar"
+                    <img src={user.photoURL || user.photoBase64} alt="avatar"
                       style={{ width: "72px", height: "72px", borderRadius: "50%", objectFit: "cover", border: `2.5px solid ${GOLD}` }} />
                   ) : (
                     <div style={{ width: "72px", height: "72px", borderRadius: "50%", background: GOLD, display: "flex", alignItems: "center", justifyContent: "center", border: `2.5px solid rgba(184,150,62,0.4)` }}>
@@ -417,9 +421,9 @@ export default function MyAccountClient() {
         {/* ══ EDIT PROFILE MODAL ═══════════════════════════════════════ */}
         {isEditing && (
           <div className="modal-overlay">
-            <div className="modal-inner">
+            <div className="modal-inner mt-20">
               {/* header */}
-              <div style={{ background: NAVY, padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0 }}>
+              <div style={{ background: NAVY, padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0 }} >
                 <div>
                   <p style={{ fontSize: "10px", color: GOLD, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 3px", fontFamily: "'Lato',sans-serif" }}>Profile</p>
                   <h2 className="lan-serif" style={{ fontSize: "20px", fontWeight: 700, color: "#fff", margin: 0 }}>Edit Profile</h2>
@@ -430,10 +434,10 @@ export default function MyAccountClient() {
               </div>
 
               {/* avatar */}
-              <div style={{ padding: "28px 24px 0", textAlign: "center" }}>
+              <div style={{ padding: "28px 24px 0", textAlign: "center" }} >
                 <div style={{ position: "relative", display: "inline-block", marginBottom: "4px" }}>
                   {user.photoURL ? (
-                    <img src={user.photoURL} alt="avatar" style={{ width: "88px", height: "88px", borderRadius: "50%", objectFit: "cover", border: `3px solid ${GOLD}` }} />
+                    <img src={user.photoURL || user.photoBase64} alt="avatar" style={{ width: "88px", height: "88px", borderRadius: "50%", objectFit: "cover", border: `3px solid ${GOLD}` }} />
                   ) : (
                     <div style={{ width: "88px", height: "88px", borderRadius: "50%", background: GOLD, display: "flex", alignItems: "center", justifyContent: "center", border: `3px solid rgba(184,150,62,0.4)` }}>
                       <span style={{ fontFamily: "'Playfair Display',serif", fontSize: "28px", fontWeight: 700, color: NAVY }}>{initials}</span>

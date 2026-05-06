@@ -649,7 +649,7 @@ export default function UniversityHubClient({
                                 <button onClick={() => setShowRequest(true)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "12px 24px", background: NAVY, color: "#fff", border: "none", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>
                                     <BookMarked size={13} /> Request a Material
                                 </button>
-                                <Link href="/my-account/seller-account" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "12px 24px", background: "transparent", color: NAVY, border: `0.5px solid ${NAVY}`, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato',sans-serif" }}>
+                                <Link href="/upload-document" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "12px 24px", background: "transparent", color: NAVY, border: `0.5px solid ${NAVY}`, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato',sans-serif" }}>
                                     <BookOpen size={13} /> Upload a Book
                                 </Link>
                             </div>
