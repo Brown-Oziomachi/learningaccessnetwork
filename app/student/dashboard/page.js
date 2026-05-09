@@ -2,8 +2,9 @@ import { Suspense } from "react";
 import StudentDashboardClient from "./student";
 
 export const metadata = {
-    title: "Access Your Purchased Books in One Place | LAN Library",
-    description: "Have access to all your books when you purchased them, download them again when you want."
+    title: "Student Dashboard | LAN Library",
+    description:
+        "Welcome to the LAN Library Student Dashboard — your personal learning space where you can access purchased books, manage your library, track your learning materials, and download your books anytime."
 }
 export default function StudentDashboardPage() {
     return (

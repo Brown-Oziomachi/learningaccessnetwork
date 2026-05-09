@@ -97,40 +97,40 @@ export default function BookPreviewPage() {
   const [followLoadingIds, setFollowLoadingIds] = useState(new Set());
   const [physicalInventory, setPhysicalInventory] = useState(null);
   const [loadingPhysical, setLoadingPhysical] = useState(true);
-const getThumbnailUrl = (book) => {
-  const direct = book.coverImage || book.image;
+  const getThumbnailUrl = (book) => {
+    const direct = book.coverImage || book.image;
 
-  // Already resolved to lh3 or unsplash — use as-is
-  if (
-    direct &&
-    (direct.includes("lh3.googleusercontent.com") ||
-      direct.includes("unsplash.com"))
-  ) {
-    return direct;
-  }
+    // Already resolved to lh3 or unsplash — use as-is
+    if (
+      direct &&
+      (direct.includes("lh3.googleusercontent.com") ||
+        direct.includes("unsplash.com"))
+    ) {
+      return direct;
+    }
 
-  if (direct && !direct.includes("drive.google.com")) return direct;
+    if (direct && !direct.includes("drive.google.com")) return direct;
 
-  let fileId = book.driveFileId;
-  if (!fileId && book.embedUrl) {
-    const m = book.embedUrl.match(/\/d\/([\w-]{25,})|id=([\w-]{25,})/);
-    if (m) fileId = m[1] || m[2];
-  }
-  if (!fileId && book.pdfUrl?.includes("drive.google.com")) {
-    const m = book.pdfUrl.match(/\/d\/([\w-]{25,})|id=([\w-]{25,})/);
-    if (m) fileId = m[1] || m[2];
-  }
-  if (!fileId && direct?.includes("drive.google.com")) {
-    const m = direct.match(/\/d\/([\w-]{25,})|id=([\w-]{25,})/);
-    if (m) fileId = m[1] || m[2];
-  }
+    let fileId = book.driveFileId;
+    if (!fileId && book.embedUrl) {
+      const m = book.embedUrl.match(/\/d\/([\w-]{25,})|id=([\w-]{25,})/);
+      if (m) fileId = m[1] || m[2];
+    }
+    if (!fileId && book.pdfUrl?.includes("drive.google.com")) {
+      const m = book.pdfUrl.match(/\/d\/([\w-]{25,})|id=([\w-]{25,})/);
+      if (m) fileId = m[1] || m[2];
+    }
+    if (!fileId && direct?.includes("drive.google.com")) {
+      const m = direct.match(/\/d\/([\w-]{25,})|id=([\w-]{25,})/);
+      if (m) fileId = m[1] || m[2];
+    }
 
-  if (fileId) {
-    return `https://lh3.googleusercontent.com/d/${fileId}=w400`;
-  }
+    if (fileId) {
+      return `https://lh3.googleusercontent.com/d/${fileId}=w400`;
+    }
 
-  return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-};
+    return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+  };
 
   const categories = [
     {
@@ -195,9 +195,6 @@ const getThumbnailUrl = (book) => {
       );
     }
   }, [book]);
-
-  
-
 
   useEffect(() => {
     if (!bookId) return;
@@ -342,7 +339,7 @@ const getThumbnailUrl = (book) => {
           }),
         );
         list.sort((a, b) => b.uploadedBooks - a.uploadedBooks);
-        setLecturers(list.slice(0, 6));
+        setLecturers(list.slice(3, 5));
       } catch {
       } finally {
         setLoadingLecturers(false);
@@ -459,25 +456,54 @@ const getThumbnailUrl = (book) => {
     }
   };
 
-  useEffect(() => {
-    const fetchSales = async () => {
-      try {
-        const snap = await getDocs(collection(db, "users"));
-        const map = {};
-        snap.docs.forEach((u) => {
-          Object.values(u.data().purchasedBooks || {}).forEach((p) => {
-            const id = p.bookId || p.id || p.firestoreId;
-            if (id) {
-              map[id] = (map[id] || 0) + 1;
-              map[`firestore-${id}`] = (map[`firestore-${id}`] || 0) + 1;
-            }
-          });
+ useEffect(() => {
+  const fetchSales = async () => {
+    try {
+      // Use a Set to track unique sale IDs already counted
+      // so the same Firestore doc can't be counted twice
+      const map = {};
+
+      const addSale = (rawId) => {
+        if (!rawId) return;
+        const id    = String(rawId);
+        const clean = id.replace("firestore-", "");
+        const full  = `firestore-${clean}`;
+        // Both variants point to the same book — increment ONCE,
+        // then mirror so lookup works regardless of which format is used
+        const current = map[full] || map[clean] || 0;
+        map[full]  = current + 1;
+        map[clean] = current + 1;
+      };
+
+      // 1. Digital purchases
+      const usersSnap = await getDocs(collection(db, "users"));
+      usersSnap.docs.forEach((u) => {
+        Object.values(u.data().purchasedBooks || {}).forEach((p) => {
+          addSale(p.bookId || p.id || p.firestoreId);
         });
-        setBookSalesCount(map);
-      } catch {}
-    };
-    fetchSales();
-  }, []);
+      });
+
+      // 2. Physical completed sales ONLY (authoritative record)
+      try {
+        const physSalesSnap = await getDocs(collection(db, "physicalSales"));
+        physSalesSnap.docs.forEach((d) => {
+          const data = d.data();
+          addSale(data.bookId || data.inventoryId);
+        });
+      } catch (e) {
+        console.warn("physicalSales fetch failed:", e);
+      }
+
+      // physicalOrders intentionally excluded — reservations, not sales
+
+      setBookSalesCount(map);
+    } catch (e) {
+      console.error("fetchSales error:", e);
+    }
+  };
+
+  fetchSales();
+}, []);
 
   useEffect(() => {
     const handleVisibility = async () => {
@@ -1149,11 +1175,12 @@ const getThumbnailUrl = (book) => {
         </div>
       ) : (
         <div>
+          {/* Replace this in PdfViewer, in the non-purchased section */}
           <div
             style={{
               position: "relative",
               overflow: "hidden",
-              height: heightClass,
+              height: !book.embedUrl && !book.pdfUrl ? "0px" : heightClass, // ← collapse if no PDF
             }}
           >
             {book.embedUrl ? (
@@ -1180,29 +1207,10 @@ const getThumbnailUrl = (book) => {
                 title={`${book.title} - Preview`}
                 scrolling="no"
               />
-            ) : (
-              <div
-                style={{ padding: "32px", background: "#fff", height: "100%" }}
-              >
-                <h3
-                  style={{
-                    fontFamily: "'Playfair Display',serif",
-                    fontSize: "20px",
-                    fontWeight: 700,
-                    color: NAVY,
-                    margin: "0 0 16px",
-                  }}
-                >
-                  {book.title}
-                </h3>
-                <p
-                  style={{ fontSize: "13px", color: "#666", lineHeight: 1.75 }}
-                >
-                  {book.introduction?.slice(0, 800) || book.description}
-                </p>
-              </div>
-            )}
+            ) : null}{" "}
+            {/* ← remove the fallback text div, the purchase CTA below handles it */}
           </div>
+
           {/* Purchase CTA */}
           <div
             style={{
@@ -1354,7 +1362,14 @@ const getThumbnailUrl = (book) => {
   const suggestedBooks = (allBooks.length > 0 ? allBooks : booksData)
     .filter((b) => b.id !== bookId)
     .slice(0, 12);
-  const sold = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
+  const cleanId = String(book.id || "").replace("firestore-", "");
+
+  const sold =
+    bookSalesCount[book.id] ||
+    bookSalesCount[book.firestoreId] ||
+    bookSalesCount[`firestore-${cleanId}`] ||
+    bookSalesCount[cleanId] ||
+    0;
 
   return (
     <>
@@ -1778,11 +1793,10 @@ const getThumbnailUrl = (book) => {
             className="lg-grid"
           >
             {/* ── LEFT SIDEBAR ── */}
+            {/* ── LEFT SIDEBAR ── */}
             <div className="lg-show" style={{ display: "none" }}>
               <div
                 style={{
-                  position: "sticky",
-                  top: "76px",
                   display: "flex",
                   flexDirection: "column",
                   gap: "16px",
@@ -1798,7 +1812,7 @@ const getThumbnailUrl = (book) => {
                 >
                   <div style={{ position: "relative" }}>
                     <img
-                      src={getThumbnailUrl(book)}
+                      src={book.image || getThumbnailUrl(book)} // ← use pre-processed image first
                       alt={book.title}
                       style={{
                         width: "100%",
@@ -1806,23 +1820,24 @@ const getThumbnailUrl = (book) => {
                         objectFit: "cover",
                         display: "block",
                       }}
-               onError={(e) => {
-                  const src = e.target.src;
-                  if (src.includes('lh3.googleusercontent.com')) {
-                    // lh3 failed too — use Unsplash
-                    e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                  } else if (src.includes('drive.google.com')) {
-                    // Chrome-only thumbnail failed — try lh3 (cross-browser)
-                    const m = src.match(/id=([\w-]{25,})/);
-                    if (m) {
-                      e.target.src = `https://lh3.googleusercontent.com/d/${m[1]}=w400`;
-                      return;
-                    }
-                    e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                  } else {
-                    e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
-                  }
-                }}
+                      onError={(e) => {
+                        const src = e.target.src;
+                        if (src.includes("lh3.googleusercontent.com")) {
+                          e.target.src =
+                            "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+                        } else {
+                          const m = src.match(
+                            /\/d\/([\w-]{25,})|id=([\w-]{25,})/,
+                          );
+                          if (m) {
+                            const fileId = m[1] || m[2];
+                            e.target.src = `https://lh3.googleusercontent.com/d/${fileId}=w400`;
+                          } else {
+                            e.target.src =
+                              "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+                          }
+                        }
+                      }}
                     />
                     {/* LIVE badge */}
                     <div
@@ -2872,8 +2887,7 @@ const getThumbnailUrl = (book) => {
                       Summary
                     </button>
                   </div>
-                </div>            
-                
+                </div>
 
                 <PhysicalStockBadge />
                 <PdfViewer heightClass="400px" fullHeight="900px" />
@@ -3164,8 +3178,6 @@ const getThumbnailUrl = (book) => {
             <div className="lg-show" style={{ display: "none" }}>
               <div
                 style={{
-                  position: "sticky",
-                  top: "76px",
                   display: "flex",
                   flexDirection: "column",
                   gap: "16px",

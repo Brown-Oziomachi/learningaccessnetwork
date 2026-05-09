@@ -561,7 +561,7 @@ useEffect(() => {
                       borderRadius: "50%", display: "inline-block",
                       animation: "spin 0.7s linear infinite",
                     }} />
-                    Loading…
+                    Checking…
                   </span>
                 ) : isSeller ? (
                   <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
@@ -782,7 +782,7 @@ useEffect(() => {
                     display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
                   }}
                 >
-                  {checkingSeller ? "Loading…" : isSeller ? <><Upload size={16} />Upload Document</> : "Become a Seller"}
+                  {checkingSeller ? "Checking…" : isSeller ? <><Upload size={16} />Upload Document</> : "Become a Seller"}
                 </button>
 
                 <div className="lan-divider-gold" />

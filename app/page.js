@@ -219,8 +219,29 @@ const SERVICES = [
 ];
 
 const TESTIMONIALS = [
-  { name: "Theresa",  text: "LAN Library is a great company with one of the best support teams I've ever seen. Every question answered instantly." },
-  { name: "Blessing", text: "LAN Library has been helping me since last year. I don't have to stress about finding books anymore — it comes quickly." },
+  // Verified Sellers
+
+  {
+    name: "Tunde Bakare",
+    role: "Verified Seller",
+    text: "LAN gave me a platform to monetise years of study materials. My balance keeps growing while I sleep.",
+  },
+  // Verified Faculty
+  {
+    name: "Dr. Ngozi Ibe",
+    role: "Verified Faculty",
+    text: "My students can now access my recommended reading directly on LAN. It has transformed my lectures.",
+  },
+  {
+    name: "Prof. Abiodun Salami",
+    role: "Verified Faculty",
+    text: "I uploaded my course materials once and students across Nigeria are benefiting. LAN is a game changer.",
+  },
+  {
+    name: "Bar. Justice Mercy",
+    role: "Verified Faculty",
+    text: "I uploaded my course materials once and students across Nigeria are benefiting. LAN is a game changer.",
+  },
 ];
 
 /* ════════════════════════════════════════════════════════════════
@@ -640,57 +661,89 @@ export default function LandingPage() {
         )}
 
         {/* ══════ TESTIMONIALS ══════ */}
-        <section className="cream-bg" style={{ padding:"96px 24px" }}>
-          <div style={{ maxWidth:1100, margin:"0 auto" }}>
-            <div style={{ textAlign:"center", marginBottom:56 }}>
-              <p style={{ fontSize:10, fontWeight:700, letterSpacing:".22em", textTransform:"uppercase", color:GOLD, marginBottom:12, fontFamily:"'Lato',sans-serif" }}>Social Proof</p>
-              <h2 className="lan-serif" style={{ fontSize:"clamp(28px,4vw,48px)", fontWeight:700, color:NAVY, margin:0, lineHeight:1.15 }}>
-                Over <span style={{ color:GOLD, fontStyle:"italic" }}>10,000+ people</span><br/>love us. You will too.
+        <section className="cream-bg" style={{ padding: "96px 24px" }}>
+          <div style={{ maxWidth: 1500, margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: 56 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".22em", textTransform: "uppercase", color: GOLD, marginBottom: 12, fontFamily: "'Lato',sans-serif" }}>Social Proof</p>
+              <h2 className="lan-serif" style={{ fontSize: "clamp(28px,4vw,48px)", fontWeight: 700, color: NAVY, margin: 0, lineHeight: 1.15 }}>
+                Over <span style={{ color: GOLD, fontStyle: "italic" }}>10,000+ people</span><br />love us. You will too.
               </h2>
+
+              {/* Role legend */}
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 16, marginTop: 24 }}>
+                {[
+                  { role: "Verified Seller", color: "#16a34a", bg: "rgba(22,163,74,.1)", border: "rgba(22,163,74,.3)" },
+                  { role: "Verified Faculty", color: NAVY, bg: "rgba(13,34,68,.07)", border: "rgba(13,34,68,.2)" },
+                ].map(({ role, color, bg, border }) => (
+                  <div key={role} style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    background: bg, border: `0.5px solid ${border}`,
+                    padding: "4px 12px", fontSize: 10, fontWeight: 700,
+                    color, fontFamily: "'Lato',sans-serif", letterSpacing: ".06em"
+                  }}>
+                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: color, display: "inline-block" }} />
+                    {role}
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div style={{ display:"grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap:20, marginBottom:24 }}>
-              {TESTIMONIALS.map(({ name, text }) => (
-                <div key={name} className="test-card lan-card">
-                  {/* quote mark */}
-                  <div className="lan-serif" style={{ fontSize:64, color:CREAM, lineHeight:1, marginBottom:-16 }}>"</div>
-                  <p style={{ fontSize:14, color:"#666", lineHeight:1.8, marginBottom:24, fontFamily:"'Lato',sans-serif" }}>{text}</p>
-                  <div style={{ display:"flex", alignItems:"center", gap:12, borderTop:"0.5px solid #f0ebe0", paddingTop:18 }}>
-                    <div style={{ width:40, height:40, background:NAVY, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, overflow:"hidden" }}>
-                      <img src="/lanlog.png" alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize:13, fontWeight:700, color:NAVY, fontFamily:"'Lato',sans-serif" }}>{name}</div>
-                      <div style={{ fontSize:11, color:GOLD, fontFamily:"'Lato',sans-serif", letterSpacing:".06em" }}>Verified User</div>
-                    </div>
-                    <div style={{ marginLeft:"auto", display:"flex", gap:2 }}>
-                      {[0,1,2,3,4].map(i => <Star key={i} size={12} style={{ color:GOLD, fill:GOLD }} />)}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20, marginBottom: 24 }}>
+              {TESTIMONIALS.map(({ name, role, text }) => {
+                const roleMeta = {
+                  "Verified Seller": { color: "#16a34a", bg: "rgba(22,163,74,.08)", border: "rgba(22,163,74,.25)" },
+                  "Verified Faculty": { color: NAVY, bg: "rgba(13,34,68,.07)", border: "rgba(13,34,68,.2)" },
+                };
+                const meta = roleMeta[role] || roleMeta["Verified User"];
+
+                return (
+                  <div key={name} className="test-card lan-card">
+                    <div className="lan-serif" style={{ fontSize: 64, color: CREAM, lineHeight: 1, marginBottom: -16 }}>"</div>
+                    <p style={{ fontSize: 14, color: "#666", lineHeight: 1.8, marginBottom: 24, fontFamily: "'Lato',sans-serif" }}>{text}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, borderTop: "0.5px solid #f0ebe0", paddingTop: 18 }}>
+                      <div style={{ width: 40, height: 40, background: NAVY, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
+                        <img src="/lanlog.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{name}</div>
+                        {/* Dynamic role badge */}
+                        <div style={{
+                          display: "inline-flex", alignItems: "center", gap: 4, marginTop: 3,
+                          fontSize: 10, fontWeight: 700, color: meta.color,
+                          background: meta.bg, border: `0.5px solid ${meta.border}`,
+                          padding: "2px 8px", fontFamily: "'Lato',sans-serif", letterSpacing: ".06em",
+                        }}>
+                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: meta.color, display: "inline-block", flexShrink: 0 }} />
+                          {role}
+                        </div>
+                      </div>
+                    
                     </div>
                   </div>
-                </div>
-              ))}
-
+                );
+              })}
               {/* video card */}
               <button onClick={() => setShowVideo(true)}
-                style={{ position:"relative", minHeight:240, border:"0.5px solid #e5ddd0", overflow:"hidden", cursor:"pointer", background:"none" }}>
-                <img src="/lanlogo.jpg" alt="Watch video" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover" }}
-                  onError={e => { e.target.style.background=NAVY; e.target.style.display="none"; }} />
-                <div style={{ position:"absolute", inset:0, background:"rgba(13,34,68,0.55)" }} />
-                <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:16 }}>
-                  <div style={{ width:68, height:68, background:"rgba(255,255,255,0.92)", borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", transition:"transform .2s", boxShadow:"0 8px 24px rgba(0,0,0,0.25)" }}>
-                    <Play size={26} style={{ color:NAVY, fill:NAVY, marginLeft:4 }} />
+                style={{ position: "relative", minHeight: 240, border: "0.5px solid #e5ddd0", overflow: "hidden", cursor: "pointer", background: "none" }}>
+                <img src="/lanlogo.jpg" alt="Watch video" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                  onError={e => { e.target.style.background = NAVY; e.target.style.display = "none"; }} />
+                <div style={{ position: "absolute", inset: 0, background: "rgba(13,34,68,0.55)" }} />
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+                  <div style={{ width: 68, height: 68, background: "rgba(255,255,255,0.92)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", transition: "transform .2s", boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
+                    <Play size={26} style={{ color: NAVY, fill: NAVY, marginLeft: 4 }} />
                   </div>
-                  <span style={{ fontSize:12, fontWeight:700, color:"#fff", fontFamily:"'Lato',sans-serif", letterSpacing:".1em", textTransform:"uppercase" }}>Watch Story</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'Lato',sans-serif", letterSpacing: ".1em", textTransform: "uppercase" }}>Watch Story</span>
                 </div>
-                <div style={{ position:"absolute", bottom:16, left:16, display:"flex", alignItems:"center", gap:10 }}>
-                  <img src="/lanlog.png" alt="" style={{ width:36, height:36, borderRadius:"50%", objectFit:"cover", border:"1px solid rgba(184,150,62,0.4)" }} />
-                  <span className="lan-serif" style={{ color:"#fff", fontSize:16, fontWeight:700 }}>LAN Library</span>
+                <div style={{ position: "absolute", bottom: 16, left: 16, display: "flex", alignItems: "center", gap: 10 }}>
+                  <img src="/lanlog.png" alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(184,150,62,0.4)" }} />
+                  <span className="lan-serif" style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>How To Use LAN Library</span>
                 </div>
               </button>
+
             </div>
 
-            <div style={{ textAlign:"center" }}>
-              <a href="/learn/make-money" target="_blank" className="btn-navy" style={{ textDecoration:"none", display:"inline-flex" }}>
+            <div style={{ textAlign: "center" }}>
+              <a href="/learn/make-money" target="_blank" className="btn-navy" style={{ textDecoration: "none", display: "inline-flex" }}>
                 Watch More Videos <ArrowRight size={13} />
               </a>
             </div>

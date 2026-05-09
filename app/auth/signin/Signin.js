@@ -180,7 +180,7 @@ export default function SignInClient() {
 
           {/* RIGHT — form */}
           <div className="signin-right">
-            <div style={{ width: "100%", maxWidth: 380 }}>
+            <div style={{ width: "100%", maxWidth: 380, }} >
 
               <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, marginBottom: 8 }}>Scholar Access</p>
               <h2 className="lan-serif" style={{ fontSize: 26, fontWeight: 700, color: NAVY, marginBottom: 6 }}>Sign into your account</h2>

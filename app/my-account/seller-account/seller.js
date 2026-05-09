@@ -50,6 +50,34 @@ const nigerianBanks = [
     { name: "Zenith Bank", code: "057" },
 ];
 
+/* ─── VerifiedFacultyBadge ───────────────────────────────────── */
+function VerifiedFacultyBadge({ user, seller }) {
+    const isVerified =
+        (user?.role === "lecturer" || user?.isLecturer === true) &&
+        user?.isVerified === true &&
+        user?.lecturerVerificationStatus !== "pending" &&
+        user?.lecturerVerificationStatus !== "rejected";
+
+    if (!isVerified) return null;
+
+    return (
+        <span
+            title={`Verified Faculty — ${user?.department || seller?.title || "Academic Staff"}`}
+            aria-label="Verified Faculty"
+            style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: "16px", height: "16px", borderRadius: "50%",
+                background: "#1d9bf0", flexShrink: 0, verticalAlign: "middle",
+                marginLeft: "4px", cursor: "default",
+            }}
+        >
+            <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                <path d="M2 5.2L4 7.2L8 3" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        </span>
+    );
+}
+
 /* ─── PinModal ───────────────────────────────────────────────── */
 function PinModal({ amount, bankDetails, pinError, onDigit, onDelete, onConfirm, onClose, pinValue }) {
     const dots = Array.from({ length: 4 }, (_, i) => i < pinValue.length);
@@ -540,6 +568,7 @@ export default function SellerAccountClient() {
     const [savingBank, setSavingBank] = useState(false);
     const [formData, setFormData] = useState({ firstName: "", surname: "", dateOfBirth: "", phone: "", address: "", country: "" });
     const { processing: pinProcessing, requestPinReset, verifyOtpAndSetPin } = usePayment(null, formData, null);
+    const isPendingLecturer = user?.lecturerVerificationStatus === 'pending';
 
     /* ── All original useEffects & handlers — completely unchanged ── */
     useEffect(() => {
@@ -557,7 +586,14 @@ export default function SellerAccountClient() {
             if (userDoc.exists()) {
                 const userData = userDoc.data();
                 if (userData.isDeactivated === true) { await auth.signOut(); router.push("/auth/signin?reason=deactivated"); return; }
-                if (!userData.isSeller) { router.push('/my-account'); return; }
+                // Lecturer pending — allow them to see the page but in pending state
+                const isPendingLecturer = userData.lecturerVerificationStatus === 'pending' ||
+                    userData.lecturerVerificationStatus === 'rejected';
+
+                if (!userData.isSeller && !isPendingLecturer) {
+                    router.push('/my-account');
+                    return;
+                }
                 if (userData.isSeller && window.location.pathname === '/my-account') { router.push('/my-account/seller-account'); return; }
                 const sellerDoc = await getDoc(doc(db, "sellers", uid));
                 let bankDetails = null;
@@ -769,18 +805,88 @@ export default function SellerAccountClient() {
 
                 <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 16px' }}>
 
+                    {/* Pending verification banner — shown only to lecturers awaiting approval */}
+                    {user?.lecturerVerificationStatus === 'pending' && (
+                        <div style={{
+                            background: 'rgba(245,158,11,0.08)',
+                            border: '0.5px solid rgba(245,158,11,0.3)',
+                            padding: '14px 20px',
+                            marginBottom: '20px',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '12px',
+                        }}>
+                            <div style={{
+                                width: '36px', height: '36px', borderRadius: '50%',
+                                background: 'rgba(245,158,11,0.15)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                            }}>
+                                <AlertCircle size={18} style={{ color: '#d97706' }} />
+                            </div>
+                            <div>
+                                <p style={{ fontFamily: "'Lato',sans-serif", fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 3px' }}>
+                                    Your Faculty Account is Pending Verification
+                                </p>
+                                <p style={{ fontFamily: "'Lato',sans-serif", fontSize: '12px', color: '#92400e', margin: 0, lineHeight: 1.6 }}>
+                                    Our team is reviewing your credentials. This usually takes <strong>24–48 hours</strong>.
+                                    You'll receive a notification once approved and your seller account will be activated.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {user?.lecturerVerificationStatus === 'rejected' && (
+                        <div style={{
+                            background: '#fef2f2',
+                            border: '0.5px solid #fecaca',
+                            padding: '14px 20px',
+                            marginBottom: '20px',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '12px',
+                        }}>
+                            <div style={{
+                                width: '36px', height: '36px', borderRadius: '50%',
+                                background: '#fee2e2',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                            }}>
+                                <AlertCircle size={18} style={{ color: '#ef4444' }} />
+                            </div>
+                            <div>
+                                <p style={{ fontFamily: "'Lato',sans-serif", fontSize: '13px', fontWeight: 700, color: '#dc2626', margin: '0 0 3px' }}>
+                                    Verification Not Approved
+                                </p>
+                                <p style={{ fontFamily: "'Lato',sans-serif", fontSize: '12px', color: '#991b1b', margin: '0 0 8px', lineHeight: 1.6 }}>
+                                    {user.verificationRejectedReason || 'Your documents could not be verified.'}
+                                </p>
+                                <a href="/docs" style={{ fontSize: '12px', fontWeight: 700, color: '#dc2626', fontFamily: "'Lato',sans-serif" }}>
+                                    Contact support →
+                                </a>
+                            </div>
+                        </div>
+                    )}
+
                     {/* ── Top Header Bar ── */}
                     <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '16px 24px', marginBottom: '24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                         <button onClick={() => setShowProfileModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
                             <img src={user?.photoURL || user?.photoBase64 || "/lan-logo.png"} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}` }} alt="Profile" />
                             <div style={{ textAlign: 'left' }}>
-                                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '16px', fontWeight: 700, color: NAVY, margin: 0 }}>
-                                    {user?.firstName || 'Seller'} {user?.surname}
+                                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '16px', fontWeight: 700, color: NAVY, margin: 0, display: 'flex', alignItems: 'center' }}>
+                                 {seller?.title ? `${seller.title} ` : ""}{user?.firstName} {user?.surname}
+                                    <VerifiedFacultyBadge user={user} seller={seller} />
                                 </p>
                                 <div className="gold-pill" style={{ marginTop: '4px' }}>
-                                    <div className="pulse-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
-                                    <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: GOLD, fontFamily: "'Lato',sans-serif" }}>
-                                        {user?.isLecturer || FACULTY_TITLES.includes(seller?.title) ? 'Verified Faculty' : 'Verified Seller'}                                    </span>
+                                    <div className="pulse-dot" style={{
+                                        width: '6px', height: '6px', borderRadius: '50%',
+                                        background: user?.lecturerVerificationStatus === 'pending' ? '#f59e0b'
+                                            : user?.lecturerVerificationStatus === 'rejected' ? '#ef4444'
+                                                : '#16a34a'
+                                    }} />                                    <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: GOLD, fontFamily: "'Lato',sans-serif" }}>
+                                        {user?.lecturerVerificationStatus === 'pending' ? 'Pending Verification'
+                                            : user?.lecturerVerificationStatus === 'rejected' ? 'Verification Rejected'
+                                                : user?.isLecturer || FACULTY_TITLES.includes(seller?.title) ? 'Verified Faculty'
+                                                    : 'Verified Seller'}
+                                    </span>
                                 </div>
                             </div>
                         </button>
@@ -818,7 +924,7 @@ export default function SellerAccountClient() {
                                     </button>
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                    <button onClick={() => setShowWithdrawModal(true)} disabled={accountBalance < 1000}
+                                    <button onClick={() => setShowWithdrawModal(true)} disabled={accountBalance < 1000 || isPendingLecturer}
                                         style={{ flex: '1', minWidth: '120px', background: GOLD, color: NAVY, padding: '12px 20px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: accountBalance >= 1000 ? 'pointer' : 'not-allowed', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em', opacity: accountBalance < 1000 ? 0.5 : 1, transition: 'background 0.18s' }}
                                         onMouseEnter={e => { if (accountBalance >= 1000) e.currentTarget.style.background = GOLDD; }}
                                         onMouseLeave={e => e.currentTarget.style.background = GOLD}
@@ -829,6 +935,12 @@ export default function SellerAccountClient() {
                                     >Transfer</a>
                                 </div>
                             </div>
+
+                            {isPendingLecturer && (
+                                <p style={{ fontSize: '11px', color: 'rgba(184,150,62,0.6)', marginTop: '8px', fontFamily: "'Lato',sans-serif" }}>
+                                    Withdrawals available after verification
+                                </p>
+                            )}
 
                             {/* Stats Row */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -989,8 +1101,8 @@ export default function SellerAccountClient() {
                                 <div style={{ position: 'relative', display: 'inline-block', marginBottom: '12px' }}>
                                     <img src={user?.photoBase64 || "/lan-logo.png"} style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${GOLD}` }} alt="Profile" />
                                 </div>
-                                <p className="lan-serif" style={{ fontSize: '22px', fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>{user?.displayName || `${user?.firstName} ${user?.surname}`}</p>
-                                <p style={{ fontSize: '12px', color: GOLD, fontFamily: "'Lato',sans-serif" }}>+234{user?.phone || '0000000000'}</p>
+                                <p className="lan-serif" style={{ fontSize: '22px', fontWeight: 700, color: '#fff', margin: '0 0 4px' }}> {seller?.title ? `${seller.title} ` : ""}{user?.firstName} {user?.surname}</p>
+                                <p style={{ fontSize: '12px', color: GOLD, fontFamily: "'Lato',sans-serif" }}>+234{user?.phone || user?.phoneNumber || '0000000000'}</p>
                             </div>
                             <div style={{ background: BG, flex: 1, overflowY: 'auto', padding: '12px' }}>
                                 {[
@@ -998,6 +1110,23 @@ export default function SellerAccountClient() {
                                     { label: 'Bank Details', icon: <Building size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setShowBankModal(true); if (user?.bankDetails) setBankFormData({ accountName: user.bankDetails.accountName || "", accountNumber: user.bankDetails.accountNumber || "", bankName: user.bankDetails.bankName || "", bankCode: user.bankDetails.bankCode || "" }); } },
                                     { label: 'Transaction History', icon: <TrendingUp size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setShowTransactionHistory(true); } },
                                     { label: 'Physical Repository', icon: <Package size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); router.push('/my-account/seller-account/repository'); } },
+
+                                    {
+                                        label: user?.lecturerVerificationStatus === 'pending'
+                                            ? 'Impact Analytics (Pending)'
+                                            : 'Impact Analytics',
+                                        icon: (
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                                stroke={user?.lecturerVerificationStatus === 'pending' ? '#d97706' : NAVY}
+                                                strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="18" y1="20" x2="18" y2="10" />
+                                                <line x1="12" y1="20" x2="12" y2="4" />
+                                                <line x1="6" y1="20" x2="6" y2="14" />
+                                                <line x1="2" y1="20" x2="22" y2="20" />
+                                            </svg>
+                                        ),
+                                        onClick: () => { setShowProfileModal(false); router.push('/my-account/seller-account/Impact-analytics'); }
+                                    },
                                     { label: 'Reset Transfer PIN', icon: <Settings size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setResetPinView('forgot'); setResetPinError(''); setResetPinSuccess(false); setResetOtpInput(''); setResetNewPin(''); setShowResetPinModal(true); } },
                                     { label: 'Help', icon: <AlertCircle size={18} style={{ color: NAVY }} />, onClick: handleButton },
                                 ].map(({ label, icon, onClick }) => (

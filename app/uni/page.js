@@ -1,4 +1,3 @@
-// app/uni/page.js
 import { AFRICAN_UNIVERSITIES, UNIVERSITY_COUNTRIES } from "@/lib/africanUniversities";
 import UniversityDirectoryClient from "./UniversityDirectoryClient";
 import { adminDb } from "@/lib/firebase-admin";
@@ -8,7 +7,7 @@ export const metadata = {
     description: "Find verified textbooks, past questions, and lecture notes for universities across Africa.",
 };
 
-const LECTURER_TITLES = ["lecturer", "dr.", "prof.", "professor", "mrs", "mr"];
+const FACULTY_TITLES = ["Dr.", "Prof.", "Engr.", "Pharm.", "Barr.", "Lecturer"];
 
 export default async function UniversityDirectoryPage() {
     const allUniversities = Object.entries(AFRICAN_UNIVERSITIES).map(([slug, uni]) => ({
@@ -26,7 +25,7 @@ export default async function UniversityDirectoryPage() {
         snap.forEach(ds => {
             const data = ds.data();
             const title = (data.title || "").toLowerCase();
-            const isLecturer = LECTURER_TITLES.some(t => title.includes(t));
+            const isLecturer = FACULTY_TITLES.some(t => title.includes(t.toLowerCase()));
             if (!isLecturer) return;
             if (!data.university) return;
 

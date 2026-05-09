@@ -319,7 +319,59 @@ export default function MyAccountClient() {
             </div>
 
             {/* Seller CTA — only for non-sellers */}
-            {!user.isSeller && (
+            {/* Pending lecturer banner */}
+            {!user.isSeller && user.lecturerVerificationStatus === 'pending' && (
+              <div style={{ background: 'rgba(245,158,11,0.06)', border: '0.5px solid rgba(245,158,11,0.3)', padding: '24px 28px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                  <div style={{ width: '44px', height: '44px', background: 'rgba(245,158,11,0.12)', border: '0.5px solid rgba(245,158,11,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ fontSize: '20px' }}>⏳</span>
+                  </div>
+                  <div>
+                    <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '17px', fontWeight: 700, color: NAVY, margin: '0 0 5px' }}>
+                      Faculty Verification Pending
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#92400e', lineHeight: 1.7, margin: '0 0 14px', fontFamily: "'Lato',sans-serif" }}>
+                      Our team is reviewing your credentials. This usually takes <strong>24–48 hours</strong>. You'll receive a notification once approved and your seller account will be activated.
+                    </p>
+                    {[
+                      user.lecturerTitle && `Title: ${user.lecturerTitle}`,
+                      user.institution && `Institution: ${user.institution}`,
+                      user.department && `Department: ${user.department}`,
+                    ].filter(Boolean).map(line => (
+                      <div key={line} style={{ fontSize: '11px', color: '#a16207', fontFamily: "'Lato',sans-serif", marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: GOLD, flexShrink: 0 }} />
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Rejected lecturer banner */}
+            {!user.isSeller && user.lecturerVerificationStatus === 'rejected' && (
+              <div style={{ background: '#fef2f2', border: '0.5px solid #fecaca', padding: '24px 28px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                  <div style={{ width: '44px', height: '44px', background: '#fee2e2', border: '0.5px solid #fecaca', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ fontSize: '20px' }}>❌</span>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '17px', fontWeight: 700, color: '#dc2626', margin: '0 0 5px' }}>
+                      Verification Not Approved
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#991b1b', lineHeight: 1.7, margin: '0 0 14px', fontFamily: "'Lato',sans-serif" }}>
+                      {user.verificationRejectedReason || 'Your documents could not be verified. Please contact support.'}
+                    </p>
+                    <a href="/docs" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#dc2626', fontFamily: "'Lato',sans-serif", textDecoration: 'none' }}>
+                      Contact support →
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Seller CTA — only for non-sellers with no pending verification */}
+            {!user.isSeller && !user.lecturerVerificationStatus && (
               <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)", backgroundSize: "24px 24px", padding: "32px 28px", position: "relative", overflow: "hidden" }}>
                 <div style={{ position: "absolute", top: "-24px", right: "-24px", width: "100px", height: "100px", border: "0.5px solid rgba(184,150,62,0.15)", transform: "rotate(45deg)" }} />
                 <div className="gold-pill" style={{ marginBottom: "16px" }}>
@@ -358,6 +410,50 @@ export default function MyAccountClient() {
                     onMouseLeave={e => e.currentTarget.style.background = GOLD}>
                     Seller Dashboard <ChevronRight size={13} />
                   </button>
+                </div>
+              </div>
+            )}
+
+            {!user.isSeller && user.lecturerVerificationStatus === 'pending' && (
+              <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)", backgroundSize: "24px 24px", padding: "28px", position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: "-24px", right: "-24px", width: "90px", height: "90px", border: "0.5px solid rgba(245,158,11,0.15)", transform: "rotate(45deg)" }} />
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(245,158,11,0.15)", border: "0.5px solid rgba(245,158,11,0.3)", padding: "5px 12px", borderRadius: "999px", marginBottom: "12px" }}>
+                      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f59e0b" }} />
+                      <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#f59e0b", fontFamily: "'Lato',sans-serif" }}>Under Review</span>
+                    </div>
+                    <p className="lan-serif" style={{ fontSize: "20px", fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>Verification in Progress</p>
+                    <p style={{ fontSize: "12px", color: "rgba(245,240,232,0.55)", fontFamily: "'Lato',sans-serif", lineHeight: 1.6 }}>
+                      Our team is reviewing your faculty credentials. You'll be notified within 24–48 hours.
+                    </p>
+                  </div>
+                  <button onClick={() => router.push("/my-account/seller-account")}
+                    style={{ display: "inline-flex", alignItems: "center", gap: "7px", padding: "11px 20px", background: "rgba(245,158,11,0.15)", color: "#f59e0b", border: "0.5px solid rgba(245,158,11,0.3)", fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>
+                    View Status <ChevronRight size={13} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!user.isSeller && user.lecturerVerificationStatus === 'rejected' && (
+              <div style={{ background: "#1a0a0a", backgroundImage: "radial-gradient(rgba(239,68,68,0.06) 1px,transparent 1px)", backgroundSize: "24px 24px", padding: "28px", position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: "-24px", right: "-24px", width: "90px", height: "90px", border: "0.5px solid rgba(239,68,68,0.15)", transform: "rotate(45deg)" }} />
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(239,68,68,0.12)", border: "0.5px solid rgba(239,68,68,0.3)", padding: "5px 12px", borderRadius: "999px", marginBottom: "12px" }}>
+                      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#ef4444" }} />
+                      <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#ef4444", fontFamily: "'Lato',sans-serif" }}>Not Approved</span>
+                    </div>
+                    <p className="lan-serif" style={{ fontSize: "20px", fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>Verification Rejected</p>
+                    <p style={{ fontSize: "12px", color: "rgba(245,240,232,0.55)", fontFamily: "'Lato',sans-serif", lineHeight: 1.6 }}>
+                      {user.verificationRejectedReason || "Your documents could not be verified."}
+                    </p>
+                  </div>
+                  <a href="/docs"
+                    style={{ display: "inline-flex", alignItems: "center", gap: "7px", padding: "11px 20px", background: "rgba(239,68,68,0.12)", color: "#f87171", border: "0.5px solid rgba(239,68,68,0.3)", fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", flexShrink: 0, textDecoration: "none" }}>
+                    Contact Support <ChevronRight size={13} />
+                  </a>
                 </div>
               </div>
             )}

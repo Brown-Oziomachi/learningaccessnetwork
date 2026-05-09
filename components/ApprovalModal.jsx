@@ -6,20 +6,24 @@ import {
   FileText,
   User,
   Mail,
+  BookOpen,
+  ShieldCheck,
+  ExternalLink,
+  Tag,
+  Hash,
   Calendar,
   DollarSign,
-  BookOpen,
-  Book,
-  ShieldCheck,
-  Building,
-  Phone,
+  Layers,
+  Building2,
+  Upload,
+  Link2,
+  Eye,
+  Clock,
   Send,
   Lock,
   UserX,
   Trash2,
   AlertTriangle,
-  Upload,
-  ExternalLink,
 } from "lucide-react";
 
 // ==================== BOOK APPROVAL MODAL ====================
@@ -39,17 +43,24 @@ export const BookApprovalModal = ({
   const [showReasonInput, setShowReasonInput] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
 
   if (!isOpen || !item) return null;
 
   const getFileType = (url) => {
     if (!url) return "Unknown";
     if (url.includes("firebasestorage.googleapis.com"))
-      return "Direct Upload (Firebase)";
+      return "Firebase Storage";
     if (url.includes("drive.google.com")) return "Google Drive";
     if (url.includes("dropbox.com")) return "Dropbox";
     return "External Link";
   };
+
+  const isDirectUpload = item.uploadMethod === "direct_upload";
+  const pdfSrc =
+    item.embedUrl ||
+    item.pdfUrl?.replace("/view", "/preview") ||
+    item.pdfLink?.replace("/view", "/preview");
 
   const handleApprove = async () => {
     if (checkPdfDuplicate) {
@@ -91,374 +102,1011 @@ export const BookApprovalModal = ({
     setActionType(null);
     setRejectionReason("");
     setShowReasonInput(false);
+    setDescExpanded(false);
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-          onClick={resetModal}
-        />
+  const S = {
+    /* ── layout ── */
+    backdrop: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 50,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+      background: "rgba(0,0,0,0.78)",
+      backdropFilter: "blur(6px)",
+    },
+    modal: {
+      position: "relative",
+      width: "100%",
+      maxWidth: 1440,
+      height: "calc(100vh - 32px)",
+      display: "flex",
+      flexDirection: "column",
+      background: "#080e1c",
+      borderRadius: 16,
+      border: "1px solid #1e293b",
+      overflow: "hidden",
+      boxShadow:
+        "0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.03)",
+    },
+    /* ── topbar ── */
+    topbar: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "0 20px",
+      height: 56,
+      flexShrink: 0,
+      background: "#0c1424",
+      borderBottom: "1px solid #1a2540",
+    },
+    /* ── body row ── */
+    body: { display: "flex", flex: 1, minHeight: 0 },
+    /* ── left panel ── */
+    leftPanel: {
+      display: "flex",
+      flexDirection: "column",
+      width: "60%",
+      flexShrink: 0,
+      borderRight: "1px solid #1a2540",
+      background: "#05090f",
+    },
+    viewerBar: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "0 16px",
+      height: 44,
+      flexShrink: 0,
+      background: "#0a1020",
+      borderBottom: "1px solid #1a2540",
+    },
+    iframeWrap: { flex: 1, overflow: "hidden", position: "relative" },
+    thumbStrip: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      padding: "10px 16px",
+      flexShrink: 0,
+      background: "#0a1020",
+      borderTop: "1px solid #1a2540",
+    },
+    /* ── right panel ── */
+    rightPanel: {
+      display: "flex",
+      flexDirection: "column",
+      flex: 1,
+      minWidth: 0,
+      background: "#080e1c",
+    },
+    scrollArea: { flex: 1, overflowY: "auto", padding: "24px 24px 0" },
+    actionBar: {
+      flexShrink: 0,
+      padding: "16px 24px",
+      background: "#0c1424",
+      borderTop: "1px solid #1a2540",
+    },
+    /* ── reusable ── */
+    metaCell: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 3,
+      padding: "12px 14px",
+      background: "#0f172a",
+      borderRadius: 10,
+      border: "1px solid #1e293b",
+    },
+    metaLabel: {
+      fontSize: 10,
+      fontWeight: 700,
+      letterSpacing: ".08em",
+      textTransform: "uppercase",
+      color: "#475569",
+      display: "flex",
+      alignItems: "center",
+      gap: 4,
+    },
+    metaVal: {
+      fontSize: 15,
+      fontWeight: 700,
+      color: "#f1f5f9",
+      lineHeight: 1.2,
+    },
+    metaValSm: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#f1f5f9",
+      lineHeight: 1.3,
+    },
+    sectionTitle: {
+      fontSize: 10,
+      fontWeight: 700,
+      letterSpacing: ".1em",
+      textTransform: "uppercase",
+      color: "#3b4f6b",
+      marginBottom: 10,
+    },
+    card: {
+      padding: "12px 14px",
+      borderRadius: 10,
+      background: "#0f172a",
+      border: "1px solid #1e293b",
+    },
+    divider: { height: 1, background: "#1a2540", margin: "0 0 20px" },
+  };
 
-        <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          {/* Header */}
-          <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-2xl z-10">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-white bg-opacity-20 rounded-lg p-2">
-                  <BookOpen className="w-6 h-6" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold">Book Review</h2>
-                  <p className="text-sm text-blue-100">
-                    Review and take action
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={resetModal}
-                className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-2"
+  const spinner = (
+    <div
+      style={{
+        width: 14,
+        height: 14,
+        borderRadius: "50%",
+        border: "2px solid rgba(255,255,255,0.25)",
+        borderTopColor: "#fff",
+        animation: "bam-spin .7s linear infinite",
+      }}
+    />
+  );
+
+  return (
+    <>
+      <style>{`
+        @keyframes bam-spin { to { transform: rotate(360deg); } }
+        @keyframes bam-up { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        .bam-scroll::-webkit-scrollbar { width: 4px; }
+        .bam-scroll::-webkit-scrollbar-track { background: transparent; }
+        .bam-scroll::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        .bam-scroll::-webkit-scrollbar-thumb:hover { background: #334155; }
+        .bam-confirm { animation: bam-up .2s ease-out; }
+        .bam-approve-btn {
+          flex:1; display:flex; align-items:center; justify-content:center; gap:8px;
+          background:#16a34a; color:#fff; border:none; border-radius:10px;
+          padding:14px 20px; font-size:14px; font-weight:700; cursor:pointer;
+          transition: background .15s, box-shadow .15s, transform .1s;
+        }
+        .bam-approve-btn:hover:not(:disabled) { background:#15803d; box-shadow:0 0 0 4px rgba(22,163,74,0.25); }
+        .bam-approve-btn:active:not(:disabled) { transform:scale(.98); }
+        .bam-approve-btn:disabled { opacity:.4; cursor:not-allowed; }
+        .bam-reject-btn {
+          flex:1; display:flex; align-items:center; justify-content:center; gap:8px;
+          background:#dc2626; color:#fff; border:none; border-radius:10px;
+          padding:14px 20px; font-size:14px; font-weight:700; cursor:pointer;
+          transition: background .15s, box-shadow .15s, transform .1s;
+        }
+        .bam-reject-btn:hover:not(:disabled) { background:#b91c1c; box-shadow:0 0 0 4px rgba(220,38,38,0.25); }
+        .bam-reject-btn:active:not(:disabled) { transform:scale(.98); }
+        .bam-reject-btn:disabled { opacity:.4; cursor:not-allowed; }
+        .bam-ghost-btn {
+          display:flex; align-items:center; justify-content:center; gap:6px;
+          background:transparent; color:#64748b;
+          border:1px solid #1e293b; border-radius:10px;
+          padding:14px 18px; font-size:13px; font-weight:600;
+          cursor:pointer; transition:all .15s; white-space:nowrap;
+        }
+        .bam-ghost-btn:hover { background:#1e293b; color:#e2e8f0; border-color:#334155; }
+        .bam-sm-btn {
+          display:flex; align-items:center; justify-content:center; gap:6px;
+          padding:10px 18px; border-radius:8px; font-size:13px; font-weight:600;
+          cursor:pointer; border:none; transition:all .15s;
+        }
+        .bam-link-btn {
+          display:flex; align-items:center; gap:5px;
+          font-size:12px; font-weight:600; color:#60a5fa;
+          text-decoration:none; padding:4px 10px;
+          border-radius:6px; border:1px solid rgba(96,165,250,0.2);
+          background:rgba(96,165,250,0.07); transition:all .15s;
+        }
+        .bam-link-btn:hover { background:rgba(96,165,250,0.15); }
+        .bam-close-btn {
+          width:32px; height:32px; border-radius:8px;
+          background:transparent; border:1px solid #1e293b;
+          cursor:pointer; display:flex; align-items:center; justify-content:center;
+          color:#64748b; transition:all .15s;
+        }
+        .bam-close-btn:hover { background:#1e293b; color:#f1f5f9; }
+      `}</style>
+
+      <div style={S.backdrop} onClick={resetModal}>
+        <div style={S.modal} onClick={(e) => e.stopPropagation()}>
+          {/* ── TOP BAR ── */}
+          <div style={S.topbar}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, }} >
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: "rgba(99,102,241,0.15)",
+                  border: "1px solid rgba(99,102,241,0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
               >
-                <X className="w-5 h-5" />
+                <BookOpen style={{ width: 15, height: 15, color: "#818cf8" }} />
+              </div>
+              <div>
+                <p
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "#f1f5f9",
+                    margin: 0,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  Book Review
+                </p>
+                <p style={{ fontSize: 11, color: "#3b4f6b", margin: 0 }} className="mt-20">
+                  Admin · Document approval
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* status badge */}
+              {[
+                item.status === "pending" && {
+                  bg: "rgba(251,191,36,0.12)",
+                  color: "#fbbf24",
+                  dot: "#fbbf24",
+                  border: "rgba(251,191,36,0.2)",
+                  label: "Pending",
+                },
+                item.status === "approved" && {
+                  bg: "rgba(34,197,94,0.12)",
+                  color: "#4ade80",
+                  dot: "#4ade80",
+                  border: "rgba(34,197,94,0.2)",
+                  label: "Approved",
+                },
+                item.status === "rejected" && {
+                  bg: "rgba(239,68,68,0.12)",
+                  color: "#f87171",
+                  dot: "#f87171",
+                  border: "rgba(239,68,68,0.2)",
+                  label: "Rejected",
+                },
+              ]
+                .filter(Boolean)
+                .map(({ bg, color, dot, border, label }) => (
+                  <span
+                    key={label}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "4px 12px",
+                      borderRadius: 999,
+                      background: bg,
+                      color,
+                      border: `1px solid ${border}`,
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: dot,
+                      }}
+                    />
+                    {label}
+                  </span>
+                ))}
+
+              {/* upload method */}
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 12px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  ...(isDirectUpload
+                    ? {
+                        background: "rgba(139,92,246,0.12)",
+                        color: "#c4b5fd",
+                        border: "1px solid rgba(139,92,246,0.2)",
+                      }
+                    : {
+                        background: "rgba(56,189,248,0.1)",
+                        color: "#7dd3fc",
+                        border: "1px solid rgba(56,189,248,0.18)",
+                      }),
+                }}
+              >
+                {isDirectUpload ? (
+                  <Upload style={{ width: 11, height: 11 }} />
+                ) : (
+                  <Link2 style={{ width: 11, height: 11 }} />
+                )}
+                {isDirectUpload ? "Direct Upload" : "Drive Link"}
+              </span>
+
+              <button onClick={resetModal} className="bam-close-btn ">
+                <X style={{ width: 14, height: 14 }} />
               </button>
             </div>
           </div>
 
-          {/* Content */}
-          <div className="p-6">
-            <div className="space-y-4">
-              {/* Book Info */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                      {item.bookTitle}
-                    </h3>
-                    <p className="text-gray-600 flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      by {item.author}
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-lg px-4 py-2 shadow-sm">
-                    <p className="text-xs text-gray-500">Price</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      ₦{item.price?.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="bg-white rounded-lg p-3">
-                    <p className="text-gray-500 text-xs mb-1">Category</p>
-                    <p className="font-semibold text-gray-900 capitalize">
-                      {item.category}
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-lg p-3">
-                    <p className="text-gray-500 text-xs mb-1">Pages</p>
-                    <p className="font-semibold text-gray-900">
-                      {item.pages || "N/A"}
-                    </p>
-                  </div>
-                  {item.institutionalCategory && (
-                    <div className="bg-white rounded-lg p-3 col-span-2">
-                      <p className="text-gray-500 text-xs mb-1">
-                        Institutional Category
-                      </p>
-                      <p className="font-semibold text-gray-900 capitalize">
-                        {item.institutionalCategory}
-                      </p>
-                    </div>
-                  )}
-                  <div className="bg-white rounded-lg p-3">
-                    <p className="text-gray-500 text-xs mb-1">Status</p>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(item.status)}`}
-                    >
-                      {item.status}
-                    </span>
-                  </div>
-                  <div className="bg-white rounded-lg p-3">
-                    <p className="text-gray-500 text-xs mb-1">Submitted</p>
-                    <p className="text-xs text-gray-900">
-                      {formatDate(item.createdAt)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Seller Info */}
-              <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs text-gray-500 mb-3 font-semibold">
-                  Seller Information
-                </p>
-                <div className="space-y-2">
-                  <p className="flex items-center gap-2 text-sm">
-                    <User className="w-4 h-4 text-gray-400" />
-                    <span className="font-semibold">{item.sellerName}</span>
-                  </p>
-                  <p className="flex items-center gap-2 text-sm text-gray-600">
-                    <Mail className="w-4 h-4 text-gray-400" />
-                    {item.sellerEmail}
-                  </p>
-                </div>
-              </div>
-
-              {/* Description */}
-              {item.description && (
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <p className="text-xs text-gray-500 mb-2 font-semibold">
-                    Description
-                  </p>
-                  <p className="text-sm text-gray-700">{item.description}</p>
-                </div>
-              )}
-
-              {/* Upload Method Indicator */}
-              <div className="mb-4">
-                <div
-                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold ${
-                    item.uploadMethod === "direct_upload"
-                      ? "bg-purple-100 text-purple-800"
-                      : "bg-blue-100 text-blue-800"
-                  }`}
-                >
-                  <FileText className="w-4 h-4" />
-                  {item.uploadMethod === "direct_upload"
-                    ? "📤 Direct Upload"
-                    : "🔗 Drive Link"}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  File Type: {getFileType(item.pdfUrl || item.pdfLink)}
-                </p>
-              </div>
-
-              {/* Thumbnail Preview (for Drive links only) */}
-              {item.driveFileId && (
-                <div className="bg-white border-2 border-dashed border-gray-300 rounded-xl p-4 mb-4">
-                  <p className="text-sm font-semibold text-gray-700 mb-3">
-                    Book Thumbnail
-                  </p>
-                  <img
-                    src={`https://drive.google.com/thumbnail?id=${item.driveFileId}&sz=w400`}
-                    alt="Book Preview"
-                    className="w-full max-w-sm mx-auto rounded-lg shadow-md"
-                    onError={(e) => {
-                      e.target.src =
-                        "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+          {/* ── BODY ── */}
+          <div style={S.body}>
+            {/* LEFT — PDF */}
+            <div style={S.leftPanel}>
+              <div style={S.viewerBar}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Eye style={{ width: 13, height: 13, color: "#3b4f6b" }} />
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: ".08em",
+                      textTransform: "uppercase",
+                      color: "#3b4f6b",
                     }}
-                  />
+                  >
+                    PDF Preview
+                  </span>
                 </div>
-              )}
+                {(item.pdfUrl || item.pdfLink || item.embedUrl) && (
+                  <a
+                    href={item.pdfUrl || item.pdfLink || item.embedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bam-link-btn"
+                  >
+                    Open original{" "}
+                    <ExternalLink style={{ width: 11, height: 11 }} />
+                  </a>
+                )}
+              </div>
 
-              {/* PDF Preview */}
-              <div className="mb-6">
-                <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  PDF Document Preview
-                </h4>
-
-                {item.pdfUrl || item.pdfLink || item.embedUrl ? (
-                  <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    {item.uploadMethod === "direct_upload" ? (
-                      <div className="space-y-3 p-4 bg-purple-50">
-                        <div className="flex items-center gap-2 text-sm text-purple-900 mb-2">
-                          <AlertCircle className="w-4 h-4" />
-                          <span>
-                            This is a direct upload to Firebase Storage
-                          </span>
-                        </div>
-                        <a
-                          href={item.pdfUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors w-full"
-                        >
-                          <FileText className="w-4 h-4" />
-                          Open PDF in New Tab
-                        </a>
-                        <iframe
-                          src={item.pdfUrl}
-                          className="w-full h-96 border-2 border-purple-200 rounded-lg"
-                          title="PDF Preview"
-                        />
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between p-3 bg-blue-50">
-                          <span className="text-sm text-blue-900">
-                            Google Drive Document
-                          </span>
-                          <a
-                            href={item.pdfUrl || item.pdfLink || item.embedUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline text-sm flex items-center gap-1"
-                          >
-                            <FileText className="w-4 h-4" />
-                            Open Original
-                          </a>
-                        </div>
-                        <iframe
-                          src={
-                            item.embedUrl ||
-                            item.pdfUrl?.replace("/view", "/preview") ||
-                            item.pdfLink?.replace("/view", "/preview")
-                          }
-                          className="w-full h-96 border-0"
-                          title="PDF Preview"
-                        />
-                      </div>
-                    )}
-                  </div>
+              <div style={S.iframeWrap}>
+                {pdfSrc ? (
+                  <iframe
+                    src={pdfSrc}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      border: "none",
+                      display: "block",
+                    }}
+                    title="PDF Preview"
+                  />
                 ) : (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-                    <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600">No PDF link provided</p>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      gap: 12,
+                      color: "#1e293b",
+                    }}
+                  >
+                    <FileText style={{ width: 52, height: 52, opacity: 0.2 }} />
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#334155",
+                      }}
+                    >
+                      No PDF available
+                    </p>
                   </div>
                 )}
               </div>
 
-              {/* Checking Duplicate */}
-              {checkingDuplicate && (
-                <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4 animate-pulse">
-                  <div className="flex items-center gap-3">
-                    <div className="animate-spin h-5 w-5 border-2 border-yellow-600 border-t-transparent rounded-full"></div>
-                    <p className="text-yellow-800 font-semibold">
-                      Checking for duplicate PDFs...
+              {item.driveFileId && (
+                <div style={S.thumbStrip}>
+                  <img
+                    src={`https://drive.google.com/thumbnail?id=${item.driveFileId}&sz=w120`}
+                    alt="cover"
+                    style={{
+                      width: 36,
+                      height: 50,
+                      objectFit: "cover",
+                      borderRadius: 5,
+                      border: "1px solid #1e293b",
+                      flexShrink: 0,
+                    }}
+                    onError={(e) => {
+                      e.target.src =
+                        "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=120";
+                    }}
+                  />
+                  <div>
+                    <p
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#cbd5e1",
+                        margin: 0,
+                      }}
+                    >
+                      {item.bookTitle}
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "#3b4f6b",
+                        margin: "2px 0 0",
+                      }}
+                    >
+                      {getFileType(item.pdfUrl || item.pdfLink)}
                     </p>
                   </div>
                 </div>
               )}
+            </div>
 
-              {/* Approval Confirmation */}
-              {showConfirm && actionType === "approve" && (
-                <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="bg-green-100 rounded-full p-3">
-                      <Check className="w-6 h-6 text-green-600" />
+            {/* RIGHT — details */}
+            <div style={S.rightPanel}>
+              <div className="bam-scroll" style={S.scrollArea}>
+                {/* Title */}
+                <div style={{ marginBottom: 20 }}>
+                  <h2
+                    style={{
+                      fontSize: 22,
+                      fontWeight: 800,
+                      color: "#f8fafc",
+                      margin: "0 0 6px",
+                      lineHeight: 1.25,
+                      letterSpacing: "-.02em",
+                    }}
+                  >
+                    {item.bookTitle}
+                  </h2>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "#3b4f6b",
+                      margin: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <User style={{ width: 13, height: 13 }} />
+                    by{" "}
+                    <span style={{ color: "#64748b", fontWeight: 600 }}>
+                      {item.author}
+                    </span>
+                  </p>
+                </div>
+
+                {/* Metrics */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr 1fr",
+                    gap: 8,
+                    marginBottom: 16,
+                  }}
+                >
+                  <div style={S.metaCell}>
+                    <span style={S.metaLabel}>
+                      <DollarSign style={{ width: 10, height: 10 }} />
+                      Price
+                    </span>
+                    <span style={{ ...S.metaVal, color: "#4ade80" }}>
+                      ₦{item.price?.toLocaleString()}
+                    </span>
+                  </div>
+                  <div style={S.metaCell}>
+                    <span style={S.metaLabel}>
+                      <Layers style={{ width: 10, height: 10 }} />
+                      Pages
+                    </span>
+                    <span style={S.metaVal}>{item.pages || "—"}</span>
+                  </div>
+                  <div style={S.metaCell}>
+                    <span style={S.metaLabel}>
+                      <Clock style={{ width: 10, height: 10 }} />
+                      Submitted
+                    </span>
+                    <span style={S.metaValSm}>
+                      {formatDate(item.createdAt)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tags */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 6,
+                    marginBottom: 20,
+                  }}
+                >
+                  {item.category && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                        padding: "4px 10px",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: "rgba(59,130,246,0.1)",
+                        color: "#60a5fa",
+                        border: "1px solid rgba(59,130,246,0.18)",
+                      }}
+                    >
+                      <Tag style={{ width: 10, height: 10 }} />
+                      {item.category}
+                    </span>
+                  )}
+                  {item.courseCode && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                        padding: "4px 10px",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: "rgba(139,92,246,0.1)",
+                        color: "#c4b5fd",
+                        border: "1px solid rgba(139,92,246,0.18)",
+                      }}
+                    >
+                      <Hash style={{ width: 10, height: 10 }} />
+                      {item.courseCode}
+                    </span>
+                  )}
+                  {item.institutionalCategory && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                        padding: "4px 10px",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: "rgba(251,146,60,0.1)",
+                        color: "#fb923c",
+                        border: "1px solid rgba(251,146,60,0.18)",
+                      }}
+                    >
+                      <Building2 style={{ width: 10, height: 10 }} />
+                      {item.institutionalCategory}
+                    </span>
+                  )}
+                  {item.format && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                        padding: "4px 10px",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: "rgba(100,116,139,0.12)",
+                        color: "#94a3b8",
+                        border: "1px solid rgba(100,116,139,0.18)",
+                      }}
+                    >
+                      <FileText style={{ width: 10, height: 10 }} />
+                      {item.format}
+                    </span>
+                  )}
+                </div>
+
+                <div style={S.divider} />
+
+                {/* Seller */}
+                <div style={{ marginBottom: 20 }}>
+                  <p style={S.sectionTitle}>Seller</p>
+                  <div
+                    style={{
+                      ...S.card,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: "50%",
+                        background: "linear-gradient(135deg,#4f46e5,#7c3aed)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 16,
+                        fontWeight: 800,
+                        color: "#fff",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {(item.sellerName || "?").charAt(0).toUpperCase()}
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-bold text-green-900 mb-2">
-                        Confirm Approval
-                      </h3>
-                      <p className="text-sm text-green-700 mb-4">
-                        This book will be published and visible to all users.
-                        The seller will be notified.
+                    <div style={{ minWidth: 0 }}>
+                      <p
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 700,
+                          color: "#f1f5f9",
+                          margin: "0 0 3px",
+                        }}
+                      >
+                        {item.sellerName}
                       </p>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={confirmApprove}
-                          disabled={isProcessing}
-                          className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 font-semibold"
-                        >
-                          {isProcessing ? (
-                            <>
-                              <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
-                              Processing...
-                            </>
-                          ) : (
-                            <>
-                              <ShieldCheck className="w-5 h-5" />
-                              Yes, Approve
-                            </>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => setShowConfirm(false)}
-                          disabled={isProcessing}
-                          className="px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "#475569",
+                          margin: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                        }}
+                      >
+                        <Mail style={{ width: 11, height: 11 }} />
+                        {item.sellerEmail}
+                      </p>
                     </div>
                   </div>
                 </div>
-              )}
 
-              {/* Rejection Input */}
-              {showReasonInput && actionType === "reject" && (
-                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="bg-red-100 rounded-full p-3">
-                      <AlertCircle className="w-6 h-6 text-red-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-bold text-red-900 mb-2">
-                        Confirm Rejection
-                      </h3>
-                      <p className="text-sm text-red-700 mb-4">
-                        This book will be rejected. Reason (optional):
+                {/* Description */}
+                {item.description && (
+                  <div style={{ marginBottom: 20 }}>
+                    <p style={S.sectionTitle}>Description</p>
+                    <div style={S.card}>
+                      <p
+                        style={{
+                          fontSize: 13,
+                          color: "#94a3b8",
+                          lineHeight: 1.7,
+                          margin: 0,
+                          display: "-webkit-box",
+                          WebkitLineClamp: descExpanded ? "unset" : 4,
+                          WebkitBoxOrient: "vertical",
+                          overflow: descExpanded ? "visible" : "hidden",
+                        }}
+                      >
+                        {item.description}
                       </p>
-                      <textarea
-                        value={rejectionReason}
-                        onChange={(e) => setRejectionReason(e.target.value)}
-                        placeholder="Enter rejection reason..."
-                        className="w-full h-24 px-4 py-3 border-2 border-red-200 rounded-lg resize-none text-gray-900 focus:outline-none focus:border-red-400"
-                      />
-                      <div className="flex gap-3 mt-4">
+                      {item.description.length > 220 && (
                         <button
-                          onClick={confirmReject}
-                          disabled={isProcessing}
-                          className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2 font-semibold"
-                        >
-                          {isProcessing ? (
-                            <>
-                              <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
-                              Processing...
-                            </>
-                          ) : (
-                            <>
-                              <X className="w-5 h-5" />
-                              Confirm Rejection
-                            </>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowReasonInput(false);
-                            setRejectionReason("");
+                          onClick={() => setDescExpanded((p) => !p)}
+                          style={{
+                            marginTop: 6,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#60a5fa",
+                            background: "transparent",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: 0,
                           }}
-                          disabled={isProcessing}
-                          className="px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                         >
-                          Cancel
+                          {descExpanded ? "Show less ↑" : "Show more ↓"}
                         </button>
-                      </div>
+                      )}
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Action Buttons */}
-              {!showConfirm && !showReasonInput && !checkingDuplicate && (
-                <div className="flex gap-4">
-                  <button
-                    onClick={handleApprove}
-                    disabled={isProcessing}
-                    className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-4 rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2 font-bold text-lg shadow-lg hover:shadow-xl"
+                {/* Table of contents */}
+                {item.message && (
+                  <div style={{ marginBottom: 20 }}>
+                    <p style={S.sectionTitle}>Table of Contents / Key Topics</p>
+                    <div style={S.card}>
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "#64748b",
+                          lineHeight: 1.8,
+                          margin: 0,
+                          whiteSpace: "pre-line",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 5,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {item.message}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Academic extras */}
+                {(item.university ||
+                  item.semester ||
+                  item.level ||
+                  item.session) && (
+                  <div style={{ marginBottom: 20 }}>
+                    <p style={S.sectionTitle}>Academic Details</p>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 8,
+                      }}
+                    >
+                      {item.university && (
+                        <div style={{ ...S.metaCell, gridColumn: "1 / -1" }}>
+                          <span style={S.metaLabel}>University</span>
+                          <span style={S.metaValSm}>{item.university}</span>
+                        </div>
+                      )}
+                      {item.level && (
+                        <div style={S.metaCell}>
+                          <span style={S.metaLabel}>Level</span>
+                          <span style={S.metaValSm}>{item.level}</span>
+                        </div>
+                      )}
+                      {item.semester && (
+                        <div style={S.metaCell}>
+                          <span style={S.metaLabel}>Semester</span>
+                          <span style={S.metaValSm}>{item.semester}</span>
+                        </div>
+                      )}
+                      {item.session && (
+                        <div style={S.metaCell}>
+                          <span style={S.metaLabel}>Session</span>
+                          <span style={S.metaValSm}>{item.session}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ height: 8 }} />
+              </div>
+
+              {/* ── ACTION BAR ── */}
+              <div style={S.actionBar}>
+                {/* Duplicate spinner */}
+                {checkingDuplicate && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "12px 14px",
+                      borderRadius: 10,
+                      marginBottom: 12,
+                      background: "rgba(251,191,36,0.07)",
+                      border: "1px solid rgba(251,191,36,0.18)",
+                    }}
                   >
-                    <Check className="w-6 h-6" />
-                    Approve
-                  </button>
-                  <button
-                    onClick={handleReject}
-                    disabled={isProcessing}
-                    className="flex-1 bg-gradient-to-r from-red-600 to-rose-600 text-white py-4 rounded-xl hover:from-red-700 hover:to-rose-700 disabled:opacity-50 flex items-center justify-center gap-2 font-bold text-lg shadow-lg hover:shadow-xl"
+                    <div
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: "50%",
+                        border: "2px solid #fbbf24",
+                        borderTopColor: "transparent",
+                        animation: "bam-spin .7s linear infinite",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#fbbf24",
+                        margin: 0,
+                      }}
+                    >
+                      Checking for duplicate PDFs…
+                    </p>
+                  </div>
+                )}
+
+                {/* Approve confirm */}
+                {showConfirm && actionType === "approve" && (
+                  <div
+                    className="bam-confirm"
+                    style={{
+                      padding: 16,
+                      borderRadius: 12,
+                      marginBottom: 12,
+                      background: "rgba(22,163,74,0.07)",
+                      border: "1px solid rgba(22,163,74,0.22)",
+                    }}
                   >
-                    <X className="w-6 h-6" />
-                    Reject
-                  </button>
-                </div>
-              )}
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: "#4ade80",
+                        margin: "0 0 4px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <ShieldCheck style={{ width: 14, height: 14 }} /> Confirm
+                      approval
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "#86efac",
+                        margin: "0 0 12px",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      This book will be published and visible to all users. The
+                      seller will be notified.
+                    </p>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={confirmApprove}
+                        disabled={isProcessing}
+                        className="bam-sm-btn"
+                        style={{
+                          flex: 1,
+                          background: "#16a34a",
+                          color: "#fff",
+                        }}
+                      >
+                        {isProcessing ? (
+                          <>{spinner} Processing…</>
+                        ) : (
+                          <>
+                            <Check style={{ width: 14, height: 14 }} /> Yes,
+                            Approve
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => setShowConfirm(false)}
+                        disabled={isProcessing}
+                        className="bam-sm-btn"
+                        style={{
+                          background: "transparent",
+                          color: "#64748b",
+                          border: "1px solid #1e293b",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reject input */}
+                {showReasonInput && actionType === "reject" && (
+                  <div
+                    className="bam-confirm"
+                    style={{
+                      padding: 16,
+                      borderRadius: 12,
+                      marginBottom: 12,
+                      background: "rgba(220,38,38,0.07)",
+                      border: "1px solid rgba(220,38,38,0.22)",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: "#f87171",
+                        margin: "0 0 4px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <AlertCircle style={{ width: 14, height: 14 }} />{" "}
+                      Rejection reason
+                      <span
+                        style={{ fontWeight: 400, opacity: 0.5, fontSize: 11 }}
+                      >
+                        (optional)
+                      </span>
+                    </p>
+                    <textarea
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Explain why this submission is being rejected…"
+                      rows={2}
+                      style={{
+                        width: "100%",
+                        padding: "8px 12px",
+                        fontSize: 13,
+                        background: "rgba(0,0,0,0.35)",
+                        border: "1px solid rgba(239,68,68,0.25)",
+                        borderRadius: 8,
+                        color: "#f1f5f9",
+                        resize: "none",
+                        outline: "none",
+                        marginBottom: 10,
+                        lineHeight: 1.6,
+                        boxSizing: "border-box",
+                      }}
+                    />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={confirmReject}
+                        disabled={isProcessing}
+                        className="bam-sm-btn"
+                        style={{
+                          flex: 1,
+                          background: "#dc2626",
+                          color: "#fff",
+                        }}
+                      >
+                        {isProcessing ? (
+                          <>{spinner} Processing…</>
+                        ) : (
+                          <>
+                            <X style={{ width: 14, height: 14 }} /> Confirm
+                            Rejection
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowReasonInput(false);
+                          setRejectionReason("");
+                        }}
+                        disabled={isProcessing}
+                        className="bam-sm-btn"
+                        style={{
+                          background: "transparent",
+                          color: "#64748b",
+                          border: "1px solid #1e293b",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Primary buttons */}
+                {!showConfirm && !showReasonInput && !checkingDuplicate && (
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      onClick={handleApprove}
+                      disabled={isProcessing}
+                      className="bam-approve-btn"
+                    >
+                      <Check style={{ width: 18, height: 18 }} /> Approve
+                    </button>
+                    <button
+                      onClick={handleReject}
+                      disabled={isProcessing}
+                      className="bam-reject-btn"
+                    >
+                      <X style={{ width: 18, height: 18 }} /> Reject
+                    </button>
+                    <button onClick={resetModal} className="bam-ghost-btn">
+                      Close
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
@@ -473,7 +1121,6 @@ export const ReplyModal = ({
   sending,
 }) => {
   if (!isOpen || !item) return null;
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -481,7 +1128,6 @@ export const ReplyModal = ({
           className="fixed inset-0 bg-black bg-opacity-50"
           onClick={onClose}
         />
-
         <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full">
           <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-4 rounded-t-2xl">
             <div className="flex items-center justify-between">
@@ -504,7 +1150,6 @@ export const ReplyModal = ({
               </button>
             </div>
           </div>
-
           <div className="p-6">
             <div className="mb-4 p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-1">
@@ -530,8 +1175,7 @@ export const ReplyModal = ({
                   "Sending..."
                 ) : (
                   <>
-                    <Send className="w-4 h-4" />
-                    Send Reply
+                    <Send className="w-4 h-4" /> Send Reply
                   </>
                 )}
               </button>
@@ -558,7 +1202,6 @@ export const TransactionModal = ({
   getStatusColor,
 }) => {
   if (!isOpen || !item) return null;
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -566,7 +1209,6 @@ export const TransactionModal = ({
           className="fixed inset-0 bg-black bg-opacity-50"
           onClick={onClose}
         />
-
         <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           <div className="sticky top-0 bg-gradient-to-r from-green-600 to-teal-600 text-white px-6 py-4 rounded-t-2xl">
             <div className="flex items-center justify-between">
@@ -589,7 +1231,6 @@ export const TransactionModal = ({
               </button>
             </div>
           </div>
-
           <div className="p-6 space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h4 className="font-bold text-blue-950 mb-3">
@@ -622,7 +1263,6 @@ export const TransactionModal = ({
                 </div>
               </div>
             </div>
-
             <div className="bg-gray-50 rounded-lg p-4">
               <h4 className="font-bold text-gray-900 mb-3">Book Details</h4>
               <div className="space-y-2">
@@ -640,7 +1280,6 @@ export const TransactionModal = ({
                 </div>
               </div>
             </div>
-
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <h4 className="font-bold text-green-900 mb-3 flex items-center gap-2">
                 <DollarSign className="w-5 h-5" />
@@ -667,7 +1306,6 @@ export const TransactionModal = ({
                 </div>
               </div>
             </div>
-
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h4 className="font-bold text-blue-900 mb-3">
                 Buyer Information
@@ -693,7 +1331,6 @@ export const TransactionModal = ({
                 </div>
               </div>
             </div>
-
             {item.paymentMethod && (
               <div className="bg-gray-50 rounded-lg p-4">
                 <h4 className="font-bold text-gray-900 mb-3">
@@ -717,7 +1354,6 @@ export const TransactionModal = ({
                 </div>
               </div>
             )}
-
             <button
               onClick={onClose}
               className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 font-semibold"
@@ -742,14 +1378,11 @@ export const UserModal = ({
   onDelete,
 }) => {
   if (!isOpen || !item) return null;
-
-  // ── Derive the true "blocked" state from both fields ──────────────────
   const isDeactivated = item.isDeactivated === true;
   const isBlocked =
     isDeactivated ||
     item.accountStatus === "suspended" ||
     item.accountStatus === "pending";
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -757,7 +1390,6 @@ export const UserModal = ({
           className="fixed inset-0 bg-black bg-opacity-50"
           onClick={onClose}
         />
-
         <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 rounded-t-2xl">
             <div className="flex items-center justify-between">
@@ -778,7 +1410,6 @@ export const UserModal = ({
               </button>
             </div>
           </div>
-
           <div className="p-6 space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h4 className="font-bold text-blue-950 mb-3">User Information</h4>
@@ -807,7 +1438,6 @@ export const UserModal = ({
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Account Status</p>
-                  {/* Show deactivated badge if isDeactivated flag is set, even if accountStatus says active */}
                   {isDeactivated ? (
                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
                       deactivated
@@ -842,14 +1472,12 @@ export const UserModal = ({
                 )}
               </div>
             </div>
-
             {item.bio && (
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-xs text-gray-500 mb-2">Bio</p>
                 <p className="text-sm text-gray-900">{item.bio}</p>
               </div>
             )}
-
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <h4 className="font-bold text-yellow-900 mb-2 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5" />
@@ -859,7 +1487,6 @@ export const UserModal = ({
                 Manage this user's account status.
               </p>
               <div className="grid grid-cols-2 gap-3">
-                {/* ── REACTIVATE: show when blocked by any mechanism ── */}
                 {isBlocked && (
                   <button
                     onClick={() => onUpdateStatus(item.id, "active")}
@@ -869,8 +1496,6 @@ export const UserModal = ({
                     {isDeactivated ? "Reactivate Account" : "Activate Account"}
                   </button>
                 )}
-
-                {/* ── SET PENDING: only show when account is currently active ── */}
                 {!isBlocked && item.accountStatus !== "pending" && (
                   <button
                     onClick={() => onUpdateStatus(item.id, "pending")}
@@ -880,8 +1505,6 @@ export const UserModal = ({
                     Set Pending
                   </button>
                 )}
-
-                {/* ── SUSPEND: only show when account is currently active ── */}
                 {!isBlocked && item.accountStatus !== "suspended" && (
                   <button
                     onClick={() => onUpdateStatus(item.id, "suspended")}
@@ -893,7 +1516,6 @@ export const UserModal = ({
                 )}
               </div>
             </div>
-
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <h4 className="font-bold text-red-900 mb-2 flex items-center gap-2">
                 <AlertCircle className="w-5 h-5" />
@@ -911,7 +1533,6 @@ export const UserModal = ({
                 Delete Account Permanently
               </button>
             </div>
-
             <button
               onClick={onClose}
               className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 font-semibold"

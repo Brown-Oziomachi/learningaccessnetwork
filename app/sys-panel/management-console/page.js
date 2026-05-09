@@ -16,7 +16,7 @@ import {
   Download, Book, Phone, MapPin, CreditCard, Building,
   Clock, ThumbsUp, Smartphone, Bell, ChevronDown, Menu, Home,
   LayoutDashboard, Activity, PieChart, Layers, Star, ArrowUp, ArrowDown,
-  MoreHorizontal, Filter, Plus, Minus, CheckCircle, Info, Package, Receipt, ShoppingBag
+  MoreHorizontal, Filter, Plus, Minus, CheckCircle, Info, Package, Receipt, ShoppingBag, GraduationCap
 } from 'lucide-react';
 import { BookApprovalModal, ReplyModal, TransactionModal, UserModal } from '@/components/ApprovalModal';
 import FlwBalanceWidget from '@/components/admin/FlwBalanceWidget';
@@ -373,6 +373,7 @@ const NAV_SECTIONS = [
     label: 'Users & Support',
     items: [
       { id: 'users', icon: Users, label: 'All Users' },
+      { id: 'faculty-verification', icon: GraduationCap, label: 'Faculty Verify', badgeKey: 'pendingFaculty', badgeType: 'warn' },
       { id: 'support', icon: MessageSquare, label: 'Support', badgeKey: 'openTickets', badgeType: 'danger' },
       { id: 'reports', icon: Flag, label: 'Reports', badgeKey: 'pendingReports', badgeType: 'danger' },
       { id: 'contact', icon: Mail, label: 'Contact Messages', badgeKey: 'openContactMessages', badgeType: 'danger' },
@@ -646,6 +647,47 @@ export default function ComprehensiveAdminPanel() {
     } catch (err) { console.error(err); } finally { setLoadingSellerDetails(false); }
   };
 
+  const approveFaculty = async (userId) => {
+    if (!confirm('Approve this faculty member?')) return;
+    await updateDoc(doc(db, 'users', userId), {
+      lecturerVerificationStatus: 'approved',
+      isSeller: true,
+      isLecturer: true,
+      isVerifiedFaculty: true,
+      verifiedAt: serverTimestamp(),
+      verifiedBy: user.email,
+    });
+    await addDoc(collection(db, 'notifications'), {
+      userId,
+      type: 'faculty_approved',
+      title: '🎓 Faculty Verification Approved!',
+      message: 'Your faculty credentials have been verified. Your seller account is now active.',
+      createdAt: serverTimestamp(),
+      read: false,
+    });
+    fetchUsers();
+  };
+
+  const rejectFaculty = async (userId, userName) => {
+    const reason = prompt('Rejection reason (will be shown to user):');
+    if (!reason?.trim()) return;
+    await updateDoc(doc(db, 'users', userId), {
+      lecturerVerificationStatus: 'rejected',
+      verificationRejectedReason: reason,
+      rejectedAt: serverTimestamp(),
+      rejectedBy: user.email,
+    });
+    await addDoc(collection(db, 'notifications'), {
+      userId,
+      type: 'faculty_rejected',
+      title: '❌ Faculty Verification Rejected',
+      message: `Your verification was not approved. Reason: ${reason}`,
+      createdAt: serverTimestamp(),
+      read: false,
+    });
+    fetchUsers();
+  };
+
   const fetchSchoolApplications = async () => {
     try { const q = query(collection(db, 'schoolApplications'), orderBy('createdAt', 'desc')); const s = await getDocs(q); setSchoolApplications(s.docs.map(d => ({ id: d.id, ...d.data() }))); } catch (e) { console.error(e); }
   };
@@ -882,6 +924,7 @@ export default function ComprehensiveAdminPanel() {
     pendingWithdrawals: withdrawals?.filter(w => w.status === 'pending').length || 0,
     pendingPhysicalOrders: physicalOrders?.filter(o => o.status === 'pending_pickup').length || 0, // ← ADD
     openContactMessages: contactMessages?.filter(m => m.status === 'open').length || 0,
+    pendingFaculty: users?.filter(u => u.lecturerVerificationStatus === 'pending').length || 0,
   };
 
   if (checkingAdmin) return (
@@ -1102,11 +1145,40 @@ export default function ComprehensiveAdminPanel() {
               <div className="section-header">
                 <div className="section-title"><BookOpen size={18} />Books <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 14 }}>({advertisements.length})</span></div>
               </div>
-              <div style={{ marginBottom: 16 }}>
-                <input className="input-dark" placeholder="Search books by title…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+                <input className="input-dark" placeholder="Search books by title…" value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)} style={{ flex: 1, minWidth: 200 }} />
+                <button
+                  onClick={() => setSearchTerm(searchTerm === '__faculty__' ? '' : '__faculty__')}
+                  className={`btn ${searchTerm === '__faculty__' ? 'btn-primary' : 'btn-ghost'}`}
+                >
+                  <GraduationCap size={13} />
+                  Faculty Uploads Only
+                  <span style={{ opacity: 0.7, marginLeft: 4 }}>
+                    ({advertisements.filter(ad => {
+                      const FACULTY_TITLES = ["Dr.", "Prof.", "Engr.", "Pharm.", "Barr.", "Lecturer"];
+                      return FACULTY_TITLES.some(t => ad.sellerName?.includes(t) ||
+                        users.find(u => u.id === ad.sellerId)?.lecturerTitle?.includes(t) ||
+                        users.find(u => u.id === ad.sellerId)?.isLecturer === true
+                      );
+                    }).length})
+                  </span>
+                </button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-                {advertisements.filter(ad => ad.bookTitle?.toLowerCase().includes(searchTerm.toLowerCase())).map((ad) => (
+                {advertisements.filter(ad => {
+                  if (searchTerm === '__faculty__') {
+                    const FACULTY_TITLES = ["Dr.", "Prof.", "Engr.", "Pharm.", "Barr.", "Lecturer"];
+                    const seller = users.find(u => u.id === (ad.sellerId || ad.userId));
+                    return FACULTY_TITLES.some(t =>
+                      ad.sellerName?.includes(t) ||
+                      seller?.lecturerTitle?.includes(t) ||
+                      seller?.isLecturer === true ||
+                      seller?.role === 'lecturer'
+                    );
+                  }
+                  return ad.bookTitle?.toLowerCase().includes(searchTerm.toLowerCase());
+                }).map((ad) => (
                   <div key={ad.id} className="book-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                       <div style={{ flex: 1 }}>
@@ -1548,6 +1620,175 @@ export default function ComprehensiveAdminPanel() {
             </div>
           )}
 
+          {activeSection === 'faculty-verification' && (
+            <div>
+              <div className="section-header">
+                <div>
+                  <div className="section-title">
+                    <GraduationCap size={18} />Faculty Verification
+                    <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 14 }}>
+                      ({users.filter(u => u.lecturerVerificationStatus === 'pending').length} pending)
+                    </span>
+                  </div>
+                  <div className="section-sub">Review submitted credentials from lecturers</div>
+                </div>
+                <button onClick={fetchUsers} className="btn btn-ghost"><RefreshCw size={13} />Refresh</button>
+              </div>
+
+              {/* Filter tabs */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+                {['pending', 'approved', 'rejected'].map(status => {
+                  const count = users.filter(u => u.lecturerVerificationStatus === status).length;
+                  return (
+                    <button
+                      key={status}
+                      onClick={() => setSearchTerm(status === searchTerm ? '' : status)}
+                      className={`btn ${searchTerm === status ? 'btn-primary' : 'btn-ghost'}`}
+                    >
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                      <span style={{ marginLeft: 4, opacity: 0.7 }}>({count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
+                {users
+                  .filter(u => u.lecturerVerificationStatus)
+                  .filter(u => !searchTerm || ['pending', 'approved', 'rejected'].includes(searchTerm)
+                    ? (searchTerm ? u.lecturerVerificationStatus === searchTerm : true)
+                    : u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+                  )
+                  .sort((a, b) => (b.submittedForVerification?.toDate?.() || 0) - (a.submittedForVerification?.toDate?.() || 0))
+                  .map(u => (
+                    <div key={u.id} className="card" style={{
+                      borderLeft: `3px solid ${u.lecturerVerificationStatus === 'approved' ? '#10b981' :
+                          u.lecturerVerificationStatus === 'rejected' ? '#ef4444' : '#f59e0b'
+                        }`
+                    }}>
+                      {/* Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {u.lecturerTitle} {u.displayName || `${u.firstName} ${u.surname}`}
+                          </div>
+                          <div style={{ fontSize: 12, color: '#60a5fa', marginTop: 2 }}>{u.email}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                            Submitted: {u.submittedForVerification?.toDate?.()?.toLocaleDateString('en-NG') || 'N/A'}
+                          </div>
+                        </div>
+                        <span className={`pill ${u.lecturerVerificationStatus === 'approved' ? 'pill-success' :
+                            u.lecturerVerificationStatus === 'rejected' ? 'pill-danger' : 'pill-warn'
+                          }`}>
+                          <span className="pill-dot" />{u.lecturerVerificationStatus}
+                        </span>
+                      </div>
+
+                      {/* Institution info */}
+                      <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
+                        {[
+                          ['Institution', u.institution],
+                          ['Department', u.department || '—'],
+                          ['Title', u.lecturerTitle],
+                        ].map(([k, v]) => (
+                          <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                            <span style={{ color: 'var(--text-muted)' }}>{k}</span>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{v}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Submitted documents */}
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>
+                          Submitted Proof
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {u.staffIdUrl && (
+                            <a href={u.staffIdUrl} target="_blank" rel="noopener noreferrer"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#60a5fa',
+                                background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+                                borderRadius: 6, padding: '7px 10px', textDecoration: 'none'
+                              }}>
+                              <CreditCard size={13} />
+                              View Staff ID Card
+                              <ExternalLink size={11} style={{ marginLeft: 'auto' }} />
+                            </a>
+                          )}
+                          {u.appointmentLetterUrl && (
+                            <a href={u.appointmentLetterUrl} target="_blank" rel="noopener noreferrer"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#a78bfa',
+                                background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)',
+                                borderRadius: 6, padding: '7px 10px', textDecoration: 'none'
+                              }}>
+                              <FileText size={13} />
+                              View Appointment Letter
+                              <ExternalLink size={11} style={{ marginLeft: 'auto' }} />
+                            </a>
+                          )}
+                          {u.facultyProfileUrl && (
+                            <a href={u.facultyProfileUrl} target="_blank" rel="noopener noreferrer"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#34d399',
+                                background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
+                                borderRadius: 6, padding: '7px 10px', textDecoration: 'none'
+                              }}>
+                              <ExternalLink size={13} />
+                              Faculty Profile URL
+                              <ExternalLink size={11} style={{ marginLeft: 'auto' }} />
+                            </a>
+                          )}
+                          {!u.staffIdUrl && !u.appointmentLetterUrl && !u.facultyProfileUrl && (
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', padding: '6px 0' }}>
+                              No documents submitted
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Rejection reason (if rejected) */}
+                      {u.lecturerVerificationStatus === 'rejected' && u.verificationRejectedReason && (
+                        <div style={{
+                          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                          borderRadius: 8, padding: '10px 12px', marginBottom: 12, fontSize: 12, color: '#f87171'
+                        }}>
+                          ❌ Rejection reason: {u.verificationRejectedReason}
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      {u.lecturerVerificationStatus === 'pending' && (
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => approveFaculty(u.id)}
+                            className="btn btn-success" style={{ flex: 1, justifyContent: 'center' }}>
+                            <Check size={13} />Approve
+                          </button>
+                          <button onClick={() => rejectFaculty(u.id, u.displayName)}
+                            className="btn btn-danger" style={{ flex: 1, justifyContent: 'center' }}>
+                            <X size={13} />Reject
+                          </button>
+                        </div>
+                      )}
+                      {u.lecturerVerificationStatus === 'approved' && (
+                        <div style={{ fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Check size={13} />Verified by {u.verifiedBy} · {u.verifiedAt?.toDate?.()?.toLocaleDateString('en-NG')}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                {users.filter(u => u.lecturerVerificationStatus).length === 0 && (
+                  <div className="card" style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48 }}>
+                    <GraduationCap size={32} color="var(--text-muted)" style={{ margin: '0 auto 12px' }} />
+                    <div style={{ color: 'var(--text-muted)' }}>No faculty verification requests yet</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* ── SETTINGS ──────────────────────────────────────────────── */}
           {activeSection === 'settings' && (
             <div>
@@ -1679,7 +1920,7 @@ export default function ComprehensiveAdminPanel() {
               <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10 }}>
                 <AlertTriangle size={14} color="#fbbf24" style={{ flexShrink: 0, marginTop: 1 }} />
                 <p style={{ fontSize: 12, color: '#fbbf24', margin: 0, lineHeight: 1.6 }}>
-                  <strong>These are online pre-orders only.</strong> Click "Mark Collected" only when the student physically arrives and picks up their copy.
+                  <strong>These are online pre-orders only.</strong> Click "Mark Collected" only when the student physically arrives, pay and picks up their copy.
                   For walk-in students with no pre-order, use{' '}
                   <a href="/sys-panel/management-console/registry-checkout" style={{ color: '#fbbf24', fontWeight: 700 }}>
                     Registry Checkout

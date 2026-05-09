@@ -410,15 +410,32 @@ export default function AdvertiseClient() {
 
         try {
             setUploadProgress('Uploading cover…');
-            const url = await uploadToCloudinary(file, 'covers', (pct) => {
-                setUploadProgress(`Uploading cover: ${pct}%`);
+            const timestamp = Date.now();
+            const fileName = `${timestamp}_${file.name.replace(/\s+/g, '_')}`;
+            const storageRef = ref(storage, `covers/${user.uid}/${fileName}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            return await new Promise((resolve, reject) => {
+                uploadTask.on(
+                    'state_changed',
+                    (snapshot) => {
+                        const pct = Math.round(
+                            (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+                        );
+                        setUploadProgress(`Uploading cover: ${pct}%`);
+                    },
+                    (error) => reject(error),
+                    async () => {
+                        const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                        resolve(downloadUrl);
+                    }
+                );
             });
-            setUploadProgress('');
-            return url;
         } catch (e) {
-            setUploadProgress('');
             alert(e.message || 'Cover upload failed');
             return null;
+        } finally {
+            setUploadProgress('');
         }
     };
 
@@ -1009,19 +1026,53 @@ export default function AdvertiseClient() {
                                         Continue <ChevronRight size={16} />
                                     </button>
                                 ) : (
-                                    <button
-                                        type="button"
-                                        onClick={handleSubmit}
-                                        disabled={loading}
-                                        className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                    >
-                                        {loading ? (
-                                            <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Submitting…</>
-                                        ) : (
-                                            <><Check size={16} /> Submit for Review</>
-                                        )}
-                                    </button>
+                                    (() => {
+                                    const FACULTY_TITLES = ["Dr.", "Prof.", "Engr.", "Pharm.", "Barr.", "Lecturer"];
+                                    const isFaculty = FACULTY_TITLES.some(t =>
+                                        userData?.lecturerTitle?.includes(t) ||
+                                        userData?.title?.includes(t) ||
+                                        userData?.role === 'lecturer' ||
+                                        userData?.isLecturer === true
+                                    );
+                                    const isPending = userData?.lecturerVerificationStatus === 'pending';
+
+                                    if (isFaculty && isPending) return (
+                                        <div style={{
+                                            flex: 1, padding: '12px 16px',
+                                            background: 'rgba(245,158,11,0.08)',
+                                            border: '1px solid rgba(245,158,11,0.3)',
+                                            borderRadius: '12px',
+                                            display: 'flex', alignItems: 'flex-start', gap: '10px',
+                                        }}>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                                            <div>
+                                                <p style={{ fontSize: '13px', fontWeight: 700, color: '#92400e', margin: '0 0 3px' }}>
+                                                    Publishing locked
+                                                </p>
+                                                <p style={{ fontSize: '12px', color: '#b45309', margin: 0, lineHeight: 1.6 }}>
+                                                    Your faculty credentials are under review. Publishing will be unlocked once verified by the Abuja Registry (24–48 hrs).
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+
+                                    return (
+                                        <button
+                                            type="button"
+                                            onClick={handleSubmit}
+                                            disabled={loading}
+                                            className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            {loading ? (
+                                                <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Submitting…</>
+                                            ) : (
+                                                <><Check size={16} /> Submit for Review</>
+                                            )}
+                                        </button>
+                                    );
+                                    })()
                                 )}
+                                
                             </div>
                         </div>
                     </div>

@@ -135,30 +135,41 @@ export default function BecomeSellerClient() {
             const flutterwaveSubaccountId = flwData.subaccount_id;
 
             const batch = writeBatch(db);
+
             batch.update(doc(db, "users", user.uid), {
                 isSeller: true,
                 phoneNumber: formData.phoneNumber,
                 flutterwaveSubaccountId,
                 updatedAt: serverTimestamp(),
             });
+
             batch.set(doc(db, "sellers", user.uid), {
-                accountBalance: 0, totalEarnings: 0, booksSold: 0,
+                accountBalance: 0,
+                totalEarnings: 0,
+                booksSold: 0,
+                totalWithdrawn: 0,
                 bankDetails: {
-                    bankName: formData.bankName, bankCode: formData.bankCode,
-                    accountNumber: formData.accountNumber, accountName: formData.accountName,
+                    bankName: formData.bankName,
+                    bankCode: formData.bankCode,
+                    accountNumber: formData.accountNumber,
+                    accountName: formData.accountName,
                 },
                 businessInfo: {
                     businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
                     businessDescription: formData.businessDescription,
                 },
                 sellerName: `${formData.firstName} ${formData.surname}`.trim(),
+                sellerId: user.uid,
+                sellerEmail: formData.email,
                 title: formData.title || "",
                 university: formData.university || "",
                 department: formData.department || "",
                 createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
                 status: "active",
                 flutterwaveSubaccountId,
             });
+
             await batch.commit();
 
             // ✅ Fire notification separately — don't let it block or crash the flow

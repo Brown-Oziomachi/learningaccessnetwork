@@ -1,6 +1,12 @@
 import { Suspense } from "react";
 import SellerAccountClient from "./seller";
 
+export const metadata = {
+    title: "Seller Dashboard | LAN Library",
+    description:
+        "Welcome to the LAN Library Seller Dashboard — manage your uploaded books, track sales and earnings, monitor your performance, and grow your digital bookstore all in one place."
+}
+
 export default function SellerPage() {
     return (
         <Suspense

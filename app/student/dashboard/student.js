@@ -463,7 +463,9 @@ export default function StudentDashboardClient() {
     const [aiSessions,     setAiSessions]     = useState([]);
     const [activeStudents, setActiveStudents] = useState([]);
     const [campusBooks,    setCampusBooks]    = useState([]);
-
+    const [selectedLecturer, setSelectedLecturer] = useState(null);
+    const [showAllLecturers, setShowAllLecturers] = useState(false);    
+    
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (u) => {
             if (u) await fetchAll(u.uid);
@@ -513,7 +515,7 @@ export default function StudentDashboardClient() {
                 }).filter(s => s.name && s.name !== 'Student' && s.id !== uid).slice(0,10));
             } catch {}
 
-            const TITLES = ['Lecturer','Dr.','Prof.','Professor'];
+            const TITLES = ['Lecturer', 'Dr.', 'Prof.', 'Professor', 'Engr.', 'Pharm.', 'Barr.'];
             const seenIds = new Set(); const rawLecs = [];
             for (const title of TITLES) {
                 try {
@@ -608,36 +610,67 @@ export default function StudentDashboardClient() {
             <div className="hero">
                 <div style={{position:'absolute',top:-40,right:-40,width:160,height:160,border:'0.5px solid rgba(184,150,62,.15)',transform:'rotate(45deg)',pointerEvents:'none'}}/>
                 <div style={{position:'absolute',bottom:-30,left:-20,width:90,height:90,border:'0.5px solid rgba(184,150,62,.1)',transform:'rotate(45deg)',pointerEvents:'none'}}/>
-                <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:18,position:'relative',width:'100%'}}>
-                    <div style={{minWidth:0,flex:1}}>
-                        <div style={{display:'inline-flex',alignItems:'center',gap:5,background:'rgba(184,150,62,.14)',border:'1px solid rgba(184,150,62,.3)',borderRadius:999,padding:'4px 12px',marginBottom:14}}>
-                            <Sparkles size={9} style={{color:GOLD}}/>
-                            <span style={{fontSize:8,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:GOLDD,fontFamily:"'Lato',sans-serif"}}>{user?.university||'LAN Library'}</span>
-                        </div>
-                        <h2 className="lan-serif" style={{fontSize:'clamp(20px,5vw,38px)',fontWeight:900,color:'#fff',margin:'0 0 8px',lineHeight:1.1}}>
-                            Welcome back,<br/><span style={{color:GOLD,fontStyle:'italic'}}>{user?.firstName||'Scholar'} ✦</span>
-                        </h2>
-                        <p style={{fontSize:12,color:'rgba(245,240,232,.6)',fontFamily:"'Lato',sans-serif",margin:'0 0 18px'}}>
-                            {library.length} {library.length===1?'book':'books'} · {aiSessions.length} AI sessions
-                        </p>
-                        <Link href="/ai-chat"><button className="btn-gold"><Sparkles size={12}/> Chat with AI Tutor</button></Link>
-                    </div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,flexShrink:0,width:'min(200px,100%)'}}>
-                        {[
-                            {icon:BookOpen,label:'Books',   val:library.length,       accent:GOLD},
-                            {icon:Sparkles,label:'AI Chats',val:aiSessions.length,    accent:'#a78bfa'},
-                            {icon:Heart,   label:'Saved',   val:wishlist.length,       accent:'#f87171'},
-                            {icon:Users,   label:'Online',  val:activeStudents.length, accent:'#34d399'},
-                        ].map(({icon:Icon,label,val,accent})=>(
-                            <div key={label} style={{background:'rgba(255,255,255,.07)',border:'0.5px solid rgba(255,255,255,.1)',padding:10,textAlign:'center'}}>
-                                <Icon size={13} style={{color:accent,margin:'0 auto 4px'}}/>
-                                <p className="lan-serif" style={{fontSize:18,fontWeight:700,color:'#fff',margin:0}}>{val}</p>
-                                <p style={{fontSize:8,fontWeight:700,letterSpacing:'.08em',textTransform:'uppercase',color:'rgba(245,240,232,.45)',fontFamily:"'Lato',sans-serif",margin:0}}>{label}</p>
-                            </div>
-                        ))}
-                    </div>
+               <div style={{position:'relative',width:'100%'}}>
+
+    {/* ── Top badge ── */}
+    <div style={{display:'inline-flex',alignItems:'center',gap:5,background:'rgba(184,150,62,.14)',border:'1px solid rgba(184,150,62,.3)',borderRadius:999,padding:'4px 12px',marginBottom:12}}>
+        <Sparkles size={9} style={{color:GOLD}}/>
+        <span style={{fontSize:8,fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:GOLDD,fontFamily:"'Lato',sans-serif"}}>{user?.university||'LAN Library'}</span>
+    </div>
+
+    {/* ── Name + stats side by side on mobile, stacked on very small ── */}
+    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12,marginBottom:14}}>
+
+        {/* Left: name + meta */}
+        <div style={{flex:1,minWidth:0}}>
+            <h2 className="lan-serif" style={{fontSize:'clamp(22px,6vw,38px)',fontWeight:900,color:'#fff',margin:'0 0 6px',lineHeight:1.05,wordBreak:'break-word'}}>
+                Welcome back,<br/>
+                <span style={{color:GOLD,fontStyle:'italic'}}>{user?.firstName||'Scholar'} ✦</span>
+            </h2>
+            <p style={{fontSize:11,color:'rgba(245,240,232,.55)',fontFamily:"'Lato',sans-serif",margin:'0 0 4px'}}>
+                {library.length} {library.length===1?'book':'books'} · {aiSessions.length} AI sessions
+            </p>
+            {(user?.department||user?.faculty||user?.institution||user?.university) && (
+                <div style={{display:'flex',flexDirection:'column',gap:2,marginTop:4}}>
+                    {(user?.department||user?.faculty) && (
+                        <span style={{fontSize:10,color:'rgba(184,150,62,.8)',fontFamily:"'Lato',sans-serif",display:'flex',alignItems:'center',gap:3}}>
+                            <BookMarked size={8} style={{color:GOLD,flexShrink:0}}/>{user.department||user.faculty}
+                        </span>
+                    )}
+                    {(user?.institution||user?.university) && (
+                        <span style={{fontSize:10,color:'rgba(184,150,62,.6)',fontFamily:"'Lato',sans-serif",display:'flex',alignItems:'center',gap:3}}>
+                            <GraduationCap size={8} style={{color:GOLD,flexShrink:0}}/>{user.institution||user.university}
+                        </span>
+                    )}
                 </div>
-            </div>
+            )}
+        </div>
+
+        {/* Right: 2×2 stat grid — compact on mobile */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,flexShrink:0,width:'clamp(130px,36vw,180px)'}}>
+            {[
+                {icon:BookOpen,label:'Books',   val:library.length,       accent:GOLD},
+                {icon:Sparkles,label:'AI Chats',val:aiSessions.length,    accent:'#a78bfa'},
+                {icon:Heart,   label:'Saved',   val:wishlist.length,       accent:'#f87171'},
+                {icon:Users,   label:'Online',  val:activeStudents.length, accent:'#34d399'},
+            ].map(({icon:Icon,label,val,accent})=>(
+                <div key={label} style={{background:'rgba(255,255,255,.07)',border:'0.5px solid rgba(255,255,255,.1)',padding:'8px 6px',textAlign:'center'}}>
+                    <Icon size={12} style={{color:accent,margin:'0 auto 3px'}}/>
+                    <p className="lan-serif" style={{fontSize:'clamp(14px,4vw,20px)',fontWeight:700,color:'#fff',margin:0,lineHeight:1}}>{val}</p>
+                    <p style={{fontSize:7,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'rgba(245,240,232,.4)',fontFamily:"'Lato',sans-serif",margin:'2px 0 0'}}>{label}</p>
+                </div>
+            ))}
+        </div>
+    </div>
+
+    {/* ── CTA button — full width on mobile ── */}
+    <Link href="/ai-chat" style={{display:'block'}}>
+        <button className="btn-gold" style={{width:'100%',justifyContent:'center',padding:'11px 18px'}}>
+            <Sparkles size={12}/> Chat with AI Tutor
+        </button>
+    </Link>
+</div>
+</div>
 
             {library.length > 0 && (
                 <section>
@@ -646,13 +679,116 @@ export default function StudentDashboardClient() {
                 </section>
             )}
 
-            <section>
-                <SH label="Faculty Directory" title={`Our Lecturers${lecturers.length>0?' · '+lecturers.length+' on LAN':''}`} action={<Link href="/lecturers" className="slink">View All <ChevronRight size={11}/></Link>}/>
-                {lecturers.length===0
-                    ? <div className="eb"><GraduationCap size={28} style={{color:'#e5ddd0',margin:'0 auto 8px'}}/><p className="et">No lecturers yet</p></div>
-                    : <div className="sr">{lecturers.map(l=><div key={l.sellerId} style={{flexShrink:0,width:180}}><LecturerCard lecturer={l}/></div>)}</div>
+           {/* ── FACULTY DIRECTORY — one featured + slide-out panel ── */}
+{lecturers.length > 0 && (() => {
+    const featured = lecturers[0];
+    const featuredBooks = lecturerBooks.filter(b =>
+        b.sellerId === featured.sellerId || b.lecturerName === featured.sellerName
+    );
+    return (
+        <section>
+            <SH
+                label="Faculty Directory"
+                title={`Our Lecturers · ${lecturers.length} on LAN`}
+                action={
+                    <button onClick={() => setShowAllLecturers(true)} className="slink">
+                        View All <ChevronRight size={11} />
+                    </button>
                 }
-            </section>
+            />
+
+            {/* ── Single featured lecturer card ── */}
+            <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', overflow: 'hidden' }}>
+
+                {/* Header row */}
+                <div
+                    onClick={() => setSelectedLecturer(featured)}
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: 14,
+                        padding: '16px 18px',
+                        borderBottom: featuredBooks.length > 0 ? '0.5px solid #f0ebe0' : 'none',
+                        cursor: 'pointer', transition: 'background .15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = CREAM}
+                    onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                >
+                    {featured.photo ? (
+                        <img src={featured.photo} alt={featured.sellerName}
+                            style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: `2px solid ${GOLD}`, flexShrink: 0 }}
+                            onError={e => e.target.style.display = 'none'} />
+                    ) : (
+                        <div style={{ width: 52, height: 52, borderRadius: '50%', background: getPalette(featured.sellerName).bg, border: `2px solid ${GOLD}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span style={{ color: getPalette(featured.sellerName).text, fontSize: 18, fontWeight: 700, fontFamily: "'Playfair Display',serif" }}>{getInitials(featured.sellerName)}</span>
+                        </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Playfair Display',serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {featured.title ? `${featured.title} ${featured.sellerName}` : featured.sellerName}
+                            </p>
+                            {featured.title && (
+                                <span style={{ fontSize: 7, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: GOLD, background: 'rgba(184,150,62,.1)', border: '0.5px solid rgba(184,150,62,.3)', padding: '2px 8px', fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>
+                                    {featured.title}
+                                </span>
+                            )}
+                        </div>
+                        {featured.department && (
+                            <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <BookMarked size={9} style={{ color: GOLD, flexShrink: 0 }} />
+                                {featured.department}
+                                {featured.university && <span style={{ color: '#ccc' }}>· {featured.university}</span>}
+                            </p>
+                        )}
+                        <p style={{ fontSize: 10, color: GOLD, margin: '4px 0 0', fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>
+                            {featured.uploadedBooks} material{featured.uploadedBooks !== 1 ? 's' : ''} uploaded
+                        </p>
+                    </div>
+                    <ChevronRight size={13} style={{ color: '#ccc', flexShrink: 0 }} />
+                </div>
+
+                {/* Featured books */}
+                {featuredBooks.length > 0 && (
+                    <div style={{ padding: '14px 18px 18px' }}>
+                        <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: '#bbb', fontFamily: "'Lato',sans-serif", margin: '0 0 12px' }}>
+                            Materials by this lecturer
+                        </p>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
+                            {featuredBooks.slice(0, 4).map((book, bi) => (
+                                <BookCard key={book.firestoreId || bi} book={book} badge="Lecturer" />
+                            ))}
+                            {featuredBooks.length > 4 && (
+                                <div onClick={() => setSelectedLecturer(featured)}
+                                    style={{ background: CREAM, border: '0.5px dashed rgba(184,150,62,.4)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', aspectRatio: '3/4', cursor: 'pointer', gap: 6 }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = '#ede8df'; e.currentTarget.style.borderColor = GOLD; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = CREAM; e.currentTarget.style.borderColor = 'rgba(184,150,62,.4)'; }}>
+                                    <span style={{ fontSize: 20, fontWeight: 700, color: NAVY, fontFamily: "'Playfair Display',serif" }}>+{featuredBooks.length - 4}</span>
+                                    <span style={{ fontSize: 8, fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif", letterSpacing: '.1em', textTransform: 'uppercase' }}>More</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {featuredBooks.length === 0 && (
+                    <div style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <BookOpen size={13} style={{ color: '#e5ddd0' }} />
+                        <p style={{ fontSize: 10, color: '#ccc', margin: 0, fontFamily: "'Lato',sans-serif" }}>No materials uploaded yet</p>
+                    </div>
+                )}
+            </div>
+
+            {/* View all teaser */}
+            {lecturers.length > 1 && (
+                <button onClick={() => setShowAllLecturers(true)}
+                    style={{ marginTop: 12, width: '100%', padding: '11px', background: 'transparent', border: '0.5px dashed rgba(13,34,68,.2)', color: NAVY, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", letterSpacing: '.04em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all .18s' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = CREAM; e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.color = GOLD; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(13,34,68,.2)'; e.currentTarget.style.color = NAVY; }}>
+                    <Users size={13} /> View All {lecturers.length} Lecturers
+                </button>
+            )}
+        </section>
+    );
+})()}
 
             <section>
                 <SH label="Faculty Uploads" title="New from Lecturers" action={<Link href="/documents?filter=lecturer" className="slink">Browse All <ChevronRight size={11}/></Link>}/>
@@ -1078,7 +1214,150 @@ export default function StudentDashboardClient() {
           .au  { animation: up .38s cubic-bezier(.4,0,.2,1) both; }
           @keyframes p2   { 0%,100%{opacity:1} 50%{opacity:.4} }
           .pd  { animation: p2 2s infinite; }
+
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         `}</style>
+
+            {/* ══ LECTURER DETAIL MODAL ══ */}
+            {/* ══ ALL LECTURERS SLIDE-OUT PANEL ══ */}
+            {showAllLecturers && (
+                <div onClick={() => setShowAllLecturers(false)}
+                    style={{ position: 'fixed', inset: 0, zIndex: 999998, background: 'rgba(13,34,68,.5)', backdropFilter: 'blur(3px)' }}>
+                    <div onClick={e => e.stopPropagation()}
+                        style={{
+                            position: 'absolute', top: 0, right: 0, bottom: 0,
+                            width: 'min(420px, 100vw)',
+                            background: BG, overflowY: 'auto',
+                            boxShadow: '-20px 0 60px rgba(13,34,68,.2)',
+                            animation: 'slideInRight .28s cubic-bezier(.4,0,.2,1) both',
+                            display: 'flex', flexDirection: 'column',
+                        }}>
+
+                        {/* Panel header */}
+                        <div style={{ background: NAVY, padding: '20px 20px 16px', position: 'sticky', top: 0, zIndex: 2 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.2em', textTransform: 'uppercase', color: GOLD, fontFamily: "'Lato',sans-serif", margin: 0 }}>Faculty Directory</p>
+                                <button onClick={() => setShowAllLecturers(false)}
+                                    style={{ background: 'rgba(255,255,255,.1)', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                                    <X size={14} />
+                                </button>
+                            </div>
+                            <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: '#fff', margin: 0 }}>
+                                All Lecturers · <span style={{ color: GOLD }}>{lecturers.length}</span>
+                            </h2>
+                        </div>
+
+                        {/* Lecturer list */}
+                        <div style={{ flex: 1, padding: '12px 16px 32px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {lecturers.map((lec, idx) => (
+                                <div key={lec.sellerId}
+                                    onClick={() => { setSelectedLecturer(lec); setShowAllLecturers(false); }}
+                                    style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '13px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', transition: 'all .18s' }}
+                                    onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.background = CREAM; }}
+                                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5ddd0'; e.currentTarget.style.background = '#fff'; }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#ccc', fontFamily: "'Playfair Display',serif", width: 20, flexShrink: 0, textAlign: 'center' }}>{idx + 1}</div>
+                                    {lec.photo ? (
+                                        <img src={lec.photo} alt={lec.sellerName}
+                                            style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: `1.5px solid ${GOLD}`, flexShrink: 0 }}
+                                            onError={e => e.target.style.display = 'none'} />
+                                    ) : (
+                                        <div style={{ width: 42, height: 42, borderRadius: '50%', background: getPalette(lec.sellerName).bg, border: `1.5px solid rgba(184,150,62,.4)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                            <span style={{ color: getPalette(lec.sellerName).text, fontSize: 14, fontWeight: 700, fontFamily: "'Playfair Display',serif" }}>{getInitials(lec.sellerName)}</span>
+                                        </div>
+                                    )}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <p style={{ fontSize: 12, fontWeight: 700, color: NAVY, margin: '0 0 2px', fontFamily: "'Playfair Display',serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {lec.title ? `${lec.title} ${lec.sellerName}` : lec.sellerName}
+                                        </p>
+                                        {lec.department && (
+                                            <p style={{ fontSize: 10, color: '#888', margin: '0 0 2px', fontFamily: "'Lato',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                                <BookMarked size={8} style={{ color: GOLD, flexShrink: 0 }} />{lec.department}
+                                            </p>
+                                        )}
+                                        <p style={{ fontSize: 10, color: GOLD, margin: 0, fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>
+                                            {lec.uploadedBooks} material{lec.uploadedBooks !== 1 ? 's' : ''}
+                                        </p>
+                                    </div>
+                                    <ChevronRight size={12} style={{ color: '#ccc', flexShrink: 0 }} />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ══ LECTURER DETAIL MODAL ══ */}
+            {selectedLecturer && (() => {
+                const lec = selectedLecturer;
+                const myBooks = lecturerBooks.filter(b =>
+                    b.sellerId === lec.sellerId || b.lecturerName === lec.sellerName
+                );
+                return (
+                    <div onClick={() => setSelectedLecturer(null)}
+                        style={{ position: 'fixed', inset: 0, zIndex: 999999, background: 'rgba(13,34,68,.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                        <div onClick={e => e.stopPropagation()}
+                            style={{ background: '#fff', width: '100%', maxWidth: 560, maxHeight: '88vh', overflowY: 'auto', borderRadius: '16px 16px 0 0', animation: 'slideUp .28s cubic-bezier(.4,0,.2,1) both' }}>
+
+                            {/* Header */}
+                            <div style={{ background: NAVY, padding: '20px 20px 18px', position: 'sticky', top: 0, zIndex: 2, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                                {lec.photo ? (
+                                    <img src={lec.photo} alt={lec.sellerName}
+                                        style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: `2px solid ${GOLD}`, flexShrink: 0 }}
+                                        onError={e => e.target.style.display = 'none'} />
+                                ) : (
+                                    <div style={{ width: 60, height: 60, borderRadius: '50%', background: getPalette(lec.sellerName).bg, border: `2px solid ${GOLD}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                        <span style={{ color: getPalette(lec.sellerName).text, fontSize: 22, fontWeight: 700, fontFamily: "'Playfair Display',serif" }}>{getInitials(lec.sellerName)}</span>
+                                    </div>
+                                )}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: GOLD, fontFamily: "'Lato',sans-serif", margin: '0 0 4px' }}>{lec.title || 'Faculty'}</p>
+                                    <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 700, color: '#fff', margin: '0 0 6px', lineHeight: 1.2 }}>
+                                        {lec.title ? `${lec.title} ${lec.sellerName}` : lec.sellerName}
+                                    </h2>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                        {lec.department && <span style={{ fontSize: 10, color: 'rgba(245,240,232,.65)', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', gap: 4 }}><BookMarked size={9} style={{ color: GOLD }} />{lec.department}</span>}
+                                        {lec.university && <span style={{ fontSize: 10, color: 'rgba(245,240,232,.45)', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', gap: 4 }}><GraduationCap size={9} style={{ color: GOLD }} />{lec.university}</span>}
+                                    </div>
+                                    <p style={{ fontSize: 10, color: GOLD, margin: '8px 0 0', fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>{lec.uploadedBooks} material{lec.uploadedBooks !== 1 ? 's' : ''} uploaded</p>
+                                </div>
+                                <button onClick={() => setSelectedLecturer(null)}
+                                    style={{ background: 'rgba(255,255,255,.1)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
+                                    <X size={15} />
+                                </button>
+                            </div>
+
+                            {/* Body */}
+                            <div style={{ padding: '18px 18px 32px' }}>
+                                <Link href={`/seller-profile?sellerId=${lec.sellerId}`} onClick={() => setSelectedLecturer(null)} style={{ textDecoration: 'none' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: CREAM, border: `0.5px solid rgba(184,150,62,.3)`, marginBottom: 20, cursor: 'pointer' }}>
+                                        <span style={{ fontSize: 11, fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>View Full Profile</span>
+                                        <ChevronRight size={13} style={{ color: GOLD }} />
+                                    </div>
+                                </Link>
+                                {myBooks.length > 0 ? (
+                                    <>
+                                        <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: '#bbb', fontFamily: "'Lato',sans-serif", margin: '0 0 12px' }}>Materials by this lecturer</p>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
+                                            {myBooks.map((book, bi) => (
+                                                <div key={book.firestoreId || bi} onClick={() => setSelectedLecturer(null)}>
+                                                    <BookCard book={book} badge="Lecturer" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div style={{ textAlign: 'center', padding: '32px 20px' }}>
+                                        <BookOpen size={32} style={{ color: '#e5ddd0', margin: '0 auto 10px' }} />
+                                        <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, fontFamily: "'Playfair Display',serif", margin: '0 0 4px' }}>No materials yet</p>
+                                        <p style={{ fontSize: 11, color: '#bbb', fontFamily: "'Lato',sans-serif", margin: 0 }}>This lecturer hasn't uploaded any books yet.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
         <div className="lan-root">
             <Navbar />
@@ -1094,8 +1373,14 @@ export default function StudentDashboardClient() {
                                 <p style={{fontSize:11,fontWeight:700,color:NAVY,margin:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:"'Lato',sans-serif"}}>{displayName}</p>
                                 <div style={{display:'inline-flex',alignItems:'center',gap:4,marginTop:2}}>
                                     <div className="pd" style={{width:5,height:5,borderRadius:'50%',background:'#16a34a'}}/>
-                                    <span style={{fontSize:8,fontWeight:700,color:GOLD,letterSpacing:'.1em',textTransform:'uppercase',fontFamily:"'Lato',sans-serif"}}>Student</span>
-                                </div>
+                                        <span style={{ fontSize: 8, fontWeight: 700, color: GOLD, letterSpacing: '.1em', textTransform: 'uppercase', fontFamily: "'Lato',sans-serif" }}>Student</span>
+                                        {(user?.department || user?.faculty) && (
+                                            <p style={{ fontSize: 9, color: '#aaa', margin: '2px 0 0', fontFamily: "'Lato',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.department || user.faculty}</p>
+                                        )}
+                                        {(user?.institution || user?.university) && (
+                                            <p style={{ fontSize: 9, color: '#ccc', margin: '1px 0 0', fontFamily: "'Lato',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.institution || user.university}</p>
+                                        )}                              
+                                          </div>
                             </div>
                         </div>
                     </div>

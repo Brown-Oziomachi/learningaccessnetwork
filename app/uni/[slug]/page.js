@@ -1,10 +1,11 @@
-// app/uni/[slug]/page.js
 import { Suspense } from "react";
 import UniversityHubClient from "./UniversityHubClient";
 import { AFRICAN_UNIVERSITIES } from "@/lib/africanUniversities";
 import { adminDb } from "@/lib/firebase-admin";
 
 export const UNIVERSITY_REGISTRY = AFRICAN_UNIVERSITIES;
+
+const FACULTY_TITLES = ["Dr.", "Prof.", "Engr.", "Pharm.", "Barr.", "Lecturer"];
 
 export async function generateMetadata({ params }) {
     const { slug } = await params;
@@ -19,8 +20,6 @@ export async function generateMetadata({ params }) {
 export async function generateStaticParams() {
     return Object.keys(UNIVERSITY_REGISTRY).map(slug => ({ slug }));
 }
-
-const LECTURER_TITLES = ["lecturer", "dr.", "prof.", "professor", "mrs", "mr"];
 
 export default async function UniversityHubPage({ params }) {
     const { slug } = await params;
@@ -45,14 +44,14 @@ export default async function UniversityHubPage({ params }) {
                 allSellerIds.add(ds.id);
                 const data = ds.data();
                 const title = (data.title || "").toLowerCase();
-                const isLecturer = LECTURER_TITLES.some(t => title.includes(t));
+                const isLecturer = FACULTY_TITLES.some(t => title.includes(t.toLowerCase()));
                 if (!isLecturer) return;
 
                 contributors.push({
                     id: ds.id,
                     name: data.sellerName || data.displayName || "Unknown",
                     title: data.title || "Lecturer",
-                    photoUrl: null, // fetch below
+                    photoUrl: null,
                     department: data.department || null,
                     faculty: data.faculty || null,
                     verified: false,

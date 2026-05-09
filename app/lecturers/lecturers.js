@@ -176,8 +176,8 @@ export default function LecturersClient() {
     const [activeFilter, setActiveFilter]     = useState('All');
     const [showFilters, setShowFilters]       = useState(false);
 
-    const filters = ['All', 'Professor', 'Dr.', 'Lecturer', 'Mrs', 'Mr'];
-
+    const filters = ['All', 'Dr.', 'Prof.', 'Engr.', 'Pharm.', 'Barr.', 'Lecturer'];
+    
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, (u) => {
             if (u) { setUser(u); fetchFollowing(u.uid); }
@@ -222,7 +222,7 @@ export default function LecturersClient() {
                 for (const ds of sellersSnap.docs) {
                     const data  = ds.data();
                     const title = (data.title || '').toLowerCase();
-                    if (!['lecturer','dr.','prof.','professor','mrs','mr'].some(t => title.includes(t))) continue;
+                    if (!['dr.', 'prof.', 'engr.', 'pharm.', 'barr.', 'lecturer'].some(t => title.includes(t))) continue;
                     let photo = null;
                     try {
                         const ud = await getDoc(doc(db, 'users', ds.id));
