@@ -25,6 +25,7 @@ dist/
 *.avi
 *.mkv
 service-account.json
+serviceAccountKey.json
 fix-key.js
 *.zip
 *.tar.gz

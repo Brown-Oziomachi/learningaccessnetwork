@@ -37,6 +37,7 @@ import {
   where,
   doc,
   getDoc,
+  onSnapshot,  // ← ADD THIS
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { createPortal } from "react-dom";
@@ -88,6 +89,20 @@ export default function Navbar() {
   const searchTagsRef = useRef(null);
   const dropdownTimer = useRef(null);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [announcement, setAnnouncement] = useState(null);
+  useEffect(() => {
+    const ref = doc(db, 'siteSettings', 'announcement');
+    const unsub = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.active) setAnnouncement(data);
+        else setAnnouncement(null);
+      } else {
+        setAnnouncement(null);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   /* scroll shadow */
   useEffect(() => {
@@ -431,12 +446,81 @@ useEffect(() => {
     }
       `}</style>
 
-      {/* ══ TOP ANNOUNCEMENT BAR ══ */}
-      <Link href="/latest/documentations" className="lan-topbar-ticker">
-        <span style={{ color: GOLD }}>●</span>
-        Recently Published
-        <ChevronRight size={13} />
-      </Link>
+     {/* ══ TOP ANNOUNCEMENT BAR ══ */}
+      {announcement && (
+        <>
+          <style>{`
+           @keyframes tickerScroll {
+            0%   { transform: translateX(0%); }
+            100% { transform: translateX(-50%); }
+          }
+          .lan-ticker-track {
+            display: flex;
+            white-space: nowrap;
+            animation: tickerScroll 18s linear infinite;
+            width: max-content;
+          }
+            .lan-ticker-track:hover { animation-play-state: paused; }
+            .lan-ticker-bar {
+              background: ${announcement.bgColor || NAVY};
+              border-bottom: 1px solid rgba(184,150,62,0.22);
+              overflow: hidden;
+              height: 34px;
+              display: flex;
+              align-items: center;
+              position: relative;
+            }
+            .lan-ticker-bar::before, .lan-ticker-bar::after {
+              content: '';
+              position: absolute;
+              top: 0; bottom: 0;
+              width: 60px;
+              z-index: 2;
+              pointer-events: none;
+            }
+            .lan-ticker-bar::before {
+              left: 0;
+              background: linear-gradient(to right, ${announcement.bgColor || NAVY}, transparent);
+            }
+            .lan-ticker-bar::after {
+              right: 0;
+              background: linear-gradient(to left, ${announcement.bgColor || NAVY}, transparent);
+            }
+          `}</style>
+
+          <div className="lan-ticker-bar">
+            <div style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6px',
+              background: GOLD, color: NAVY,
+              fontFamily: "'Lato', sans-serif", fontSize: '9px',
+              fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase',
+              padding: '3px 10px', margin: '0 16px', zIndex: 3, position: 'relative',
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: NAVY, display: 'inline-block' }} />
+              {announcement.label || 'NOTICE'}
+            </div>
+            <div style={{ overflow: 'hidden', flex: 1 }}>
+              <div className="lan-ticker-track">
+                {[0, 1].map((i) => (
+                  <span key={i} style={{
+                    fontFamily: "'Lato', sans-serif", fontSize: '12px',
+                    fontWeight: 600, color: announcement.textColor || CREAM,
+                    letterSpacing: '0.03em', paddingRight: '80px',
+                  }}>
+                    {announcement.message}
+                    {announcement.linkUrl && (
+                      <a href={announcement.linkUrl} style={{ color: GOLD, fontWeight: 700, marginLeft: '12px', textDecoration: 'underline' }}>
+                        {announcement.linkText || 'Learn more →'}
+                      </a>
+                    )}
+                    <span style={{ margin: '0 32px', color: GOLD, opacity: 0.4 }}>◆</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ══ MAIN HEADER ══ */}
       <header
@@ -544,7 +628,7 @@ useEffect(() => {
             <nav style={{ display: "flex", alignItems: "center", gap: "2px", marginLeft: "auto" }}>
               <Link href="/my-books" className="lan-nav-link"><Book size={15} /> My Books</Link>
               <button className="lan-nav-link" onClick={handleMyAccountClick}><User size={15} /> Account</button>
-              <Link href="/lecturers" className="lan-nav-link"><Crown size={15} /> Lecturers</Link>
+              <Link href="/lecturers" className="lan-nav-link"><Crown size={15} /> Faculties</Link>
               <Link href="/saved-my-book" className="lan-nav-link"><Bookmark size={15} /> Saved</Link>
 
               <button
@@ -792,7 +876,7 @@ useEffect(() => {
                     { href: "/home", icon: Home, label: "Home" },
                     { href: "/my-books", icon: Book, label: "My Books" },
                     { fn: handleMyAccountClick, icon: User, label: "My Account" },
-                    { href: "/lecturers", icon: Crown, label: "Lecturers" },
+                    { href: "/lecturers", icon: Crown, label: "Faculties" },
                     { href: "/saved-my-book", icon: Bookmark, label: "Saved" },
                     { href: "/transfer", icon: Bookmark, label: "Transfer" },
                     { href: "/referrals", icon: Bookmark, label: "Referral" },

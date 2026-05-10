@@ -4,8 +4,8 @@ import {
   collection, query, where, getDocs, getDoc,
   doc, updateDoc, deleteDoc, addDoc,
   serverTimestamp, increment, orderBy,
-  runTransaction, limit,      // ← these two are the ones most likely missing
-  writeBatch, onSnapshot
+  runTransaction, limit,     
+  writeBatch, onSnapshot, setDoc, 
 } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -354,6 +354,7 @@ const NAV_SECTIONS = [
     label: 'Content',
     items: [
       { id: 'advertisements', icon: BookOpen, label: 'Books', badgeKey: 'pendingAds' },
+      { id: 'announcements', icon: Bell, label: 'Announcements' }, 
       { id: 'schools', icon: Building, label: 'Schools', badgeKey: 'pendingSchools' },
       { id: 'school-documents', icon: FileText, label: 'School Docs', badgeKey: 'pendingSchoolDocs' },
       { id: 'physical-orders', icon: ShoppingBag, label: 'Physical Orders', badgeKey: 'pendingPhysicalOrders', badgeType: 'warn' },
@@ -390,6 +391,249 @@ const NAV_SECTIONS = [
 
 
 // ── paste this ABOVE the `export default function ComprehensiveAdminPanel` line ──
+
+function AnnouncementsSection({ user }) {
+  const [current, setCurrent]     = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [saving, setSaving]       = useState(false);
+  const [message,   setMessage]   = useState('');
+  const [label,     setLabel]     = useState('NOTICE');
+  const [linkUrl,   setLinkUrl]   = useState('');
+  const [linkText,  setLinkText]  = useState('');
+  const [bgColor,   setBgColor]   = useState('#0d2244');
+  const [textColor, setTextColor] = useState('#f5f0e8');
+  const [active,    setActive]    = useState(true);
+
+  useEffect(() => {
+    const ref = doc(db, 'siteSettings', 'announcement');
+    const unsub = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setCurrent(data);
+        setMessage(data.message     || '');
+        setLabel(data.label         || 'NOTICE');
+        setLinkUrl(data.linkUrl     || '');
+        setLinkText(data.linkText   || '');
+        setBgColor(data.bgColor     || '#0d2244');
+        setTextColor(data.textColor || '#f5f0e8');
+        setActive(data.active !== false);
+      }
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleSave = async () => {
+    if (!message.trim()) { alert('Message cannot be empty'); return; }
+    setSaving(true);
+    try {
+      await setDoc(doc(db, 'siteSettings', 'announcement'), {
+        message:   message.trim(),
+        label:     label.trim() || 'NOTICE',
+        linkUrl:   linkUrl.trim(),
+        linkText:  linkText.trim(),
+        bgColor,
+        textColor,
+        active,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.email || 'admin',
+      });
+      alert('✅ Announcement published!');
+    } catch (e) {
+      alert('❌ Failed: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!confirm('Hide the announcement bar from the site?')) return;
+    try {
+      await updateDoc(doc(db, 'siteSettings', 'announcement'), { active: false });
+    } catch (e) { alert('Failed: ' + e.message); }
+  };
+
+  const PRESET_LABELS = ['NOTICE', 'NEW', 'UPDATE', 'ALERT', 'EVENT', 'PROMO'];
+
+  if (loading) return (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+      <div style={{ width: 32, height: 32, border: '2px solid rgba(59,130,246,0.3)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* Live preview */}
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>
+          Live Preview
+        </div>
+        <div style={{
+          background: bgColor, borderRadius: 8, overflow: 'hidden',
+          height: 34, display: 'flex', alignItems: 'center',
+          border: '1px solid rgba(255,255,255,0.08)',
+          opacity: active ? 1 : 0.4,
+        }}>
+          <div style={{
+            flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
+            background: '#b8963e', color: '#0d2244',
+            fontFamily: 'monospace', fontSize: '9px', fontWeight: 900,
+            letterSpacing: '0.14em', textTransform: 'uppercase',
+            padding: '3px 10px', margin: '0 16px',
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#0d2244', display: 'inline-block' }} />
+            {label || 'NOTICE'}
+          </div>
+          <span style={{
+            fontFamily: 'monospace', fontSize: '12px', fontWeight: 600,
+            color: textColor, whiteSpace: 'nowrap', overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+            {message || 'Your announcement text will appear here…'}
+            {linkUrl && (
+              <span style={{ color: '#b8963e', fontWeight: 700, marginLeft: 12 }}>
+                {linkText || 'Learn more →'}
+              </span>
+            )}
+          </span>
+        </div>
+        {!active && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>
+            ⚠ Announcement is currently hidden from the site
+          </div>
+        )}
+      </div>
+
+      {/* Form */}
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 6 }}>
+            Announcement Message *
+          </label>
+          <textarea
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            placeholder="e.g. 🎉 New semester documents now available — get your past questions before exams!"
+            rows={3}
+            className="input-dark"
+            style={{ resize: 'vertical', lineHeight: 1.6, width: '100%' }}
+          />
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+            This scrolls across the top of every page. Keep it under 150 characters for best results.
+          </div>
+        </div>
+
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>
+            Label Badge
+          </label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {PRESET_LABELS.map(l => (
+              <button key={l} onClick={() => setLabel(l)} style={{
+                padding: '5px 12px', fontSize: 11, fontWeight: 700,
+                letterSpacing: '0.08em', cursor: 'pointer', border: 'none', borderRadius: 4,
+                background: label === l ? '#b8963e' : 'var(--surface)',
+                color: label === l ? '#0d2244' : 'var(--text-secondary)',
+                transition: '0.15s',
+              }}>{l}</button>
+            ))}
+            <input
+              value={label}
+              onChange={e => setLabel(e.target.value.toUpperCase().slice(0, 10))}
+              placeholder="CUSTOM"
+              className="input-dark"
+              style={{ width: 100, fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', padding: '5px 10px' }}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 6 }}>
+              Link URL (optional)
+            </label>
+            <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="/latest/documentations" className="input-dark" />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 6 }}>
+              Link Text (optional)
+            </label>
+            <input value={linkText} onChange={e => setLinkText(e.target.value)} placeholder="Learn more →" className="input-dark" />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 6 }}>Bar Background</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} style={{ width: 36, height: 36, cursor: 'pointer', border: 'none', background: 'none', borderRadius: 4 }} />
+              <input value={bgColor} onChange={e => setBgColor(e.target.value)} className="input-dark" style={{ flex: 1, fontFamily: 'monospace' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              {['#0d2244', '#b8963e', '#1a3a6e', '#7c2d12', '#14532d'].map(c => (
+                <button key={c} onClick={() => setBgColor(c)} style={{ width: 22, height: 22, borderRadius: 4, background: c, border: bgColor === c ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer' }} />
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 6 }}>Text Color</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input type="color" value={textColor} onChange={e => setTextColor(e.target.value)} style={{ width: 36, height: 36, cursor: 'pointer', border: 'none', background: 'none', borderRadius: 4 }} />
+              <input value={textColor} onChange={e => setTextColor(e.target.value)} className="input-dark" style={{ flex: 1, fontFamily: 'monospace' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              {['#f5f0e8', '#ffffff', '#b8963e', '#fbbf24', '#86efac'].map(c => (
+                <button key={c} onClick={() => setTextColor(c)} style={{ width: 22, height: 22, borderRadius: 4, background: c, border: textColor === c ? '2px solid #fff' : '2px solid rgba(255,255,255,0.2)', cursor: 'pointer' }} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface)', borderRadius: 8, padding: '12px 14px' }}>
+          <button onClick={() => setActive(!active)} style={{
+            width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+            background: active ? '#10b981' : 'var(--surface2)',
+            position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+          }}>
+            <span style={{ position: 'absolute', top: 3, left: active ? 22 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', display: 'block' }} />
+          </button>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{active ? 'Visible on site' : 'Hidden from site'}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Toggle to show or hide the announcement bar</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+          <button onClick={handleSave} disabled={saving} className="btn btn-primary" style={{ flex: 1, justifyContent: 'center', padding: '12px', fontSize: 13 }}>
+            {saving ? (
+              <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Publishing…</>
+            ) : <>📢 Publish Announcement</>}
+          </button>
+          {current?.active && (
+            <button onClick={handleDeactivate} className="btn btn-danger" style={{ padding: '12px 20px', fontSize: 13 }}>
+              Hide Bar
+            </button>
+          )}
+        </div>
+      </div>
+
+      {current && (
+        <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '12px 16px', fontSize: 12 }}>
+          <div style={{ color: 'var(--text-muted)', marginBottom: 4 }}>Last published by</div>
+          <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{current.updatedBy || 'admin'}</div>
+          {current.updatedAt?.toDate && (
+            <div style={{ color: 'var(--text-muted)', marginTop: 2, fontSize: 11 }}>
+              {current.updatedAt.toDate().toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function AdminNotificationBell({ setActiveSection }) {
   const [open, setOpen] = useState(false);
@@ -1847,6 +2091,7 @@ export default function ComprehensiveAdminPanel() {
             </div>
           )}
 
+
           {activeSection === 'registry-checkout' && (
             <div>
               <div className="section-header">
@@ -1886,6 +2131,7 @@ export default function ComprehensiveAdminPanel() {
                     <span style={{ fontSize: 12, color, fontWeight: 600, fontFamily: 'monospace' }}>{text}</span>
                   </div>
                 ))}
+                
               </div>
 
               {/* The flow */}
@@ -1911,6 +2157,20 @@ export default function ComprehensiveAdminPanel() {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+        {activeSection === 'announcements' && (
+            <div>
+              <div className="section-header">
+                <div>
+                  <div className="section-title"><Bell size={18} />Announcements</div>
+                  <div className="section-sub">
+                    Publish a rolling ticker message shown at the top of every page
+                  </div>
+                </div>
+              </div>
+              <AnnouncementsSection user={user} />
             </div>
           )}
 

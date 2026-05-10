@@ -44,17 +44,22 @@ import {
   Package,
   MapPin,
   AlertCircle,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 import { fetchBookDetails } from "@/utils/bookUtils";
 import BookAIChat from "./BookAIChat";
 import AiAskButton from "./AiAskButton";
 
-/* ─── colour tokens (matches SellerPage exactly) ─────────────── */
-const NAVY = "#0d2244";
-const GOLD = "#b8963e";
-const CREAM = "#f5f0e8";
-const BG = "#f5f1ea";
+/* ── palette — matches the app ── */
+const NAVY   = "#0d2244";
+const GOLD   = "#b8963e";
+const CREAM  = "#f5f0e8";
+const BG     = "#f5f1ea";
+const BORDER = "#e5ddd0";
+const MUTED  = "#aaa";
+const TEXT   = NAVY;
+const CARD   = "#fff";
 
 export default function BookPreviewPage() {
   const router = useRouter();
@@ -97,6 +102,7 @@ export default function BookPreviewPage() {
   const [followLoadingIds, setFollowLoadingIds] = useState(new Set());
   const [physicalInventory, setPhysicalInventory] = useState(null);
   const [loadingPhysical, setLoadingPhysical] = useState(true);
+  const [feedbackRating, setFeedbackRating] = useState(0);
   const getThumbnailUrl = (book) => {
     const direct = book.coverImage || book.image;
 
@@ -696,8 +702,12 @@ export default function BookPreviewPage() {
         userName:
           user?.displayName || user?.email?.split("@")[0] || "Anonymous",
         feedback: feedbackText.trim(),
+        rating: feedbackRating, // ← new
+        helpfulCount: 0, // ← new
+        unhelpfulCount: 0, // ← new
         createdAt: serverTimestamp(),
       });
+      setFeedbackRating(0); // ← reset after submit
       setFeedbackText("");
       setShowFeedbackModal(false);
       setBookFeedbackCount((prev) => prev + 1);
@@ -3775,6 +3785,7 @@ export default function BookPreviewPage() {
               onClick={() => {
                 setShowFeedbackModal(false);
                 setFeedbackText("");
+                setFeedbackRating(0);
               }}
             />
             <div
@@ -3796,53 +3807,166 @@ export default function BookPreviewPage() {
                   overflow: "hidden",
                 }}
               >
+                {/* Header */}
                 <div
                   style={{
                     padding: "20px 24px",
                     borderBottom: "0.5px solid rgba(255,255,255,0.1)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                   }}
                 >
-                  <p
+                  <div>
+                    <p
+                      style={{
+                        fontSize: "10px",
+                        color: GOLD,
+                        fontWeight: 700,
+                        letterSpacing: "0.14em",
+                        textTransform: "uppercase",
+                        margin: "0 0 2px",
+                        fontFamily: "'Lato',sans-serif",
+                      }}
+                    >
+                      Your Review
+                    </p>
+                    <p
+                      style={{
+                        fontFamily: "'Playfair Display',serif",
+                        fontSize: "18px",
+                        fontWeight: 700,
+                        color: "#fff",
+                        margin: 0,
+                      }}
+                    >
+                      Write a Review
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowFeedbackModal(false);
+                      setFeedbackText("");
+                      setFeedbackRating(0);
+                    }}
                     style={{
-                      color: GOLD,
-                      fontSize: "10px",
-                      fontWeight: 700,
-                      letterSpacing: "0.14em",
-                      textTransform: "uppercase",
-                      margin: "0 0 4px",
-                      fontFamily: "'Lato',sans-serif",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "rgba(255,255,255,0.6)",
+                      padding: "4px",
                     }}
                   >
-                    Your Review
-                  </p>
-                  <p
-                    style={{
-                      fontFamily: "'Playfair Display',serif",
-                      fontSize: "18px",
-                      fontWeight: 700,
-                      color: "#fff",
-                      margin: 0,
-                    }}
-                  >
-                    Leave Feedback
-                  </p>
+                    <X size={20} />
+                  </button>
                 </div>
+
+                {/* Body */}
                 <div style={{ padding: "20px 24px" }}>
+                  {book?.title && (
+                    <p
+                      style={{
+                        fontSize: "12px",
+                        color: "rgba(255,255,255,0.45)",
+                        marginBottom: "18px",
+                        fontFamily: "'Lato',sans-serif",
+                        fontStyle: "italic",
+                      }}
+                    >
+                      {book.title}
+                    </p>
+                  )}
+
+                  {/* Star picker */}
                   <p
                     style={{
-                      fontSize: "12px",
+                      fontSize: "11px",
                       color: "rgba(255,255,255,0.5)",
-                      marginBottom: "12px",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      marginBottom: "10px",
                       fontFamily: "'Lato',sans-serif",
                     }}
                   >
-                    Please share your thoughts on this document (optional)
+                    Your rating
+                  </p>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      marginBottom: "20px",
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Star
+                          key={n}
+                          size={30}
+                          fill={n <= feedbackRating ? GOLD : "none"}
+                          stroke={
+                            n <= feedbackRating ? GOLD : "rgba(255,255,255,0.3)"
+                          }
+                          style={{
+                            cursor: "pointer",
+                            transition: "transform 0.1s",
+                          }}
+                          onClick={() => setFeedbackRating(n)}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.transform = "scale(1.2)")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.transform = "scale(1)")
+                          }
+                        />
+                      ))}
+                    </div>
+                    {feedbackRating > 0 && (
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          color: GOLD,
+                          fontWeight: 700,
+                          fontFamily: "'Lato',sans-serif",
+                        }}
+                      >
+                        {
+                          ["", "Poor", "Fair", "Good", "Great", "Excellent"][
+                            feedbackRating
+                          ]
+                        }
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      height: "0.5px",
+                      background: "rgba(255,255,255,0.1)",
+                      marginBottom: "20px",
+                    }}
+                  />
+
+                  {/* Text */}
+                  <p
+                    style={{
+                      fontSize: "11px",
+                      color: "rgba(255,255,255,0.5)",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      marginBottom: "10px",
+                      fontFamily: "'Lato',sans-serif",
+                    }}
+                  >
+                    Your review
                   </p>
                   <textarea
                     autoFocus
                     value={feedbackText}
                     onChange={(e) => setFeedbackText(e.target.value)}
-                    placeholder="What was satisfying about this document?"
+                    placeholder="Share your thoughts about this book…"
                     rows={4}
                     style={{
                       width: "100%",
@@ -3856,38 +3980,52 @@ export default function BookPreviewPage() {
                       fontFamily: "'Lato',sans-serif",
                       boxSizing: "border-box",
                     }}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = GOLD)}
+                    onBlur={(e) =>
+                      (e.currentTarget.style.borderColor =
+                        "rgba(255,255,255,0.15)")
+                    }
                   />
                   <p
                     style={{
-                      fontSize: "11px",
-                      color: "rgba(255,255,255,0.3)",
-                      marginTop: "8px",
-                      marginBottom: "16px",
+                      fontSize: "10px",
+                      color: "rgba(255,255,255,0.25)",
+                      marginTop: "4px",
+                      marginBottom: "18px",
                       fontFamily: "'Lato',sans-serif",
                     }}
                   >
-                    <button
-                      onClick={() =>
-                        router.push(`/book/feedbacks?bookId=${bookId}`)
-                      }
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        color: GOLD,
-                        fontSize: "11px",
-                        padding: 0,
-                        fontFamily: "'Lato',sans-serif",
-                      }}
-                    >
-                      View all feedback →
-                    </button>
+                    {feedbackText.length}/500
                   </p>
+
+                  {/* View all link */}
+                  <button
+                    onClick={() =>
+                      router.push(`/book/feedbacks?bookId=${bookId}`)
+                    }
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      color: GOLD,
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      padding: 0,
+                      fontFamily: "'Lato',sans-serif",
+                      marginBottom: "16px",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    View all reviews →
+                  </button>
+
+                  {/* Actions */}
                   <div style={{ display: "flex", gap: "10px" }}>
                     <button
                       onClick={() => {
                         setShowFeedbackModal(false);
                         setFeedbackText("");
+                        setFeedbackRating(0);
                       }}
                       style={{
                         flex: 1,
@@ -3899,13 +4037,14 @@ export default function BookPreviewPage() {
                         fontWeight: 700,
                         cursor: "pointer",
                         fontFamily: "'Lato',sans-serif",
+                        letterSpacing: "0.04em",
                       }}
                     >
                       Cancel
                     </button>
                     <button
                       onClick={submitFeedback}
-                      disabled={isSubmittingFeedback}
+                      disabled={isSubmittingFeedback || !feedbackText.trim()}
                       style={{
                         flex: 1,
                         padding: "12px",
@@ -3916,10 +4055,14 @@ export default function BookPreviewPage() {
                         fontWeight: 700,
                         cursor: "pointer",
                         fontFamily: "'Lato',sans-serif",
-                        opacity: isSubmittingFeedback ? 0.6 : 1,
+                        opacity:
+                          isSubmittingFeedback || !feedbackText.trim()
+                            ? 0.5
+                            : 1,
+                        letterSpacing: "0.04em",
                       }}
                     >
-                      {isSubmittingFeedback ? "Submitting…" : "Submit"}
+                      {isSubmittingFeedback ? "Submitting…" : "Submit Review"}
                     </button>
                   </div>
                 </div>

@@ -1,26 +1,3 @@
-/**
- * ══════════════════════════════════════════════════════════════
- *  FACULTY ANALYTICS — Role-Gated Dashboard
- *
- *  DATA STRUCTURE (mapped from codebase):
- *
- *  advertMyBook       → sellerId, bookTitle (NOT title), courseCode, author
- *  users              → purchasedBooks{[key]:{sellerId,firestoreId,bookId,id,title,buyerDepartment}}
- *                       savedBooks[{id,title,savedAt}], enrolledCourses[], courses[]
- *                       department|faculty, country|location.country, university|institution
- *  bookViews          → bookId:"firestore-XXX", count:number
- *  bookFeedbacks      → bookId (either format), userName, userEmail, userId,
- *                       feedback, bookTitle, bookAuthor, createdAt, rating
- *  physicalInventory  → sellerId, bookId, assetId, currentStock, totalConsignment,
- *                       reservedStock, shelfLocation, section, pricePerCopy, bookTitle
- *  physicalOrders     → sellerId, bookId, status:"pending_pickup", pickupCode,
- *                       userId, userEmail, userName, price, bookTitle, assetId, inventoryId
- *  physicalSales      → sellerId, assetId, bookId, bookTitle, studentEmail,
- *                       studentName, studentId, salePrice, sellerPayout, platformFee,
- *                       stockAfter, soldAt
- * ══════════════════════════════════════════════════════════════
- */
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -33,29 +10,80 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
 
 /* ─── Design Tokens ─────────────────────────────────────────── */
-const NAVY = "#0d2244";
-const GOLD = "#b8963e";
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
 const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
-const BG = "#f5f1ea";
+const BG    = "#f5f1ea";
+
+/* ─── Faculty Title Detection ───────────────────────────────── */
+const FACULTY_TITLES = ["Dr.", "Prof.", "Engr.", "Pharm.", "Barr.", "Lecturer"];
+
+/**
+ * True when the user carries a recognised academic title on their user
+ * doc or their seller profile. Title holders get automatic access —
+ * they never go through the lecturerVerificationStatus flow.
+ */
+function hasFacultyTitle(user, seller) {
+    if (!user) return false;
+    return (
+        FACULTY_TITLES.includes(user.title) ||
+        FACULTY_TITLES.includes(seller?.title)
+    );
+}
+
+/**
+ * True when the user registered via the formal lecturer/role pathway
+ * (role: "lecturer" or isLecturer: true). These users must pass the
+ * lecturerVerificationStatus check before analytics are unlocked.
+ */
+function isRoleBasedLecturer(user) {
+    if (!user) return false;
+    return user.role === "lecturer" || user.isLecturer === true;
+}
+
+/**
+ * Returns true if the user qualifies as faculty by ANY route:
+ * academic title  OR  formal lecturer role.
+ */
+function isFacultyMember(user, seller) {
+    return hasFacultyTitle(user, seller) || isRoleBasedLecturer(user);
+}
 
 /* ══════════════════════════════════════════════════════════════
-   VERIFIED FACULTY BADGE  (unchanged)
+   VERIFIED FACULTY BADGE
 ══════════════════════════════════════════════════════════════ */
 export function VerifiedFacultyBadge({ user, seller, size = "md" }) {
     if (!user) return null;
+
+    // Title holders (Dr., Prof., etc.) are considered verified automatically.
+    // Role-based lecturers need isVerified + a non-pending/rejected status.
+    const titleHolder = hasFacultyTitle(user, seller);
+    const roleLecturer = isRoleBasedLecturer(user);
+
     const isVerifiedFaculty =
-        (user.role === "lecturer" || user.isLecturer === true) &&
-        user.isVerified === true &&
-        user.lecturerVerificationStatus !== "pending" &&
-        user.lecturerVerificationStatus !== "rejected";
-    const isPending = user.lecturerVerificationStatus === "pending";
+        isFacultyMember(user, seller) &&
+        (
+            titleHolder ||   // title → automatic
+            (
+                user.isVerified === true &&
+                user.lecturerVerificationStatus !== "pending" &&
+                user.lecturerVerificationStatus !== "rejected"
+            )
+        );
+
+    // Only role-based lecturers who haven't completed verification show "pending"
+    const isPending =
+        roleLecturer &&
+        !titleHolder &&
+        user.lecturerVerificationStatus === "pending";
+
     if (!isVerifiedFaculty && !isPending) return null;
 
     const sizes = {
-        sm: { badge: 14, icon: 10, gap: 4, px: "6px 10px", text: 9 },
-        md: { badge: 16, icon: 12, gap: 5, px: "6px 12px", text: 10 },
-        lg: { badge: 20, icon: 14, gap: 6, px: "8px 16px", text: 11 },
+        sm: { badge: 14, icon: 10, gap: 4, px: "6px 10px",  text: 9  },
+        md: { badge: 16, icon: 12, gap: 5, px: "6px 12px",  text: 10 },
+        lg: { badge: 20, icon: 14, gap: 6, px: "8px 16px",  text: 11 },
     };
     const s = sizes[size] || sizes.md;
 
@@ -78,8 +106,9 @@ export function VerifiedFacultyBadge({ user, seller, size = "md" }) {
         <span
             role="img"
             aria-label={isPending ? "Pending faculty verification" : "Verified faculty"}
-            title={isPending ? "Faculty verification is pending"
-                : `Verified ${seller?.title || "Faculty"} — ${user?.department || "Academic Staff"}`}
+            title={isPending
+                ? "Faculty verification is pending"
+                : `Verified ${seller?.title || user?.title || "Faculty"} — ${user?.department || "Academic Staff"}`}
             style={{
                 display: "inline-flex", alignItems: "center", gap: s.gap,
                 background: isPending ? "rgba(245,158,11,0.1)" : "rgba(184,150,62,0.13)",
@@ -102,103 +131,73 @@ export function VerifiedFacultyBadge({ user, seller, size = "md" }) {
 
 /* ══════════════════════════════════════════════════════════════
    CORE ANALYTICS FETCHER
-   Queries every relevant collection with correct field names
 ══════════════════════════════════════════════════════════════ */
 export async function fetchFacultyAnalytics(uid) {
     console.log("[Analytics] Starting for uid:", uid);
 
     const results = {
-        /* digital engagement */
         departmentalReach: 0,
         departmentBreakdown: {},
         courseEngagement: {},
         wishlistCount: 0,
         topCourse: null,
         totalViews: 0,
-        totalDownloads: 0,   // digital purchases only
-
-        /* geographic */
+        totalDownloads: 0,
         wishlistByCountry: {},
         wishlistDetails: [],
-
-        /* per-book */
         downloadsByDepartment: {},
         downloadsByBook: {},
-
-        /* students */
         courseStudents: [],
-
-        /* feedback */
         bookFeedback: [],
-
-        /* physical */
-        physicalInventory: [],   // stock info per asset
-        physicalPendingOrders: [],   // status === "pending_pickup"
-        physicalSales: [],   // completed sales from registry
+        physicalInventory: [],
+        physicalPendingOrders: [],
+        physicalSales: [],
         totalPhysicalSales: 0,
-
-        /* combined */
         totalSales: 0,
     };
 
     try {
-        /* ─────────────────────────────────────────────────────────
-           STEP 1 — Books from advertMyBook
-           Fields: sellerId (uid), bookTitle (NOT title), courseCode
-        ───────────────────────────────────────────────────────── */
         const booksSnap = await getDocs(
             query(collection(db, "advertMyBook"), where("sellerId", "==", uid))
         );
         console.log("[Analytics] advertMyBook docs:", booksSnap.size);
 
-       if (booksSnap.empty) {
-    console.warn("[Analytics] No books found for uid:", uid);
-}
+        if (booksSnap.empty) {
+            console.warn("[Analytics] No books found for uid:", uid);
+        }
 
-        // Maps keyed by BOTH prefixed and unprefixed IDs for safe lookups
-        const bookCourseCodes = {};  // "firestore-abc" | "abc" → courseCode
-        const bookTitles = {};  // same → title
-        const prefixedBookIds = [];  // ["firestore-abc", ...]
-        const unprefixedBookIds = []; // ["abc", ...]
+        const bookCourseCodes = {};
+        const bookTitles      = {};
+        const prefixedBookIds = [];
+        const unprefixedBookIds = [];
 
         booksSnap.docs.forEach((d) => {
-            const data = d.data();
-            const rawId = d.id; // raw Firestore doc ID (no prefix)
-            const prefixedId = `firestore-${rawId}`;
+            const data         = d.data();
+            const rawId        = d.id;
+            const prefixedId   = `firestore-${rawId}`;
             const unprefixedId = rawId;
 
             prefixedBookIds.push(prefixedId);
             unprefixedBookIds.push(unprefixedId);
 
-            // advertMyBook uses "bookTitle", confirmed from BookFeedbacksClient:
-            // data.bookTitle || data.title
-            const title = data.bookTitle || data.title || "Untitled";
+            const title      = data.bookTitle || data.title || "Untitled";
             const courseCode = data.courseCode || "Uncategorised";
 
-            // Store under both key formats — callers may use either
-            bookCourseCodes[prefixedId] = courseCode;
+            bookCourseCodes[prefixedId]   = courseCode;
             bookCourseCodes[unprefixedId] = courseCode;
-            bookTitles[prefixedId] = title;
-            bookTitles[unprefixedId] = title;
+            bookTitles[prefixedId]        = title;
+            bookTitles[unprefixedId]      = title;
 
             console.log(`[Analytics] Book: "${title}" | course:${courseCode} | id:${prefixedId}`);
         });
 
-        /**
-         * Normalise any book ID to the "firestore-XXX" form.
-         * Returns null for falsy input.
-         */
         const normalise = (id) => {
             if (!id) return null;
             const s = String(id).trim();
             return s.startsWith("firestore-") ? s : `firestore-${s}`;
         };
 
-        /* ─────────────────────────────────────────────────────────
-           STEP 2 — bookViews
-           Fields: bookId:"firestore-XXX", count:number
-           Firestore "in" operator max = 30 items → chunk
-        ───────────────────────────────────────────────────────── */
+        /* STEP 2 — bookViews */
         const prefixedChunks = [];
         if (prefixedBookIds.length > 0) {
             for (let i = 0; i < prefixedBookIds.length; i += 30)
@@ -210,16 +209,13 @@ export async function fetchFacultyAnalytics(uid) {
                     query(collection(db, "bookViews"), where("bookId", "in", chunk))
                 );
                 console.log("[Analytics] bookViews for chunk:", viewsSnap.size);
-
                 viewsSnap.docs.forEach((d) => {
-                    const data = d.data();
-                    const bookId = normalise(data.bookId) || normalise(d.id);
+                    const data      = d.data();
+                    const bookId    = normalise(data.bookId) || normalise(d.id);
                     const viewCount = typeof data.count === "number" ? data.count : 1;
-                    const cc = bookCourseCodes[bookId] || "Uncategorised";
-
+                    const cc        = bookCourseCodes[bookId] || "Uncategorised";
                     if (!results.courseEngagement[cc])
                         results.courseEngagement[cc] = { views: 0, downloads: 0, physicalSales: 0, feedback: [] };
-
                     results.courseEngagement[cc].views += viewCount;
                     results.totalViews += viewCount;
                 });
@@ -228,30 +224,7 @@ export async function fetchFacultyAnalytics(uid) {
             }
         }
 
-        /* ─────────────────────────────────────────────────────────
-           STEP 3 — Full users scan
-           Needed for: purchasedBooks, savedBooks, enrolledCourses
-           (Firestore doesn't allow cross-collection joins, so we
-            scan all users and filter client-side)
-
-           purchasedBooks structure (from PaymentClient / authHelpers):
-             {
-               [arbitraryKey]: {
-                 sellerId,          ← MATCH against uid
-                 title,
-                 firestoreId,       ← most reliable bookId
-                 bookId,
-                 id,
-                 buyerDepartment,
-               }
-             }
-           Keys are NOT the bookId — always match by sellerId.
-
-           savedBooks structure (from SavedBooksClient):
-             [{id, title, savedAt, driveFileId, ...}]
-
-           enrolledCourses / courses: string[]
-        ───────────────────────────────────────────────────────── */
+        /* STEP 3 — Full users scan */
         const usersSnap = prefixedBookIds.length > 0
             ? await getDocs(collection(db, "users"))
             : { docs: [] };
@@ -262,51 +235,38 @@ export async function fetchFacultyAnalytics(uid) {
         ].filter((c) => c !== "Uncategorised");
 
         for (const userDoc of usersSnap.docs) {
-            if (userDoc.id === uid) continue; // skip self
+            if (userDoc.id === uid) continue;
             const userData = userDoc.data();
 
-            /* ── 3a. Digital purchases ── */
+            /* 3a. Digital purchases */
             const purchasedBooks = userData.purchasedBooks || {};
-
             Object.entries(purchasedBooks).forEach(([, purchase]) => {
                 if (!purchase || typeof purchase !== "object") return;
-
-                // Keys are not the bookId; always match by sellerId
                 if (purchase.sellerId !== uid) return;
 
-                // Resolve the Firestore book ID (try most reliable fields first)
                 const rawBookId =
                     purchase.firestoreId ||
                     (typeof purchase.bookId === "string" ? purchase.bookId : null) ||
-                    (typeof purchase.id === "string" ? purchase.id : null) ||
+                    (typeof purchase.id     === "string" ? purchase.id     : null) ||
                     null;
 
-                const prefixed = rawBookId ? normalise(rawBookId) : null;
+                const prefixed  = rawBookId ? normalise(rawBookId) : null;
                 const bookTitle = (prefixed && bookTitles[prefixed]) || purchase.title || "Unknown";
 
-                // Department from user profile first, then purchase record
                 const dept =
                     userData.department ||
-                    userData.faculty ||
+                    userData.faculty    ||
                     purchase.buyerDepartment ||
                     null;
 
                 if (dept) {
-                    results.departmentBreakdown[dept] =
-                        (results.departmentBreakdown[dept] || 0) + 1;
-                    results.downloadsByDepartment[dept] =
-                        (results.downloadsByDepartment[dept] || 0) + 1;
+                    results.departmentBreakdown[dept]    = (results.departmentBreakdown[dept]    || 0) + 1;
+                    results.downloadsByDepartment[dept]  = (results.downloadsByDepartment[dept]  || 0) + 1;
                 }
 
-                // Per-book download stats
                 const bookKey = prefixed || `title:${bookTitle}`;
                 if (!results.downloadsByBook[bookKey]) {
-                    results.downloadsByBook[bookKey] = {
-                        title: bookTitle,
-                        count: 0,
-                        physicalCount: 0,
-                        departments: {},
-                    };
+                    results.downloadsByBook[bookKey] = { title: bookTitle, count: 0, physicalCount: 0, departments: {} };
                 }
                 results.downloadsByBook[bookKey].count += 1;
                 if (dept) {
@@ -317,14 +277,12 @@ export async function fetchFacultyAnalytics(uid) {
                 const cc = (prefixed && bookCourseCodes[prefixed]) || "Uncategorised";
                 if (!results.courseEngagement[cc])
                     results.courseEngagement[cc] = { views: 0, downloads: 0, physicalSales: 0, feedback: [] };
-
                 results.courseEngagement[cc].downloads += 1;
                 results.totalDownloads += 1;
             });
 
-            /* ── 3b. Wishlists (savedBooks array) ── */
-            const savedBooks = Array.isArray(userData.savedBooks) ? userData.savedBooks : [];
-
+            /* 3b. Wishlists */
+            const savedBooks   = Array.isArray(userData.savedBooks) ? userData.savedBooks : [];
             const matchedSaved = savedBooks.filter((saved) => {
                 if (!saved?.id) return false;
                 const norm = normalise(String(saved.id));
@@ -333,57 +291,43 @@ export async function fetchFacultyAnalytics(uid) {
 
             if (matchedSaved.length > 0 && !wishlistUserIds.has(userDoc.id)) {
                 wishlistUserIds.add(userDoc.id);
-
-                // country stored as top-level field OR nested under location
-                const country =
-                    userData.country ||
-                    userData.location?.country ||
-                    "Unknown";
-
+                const country = userData.country || userData.location?.country || "Unknown";
                 if (!results.wishlistByCountry[country])
                     results.wishlistByCountry[country] = { count: 0, materials: [] };
-
                 results.wishlistByCountry[country].count += 1;
 
                 matchedSaved.forEach((saved) => {
                     const pfxId = normalise(String(saved.id));
                     const title = bookTitles[pfxId] || saved?.title || "Unknown Book";
-
                     if (!results.wishlistByCountry[country].materials.includes(title))
                         results.wishlistByCountry[country].materials.push(title);
-
                     results.wishlistDetails.push({
-                        userId: userDoc.id,
-                        userName: userData.displayName || userData.firstName || "Anonymous",
+                        userId:    userDoc.id,
+                        userName:  userData.displayName || userData.firstName || "Anonymous",
                         country,
                         bookTitle: title,
-                        bookId: pfxId,
-                        savedAt: saved?.savedAt || null,
+                        bookId:    pfxId,
+                        savedAt:   saved?.savedAt || null,
                     });
                 });
             }
 
-            /* ── 3c. Course students ── */
-            // Users store courses in enrolledCourses OR courses (both checked)
+            /* 3c. Course students */
             const enrolled = [
                 ...(Array.isArray(userData.enrolledCourses) ? userData.enrolledCourses : []),
-                ...(Array.isArray(userData.courses) ? userData.courses : []),
+                ...(Array.isArray(userData.courses)         ? userData.courses         : []),
             ];
-
             enrolled.forEach((courseCode) => {
                 if (!lecturerCourses.includes(courseCode)) return;
                 const alreadyAdded = results.courseStudents.some(
                     (s) => s.userId === userDoc.id && s.courseCode === courseCode
                 );
                 if (alreadyAdded) return;
-
                 results.courseStudents.push({
-                    userId: userDoc.id,
-                    name:
-                        userData.displayName ||
-                        `${userData.firstName || ""} ${userData.surname || ""}`.trim() ||
-                        "Student",
-                    email: userData.email || "",
+                    userId:     userDoc.id,
+                    name:       userData.displayName ||
+                                `${userData.firstName || ""} ${userData.surname || ""}`.trim() || "Student",
+                    email:      userData.email || "",
                     department: userData.department || userData.faculty || "Unknown",
                     university: userData.university || userData.institution || "",
                     courseCode,
@@ -392,12 +336,10 @@ export async function fetchFacultyAnalytics(uid) {
         }
 
         results.wishlistCount = wishlistUserIds.size;
-        console.log("[Analytics] totalDownloads:", results.totalDownloads,
-            "wishlist:", results.wishlistCount);
+        console.log("[Analytics] totalDownloads:", results.totalDownloads, "wishlist:", results.wishlistCount);
 
-       
-        // Build a unified list covering both ID formats; dedup later
-        const allIdFormats = [...new Set([...prefixedBookIds, ...unprefixedBookIds])];
+        /* STEP 4 — bookFeedbacks */
+        const allIdFormats  = [...new Set([...prefixedBookIds, ...unprefixedBookIds])];
         const feedbackChunks = [];
         if (allIdFormats.length > 0) {
             for (let i = 0; i < allIdFormats.length; i += 30)
@@ -411,35 +353,29 @@ export async function fetchFacultyAnalytics(uid) {
                     query(collection(db, "bookFeedbacks"), where("bookId", "in", chunk))
                 );
                 console.log("[Analytics] bookFeedbacks for chunk:", fbSnap.size);
-
                 fbSnap.docs.forEach((d) => {
-                    if (seenFeedbackIds.has(d.id)) return; // dedup across prefixed/unprefixed
+                    if (seenFeedbackIds.has(d.id)) return;
                     seenFeedbackIds.add(d.id);
-
                     const data = d.data();
-                    const fb = {
-                        id: d.id,
-                        userName: data.userName || "Anonymous",
-                        userEmail: data.userEmail || "",
-                        userId: data.userId || "",
-                        feedback: data.feedback || "",
+                    const fb   = {
+                        id:         d.id,
+                        userName:   data.userName   || "Anonymous",
+                        userEmail:  data.userEmail  || "",
+                        userId:     data.userId     || "",
+                        feedback:   data.feedback   || "",
                         bookTitle:
                             data.bookTitle ||
                             bookTitles[normalise(data.bookId)] ||
                             bookTitles[data.bookId] ||
                             "Unknown",
-                        bookId: data.bookId || "",
+                        bookId:     data.bookId     || "",
                         bookAuthor: data.bookAuthor || "",
-                        // createdAt is a Firestore Timestamp; convert to JS Date
-                        createdAt: data.createdAt?.toDate?.() || data.createdAt || null,
-                        rating: data.rating ?? null,
+                        createdAt:  data.createdAt?.toDate?.() || data.createdAt || null,
+                        rating:     data.rating ?? null,
                     };
-
                     results.bookFeedback.push(fb);
-
                     const cc = bookCourseCodes[normalise(data.bookId)] ||
-                        bookCourseCodes[data.bookId] ||
-                        "Uncategorised";
+                               bookCourseCodes[data.bookId] || "Uncategorised";
                     if (!results.courseEngagement[cc])
                         results.courseEngagement[cc] = { views: 0, downloads: 0, physicalSales: 0, feedback: [] };
                     results.courseEngagement[cc].feedback.push(fb);
@@ -449,44 +385,27 @@ export async function fetchFacultyAnalytics(uid) {
             }
         }
 
-        /* ─────────────────────────────────────────────────────────
-           STEP 5 — physicalInventory
-           Direct query by sellerId (no user scan needed).
-           Fields: sellerId, bookId, assetId, currentStock,
-                   totalConsignment, reservedStock, shelfLocation,
-                   section, pricePerCopy, bookTitle, courseCode
-        ───────────────────────────────────────────────────────── */
+        /* STEP 5 — physicalInventory */
         try {
             const invSnap = await getDocs(
                 query(collection(db, "physicalInventory"), where("sellerId", "==", uid))
             );
             console.log("[Analytics] physicalInventory docs:", invSnap.size);
-
-            results.physicalInventory = invSnap.docs.map((d) => ({
-                id: d.id,
-                ...d.data(),
-            }));
+            results.physicalInventory = invSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
         } catch (e) {
             console.warn("[physicalInventory] query error:", e.message);
         }
 
-        /* ─────────────────────────────────────────────────────────
-           STEP 6 — physicalOrders (pending pickup)
-           Direct query by sellerId + status.
-           Fields: sellerId, bookId, status:"pending_pickup",
-                   pickupCode, orderId, userId, userEmail,
-                   userName, price, bookTitle, assetId, inventoryId
-        ───────────────────────────────────────────────────────── */
+        /* STEP 6 — physicalOrders (pending pickup) */
         try {
             const ordersSnap = await getDocs(
                 query(
                     collection(db, "physicalOrders"),
                     where("sellerId", "==", uid),
-                    where("status", "==", "pending_pickup")
+                    where("status",   "==", "pending_pickup")
                 )
             );
             console.log("[Analytics] physicalOrders (pending):", ordersSnap.size);
-
             results.physicalPendingOrders = ordersSnap.docs.map((d) => ({
                 id: d.id,
                 ...d.data(),
@@ -496,20 +415,12 @@ export async function fetchFacultyAnalytics(uid) {
             console.warn("[physicalOrders] query error:", e.message);
         }
 
-        /* ─────────────────────────────────────────────────────────
-           STEP 7 — physicalSales (completed registry sales)
-           Direct query by sellerId.
-           Fields: sellerId, assetId, bookId, bookTitle,
-                   studentName, studentEmail, studentId,
-                   salePrice, sellerPayout, platformFee,
-                   stockAfter, soldAt
-        ───────────────────────────────────────────────────────── */
+        /* STEP 7 — physicalSales */
         try {
             const salesSnap = await getDocs(
                 query(collection(db, "physicalSales"), where("sellerId", "==", uid))
             );
             console.log("[Analytics] physicalSales docs:", salesSnap.size);
-
             results.physicalSales = salesSnap.docs.map((d) => ({
                 id: d.id,
                 ...d.data(),
@@ -517,23 +428,15 @@ export async function fetchFacultyAnalytics(uid) {
             }));
             results.totalPhysicalSales = results.physicalSales.length;
 
-            // Roll physical sales into per-book + courseEngagement counters
             results.physicalSales.forEach((sale) => {
-                const prefixed = normalise(sale.bookId);
+                const prefixed  = normalise(sale.bookId);
                 const bookTitle = (prefixed && bookTitles[prefixed]) || sale.bookTitle || "Unknown";
-                const bookKey = prefixed || `title:${bookTitle}`;
-
+                const bookKey   = prefixed || `title:${bookTitle}`;
                 if (!results.downloadsByBook[bookKey]) {
-                    results.downloadsByBook[bookKey] = {
-                        title: bookTitle,
-                        count: 0,
-                        physicalCount: 0,
-                        departments: {},
-                    };
+                    results.downloadsByBook[bookKey] = { title: bookTitle, count: 0, physicalCount: 0, departments: {} };
                 }
                 results.downloadsByBook[bookKey].physicalCount =
                     (results.downloadsByBook[bookKey].physicalCount || 0) + 1;
-
                 const cc = (prefixed && bookCourseCodes[prefixed]) || "Uncategorised";
                 if (!results.courseEngagement[cc])
                     results.courseEngagement[cc] = { views: 0, downloads: 0, physicalSales: 0, feedback: [] };
@@ -544,38 +447,29 @@ export async function fetchFacultyAnalytics(uid) {
             console.warn("[physicalSales] query error:", e.message);
         }
 
-        /* ─────────────────────────────────────────────────────────
-           STEP 8 — Derived totals
-        ───────────────────────────────────────────────────────── */
-        results.totalSales = results.totalDownloads + results.totalPhysicalSales;
+        /* STEP 8 — Derived totals */
+        results.totalSales        = results.totalDownloads + results.totalPhysicalSales;
+        results.departmentalReach = Object.values(results.departmentBreakdown).reduce((s, c) => s + c, 0);
 
-        results.departmentalReach = Object.values(results.departmentBreakdown)
-            .reduce((s, c) => s + c, 0);
-
-        // Top course by composite score
-        // digital download = ×3, physical sale = ×3, feedback = ×2, view = ×1
         let topScore = -1;
         Object.entries(results.courseEngagement).forEach(([cc, data]) => {
             const score =
-                (data.views || 0) * 1 +
-                (data.downloads || 0) * 3 +
+                (data.views         || 0) * 1 +
+                (data.downloads     || 0) * 3 +
                 (data.physicalSales || 0) * 3 +
                 (data.feedback?.length || 0) * 2;
-            if (score > topScore) {
-                topScore = score;
-                results.topCourse = cc;
-            }
+            if (score > topScore) { topScore = score; results.topCourse = cc; }
         });
 
         console.log("[Analytics] DONE →", {
-            views: results.totalViews,
-            digitalSales: results.totalDownloads,
-            physicalSales: results.totalPhysicalSales,
-            totalSales: results.totalSales,
-            wishlist: results.wishlistCount,
-            feedback: results.bookFeedback.length,
+            views:          results.totalViews,
+            digitalSales:   results.totalDownloads,
+            physicalSales:  results.totalPhysicalSales,
+            totalSales:     results.totalSales,
+            wishlist:       results.wishlistCount,
+            feedback:       results.bookFeedback.length,
             pendingPickups: results.physicalPendingOrders.length,
-            topCourse: results.topCourse,
+            topCourse:      results.topCourse,
         });
 
     } catch (err) {
@@ -586,13 +480,15 @@ export async function fetchFacultyAnalytics(uid) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   SIDEBAR LINK  (unchanged)
+   SIDEBAR LINK
 ══════════════════════════════════════════════════════════════ */
-export function FacultyAnalyticsSidebarLink({ user, onClick }) {
+export function FacultyAnalyticsSidebarLink({ user, seller, onClick }) {
     const router = useRouter();
     if (!user) return null;
-    const isLecturer = user.role === "lecturer" || user.isLecturer === true;
-    if (!isLecturer) return null;
+
+    // Accept any recognised faculty title or the legacy flags
+    if (!isFacultyMember(user, seller)) return null;
+
     const isPending = user.lecturerVerificationStatus === "pending";
 
     const handleClick = () => {
@@ -612,11 +508,11 @@ export function FacultyAnalyticsSidebarLink({ user, onClick }) {
             }}
             onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = GOLD;
-                e.currentTarget.style.background = CREAM;
+                e.currentTarget.style.background  = CREAM;
             }}
             onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = isPending ? "rgba(245,158,11,0.25)" : "#e5ddd0";
-                e.currentTarget.style.background = isPending ? "rgba(245,158,11,0.06)" : "#fff";
+                e.currentTarget.style.background  = isPending ? "rgba(245,158,11,0.06)" : "#fff";
             }}
         >
             <div style={{
@@ -654,11 +550,11 @@ export function FacultyAnalyticsSidebarLink({ user, onClick }) {
 ══════════════════════════════════════════════════════════════ */
 export default function FacultyAnalyticsPage() {
     const router = useRouter();
-    const [user, setUser] = useState(null);
-    const [seller, setSeller] = useState(null);
+    const [user,      setUser]      = useState(null);
+    const [seller,    setSeller]    = useState(null);
     const [analytics, setAnalytics] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [loading,   setLoading]   = useState(true);
+    const [error,     setError]     = useState(null);
 
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (cu) => {
@@ -668,19 +564,32 @@ export default function FacultyAnalyticsPage() {
                 if (!userDoc.exists()) { router.push("/my-account"); return; }
 
                 const userData = { uid: cu.uid, ...userDoc.data() };
-                const isLecturer = userData.role === "lecturer" || userData.isLecturer === true;
-                const isSeller = userData.isSeller === true;
-                if (!isLecturer && !isSeller) { router.replace("/my-account/seller-account"); return; }
+
+                // Fetch seller profile first so we can check seller.title too
+                const sellerDoc = await getDoc(doc(db, "sellers", cu.uid));
+                const sellerData = sellerDoc.exists() ? sellerDoc.data() : null;
+                if (sellerData) setSeller(sellerData);
+
+                const isLecturer  = isFacultyMember(userData, sellerData);
+                const titleHolder  = hasFacultyTitle(userData, sellerData);
+                const roleLecturer = isRoleBasedLecturer(userData);
+                const isSeller     = userData.isSeller === true;
+
+                if (!isLecturer && !isSeller) {
+                    router.replace("/my-account/seller-account");
+                    return;
+                }
                 setUser(userData);
 
-                // sellers collection: title, sellerName, businessInfo.businessName, etc.
-                const sellerDoc = await getDoc(doc(db, "sellers", cu.uid));
-                if (sellerDoc.exists()) setSeller(sellerDoc.data());
-
-                // Only load analytics for fully verified lecturers
+                // Title holders (Dr., Prof., Engr., etc.) get immediate access —
+                // they never go through the lecturerVerificationStatus flow.
+                // Role-based lecturers must have isVerified + approved status.
+                // Pure sellers always pass (isLecturer is false → !isLecturer = true).
                 const isVerified =
-                    !isLecturer || // sellers always get analytics
+                    !isLecturer ||      // pure seller path
+                    titleHolder  ||     // Dr. / Prof. / Engr. etc. → instant access
                     (
+                        roleLecturer &&
                         userData.isVerified === true &&
                         userData.lecturerVerificationStatus !== "pending" &&
                         userData.lecturerVerificationStatus !== "rejected"
@@ -700,28 +609,33 @@ export default function FacultyAnalyticsPage() {
     }, [router]);
 
     if (loading) return <FullPageSpinner />;
-    if (error) return <PageShell><ErrorBanner message={error} /></PageShell>;
+    if (error)   return <PageShell><ErrorBanner message={error} /></PageShell>;
 
-    const isLecturer = user?.role === "lecturer" || user?.isLecturer === true;
-    const isPending = isLecturer && user?.lecturerVerificationStatus === "pending";
+    const isLecturer = isFacultyMember(user, seller);
+    const isFaculty  = isLecturer;
+    const isPending  = isLecturer && user?.lecturerVerificationStatus === "pending";
     const isRejected = isLecturer && user?.lecturerVerificationStatus === "rejected";
 
-    if (isPending) return <PageShell user={user} seller={seller}><PendingGate /></PageShell>;
+    if (isPending)  return (
+        <PageShell user={user} seller={seller} isFaculty={isFaculty}>
+            <PendingGate />
+        </PageShell>
+    );
     if (isRejected) return (
-        <PageShell user={user} seller={seller}>
+        <PageShell user={user} seller={seller} isFaculty={isFaculty}>
             <RejectedGate reason={user?.verificationRejectedReason} />
         </PageShell>
     );
 
     return (
-        <PageShell user={user} seller={seller}>
-            <AnalyticsDashboard analytics={analytics} user={user} seller={seller} />
+        <PageShell user={user} seller={seller} isFaculty={isFaculty}>
+            <AnalyticsDashboard analytics={analytics} user={user} seller={seller} isFaculty={isFaculty} />
         </PageShell>
     );
 }
 
 /* ─── PageShell ─────────────────────────────────────────────── */
-function PageShell({ children, user, seller }) {
+function PageShell({ children, user, seller, isFaculty }) {
     const router = useRouter();
     return (
         <>
@@ -751,14 +665,18 @@ function PageShell({ children, user, seller }) {
                             fontSize: 10, fontWeight: 700, letterSpacing: "0.2em",
                             textTransform: "uppercase", color: GOLD, marginBottom: 4,
                             fontFamily: "'Lato',sans-serif",
-                        }}>Faculty Portal</p>
+                        }}>
+                            {isFaculty ? "Faculty Portal" : "Seller Portal"}
+                        </p>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                             <h1 style={{
                                 fontFamily: "'Playfair Display',Georgia,serif",
                                 fontSize: "clamp(20px,4vw,28px)", fontWeight: 700,
                                 color: "#fff", margin: 0,
-                            }}>Faculty Analytics</h1>
-                            {user && <VerifiedFacultyBadge user={user} seller={seller} size="sm" />}
+                            }}>
+                                {isFaculty ? "Faculty Analytics" : "Sales Analytics"}
+                            </h1>
+                            {user && isFaculty && <VerifiedFacultyBadge user={user} seller={seller} size="sm" />}
                         </div>
                     </div>
                 </div>
@@ -838,7 +756,7 @@ function RejectedGate({ reason }) {
 /* ══════════════════════════════════════════════════════════════
    MAIN ANALYTICS DASHBOARD
 ══════════════════════════════════════════════════════════════ */
-function AnalyticsDashboard({ analytics, user, seller }) {
+function AnalyticsDashboard({ analytics, user, seller, isFaculty }) {
     const [activeTab, setActiveTab] = useState("overview");
 
     const a = analytics || {
@@ -851,12 +769,12 @@ function AnalyticsDashboard({ analytics, user, seller }) {
     };
 
     const tabs = [
-        { id: "overview", label: "Overview" },
+        { id: "overview",  label: "Overview" },
         { id: "downloads", label: "Digital Sales" },
-        { id: "physical", label: `Physical (${a.totalPhysicalSales})` },
-        { id: "wishlist", label: "Wishlist & Countries" },
-        { id: "students", label: "Course Students" },
-        { id: "feedback", label: `Feedback (${a.bookFeedback.length})` },
+        { id: "physical",  label: `Physical (${a.totalPhysicalSales})` },
+        { id: "wishlist",  label: "Wishlist & Countries" },
+        { id: "students",  label: isFaculty ? "Course Students" : "Buyers" },
+        { id: "feedback",  label: `Feedback (${a.bookFeedback.length})` },
     ];
 
     return (
@@ -874,10 +792,15 @@ function AnalyticsDashboard({ analytics, user, seller }) {
                 />
                 <div style={{ flex: 1 }}>
                     <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>
-                        {seller?.title ? `${seller.title} ` : ""}{user?.firstName} {user?.surname}
+                        {/* Show the user's title (Dr., Prof., etc.) if available */}
+                        {seller?.title || user?.title ? `${seller?.title || user?.title} ` : ""}
+                        {user?.firstName} {user?.surname}
                     </p>
                     <p style={{ fontSize: 12, color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>
-                        {seller?.department || seller?.university || "Department not set"} · Academic Analytics
+                        {isFaculty
+                            ? `${seller?.department || seller?.university || "Department not set"} · Academic Analytics`
+                            : `${seller?.businessInfo?.businessName || seller?.sellerName || `${user?.firstName || ""} ${user?.surname || ""}`.trim() || "Store"} · Sales Analytics`
+                        }
                     </p>
                 </div>
                 <div style={{ textAlign: "right" }}>
@@ -908,7 +831,7 @@ function AnalyticsDashboard({ analytics, user, seller }) {
                 />
                 <MetricCard
                     label="Wishlisted"
-                    sublabel="Students saving your work"
+                    sublabel={isFaculty ? "Students saving your work" : "Users saving your books"}
                     value={a.wishlistCount.toLocaleString()}
                     icon={<HeartIcon color={GOLD} />}
                     detail={`${Object.keys(a.wishlistByCountry).length} countr${Object.keys(a.wishlistByCountry).length !== 1 ? "ies" : "y"}`}
@@ -918,21 +841,23 @@ function AnalyticsDashboard({ analytics, user, seller }) {
                     sublabel="Physical orders reserved"
                     value={a.physicalPendingOrders.length.toLocaleString()}
                     icon={<PackageIcon color={GOLD} />}
-                    detail={`${a.physicalInventory.length} asset(s) at registry`}
+                    detail={`${a.physicalInventory.length} asset(s) at Abuja registry`}
                 />
                 <MetricCard
-                    label="Student Reach"
-                    sublabel="Unique dept. buyers"
+                    label={isFaculty ? "Student Reach" : "Buyer Reach"}
+                    sublabel={isFaculty ? "Unique dept. buyers" : "Unique dept. purchasers"}
                     value={a.departmentalReach.toLocaleString()}
                     icon={<UsersIcon color={GOLD} />}
                     detail={`${Object.keys(a.departmentBreakdown).length} departments`}
                 />
                 <MetricCard
                     label="Feedback"
-                    sublabel="Student reviews"
+                    sublabel={isFaculty ? "Student reviews" : "Customer reviews"}
                     value={a.bookFeedback.length.toLocaleString()}
                     icon={<StarIcon color={GOLD} />}
-                    detail={`${a.courseStudents.length} enrolled students found`}
+                    detail={isFaculty
+                        ? `${a.courseStudents.length} enrolled students found`
+                        : `Across ${Object.keys(a.downloadsByBook).length} book(s)`}
                 />
             </div>
 
@@ -959,12 +884,12 @@ function AnalyticsDashboard({ analytics, user, seller }) {
             </div>
 
             {/* Tab content */}
-            {activeTab === "overview" && <OverviewTab analytics={a} />}
+            {activeTab === "overview"  && <OverviewTab  analytics={a} isFaculty={isFaculty} />}
             {activeTab === "downloads" && <DownloadsTab analytics={a} />}
-            {activeTab === "physical" && <PhysicalTab analytics={a} />}
-            {activeTab === "wishlist" && <WishlistTab analytics={a} />}
-            {activeTab === "students" && <StudentsTab analytics={a} />}
-            {activeTab === "feedback" && <FeedbackTab analytics={a} />}
+            {activeTab === "physical"  && <PhysicalTab  analytics={a} />}
+            {activeTab === "wishlist"  && <WishlistTab  analytics={a} isFaculty={isFaculty} />}
+            {activeTab === "students"  && <StudentsTab  analytics={a} isFaculty={isFaculty} />}
+            {activeTab === "feedback"  && <FeedbackTab  analytics={a} isFaculty={isFaculty} />}
         </div>
     );
 }
@@ -972,7 +897,7 @@ function AnalyticsDashboard({ analytics, user, seller }) {
 /* ══════════════════════════════════════════════════════════════
    TAB: OVERVIEW
 ══════════════════════════════════════════════════════════════ */
-function OverviewTab({ analytics: a }) {
+function OverviewTab({ analytics: a, isFaculty }) {
     const courseEntries = Object.entries(a.courseEngagement).sort(
         ([, x], [, y]) =>
             (y.views + y.downloads * 3 + (y.physicalSales || 0) * 3) -
@@ -985,9 +910,12 @@ function OverviewTab({ analytics: a }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 20 }}>
 
-                {/* Course Breakdown */}
+                {/* Course / Book Breakdown */}
                 <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24 }}>
-                    <SectionHeader label="Activity" title="Course Breakdown" />
+                    <SectionHeader
+                        label="Activity"
+                        title={isFaculty ? "Course Breakdown" : "Book Performance"}
+                    />
                     {courseEntries.length === 0
                         ? <EmptyState message="No course engagement recorded yet." />
                         : (
@@ -998,19 +926,19 @@ function OverviewTab({ analytics: a }) {
                                     gap: 4, padding: "8px 10px",
                                     background: CREAM, borderBottom: "0.5px solid #e5ddd0", marginBottom: 4,
                                 }}>
-                                    {["Course", "Views", "Digital", "Physical", "Reviews", "Total"].map((h) => (
+                                    {[isFaculty ? "Course" : "Book / Tag", "Views", "Digital", "Physical", "Reviews", "Total"].map((h) => (
                                         <p key={h} style={{
                                             fontSize: 9, fontWeight: 700, color: "#aaa", margin: 0,
                                             fontFamily: "'Lato',sans-serif", letterSpacing: "0.12em",
                                             textTransform: "uppercase",
-                                            textAlign: h !== "Course" ? "right" : "left",
+                                            textAlign: h !== (isFaculty ? "Course" : "Book / Tag") ? "right" : "left",
                                         }}>{h}</p>
                                     ))}
                                 </div>
                                 {courseEntries.slice(0, 10).map(([code, data]) => {
-                                    const total = data.views + data.downloads + (data.physicalSales || 0);
+                                    const total        = data.views + data.downloads + (data.physicalSales || 0);
                                     const feedbackCount = data.feedback?.length || 0;
-                                    const isTop = code === a.topCourse;
+                                    const isTop        = code === a.topCourse;
                                     return (
                                         <div key={code} style={{
                                             display: "grid",
@@ -1088,7 +1016,8 @@ function OverviewTab({ analytics: a }) {
                         Future Demand Signal
                     </p>
                     <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>
-                        {a.wishlistCount.toLocaleString()} student{a.wishlistCount !== 1 ? "s" : ""} have your materials wishlisted
+                        {a.wishlistCount.toLocaleString()}{" "}
+                        {isFaculty ? "student" : "user"}{a.wishlistCount !== 1 ? "s" : ""} have your materials wishlisted
                     </p>
                     <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", margin: 0, fontFamily: "'Lato',sans-serif" }}>
                         Spread across {Object.keys(a.wishlistByCountry).length} countries.
@@ -1116,8 +1045,6 @@ function DownloadsTab({ analytics: a }) {
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-            {/* Downloads per book */}
             <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24 }}>
                 <SectionHeader label="Book Performance" title="Digital Downloads Per Book" />
                 {bookEntries.length === 0
@@ -1185,7 +1112,6 @@ function DownloadsTab({ analytics: a }) {
                     )}
             </div>
 
-            {/* Downloads by department */}
             <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24 }}>
                 <SectionHeader label="Student Reach" title="Downloads by Department" />
                 {deptEntries.length === 0
@@ -1220,22 +1146,18 @@ function DownloadsTab({ analytics: a }) {
 
 /* ══════════════════════════════════════════════════════════════
    TAB: PHYSICAL SALES & INVENTORY
-   Sources: physicalInventory (sellerId), physicalSales (sellerId),
-            physicalOrders (sellerId + status:"pending_pickup")
 ══════════════════════════════════════════════════════════════ */
 function PhysicalTab({ analytics: a }) {
     const totalRevenue = a.physicalSales.reduce((s, sale) => s + (sale.sellerPayout || 0), 0);
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-            {/* Summary strip */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12 }}>
                 {[
-                    { label: "Copies Sold", value: a.totalPhysicalSales, color: NAVY },
-                    { label: "Pending Pickup", value: a.physicalPendingOrders.length, color: "#d97706" },
-                    { label: "Payout Earned", value: `₦${totalRevenue.toLocaleString()}`, color: "#16a34a" },
-                    { label: "Assets at Registry", value: a.physicalInventory.length, color: NAVY },
+                    { label: "Copies Sold",        value: a.totalPhysicalSales,              color: NAVY      },
+                    { label: "Pending Pickup",      value: a.physicalPendingOrders.length,    color: "#d97706" },
+                    { label: "Payout Earned",       value: `₦${totalRevenue.toLocaleString()}`, color: "#16a34a" },
+                    { label: "Assets at Registry",  value: a.physicalInventory.length,        color: NAVY      },
                 ].map(({ label, value, color }) => (
                     <div key={label} style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "16px 20px", textAlign: "center" }}>
                         <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 28, fontWeight: 700, color, margin: "0 0 4px" }}>{value}</p>
@@ -1244,7 +1166,6 @@ function PhysicalTab({ analytics: a }) {
                 ))}
             </div>
 
-            {/* Inventory status */}
             <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24 }}>
                 <SectionHeader label="Registry Stock" title="Physical Inventory" />
                 {a.physicalInventory.length === 0
@@ -1268,7 +1189,6 @@ function PhysicalTab({ analytics: a }) {
                                     ? Math.round((inv.currentStock / inv.totalConsignment) * 100)
                                     : 0;
                                 const stockColor = pct <= 20 ? "#dc2626" : pct <= 40 ? "#d97706" : "#16a34a";
-
                                 return (
                                     <div key={inv.id} style={{
                                         display: "grid", gridTemplateColumns: "1fr 90px 90px 90px 100px",
@@ -1296,7 +1216,6 @@ function PhysicalTab({ analytics: a }) {
                     )}
             </div>
 
-            {/* Pending pickup orders */}
             {a.physicalPendingOrders.length > 0 && (
                 <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24 }}>
                     <SectionHeader label="Awaiting Collection" title="Pending Pickup Orders" />
@@ -1335,7 +1254,6 @@ function PhysicalTab({ analytics: a }) {
                 </div>
             )}
 
-            {/* Completed sales ledger */}
             <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24 }}>
                 <SectionHeader label="Sales Ledger" title="Completed Physical Sales" />
                 {a.physicalSales.length === 0
@@ -1378,9 +1296,9 @@ function PhysicalTab({ analytics: a }) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   TAB: WISHLIST & COUNTRIES  (unchanged logic)
+   TAB: WISHLIST & COUNTRIES
 ══════════════════════════════════════════════════════════════ */
-function WishlistTab({ analytics: a }) {
+function WishlistTab({ analytics: a, isFaculty }) {
     const countryEntries = Object.entries(a.wishlistByCountry).sort(([, x], [, y]) => y.count - x.count);
     const maxCount = countryEntries[0]?.[1]?.count || 1;
 
@@ -1411,7 +1329,7 @@ function WishlistTab({ analytics: a }) {
                                             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
                                                 <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>{country}</p>
                                                 <span style={{ fontSize: 11, fontWeight: 700, background: "rgba(184,150,62,0.12)", color: GOLD, padding: "2px 8px", borderRadius: 999, fontFamily: "'Lato',sans-serif" }}>
-                                                    {data.count} student{data.count !== 1 ? "s" : ""}
+                                                    {data.count} {isFaculty ? "student" : "user"}{data.count !== 1 ? "s" : ""}
                                                 </span>
                                             </div>
                                             <div style={{ height: 4, background: "#f0ebe0" }}>
@@ -1459,15 +1377,23 @@ function WishlistTab({ analytics: a }) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   TAB: COURSE STUDENTS  (unchanged)
+   TAB: STUDENTS / BUYERS
 ══════════════════════════════════════════════════════════════ */
-function StudentsTab({ analytics: a }) {
-    const [search, setSearch] = useState("");
+function StudentsTab({ analytics: a, isFaculty }) {
+    if (isFaculty) return <FacultyStudentsView analytics={a} />;
+    return <SellerBuyersView analytics={a} />;
+}
+
+function FacultyStudentsView({ analytics: a }) {
+    const [search,       setSearch]       = useState("");
     const [filterCourse, setFilterCourse] = useState("all");
 
-    const courses = [...new Set(a.courseStudents.map(s => s.courseCode))];
+    const courses  = [...new Set(a.courseStudents.map(s => s.courseCode))];
     const filtered = a.courseStudents.filter(s => {
-        const matchSearch = !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase()) || s.department.toLowerCase().includes(search.toLowerCase());
+        const matchSearch = !search ||
+            s.name.toLowerCase().includes(search.toLowerCase()) ||
+            s.email.toLowerCase().includes(search.toLowerCase()) ||
+            s.department.toLowerCase().includes(search.toLowerCase());
         const matchCourse = filterCourse === "all" || s.courseCode === filterCourse;
         return matchSearch && matchCourse;
     });
@@ -1535,12 +1461,109 @@ function StudentsTab({ analytics: a }) {
     );
 }
 
-/* ══════════════════════════════════════════════════════════════
-   TAB: FEEDBACK  (unchanged)
-══════════════════════════════════════════════════════════════ */
-function FeedbackTab({ analytics: a }) {
-    const [expandedId, setExpandedId] = useState(null);
+function SellerBuyersView({ analytics: a }) {
+    const deptEntries = Object.entries(a.downloadsByDepartment).sort(([, x], [, y]) => y - x);
+    const bookEntries = Object.entries(a.downloadsByBook).sort(
+        ([, x], [, y]) => (y.count + (y.physicalCount || 0)) - (x.count + (x.physicalCount || 0))
+    );
+    const maxDept     = deptEntries[0]?.[1] || 1;
+    const totalBuyers = Object.values(a.downloadsByDepartment).reduce((s, c) => s + c, 0);
 
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12 }}>
+                {[
+                    { label: "Total Buyers",    value: totalBuyers,                           color: NAVY },
+                    { label: "Departments",     value: deptEntries.length,                    color: GOLD },
+                    { label: "Books Purchased", value: Object.keys(a.downloadsByBook).length, color: NAVY },
+                ].map(({ label, value, color }) => (
+                    <div key={label} style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "16px 20px", textAlign: "center" }}>
+                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 28, fontWeight: 700, color, margin: "0 0 4px" }}>{value}</p>
+                        <p style={{ fontSize: 10, fontWeight: 700, color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif", textTransform: "uppercase", letterSpacing: "0.1em" }}>{label}</p>
+                    </div>
+                ))}
+            </div>
+
+            <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24 }}>
+                <SectionHeader label="Purchase Reach" title="Buyers by Department" />
+                {deptEntries.length === 0
+                    ? <EmptyState message="No buyer department data yet." />
+                    : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                            {deptEntries.map(([dept, count]) => (
+                                <div key={dept}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                            <div style={{ width: 8, height: 8, background: GOLD, borderRadius: "50%", flexShrink: 0 }} />
+                                            <p style={{ fontSize: 12, fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>{dept}</p>
+                                        </div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                            <p style={{ fontSize: 13, fontWeight: 700, color: GOLD, margin: 0, fontFamily: "'Playfair Display',serif" }}>{count}</p>
+                                            <span style={{ fontSize: 10, color: "#aaa", fontFamily: "'Lato',sans-serif" }}>{count === 1 ? "buyer" : "buyers"}</span>
+                                        </div>
+                                    </div>
+                                    <div style={{ height: 6, background: "#f0ebe0" }}>
+                                        <div style={{
+                                            height: "100%",
+                                            background: `linear-gradient(90deg, ${GOLD}, ${GOLDD})`,
+                                            width: `${Math.round((count / maxDept) * 100)}%`,
+                                            transition: "width 0.6s ease",
+                                        }} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+            </div>
+
+            <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24 }}>
+                <SectionHeader label="Book Breakdown" title="Purchases Per Book" />
+                {bookEntries.length === 0
+                    ? <EmptyState message="No purchase data yet." />
+                    : (
+                        <div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 100px", gap: 8, padding: "8px 12px", background: CREAM, borderBottom: "0.5px solid #e5ddd0" }}>
+                                {["Book", "Digital", "Physical"].map(h => (
+                                    <p key={h} style={{
+                                        fontSize: 9, fontWeight: 700, color: "#aaa", margin: 0,
+                                        fontFamily: "'Lato',sans-serif", letterSpacing: "0.12em", textTransform: "uppercase",
+                                        textAlign: h !== "Book" ? "right" : "left",
+                                    }}>{h}</p>
+                                ))}
+                            </div>
+                            {bookEntries.map(([bookId, data], i) => (
+                                <div key={bookId} style={{
+                                    display: "grid", gridTemplateColumns: "1fr 90px 100px", gap: 8,
+                                    padding: "13px 12px", borderBottom: "0.5px solid #f5f0e8",
+                                    background: i === 0 ? "rgba(184,150,62,0.04)" : "#fff",
+                                }}>
+                                    <div>
+                                        <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: "0 0 3px", fontFamily: "'Lato',sans-serif" }}>{data.title}</p>
+                                        {Object.keys(data.departments).length > 0 && (
+                                            <p style={{ fontSize: 11, color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                                                Top dept: {Object.entries(data.departments).sort(([, a], [, b]) => b - a)[0]?.[0]}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <p style={{ fontSize: 20, fontWeight: 700, color: i === 0 ? GOLD : NAVY, margin: 0, fontFamily: "'Playfair Display',serif", textAlign: "right", alignSelf: "center" }}>
+                                        {data.count}
+                                    </p>
+                                    <p style={{ fontSize: 20, fontWeight: 700, color: (data.physicalCount || 0) > 0 ? NAVY : "#ddd", margin: 0, fontFamily: "'Playfair Display',serif", textAlign: "right", alignSelf: "center" }}>
+                                        {data.physicalCount || "—"}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+            </div>
+        </div>
+    );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TAB: FEEDBACK
+══════════════════════════════════════════════════════════════ */
+function FeedbackTab({ analytics: a, isFaculty }) {
     const formatDate = (d) => {
         if (!d) return "";
         const date = d instanceof Date ? d : new Date(d);
@@ -1549,7 +1572,7 @@ function FeedbackTab({ analytics: a }) {
 
     const getSentiment = (text) => {
         if (!text) return "neutral";
-        const lower = text.toLowerCase();
+        const lower    = text.toLowerCase();
         const positive = ["excellent", "great", "thank", "good", "amazing", "recommend", "helpful", "love", "best", "wonderful", "perfect", "outstanding"];
         const negative = ["poor", "bad", "wrong", "mistake", "error", "disappoint", "terrible", "worst", "useless"];
         const posScore = positive.filter(w => lower.includes(w)).length;
@@ -1560,22 +1583,35 @@ function FeedbackTab({ analytics: a }) {
     };
 
     const sentimentColors = { positive: "#16a34a", negative: "#dc2626", neutral: "#d97706" };
-    const sentimentBg = { positive: "rgba(22,163,74,0.08)", negative: "rgba(220,38,38,0.08)", neutral: "rgba(217,119,6,0.08)" };
-    const sentimentLabel = { positive: "Positive", negative: "Needs Review", neutral: "Neutral" };
+    const sentimentBg     = { positive: "rgba(22,163,74,0.08)", negative: "rgba(220,38,38,0.08)", neutral: "rgba(217,119,6,0.08)" };
+    const sentimentLabel  = { positive: "Positive", negative: "Needs Review", neutral: "Neutral" };
 
     const posCount = a.bookFeedback.filter(f => getSentiment(f.feedback) === "positive").length;
     const negCount = a.bookFeedback.filter(f => getSentiment(f.feedback) === "negative").length;
 
+    const RatingStars = ({ value, size = 13 }) => (
+        <span style={{ display: "inline-flex", gap: "2px" }}>
+            {[1, 2, 3, 4, 5].map((n) => (
+                <svg key={n} width={size} height={size} viewBox="0 0 24 24"
+                    fill={n <= Math.round(value) ? GOLD : "none"}
+                    stroke={n <= Math.round(value) ? GOLD : "#ccc"}
+                    strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+                >
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+            ))}
+        </span>
+    );
+
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
             {a.bookFeedback.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12 }}>
                     {[
-                        { count: posCount, label: "Positive", color: "#16a34a", bg: "rgba(22,163,74,0.06)", border: "rgba(22,163,74,0.2)" },
-                        { count: a.bookFeedback.length - posCount - negCount, label: "Neutral", color: "#d97706", bg: "rgba(217,119,6,0.06)", border: "rgba(217,119,6,0.2)" },
-                        { count: negCount, label: "Needs Review", color: "#dc2626", bg: "rgba(220,38,38,0.06)", border: "rgba(220,38,38,0.2)" },
-                        { count: a.bookFeedback.length, label: "Total Reviews", color: GOLD, bg: "rgba(184,150,62,0.06)", border: "rgba(184,150,62,0.2)" },
+                        { count: posCount,                                    label: "Positive",      color: "#16a34a", bg: "rgba(22,163,74,0.06)",  border: "rgba(22,163,74,0.2)"  },
+                        { count: a.bookFeedback.length - posCount - negCount, label: "Neutral",       color: "#d97706", bg: "rgba(217,119,6,0.06)",  border: "rgba(217,119,6,0.2)"  },
+                        { count: negCount,                                    label: "Needs Review",  color: "#dc2626", bg: "rgba(220,38,38,0.06)",  border: "rgba(220,38,38,0.2)"  },
+                        { count: a.bookFeedback.length,                       label: "Total Reviews", color: GOLD,      bg: "rgba(184,150,62,0.06)", border: "rgba(184,150,62,0.2)" },
                     ].map(({ count, label, color, bg, border }) => (
                         <div key={label} style={{ background: bg, border: `0.5px solid ${border}`, padding: "16px 20px", textAlign: "center" }}>
                             <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 32, fontWeight: 700, color, margin: "0 0 4px" }}>{count}</p>
@@ -1586,69 +1622,83 @@ function FeedbackTab({ analytics: a }) {
             )}
 
             <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24 }}>
-                <SectionHeader label="Student Reviews" title="Book Feedback" />
-                {a.bookFeedback.length === 0
-                    ? <EmptyState message="No feedback yet. Student reviews will appear here once they leave feedback on your books." />
-                    : (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                            {a.bookFeedback.map((fb) => {
-                                const sentiment = getSentiment(fb.feedback);
-                                const isExpanded = expandedId === fb.id;
-                                const truncated = fb.feedback.length > 160;
-                                return (
-                                    <div key={fb.id} style={{
-                                        border: "0.5px solid #e8e0d4",
-                                        borderLeft: `3px solid ${sentimentColors[sentiment]}`,
-                                        padding: "16px 18px",
-                                        background: sentimentBg[sentiment],
-                                    }}>
-                                        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
-                                            <div style={{ width: 36, height: 36, borderRadius: "50%", background: NAVY, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1.5px solid ${GOLD}` }}>
-                                                <span style={{ fontSize: 13, fontWeight: 700, color: GOLD, fontFamily: "'Playfair Display',serif" }}>
-                                                    {(fb.userName || "?")[0].toUpperCase()}
-                                                </span>
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                                                    <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>{fb.userName}</p>
-                                                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: sentimentColors[sentiment], background: `${sentimentColors[sentiment]}1a`, padding: "2px 7px", borderRadius: 999, fontFamily: "'Lato',sans-serif" }}>
-                                                        {sentimentLabel[sentiment]}
-                                                    </span>
-                                                </div>
-                                                <p style={{ fontSize: 11, color: "#aaa", margin: "2px 0 0", fontFamily: "'Lato',sans-serif" }}>
-                                                    {fb.userEmail}{fb.createdAt && ` · ${formatDate(fb.createdAt)}`}
+                <SectionHeader
+                    label={isFaculty ? "Student Reviews" : "Customer Reviews"}
+                    title="Book Feedback"
+                />
+                {a.bookFeedback.length === 0 ? (
+                    <EmptyState message="No feedback yet. Reviews will appear here once customers leave feedback on your books." />
+                ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {a.bookFeedback.map((fb) => {
+                            const sentiment = getSentiment(fb.feedback);
+                            return (
+                                <div key={fb.id} style={{
+                                    border: "0.5px solid #e8e0d4",
+                                    borderLeft: `3px solid ${sentimentColors[sentiment]}`,
+                                    padding: "16px 18px",
+                                    background: sentimentBg[sentiment],
+                                }}>
+                                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
+                                        <div style={{
+                                            width: 36, height: 36, borderRadius: "50%",
+                                            background: NAVY, display: "flex", alignItems: "center",
+                                            justifyContent: "center", flexShrink: 0, border: `1.5px solid ${GOLD}`,
+                                        }}>
+                                            <span style={{ fontSize: 13, fontWeight: 700, color: GOLD, fontFamily: "'Playfair Display',serif" }}>
+                                                {(fb.userName || "?")[0].toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                                                <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                                                    {fb.userName || "Anonymous"}
                                                 </p>
+                                                <span style={{
+                                                    fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
+                                                    color: sentimentColors[sentiment],
+                                                    background: `${sentimentColors[sentiment]}1a`,
+                                                    padding: "2px 7px", borderRadius: 999, fontFamily: "'Lato',sans-serif",
+                                                }}>
+                                                    {sentimentLabel[sentiment]}
+                                                </span>
+                                                {fb.createdAt && (
+                                                    <span style={{ fontSize: 10, color: "#aaa", fontFamily: "'Lato',sans-serif", marginLeft: "auto" }}>
+                                                        {formatDate(fb.createdAt)}
+                                                    </span>
+                                                )}
                                             </div>
-                                        </div>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                                            <BookOpenIcon color={GOLD} size={12} />
-                                            <p style={{ fontSize: 11, fontWeight: 700, color: GOLD, margin: 0, fontFamily: "'Lato',sans-serif" }}>{fb.bookTitle}</p>
-                                        </div>
-                                        <div style={{ background: "rgba(255,255,255,0.7)", border: "0.5px solid rgba(0,0,0,0.06)", padding: "12px 14px" }}>
-                                            <p style={{ fontSize: 13, color: "#444", margin: 0, fontFamily: "'Lato',sans-serif", lineHeight: 1.65, fontStyle: "italic" }}>
-                                                "{isExpanded || !truncated ? fb.feedback : `${fb.feedback.slice(0, 160)}…`}"
-                                            </p>
-                                            {truncated && (
-                                                <button
-                                                    onClick={() => setExpandedId(isExpanded ? null : fb.id)}
-                                                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif", padding: "4px 0 0", letterSpacing: "0.04em" }}
-                                                >
-                                                    {isExpanded ? "Show less ▲" : "Read more ▼"}
-                                                </button>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                                <RatingStars value={fb.rating || 0} size={13} />
+                                                {fb.rating > 0 && (
+                                                    <span style={{ fontSize: 10, fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif" }}>
+                                                        {Number(fb.rating).toFixed(1)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {fb.userEmail && (
+                                                <p style={{ fontSize: 11, color: "#aaa", margin: "3px 0 0", fontFamily: "'Lato',sans-serif" }}>
+                                                    {fb.userEmail}
+                                                </p>
                                             )}
                                         </div>
-                                        {fb.rating && (
-                                            <div style={{ marginTop: 8 }}>
-                                                {Array.from({ length: 5 }).map((_, i) => (
-                                                    <span key={i} style={{ color: i < fb.rating ? GOLD : "#ddd", fontSize: 14 }}>★</span>
-                                                ))}
-                                            </div>
-                                        )}
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                                        <BookOpenIcon color={GOLD} size={12} />
+                                        <p style={{ fontSize: 11, fontWeight: 700, color: GOLD, margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                                            {fb.bookTitle}
+                                        </p>
+                                    </div>
+                                    <div style={{ background: "rgba(255,255,255,0.7)", border: "0.5px solid rgba(0,0,0,0.06)", padding: "12px 14px" }}>
+                                        <p style={{ fontSize: 13, color: "#444", margin: 0, fontFamily: "'Lato',sans-serif", lineHeight: 1.65, fontStyle: "italic" }}>
+                                            "{fb.feedback || "(No details provided)"}"
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         </div>
     );
