@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   collection, getDocs, doc, getDoc, setDoc, deleteDoc,
   query, where, updateDoc, increment,
@@ -42,8 +42,67 @@ const isLecturer = (title) => {
   return ["lecturer","dr.","prof.","professor","mrs","mr"].includes(t);
 };
 
+/* ─── slug resolver ──────────────────────────────────────── */
+/* ─── slug helper (must match the one in lecturers) ─── */
+const makeSlug = (title, name) => {
+  const full = `${title ? title + " " : ""}${name}`.trim();
+  return full
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+};
+
+/* ─── slug resolver ──────────────────────────────────────── */
+const resolveSellerUid = async (param) => {
+  if (!param) return null;
+
+  // 1. Try direct UID lookup in sellers collection
+  try {
+    const direct = await getDoc(doc(db, "sellers", param));
+    if (direct.exists()) return param;
+  } catch {}
+
+  // 2. Try direct UID lookup in users collection
+  try {
+    const directUser = await getDoc(doc(db, "users", param));
+    if (directUser.exists()) return param;
+  } catch {}
+
+  // 3. Try slug field in users collection
+  try {
+    const q = query(collection(db, "users"), where("slug", "==", param));
+    const snap = await getDocs(q);
+    if (!snap.empty) return snap.docs[0].id;
+  } catch {}
+
+  // 4. Try slug field in sellers collection
+  try {
+    const q2 = query(collection(db, "sellers"), where("slug", "==", param));
+    const snap2 = await getDocs(q2);
+    if (!snap2.empty) return snap2.docs[0].id;
+  } catch {}
+
+  // 5. Fallback: compute slug from name and match against all sellers
+  //    (handles sellers whose slug field hasn't been saved yet)
+  try {
+    const allSellers = await getDocs(collection(db, "sellers"));
+    for (const ds of allSellers.docs) {
+      const d = ds.data();
+      const computed = makeSlug(d.title || "", d.sellerName || d.displayName || "");
+      if (computed === param) {
+        // Save it now so future lookups hit step 4 instead
+        try { await updateDoc(doc(db, "sellers", ds.id), { slug: computed }); } catch {}
+        return ds.id;
+      }
+    }
+  } catch {}
+
+  return null;
+};
+
 /* ═══════════════════════════════════════════════════════════
-   BOOK CARD — editorial cover style
+   BOOK CARD
 ═══════════════════════════════════════════════════════════ */
 function BookCard({ book, isPurchased, view }) {
   const href = `/book/preview?id=${String(book.id).replace("firestore-", "")}`;
@@ -100,10 +159,10 @@ function BookCard({ book, isPurchased, view }) {
 /* ═══════════════════════════════════════════════════════════
    MAIN
 ═══════════════════════════════════════════════════════════ */
-export default function SellerProfileClient() {
-  const searchParams = useSearchParams();
+// AFTER
+export default function SellerProfileClient({ sellerIdProp }) {
+  const sellerId = sellerIdProp;
   const router = useRouter();
-  const sellerId = searchParams.get("sellerId");
 
   const [seller, setSeller]             = useState(null);
   const [sellerPhoto, setSellerPhoto]   = useState(null);
@@ -119,91 +178,192 @@ export default function SellerProfileClient() {
   const [view, setView]                 = useState("grid");
   const [followLoading, setFollowLoad]  = useState(false);
   const [stats, setStats]               = useState({ totalSold:0, totalEarnings:0, totalBooks:0 });
+  const [resolvedUid, setResolvedUid]   = useState(null);
+
   const user = auth.currentUser;
 
-  /* follow check */
+  /* ── follow check — uses resolvedUid ── */
   useEffect(() => {
     const check = async () => {
-      if (!user || !sellerId) return;
-      const fd = await getDoc(doc(db, "follows", `${user.uid}_${sellerId}`));
+      if (!user || !resolvedUid) return;
+      const fd = await getDoc(doc(db, "follows", `${user.uid}_${resolvedUid}`));
       setFollowing(fd.exists());
-      const q = query(collection(db, "follows"), where("lecturerId","==",sellerId));
+      const q = query(collection(db, "follows"), where("lecturerId", "==", resolvedUid));
       setFollowers((await getDocs(q)).size);
     };
     check();
-  }, [user, sellerId]);
+  }, [user, resolvedUid]);
 
-  /* toggle follow */
+  /* ── toggle follow — uses resolvedUid ── */
   const toggleFollow = async () => {
     if (!user) { alert("Please sign in to follow"); return; }
     if (followLoading) return;
     setFollowLoad(true);
-    const followRef = doc(db,"follows",`${user.uid}_${sellerId}`);
-    const sellerRef = doc(db,"sellers",sellerId);
+    const followRef = doc(db, "follows", `${user.uid}_${resolvedUid}`);
+    const sellerRef = doc(db, "sellers", resolvedUid);
     try {
       if (isFollowing) {
         await deleteDoc(followRef);
-        try { await updateDoc(sellerRef,{followersCount:increment(-1)}); } catch {}
-        setFollowing(false); setFollowers(p=>Math.max(0,p-1));
+        try { await updateDoc(sellerRef, { followersCount: increment(-1) }); } catch {}
+        setFollowing(false); setFollowers(p => Math.max(0, p - 1));
       } else {
-        await setDoc(followRef,{followerId:user.uid,lecturerId:sellerId,lecturerName:seller?.sellerName||"",createdAt:new Date()});
-        try { await updateDoc(sellerRef,{followersCount:increment(1)}); } catch { await setDoc(sellerRef,{followersCount:1},{merge:true}); }
-        setFollowing(true); setFollowers(p=>p+1);
+        await setDoc(followRef, {
+          followerId: user.uid,
+          lecturerId: resolvedUid,
+          lecturerName: seller?.sellerName || "",
+          createdAt: new Date(),
+        });
+        try { await updateDoc(sellerRef, { followersCount: increment(1) }); }
+        catch { await setDoc(sellerRef, { followersCount: 1 }, { merge: true }); }
+        setFollowing(true); setFollowers(p => p + 1);
       }
-    } catch(err){console.error(err);} finally{setFollowLoad(false);}
+    } catch (err) { console.error(err); } finally { setFollowLoad(false); }
   };
 
-  /* fetch data */
-  useEffect(()=>{
-    const fetchSellerData=async()=>{
-      if(!sellerId){router.push("/");return;}
-      try{
-        setLoading(true);
-        let sellerName="Unknown",sellerTitle="",sellerDept="",sellerUni="",photo=null;
-        const sd=await getDoc(doc(db,"sellers",sellerId));
-        if(sd.exists()){const d=sd.data();sellerName=d.sellerName||d.displayName||sellerName;sellerTitle=d.title||"";sellerDept=d.department||"";sellerUni=d.university||"";}
-        const ud=await getDoc(doc(db,"users",sellerId));
-        if(ud.exists()){const u=ud.data();if(!sellerName||sellerName==="Unknown")sellerName=u.displayName||`${u.firstName||""} ${u.surname||""}`.trim()||sellerName;photo=u.photoBase64||u.photoURL||u.profilePicture||null;if(!sellerDept)sellerDept=u.department||"";if(!sellerUni)sellerUni=u.university||"";}
-        setSellerPhoto(photo);
-        const advertSnap=await getDocs(collection(db,"advertMyBook"));
-        const books=[];
-        advertSnap.forEach(ds=>{
-          const data=ds.data();
-          if((data.userId===sellerId||data.sellerId===sellerId)&&data.status==="approved"){
-            const b={id:`firestore-${ds.id}`,firestoreId:ds.id,title:data.bookTitle||data.title,author:data.author||"Unknown",category:(data.category||"General").toLowerCase(),price:Number(data.price)||0,pages:data.pages||0,format:data.format||"PDF",description:data.description||"",driveFileId:data.driveFileId,pdfUrl:data.pdfUrl||data.pdfLink,embedUrl:data.embedUrl,status:data.status||"pending",isFromFirestore:true};
-            b.image=getThumbnailUrl(b);books.push(b);
-          }
+ useEffect(() => {
+  if (!sellerId) {
+    setLoading(false);
+    router.push("/");
+    return;
+  }
+
+  setLoading(true);
+
+  // Hard timeout — loading will ALWAYS stop after 12s
+  const timeoutId = setTimeout(() => {
+    console.warn("fetchSellerData timed out");
+    setSeller(null);
+    setLoading(false);
+  }, 12000);
+
+  const fetchSellerData = async () => {
+    try {
+      // Wrap resolveSellerUid in its own 8s timeout
+      const uid = await Promise.race([
+        resolveSellerUid(sellerId),
+        new Promise((resolve) => setTimeout(() => resolve(null), 8000)),
+      ]);
+
+      console.log("Resolved UID:", uid, "from sellerId:", sellerId);
+
+      if (!uid) {
+        setSeller(null);
+        return;
+      }
+      setResolvedUid(uid);
+
+      let sellerName = "Unknown", sellerTitle = "", sellerDept = "", sellerUni = "";
+
+      const sd = await getDoc(doc(db, "sellers", uid));
+      if (sd.exists()) {
+        const d = sd.data();
+        sellerName  = d.sellerName || d.displayName || sellerName;
+        sellerTitle = d.title || "";
+        sellerDept  = d.department || "";
+        sellerUni   = d.university || "";
+      }
+
+      const ud = await getDoc(doc(db, "users", uid));
+      if (ud.exists()) {
+        const u = ud.data();
+        if (!sellerName || sellerName === "Unknown")
+          sellerName = u.displayName || `${u.firstName || ""} ${u.surname || ""}`.trim() || sellerName;
+        setSellerPhoto(u.photoBase64 || u.photoURL || u.profilePicture || null);
+        if (!sellerDept) sellerDept = u.department || "";
+        if (!sellerUni)  sellerUni  = u.university || "";
+      }
+
+      const snap1 = await getDocs(
+        query(collection(db, "advertMyBook"), where("userId", "==", uid))
+      );
+      const snap2 = await getDocs(
+        query(collection(db, "advertMyBook"), where("sellerId", "==", uid))
+      );
+
+      const seenIds = new Set();
+      const books = [];
+      const processSnap = (snap) => {
+        snap.forEach(ds => {
+          if (seenIds.has(ds.id)) return;
+          const data = ds.data();
+          if (data.status !== "approved") return;
+          seenIds.add(ds.id);
+          const b = {
+            id: `firestore-${ds.id}`,
+            firestoreId: ds.id,
+            title: data.bookTitle || data.title || "Untitled",
+            author: data.author || "Unknown",
+            category: (data.category || "general").toLowerCase(),
+            price: Number(data.price) || 0,
+            format: data.format || "PDF",
+            description: data.description || "",
+            driveFileId: data.driveFileId,
+            pdfUrl: data.pdfUrl || data.pdfLink,
+            embedUrl: data.embedUrl,
+            soldCount: 0,
+            isFromFirestore: true,
+          };
+          b.image = getThumbnailUrl(b);
+          books.push(b);
         });
-        let totalSold=0,totalEarnings=0;const salesMap={};
-        const usersSnap=await getDocs(collection(db,"users"));
-        usersSnap.docs.forEach(ud=>{Object.values(ud.data().purchasedBooks||{}).forEach(p=>{if(p.sellerId===sellerId){totalSold++;totalEarnings+=p.amount||0;const t=p.title||"Untitled";salesMap[t]=(salesMap[t]||0)+1;}});});
-        books.forEach(b=>{b.soldCount=salesMap[b.title]||0;});
-        const cu=auth.currentUser;
-        if(cu){const md=await getDoc(doc(db,"users",cu.uid));if(md.exists()){const ids=new Set();Object.values(md.data().purchasedBooks||{}).forEach(p=>{const id=p.bookId||p.id||p.firestoreId;if(id){ids.add(id);ids.add(`firestore-${id}`);}});setPurchased(ids);}}
-        setSeller({sellerId,sellerName,sellerTitle,sellerDept,sellerUni});
-        setSellerBooks(books);setFiltered(books);
-        setStats({totalSold,totalEarnings,totalBooks:books.length});
-      }catch(err){console.error(err);}finally{setLoading(false);}
-    };
-    fetchSellerData();
-  },[sellerId,router]);
+      };
+      processSnap(snap1);
+      processSnap(snap2);
 
-  /* filter */
-  useEffect(()=>{
-    const q=searchQuery.toLowerCase();
-    setFiltered(sellerBooks.filter(b=>{
-      const ms=!q||b.title?.toLowerCase().includes(q)||b.category?.toLowerCase().includes(q);
-      const mc=selectedCategory==="all"||b.category===selectedCategory;
-      return ms&&mc;
+      const cu = auth.currentUser;
+      if (cu) {
+        const md = await getDoc(doc(db, "users", cu.uid));
+        if (md.exists()) {
+          const ids = new Set();
+          Object.values(md.data().purchasedBooks || {}).forEach(p => {
+            const id = p.bookId || p.id || p.firestoreId;
+            if (id) { ids.add(id); ids.add(`firestore-${id}`); }
+          });
+          setPurchased(ids);
+        }
+      }
+
+      setSeller({ sellerId: uid, sellerName, sellerTitle, sellerDept, sellerUni });
+      setSellerBooks(books);
+      setFiltered(books);
+      setStats({ totalSold: 0, totalEarnings: 0, totalBooks: books.length });
+
+    } catch (err) {
+      console.error("fetchSellerData error:", err);
+      setSeller(null);
+    } finally {
+      clearTimeout(timeoutId);
+      setLoading(false);
+    }
+  };
+
+  fetchSellerData();
+
+  return () => clearTimeout(timeoutId);
+}, [sellerId]);
+
+  /* ── filter ── */
+  useEffect(() => {
+    const q = searchQuery.toLowerCase();
+    setFiltered(sellerBooks.filter(b => {
+      const ms = !q || b.title?.toLowerCase().includes(q) || b.category?.toLowerCase().includes(q);
+      const mc = selectedCategory === "all" || b.category === selectedCategory;
+      return ms && mc;
     }));
-  },[searchQuery,selectedCategory,sellerBooks]);
+  }, [searchQuery, selectedCategory, sellerBooks]);
 
-  const categories=[{value:"all",label:"All"},...Array.from(new Set(sellerBooks.map(b=>b.category))).filter(Boolean).map(c=>({value:c,label:c.charAt(0).toUpperCase()+c.slice(1)}))];
-  const isPurchased=id=>purchasedBookIds.has(id)||purchasedBookIds.has(String(id));
-  const lecturerMode=isLecturer(seller?.sellerTitle);
-  const displayTitle=seller?(lecturerMode?`${seller.sellerTitle} ${seller.sellerName}`:seller.sellerName):"Profile";
+  const categories = [
+    { value:"all", label:"All" },
+    ...Array.from(new Set(sellerBooks.map(b => b.category))).filter(Boolean)
+      .map(c => ({ value:c, label:c.charAt(0).toUpperCase()+c.slice(1) })),
+  ];
+  const isPurchased = id => purchasedBookIds.has(id) || purchasedBookIds.has(String(id));
+  const lecturerMode = isLecturer(seller?.sellerTitle);
+  const displayTitle = seller
+    ? (lecturerMode ? `${seller.sellerTitle} ${seller.sellerName}` : seller.sellerName)
+    : "Profile";
 
-  /* global styles */
+  /* ── global styles ── */
   const S = () => (
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
@@ -237,7 +397,6 @@ export default function SellerProfileClient() {
       @keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
       .anim-up { animation:slideUp .5s cubic-bezier(.4,0,.2,1) both; }
 
-      /* ── layout helpers ── */
       .profile-content-grid {
         display: grid;
         grid-template-columns: 260px 1fr;
@@ -249,16 +408,9 @@ export default function SellerProfileClient() {
       .page-inner  { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
       .books-grid  { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
 
-      /* ── mobile breakpoint ── */
       @media (max-width: 768px) {
-        .profile-content-grid {
-          grid-template-columns: 1fr;
-        }
-        .sidebar-mobile-hidden {
-          /* On mobile the sidebar shows BELOW the feed (after about tab) or we reorder. 
-             We'll hide the desktop sidebar and show an inline version in About tab instead. */
-          display: none;
-        }
+        .profile-content-grid { grid-template-columns: 1fr; }
+        .sidebar-mobile-hidden { display: none; }
         .hero-inner { padding: 48px 16px 0; }
         .page-inner { padding: 16px 12px 80px; }
         .books-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
@@ -283,7 +435,7 @@ export default function SellerProfileClient() {
     `}</style>
   );
 
-  /* loading */
+  /* ── loading ── */
   if (loading) return (
     <div className="lan-root" style={{ minHeight:"100vh" }}>
       <S/>
@@ -302,6 +454,7 @@ export default function SellerProfileClient() {
     </div>
   );
 
+  /* ── not found ── */
   if (!seller) return (
     <div className="lan-root" style={{ minHeight:"100vh" }}>
       <S/><Navbar/>
@@ -310,15 +463,18 @@ export default function SellerProfileClient() {
           <BookOpen size={24} style={{ color:"#e5ddd0", transform:"rotate(-45deg)" }}/>
         </div>
         <h2 className="lan-serif" style={{ fontSize:"24px", color:NAVY, marginBottom:"8px" }}>Profile Not Found</h2>
+        <p style={{ fontSize:"13px", color:"#aaa", fontFamily:"'Lato',sans-serif", marginBottom:"20px" }}>
+          The seller profile you're looking for doesn't exist or the link may be incorrect.
+        </p>
         <button onClick={()=>router.push("/")}
-          style={{ marginTop:"16px", background:NAVY, color:"#fff", padding:"10px 24px", border:"none", cursor:"pointer", fontSize:"12px", fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'Lato',sans-serif" }}>
+          style={{ background:NAVY, color:"#fff", padding:"10px 24px", border:"none", cursor:"pointer", fontSize:"12px", fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'Lato',sans-serif" }}>
           Go Home
         </button>
       </div>
     </div>
   );
 
-  /* Inline About card — shown on mobile inside About tab */
+  /* ── About card (mobile) ── */
   const AboutCard = () => (
     <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"24px", marginBottom:"16px" }}>
       <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLD, marginBottom:"14px", fontFamily:"'Lato',sans-serif" }}>About</p>
@@ -368,6 +524,9 @@ export default function SellerProfileClient() {
     </div>
   );
 
+  /* ══════════════════════════════════════════════════════════
+     RENDER
+  ══════════════════════════════════════════════════════════ */
   return (
     <div className="lan-root" style={{ minHeight:"100vh" }}>
       <S/>
@@ -386,9 +545,7 @@ export default function SellerProfileClient() {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════
-          PROFILE HERO
-      ══════════════════════════════════════════════════════ */}
+      {/* ══ PROFILE HERO ══ */}
       <div style={{
         backgroundColor:NAVY,
         backgroundImage:`radial-gradient(rgba(184,150,62,.07) 1px,transparent 1px),radial-gradient(rgba(255,255,255,.03) 1px,transparent 1px)`,
@@ -410,6 +567,7 @@ export default function SellerProfileClient() {
         <div className="hero-inner">
           {/* Avatar row */}
           <div style={{ display:"flex", alignItems:"flex-end", gap:"16px", flexWrap:"wrap" }}>
+
             {/* Avatar */}
             <div className="hero-avatar" style={{ width:"110px", height:"110px", flexShrink:0, position:"relative", bottom:"-28px" }}>
               {sellerPhoto ? (
@@ -470,9 +628,7 @@ export default function SellerProfileClient() {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════
-          CONTENT
-      ══════════════════════════════════════════════════════ */}
+      {/* ══ CONTENT ══ */}
       <div className="page-inner">
         <div className="profile-content-grid">
 
@@ -541,13 +697,11 @@ export default function SellerProfileClient() {
                       </button>
                     )}
                   </div>
-                  {/* View toggle */}
                   <div style={{ display:"flex", gap:"0" }}>
                     <button onClick={()=>setView("grid")} className={`view-btn ${view==="grid"?"active":""}`}><Grid3X3 size={14}/></button>
                     <button onClick={()=>setView("list")} className={`view-btn ${view==="list"?"active":""}`}><LayoutList size={14}/></button>
                   </div>
                 </div>
-                {/* Category pills */}
                 <div className="sbar-none" style={{ display:"flex", gap:"6px", overflowX:"auto", paddingBottom:"2px" }}>
                   {categories.map(cat=>(
                     <button key={cat.value} onClick={()=>setCategory(cat.value)} className={`cat-pill${selectedCategory===cat.value?" active":""}`}>
@@ -595,7 +749,6 @@ export default function SellerProfileClient() {
           {/* ── ABOUT TAB ── */}
           {activeTab==="about" && (
             <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
-              {/* On mobile, show About + Stats inline here */}
               <div style={{ display:"none" }} className="mobile-about-cards">
                 <AboutCard/>
                 <StatsCard/>
@@ -607,9 +760,9 @@ export default function SellerProfileClient() {
                 </p>
                 <div style={{ display:"flex", flexDirection:"column", gap:"0" }}>
                   {[
-                    {label:"Title", value:seller.sellerTitle, Icon:GraduationCap},
-                    {label:"Department", value:seller.sellerDept, Icon:BookMarked},
-                    {label:"University", value:seller.sellerUni, Icon:Building2},
+                    {label:"Title",      value:seller.sellerTitle, Icon:GraduationCap},
+                    {label:"Department", value:seller.sellerDept,  Icon:BookMarked},
+                    {label:"University", value:seller.sellerUni,   Icon:Building2},
                   ].filter(r=>r.value).map(({label,value,Icon})=>(
                     <div key={label} style={{ display:"flex", alignItems:"flex-start", gap:"14px", padding:"18px 0", borderBottom:`0.5px solid #f0ebe0` }}>
                       <Icon size={16} style={{ color:GOLD, flexShrink:0, marginTop:"2px" }}/>
@@ -625,7 +778,7 @@ export default function SellerProfileClient() {
                 </div>
               </div>
 
-              {/* Stats shown in About tab on mobile */}
+              {/* Stats in About tab (visible on all screens) */}
               <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"24px 20px" }}>
                 <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLD, marginBottom:"14px", fontFamily:"'Lato',sans-serif" }}>Stats</p>
                 <div style={{ display:"flex", flexDirection:"column" }}>

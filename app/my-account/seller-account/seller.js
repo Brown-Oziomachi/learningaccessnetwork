@@ -1011,6 +1011,7 @@ export default function SellerAccountClient() {
                                     { href: "/documents", icon: <Globe size={16} style={{ color: NAVY }} />, title: 'Browse documents', sub: 'Explore library' },
                                     { href: "/upload-document", icon: <TrendingUp size={16} style={{ color: NAVY }} />, title: 'Upload documents', sub: 'Add new document' },
                                     { href: "/upload-document/my-pending-books", icon: <TrendingUp size={16} style={{ color: NAVY }} />, title: 'Pending documents', sub: 'Track documents' },
+                                    { href: "/my-account/seller-account/share-profile", icon: <Globe size={16} style={{ color: NAVY }} />, title: 'Share My Profile', sub: 'Copy your public link' },
                                 ].map(({ href, icon, title, sub }) => (
                                     <Link key={href} href={href} className="action-row" style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', border: '0.5px solid #e5ddd0', background: '#fff', textDecoration: 'none', transition: 'all 0.18s' }}>
                                         <div style={{ width: '34px', height: '34px', border: `0.5px solid #e5ddd0`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: CREAM }}>{icon}</div>

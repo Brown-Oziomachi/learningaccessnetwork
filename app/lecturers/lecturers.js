@@ -48,7 +48,7 @@ function LecturerCard({ lecturer, isFollowing, onFollow, user }) {
     const initials  = getInitials(lecturer.sellerName || "?");
     const titleDisplay = lecturer.title?.toLowerCase().includes("lecturer")
         ? "Lecturer" : lecturer.title;
-    const profileHref  = `/seller-profile?sellerId=${lecturer.sellerId}`;
+const profileHref = `/faculty/${lecturer.slug || lecturer.sellerId}`;
     const displayName  = lecturer.title
         ? `${lecturer.title} ${lecturer.sellerName}` : lecturer.sellerName;
 
@@ -213,46 +213,65 @@ export default function LecturersClient() {
         } catch (err) { console.error(err); }
     };
 
-    useEffect(() => {
-        const fetchLecturers = async () => {
-            try {
-                setLoading(true);
-                const sellersSnap = await getDocs(collection(db, 'sellers'));
-                const list = [];
-                for (const ds of sellersSnap.docs) {
-                    const data  = ds.data();
-                    const title = (data.title || '').toLowerCase();
-                    if (!['dr.', 'prof.', 'engr.', 'pharm.', 'barr.', 'lecturer'].some(t => title.includes(t))) continue;
-                    let photo = null;
-                    try {
-                        const ud = await getDoc(doc(db, 'users', ds.id));
-                        if (ud.exists()) {
-                            const udata = ud.data();
-                            photo = udata.photoBase64 || udata.photoURL || udata.profilePicture || null;
-                        }
-                    } catch {}
-                    list.push({
-                        sellerId: ds.id,
-                        sellerName: data.sellerName || data.displayName || 'Unknown',
-                        title: data.title || 'Lecturer',
-                        department: data.department || '',
-                        university: data.university || '',
-                        isVerified: data.verifiedSchool || false,
-                        uploadedBooks: 0,
-                        photo,
-                    });
+   const makeSlug = (title, name) => {
+    const full = `${title ? title + " " : ""}${name}`.trim();
+    return full
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-");
+};
+
+useEffect(() => {
+    const fetchLecturers = async () => {
+        try {
+            setLoading(true);
+            const sellersSnap = await getDocs(collection(db, 'sellers'));
+            const list = [];
+            for (const ds of sellersSnap.docs) {
+                const data  = ds.data();
+                const title = (data.title || '').toLowerCase();
+                if (!['dr.', 'prof.', 'engr.', 'pharm.', 'barr.', 'lecturer'].some(t => title.includes(t))) continue;
+
+                let photo = null;
+                try {
+                    const ud = await getDoc(doc(db, 'users', ds.id));
+                    if (ud.exists()) {
+                        const udata = ud.data();
+                        photo = udata.photoBase64 || udata.photoURL || udata.profilePicture || null;
+                    }
+                } catch {}
+
+                const slug = data.slug || makeSlug(data.title, data.sellerName || data.displayName || '');
+
+                // Save slug to Firestore if not already there
+                if (!data.slug && slug) {
+                    try { await updateDoc(doc(db, "sellers", ds.id), { slug }); } catch {}
                 }
-                await Promise.all(list.map(async (l) => {
-                    const bq = query(collection(db, 'advertMyBook'), where('userId','==',l.sellerId), where('status','==','approved'));
-                    l.uploadedBooks = (await getDocs(bq)).size;
-                }));
-                list.sort((a, b) => b.uploadedBooks - a.uploadedBooks);
-                setLecturers(list);
-                setFiltered(list);
-            } catch (err) { console.error(err); } finally { setLoading(false); }
-        };
-        fetchLecturers();
-    }, []);
+
+                list.push({
+                    sellerId: ds.id,
+                    sellerName: data.sellerName || data.displayName || 'Unknown',
+                    title: data.title || 'Lecturer',
+                    department: data.department || '',
+                    university: data.university || '',
+                    isVerified: data.verifiedSchool || false,
+                    uploadedBooks: 0,
+                    photo,
+                    slug,
+                });
+            }
+            await Promise.all(list.map(async (l) => {
+                const bq = query(collection(db, 'advertMyBook'), where('userId','==',l.sellerId), where('status','==','approved'));
+                l.uploadedBooks = (await getDocs(bq)).size;
+            }));
+            list.sort((a, b) => b.uploadedBooks - a.uploadedBooks);
+            setLecturers(list);
+            setFiltered(list);
+        } catch (err) { console.error(err); } finally { setLoading(false); }
+    };
+    fetchLecturers();
+}, []);
 
     useEffect(() => {
         const q = searchTerm.toLowerCase();

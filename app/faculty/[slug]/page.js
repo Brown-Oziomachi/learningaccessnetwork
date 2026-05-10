@@ -1,22 +1,23 @@
-
-
 import { Suspense } from "react";
 import SellerProfileClient from "@/components/SellerProfileClient";
 
 export const metadata = {
     title: "Find a lecturer | LAN Library",
-    description: "Have access to all your books when you purchased them, download them again when you want."
-}
-export default function SellerProfilePage() {
+    description: "Have access to all your books when you purchased them, download them again when you want.",
+};
+
+export default async function SellerProfileSlugPage({ params }) {
+    const { slug } = await params;
+
     return (
         <Suspense
             fallback={
                 <div className="min-h-screen flex items-center justify-center">
-                    <div className="animate-spin h-10 w-10 border-b-2 border-blue-950 rounded-full"></div>
+                    <div className="animate-spin h-10 w-10 border-b-2 border-blue-950 rounded-full" />
                 </div>
             }
         >
-            <SellerProfileClient />
+            <SellerProfileClient sellerIdProp={slug} />
         </Suspense>
     );
 }
