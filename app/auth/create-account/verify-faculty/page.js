@@ -12,7 +12,7 @@ export default function VerifyFacultyPage() {
 function FacultyLoading() {
     return (
         <div className="min-h-screen flex items-center justify-center">
-            <p className="text-gray-600">Loading faculty verification…</p>
+            <p className="text-gray-600">Working on it</p>
         </div>
     );
 }

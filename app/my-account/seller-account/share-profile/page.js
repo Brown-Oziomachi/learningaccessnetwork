@@ -50,7 +50,7 @@ export default function ShareProfilePage() {
     if (!user || seller === null) return;
 
     const build = async () => {
-      const base = "https://learningaccessnetwork.vercel.app/faculty";
+const base = "https://learningaccessnetwork.vercel.app/profile";
 
       const titlePrefix = seller?.title ? `${seller.title} ` : "";
       const fullName    = `${titlePrefix}${user?.firstName || ""} ${user?.surname || ""}`.trim();

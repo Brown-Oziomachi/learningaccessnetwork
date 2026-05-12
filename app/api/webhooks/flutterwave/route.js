@@ -11,6 +11,11 @@ import {
     getDoc,
     setDoc,
     updateDoc,
+    addDoc,
+    collection,
+    getDocs,
+    query,
+    where,
     arrayUnion,
     serverTimestamp,
     increment,
@@ -42,6 +47,117 @@ export async function POST(request) {
 
         // Extract metadata
         const metadata = paymentData.meta || paymentData.metadata || {};
+
+        /* ══════════════════════════════════════════════════════════
+           ROUTE: AD BOOST
+           Triggered when SellerAdCreator sends meta.type = "ad_boost"
+        ══════════════════════════════════════════════════════════ */
+        if (metadata.type === 'ad_boost') {
+            const { tier, days, bookId, sellerId } = metadata;
+
+            console.log('Processing ad_boost payment:', { sellerId, tier, days, bookId, amount });
+
+            try {
+                // Idempotency: skip if this tx_ref already logged in revenue
+                const existingRevenue = await getDocs(
+                    query(collection(db, 'revenue'), where('txRef', '==', tx_ref))
+                );
+                if (!existingRevenue.empty) {
+                    console.log('ad_boost already recorded — skipping:', tx_ref);
+                    return NextResponse.json({ message: 'Duplicate — skipped' }, { status: 200 });
+                }
+
+                // 1. Mark the promotion doc as "paid" + webhook-confirmed.
+                //    The client already wrote it with status "paid" on the
+                //    Flutterwave callback. This is the safety-net in case that
+                //    write failed — and also stamps webhookConfirmed: true either way.
+                const promoSnap = await getDocs(
+                    query(collection(db, 'promotions'), where('paymentRef', '==', tx_ref))
+                );
+                if (!promoSnap.empty) {
+                    // Client write succeeded — just confirm it
+                    await updateDoc(promoSnap.docs[0].ref, {
+                        status: 'paid',
+                        webhookConfirmed: true,
+                        updatedAt: serverTimestamp(),
+                    });
+                    console.log('✓ Promotion doc confirmed via webhook');
+                } else {
+                    // Client write failed — create the doc from webhook metadata
+                    await addDoc(collection(db, 'promotions'), {
+                        sellerId,
+                        sellerEmail: customer?.email || null,
+                        bookId: bookId || null,
+                        tier,
+                        durationDays: Number(days),
+                        totalPrice: amount,
+                        status: 'paid',
+                        expiryDate: null,     // admin sets this on approval
+                        clicks: 0,
+                        impressions: 0,
+                        paymentMethod: 'flutterwave',
+                        paymentRef: tx_ref,
+                        webhookConfirmed: true,
+                        createdAt: serverTimestamp(),
+                    });
+                    console.log('✓ Promotion doc created via webhook (client write had failed)');
+                }
+
+                // 2. Log to revenue collection — your admin dashboard reads this
+                await addDoc(collection(db, 'revenue'), {
+                    type: 'ad_boost',
+                    amount,
+                    currency,
+                    sellerId,
+                    sellerEmail: customer?.email || null,
+                    tier,
+                    durationDays: Number(days),
+                    bookId: bookId || null,
+                    paymentMethod: 'flutterwave',
+                    txRef: tx_ref,
+                    status: 'completed',
+                    createdAt: serverTimestamp(),
+                });
+                console.log('✓ Revenue entry logged for ad_boost');
+
+                // 3. Notify seller (same non-blocking pattern as book purchase)
+                try {
+                    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-seller-notification`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sellerId,
+                            type: 'ad_boost',
+                            tier,
+                            durationDays: Number(days),
+                            amount,
+                            buyerEmail: customer?.email || null,
+                        }),
+                    });
+                    console.log('✓ Seller notification sent for ad_boost');
+                } catch (notifError) {
+                    console.error('Failed to send ad_boost notification:', notifError);
+                    // Non-blocking — don't fail the webhook if notification fails
+                }
+
+                console.log('✅ ad_boost webhook processed successfully');
+                return NextResponse.json({
+                    message: 'ad_boost processed successfully',
+                    details: { sellerId, tier, days, amount },
+                }, { status: 200 });
+
+            } catch (adErr) {
+                console.error('ad_boost webhook error:', adErr);
+                return NextResponse.json({
+                    error: 'ad_boost processing failed',
+                    details: adErr.message,
+                }, { status: 500 });
+            }
+        }
+
+        /* ══════════════════════════════════════════════════════════
+           ROUTE: BOOK PURCHASE  (everything below is unchanged)
+        ══════════════════════════════════════════════════════════ */
         const { userId, bookId, bookTitle, bookPrice, sellerId, sellerEmail, sellerName } = metadata;
 
         if (!userId || !bookId || !sellerId) {

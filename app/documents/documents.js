@@ -6,9 +6,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
 import { booksData } from "@/lib/booksData";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, increment } from 'firebase/firestore';
 import Navbar from '@/components/NavBar';
 import Footer from '@/components/FooterComp';
+import { useAds, injectAds } from "@/lib/useAds";
+import FeaturedAdsCarousel from "@/components/FeaturedAdsCarousel"; // ← ADD THIS IMPORT
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -17,8 +19,11 @@ const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
 const BG = "#f5f1ea";
 
+// Carousel tier rotation — cycles Gold → Silver → Bronze → Gold…
+const CAROUSEL_TIERS = ["Gold", "Silver", "Bronze"];
+
 /* ═══════════════════════════════════════════════════════════════
-   SHARED BOOK CARD  —  matches the screenshot exactly
+   SHARED BOOK CARD  (unchanged)
 ═══════════════════════════════════════════════════════════════ */
 function BookCard({ book, isPurchased, bookSalesCount, getFeedbackCount }) {
     const sold = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
@@ -31,7 +36,6 @@ function BookCard({ book, isPurchased, bookSalesCount, getFeedbackCount }) {
             style={{ flexShrink: 0, width: '200px', textDecoration: 'none', display: 'block' }}
             className="lan-book-card"
         >
-            {/* ── Cover ── */}
             <div style={{ position: 'relative', marginBottom: '12px', background: '#e8e4dc' }}>
                 <img
                     src={book.image}
@@ -40,90 +44,56 @@ function BookCard({ book, isPurchased, bookSalesCount, getFeedbackCount }) {
                     style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }}
                     onError={e => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
                 />
-
-                {/* LIVE badge — top-left, always shown for firestore books */}
                 {book.isFromFirestore && (
-                    <div style={{
-                        position: 'absolute', top: '10px', left: '10px',
-                        display: 'flex', alignItems: 'center', gap: '5px',
-                        background: NAVY, padding: '4px 10px',
-                    }}>
-                        <span style={{
-                            width: '6px', height: '6px', borderRadius: '50%',
-                            background: '#22c55e', flexShrink: 0,
-                        }} />
-                        <span style={{
-                            fontSize: '9px', fontWeight: 700, color: GOLD,
-                            fontFamily: "'Lato',sans-serif", letterSpacing: '0.1em',
-                            textTransform: 'uppercase',
-                        }}>PDF</span>
+                    <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', alignItems: 'center', gap: '5px', background: NAVY, padding: '4px 10px' }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+                        <span style={{ fontSize: '9px', fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif", letterSpacing: '0.1em', textTransform: 'uppercase' }}>PDF</span>
                     </div>
                 )}
-
-                {/* OWNED badge — top-right */}
                 {owned && (
-                    <span style={{
-                        position: 'absolute', top: '10px', right: '10px',
-                        background: '#16a34a', color: '#fff',
-                        fontSize: '9px', fontWeight: 700,
-                        padding: '3px 8px', fontFamily: "'Lato',sans-serif",
-                        letterSpacing: '0.06em',
-                    }}>OWNED</span>
+                    <span style={{ position: 'absolute', top: '10px', right: '10px', background: '#16a34a', color: '#fff', fontSize: '9px', fontWeight: 700, padding: '3px 8px', fontFamily: "'Lato',sans-serif", letterSpacing: '0.06em' }}>OWNED</span>
                 )}
             </div>
-
-            {/* ── Meta ── */}
             <div>
-                {/* Title */}
-                <h4 style={{
-                    fontFamily: "'Playfair Display',serif",
-                    fontSize: '13px', fontWeight: 700, color: NAVY,
-                    margin: '0 0 4px', lineHeight: 1.35,
-                    display: '-webkit-box', WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                }}>{book.title}</h4>
-
-                {/* Author */}
-                <p style={{
-                    fontSize: '11px', color: '#888', margin: '0 0 8px',
-                    fontFamily: "'Lato',sans-serif",
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>{book.author}</p>
-
-                {/* Price row */}
+                <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 4px', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{book.title}</h4>
+                <p style={{ fontSize: '11px', color: '#888', margin: '0 0 8px', fontFamily: "'Lato',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.author}</p>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', flexWrap: 'wrap' }}>
-                    <span style={{
-                        fontSize: '13px', fontWeight: 700, color: NAVY,
-                        fontFamily: "'Lato',sans-serif",
-                    }}>
-                        {book.price > 0 ? `₦${Number(book.price).toLocaleString()}` : 'Free'}
-                    </span>
-
-                    {/* Category pill */}
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }} />
                     {book.category && (
-                        <span style={{
-                            fontSize: '9px', fontWeight: 700,
-                            background: CREAM, border: `0.5px solid rgba(184,150,62,0.35)`,
-                            color: GOLD, padding: '3px 8px',
-                            fontFamily: "'Lato',sans-serif", letterSpacing: '0.08em',
-                            textTransform: 'uppercase', whiteSpace: 'nowrap',
-                        }}>{book.category}</span>
+                        <span style={{ fontSize: '9px', fontWeight: 700, background: CREAM, border: `0.5px solid rgba(184,150,62,0.35)`, color: GOLD, padding: '3px 8px', fontFamily: "'Lato',sans-serif", letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{book.category}</span>
                     )}
                 </div>
-
-                {/* Stats row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
-                    {sold > 0 && (
-                        <span style={{ fontSize: '10px', color: '#bbb', display: 'flex', alignItems: 'center', gap: '3px', fontFamily: "'Lato',sans-serif" }}>
-                            <ShoppingBag size={9} /> {sold}
-                        </span>
-                    )}
-                    {feedback > 0 && (
-                        <span style={{ fontSize: '10px', color: '#bbb', display: 'flex', alignItems: 'center', gap: '3px', fontFamily: "'Lato',sans-serif" }}>
-                            <ThumbsUp size={9} /> {feedback}
-                        </span>
-                    )}
+                    {sold > 0 && <span style={{ fontSize: '10px', color: '#bbb', display: 'flex', alignItems: 'center', gap: '3px', fontFamily: "'Lato',sans-serif" }}><ShoppingBag size={9} /> {sold}</span>}
+                    {feedback > 0 && <span style={{ fontSize: '10px', color: '#bbb', display: 'flex', alignItems: 'center', gap: '3px', fontFamily: "'Lato',sans-serif" }}><ThumbsUp size={9} /> {feedback}</span>}
                 </div>
+            </div>
+        </a>
+    );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AD CARD  (unchanged)
+═══════════════════════════════════════════════════════════════ */
+function AdCard({ book }) {
+    const handleClick = () => {
+        updateDoc(doc(db, "promotions", book.adId), { clicks: increment(1) }).catch(() => { });
+    };
+    return (
+        <a href={book.adLink} onClick={handleClick} style={{ flexShrink: 0, width: '200px', textDecoration: 'none', display: 'block' }} className="lan-book-card">
+            <div style={{ position: 'relative', marginBottom: '12px', background: '#e8e4dc' }}>
+                <img src={book.image} alt={book.title} className="lan-book-img" style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }} onError={e => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }} />
+                <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', alignItems: 'center', gap: '5px', background: NAVY, padding: '4px 10px' }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+                    <span style={{ fontSize: '9px', fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif", letterSpacing: '0.1em', textTransform: 'uppercase' }}>PDF</span>
+                </div>
+                <div style={{ position: 'absolute', top: '10px', right: '10px', background: GOLD, color: NAVY, fontSize: '9px', fontWeight: 700, padding: '3px 8px', fontFamily: "'Lato',sans-serif" }}>AD</div>
+                <div style={{ position: 'absolute', bottom: '8px', left: '8px', background: 'rgba(13,34,68,0.82)', padding: '3px 8px', fontSize: '9px', fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif" }}>GOLD SPONSOR</div>
+            </div>
+            <div>
+                <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 4px', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{book.title}</h4>
+                <p style={{ fontSize: '11px', color: '#888', margin: '0 0 8px', fontFamily: "'Lato',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.author}</p>
+                {book.category && <span style={{ fontSize: '9px', fontWeight: 700, background: CREAM, border: `0.5px solid rgba(184,150,62,0.35)`, color: GOLD, padding: '3px 8px', fontFamily: "'Lato',sans-serif", letterSpacing: '0.08em', textTransform: 'uppercase', display: 'inline-block' }}>{book.category}</span>}
             </div>
         </a>
     );
@@ -146,6 +116,7 @@ export default function AllBooksClient() {
     const [visibleRows, setVisibleRows] = useState(5);
     const [bookFeedbackCounts, setBookFeedbackCounts] = useState({});
 
+    const goldAds = useAds("Gold", 4);
     const booksPerRow = 10;
     const rowsPerLoad = 2;
     const searchParams = useSearchParams();
@@ -353,21 +324,11 @@ export default function AllBooksClient() {
                     border:0.5px solid #e5ddd0; background:#fff; color:${NAVY};
                     font-family:'Lato',sans-serif; font-size:11px; font-weight:700;
                     letter-spacing:0.07em; text-transform:uppercase; padding:8px 16px;
-                    cursor:pointer; transition:background 0.18s,color 0.18s,border-color 0.18s;
-                    white-space:nowrap;
+                    cursor:pointer; transition:background 0.18s,color 0.18s,border-color 0.18s; white-space:nowrap;
                 }
                 .cat-pill.active,.cat-pill:hover { background:${NAVY}; color:#fff; border-color:${NAVY}; }
-                .filter-select {
-                    border:0.5px solid #e5ddd0; background:#fff; color:${NAVY};
-                    font-family:'Lato',sans-serif; font-size:12px; font-weight:700;
-                    padding:9px 14px; outline:none; cursor:pointer;
-                }
-                .load-btn {
-                    display:inline-flex; align-items:center; gap:8px;
-                    padding:14px 36px; background:${NAVY}; color:#fff;
-                    font-family:'Lato',sans-serif; font-size:13px; font-weight:700;
-                    letter-spacing:0.05em; border:none; cursor:pointer; transition:background 0.18s;
-                }
+                .filter-select { border:0.5px solid #e5ddd0; background:#fff; color:${NAVY}; font-family:'Lato',sans-serif; font-size:12px; font-weight:700; padding:9px 14px; outline:none; cursor:pointer; }
+                .load-btn { display:inline-flex; align-items:center; gap:8px; padding:14px 36px; background:${NAVY}; color:#fff; font-family:'Lato',sans-serif; font-size:13px; font-weight:700; letter-spacing:0.05em; border:none; cursor:pointer; transition:background 0.18s; }
                 .load-btn:hover { background:#1a3a6e; }
                 @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
                 .anim-up { animation:slideUp 0.5s cubic-bezier(0.4,0,0.2,1) both; }
@@ -409,10 +370,8 @@ export default function AllBooksClient() {
                     <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '18px 24px', marginBottom: '40px', display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center' }}>
                         <div style={{ flex: '1', minWidth: '200px', position: 'relative' }}>
                             <Search size={13} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#bbb' }} />
-                            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                                placeholder="Search books or authors…"
-                                style={{ width: '100%', padding: '10px 12px 10px 34px', border: '0.5px solid #e5ddd0', fontSize: '13px', fontFamily: "'Lato',sans-serif", outline: 'none', color: NAVY, boxSizing: 'border-box' }}
-                            />
+                            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search books or authors…"
+                                style={{ width: '100%', padding: '10px 12px 10px 34px', border: '0.5px solid #e5ddd0', fontSize: '13px', fontFamily: "'Lato',sans-serif", outline: 'none', color: NAVY, boxSizing: 'border-box' }} />
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#aaa' }}>Category</span>
@@ -439,10 +398,7 @@ export default function AllBooksClient() {
                     {/* Category Pills */}
                     <div className="sbar-none" style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '48px', paddingBottom: '4px' }}>
                         {categories.map(c => (
-                            <button key={c.value} onClick={() => setSelectedCategory(c.value)}
-                                className={`cat-pill${selectedCategory === c.value ? ' active' : ''}`}>
-                                {c.label}
-                            </button>
+                            <button key={c.value} onClick={() => setSelectedCategory(c.value)} className={`cat-pill${selectedCategory === c.value ? ' active' : ''}`}>{c.label}</button>
                         ))}
                     </div>
 
@@ -462,40 +418,54 @@ export default function AllBooksClient() {
                     ) : (
                         <>
                             {bookRows.map((rowBooks, ri) => (
-                                <div key={ri} style={{ marginBottom: '56px' }}>
-                                    {ri === 0 && (
-                                        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '24px' }}>
-                                            <div>
-                                                <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: GOLD, marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>
-                                                    {selectedCategory === 'all' ? 'Full Collection' : categories.find(c => c.value === selectedCategory)?.label}
-                                                </p>
-                                                <h2 className="lan-serif" style={{ fontSize: 'clamp(22px,3vw,32px)', fontWeight: 700, color: NAVY, margin: 0 }}>
-                                                    {sortedBooks.length} Documents Available
-                                                </h2>
-                                            </div>
-                                        </div>
-                                    )}
+                                <React.Fragment key={ri}>
+                                    <div style={{ marginBottom: '32px' }}>
 
-                                    {/* horizontal scroll row */}
-                                    <div className="sbar-none" style={{ overflowX: 'auto', margin: '0 -4px', padding: '0 4px 12px' }}>
-                                        <div style={{ display: 'flex', gap: '20px', paddingBottom: '4px' }}>
-                                            {rowBooks.map(book => (
-                                                <BookCard
-                                                    key={book.id}
-                                                    book={book}
-                                                    isPurchased={isPurchased}
-                                                    bookSalesCount={bookSalesCount}
-                                                    getFeedbackCount={getFeedbackCount}
-                                                />
-                                            ))}
+                                        {/* Section heading — first row only */}
+                                        {ri === 0 && (
+                                            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '24px' }}>
+                                                <div>
+                                                    <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: GOLD, marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>
+                                                        {selectedCategory === 'all' ? 'Full Collection' : categories.find(c => c.value === selectedCategory)?.label}
+                                                    </p>
+                                                    <h2 className="lan-serif" style={{ fontSize: 'clamp(22px,3vw,32px)', fontWeight: 700, color: NAVY, margin: 0 }}>
+                                                        {sortedBooks.length} Documents Available
+                                                    </h2>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Horizontal scroll row */}
+                                        <div className="sbar-none" style={{ overflowX: 'auto', margin: '0 -4px', padding: '0 4px 12px' }}>
+                                            <div style={{ display: 'flex', gap: '20px', paddingBottom: '4px' }}>
+                                                {injectAds(rowBooks, ri === 0 ? goldAds : [], 1).map(book =>
+                                                    book.isAd ? (
+                                                        <AdCard key={book.id} book={book} />
+                                                    ) : (
+                                                        <BookCard key={book.id} book={book} isPurchased={isPurchased} bookSalesCount={bookSalesCount} getFeedbackCount={getFeedbackCount} />
+                                                    )
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* gold divider */}
-                                    {ri < bookRows.length - 1 && (
-                                        <div style={{ borderBottom: '0.5px solid rgba(184,150,62,0.2)', marginTop: '16px' }} />
+                                    {/* ── Rotating FeaturedAdsCarousel between every 2 book rows ── */}
+                                    {(ri + 1) % 2 === 0 && ri < bookRows.length - 1 && (
+                                        <div style={{ marginBottom: '40px' }}>
+                                            <FeaturedAdsCarousel
+                                                tier={CAROUSEL_TIERS[Math.floor(ri / 2) % CAROUSEL_TIERS.length]}
+                                                maxAds={2}
+                                                autoPlay={true}
+                                                autoPlayMs={4000 + (ri * 500)} // slightly stagger each carousel
+                                            />
+                                        </div>
                                     )}
-                                </div>
+
+                                    {/* Gold divider between rows (not after carousel) */}
+                                    {(ri + 1) % 2 !== 0 && ri < bookRows.length - 1 && (
+                                        <div style={{ borderBottom: '0.5px solid rgba(184,150,62,0.2)', marginBottom: '40px' }} />
+                                    )}
+                                </React.Fragment>
                             ))}
 
                             {/* Load More */}
@@ -508,6 +478,7 @@ export default function AllBooksClient() {
                                 </div>
                             )}
 
+                            {/* End of list */}
                             {!hasMoreRows && sortedBooks.length > booksPerRow && (
                                 <div style={{ textAlign: 'center', marginTop: '40px', padding: '32px', background: '#fff', border: '0.5px solid #e5ddd0' }}>
                                     <div style={{ width: '40px', height: '1px', background: GOLD, margin: '0 auto 14px' }} />

@@ -11,6 +11,8 @@ import { booksData } from "@/lib/booksData";
 import { FileText, X, TrendingUp, Search, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import Navbar from "@/components/NavBar";
+import FeaturedAdsCarousel from "@/components/FeaturedAdsCarousel";
+import { useAds } from "@/lib/useAds";
 
 /* ─── colour tokens (match homepage) ─── */
 const NAVY  = "#0d2244";
@@ -55,7 +57,8 @@ export default function SearchClient() {
   const [loading, setLoading] = useState(false);
   const [mostSearchedBooks, setMostSearchedBooks] = useState([]);
   const [showMostSearched, setShowMostSearched] = useState(false);
-
+  const goldAds = useAds("Gold", 5);
+  const silverAds = useAds("Silver", 3);
   /* ── track search ── */
   const trackSearch = async (searchQuery) => {
     if (!searchQuery || searchQuery.length < 2) return;
@@ -186,6 +189,70 @@ export default function SearchClient() {
   };
   const isPurchased = id => purchasedBookIds.has(id);
 
+  const SearchAdCard = ({ ad, tier }) => {
+    const handleClick = async () => {
+      const id = ad.adId || ad.id;
+      if (id) {
+        try { await updateDoc(doc(db, "promotions", id), { clicks: increment(1) }); } catch { }
+      }
+      if (ad.adLink) window.open(ad.adLink, '_blank');
+    };
+    const accentColor = tier === 'Gold' ? GOLD : '#aaa';
+    const imgSrc = ad.image || ad.imageUrl || ad.coverImage || null;
+
+    return (
+      <div onClick={handleClick} style={{ flexShrink: 0, width: 160, cursor: 'pointer' }}>
+        <div style={{ position: 'relative', background: '#ede8df', overflow: 'hidden', marginBottom: 8 }}>
+          {imgSrc
+            ? <img src={imgSrc} alt={ad.title || 'Ad'}
+              style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }}
+              onError={e => e.target.style.display = 'none'} />
+            : <div style={{
+              width: '100%', aspectRatio: '3/4', background: '#ddd',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#aaa'
+            }}>No image</div>
+          }
+          {/* "FEATURED · GOLD" bar matching image 2 */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0,
+            background: 'rgba(13,34,68,.8)', padding: '4px 8px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+          }}>
+            <span style={{
+              fontSize: 7, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase',
+              color: accentColor, fontFamily: "'Lato',sans-serif"
+            }}>
+              Featured · {tier}
+            </span>
+            <span style={{
+              fontSize: 7, fontWeight: 700, background: accentColor, color: NAVY,
+              padding: '1px 5px', fontFamily: "'Lato',sans-serif"
+            }}>AD</span>
+          </div>
+          {/* PDF badge bottom */}
+          <div style={{
+            position: 'absolute', bottom: 6, left: 6, background: NAVY, padding: '2px 7px',
+            fontSize: 7, fontWeight: 700, color: '#fff', fontFamily: "'Lato',sans-serif",
+            letterSpacing: '.08em', display: 'flex', alignItems: 'center', gap: 3
+          }}>
+            <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#22c55e' }} />PDF
+          </div>
+        </div>
+        <h4 style={{
+          fontFamily: "'Playfair Display',serif", fontSize: 12, fontWeight: 700, color: NAVY,
+          margin: '0 0 3px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          overflow: 'hidden', lineHeight: 1.3
+        }}>{ad.title || 'Sponsored'}</h4>
+        <p style={{
+          fontSize: 10, color: '#888', margin: 0, fontFamily: "'Lato',sans-serif",
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+        }}>
+          {ad.author || ad.sponsor || ''}
+        </p>
+      </div>
+    );
+  };
+  
   /* ── Book Card ── */
   const BookCard = ({ book, showTrending = false }) => {
     const owned = isPurchased(book.id);
@@ -349,6 +416,11 @@ export default function SearchClient() {
           margin: 0 auto;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        .search-book-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+@media (min-width: 480px)  { .search-book-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 768px)  { .search-book-grid { grid-template-columns: repeat(4, 1fr); gap: 16px; } }
+@media (min-width: 1024px) { .search-book-grid { grid-template-columns: repeat(5, 1fr); } }
       `}</style>
 
       <div className="search-root">
@@ -388,6 +460,34 @@ export default function SearchClient() {
             )}
           </div>
         </div>
+
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 24px 0' }}>
+    {/* Gold tier — horizontal scroll row of inline ad cards */}
+    {goldAds.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+            <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase',
+                color: GOLD, fontFamily: "'Lato',sans-serif", margin: '0 0 10px' }}>
+                Featured · Gold
+            </p>
+            <div className="sbar-none" style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8 }}>
+                {goldAds.map(ad => <SearchAdCard key={ad.adId} ad={ad} tier="Gold" />)}
+            </div>
+        </div>
+    )}
+    {/* Silver tier */}
+    {silverAds.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+            <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase',
+                color: '#aaa', fontFamily: "'Lato',sans-serif", margin: '0 0 10px' }}>
+                Featured · Silver
+            </p>
+            <div className="sbar-none" style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8 }}>
+                {silverAds.map(ad => <SearchAdCard key={ad.adId} ad={ad} tier="Silver" />)}
+            </div>
+        </div>
+    )}
+</div>
+               
 
         {/* ── Content ── */}
         <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "48px 24px" }}>
@@ -465,7 +565,11 @@ export default function SearchClient() {
             );
           })()}
         </div>
+      <section style={{ padding: '0 0 32px' }}>
+        <FeaturedAdsCarousel tier="Gold" maxAds={5} autoPlay={true} />
+      </section>
       </div>
+
 
       {/* ── Purchase Modal ── */}
       {showPurchaseModal && selectedBook && (

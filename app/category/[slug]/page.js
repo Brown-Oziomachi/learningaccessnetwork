@@ -9,6 +9,8 @@ import { booksData } from "@/lib/booksData";
 import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import Navbar from '@/components/NavBar';
 import Footer from '@/components/FooterComp';
+import FeaturedAdsCarousel from '@/components/FeaturedAdsCarousel';
+import { useAds, injectAds } from "@/lib/useAds";
 
 /* ─── colour tokens (matches AllBooksClient exactly) ─────────── */
 const NAVY  = "#0d2244";
@@ -16,6 +18,93 @@ const GOLD  = "#b8963e";
 const CREAM = "#f5f0e8";
 const BG    = "#f5f1ea";
 
+function AdBookCard({ ad }) {
+    const tierColors = { Gold: GOLD, Silver: "#94a3b8", Bronze: "#cd7f32" };
+    const tierColor = tierColors[ad.adTier] || GOLD;
+    return (
+        <a
+            href={ad.adLink}
+            style={{ flexShrink: 0, width: '200px', textDecoration: 'none', display: 'block' }}
+            className="lan-book-card"
+            onClick={() => {
+                import("firebase/firestore").then(({ doc, updateDoc, increment }) => {
+        import("@/lib/firebaseConfig").then(({ db }) => {
+            updateDoc(doc(db, "promotions", ad.adId), { clicks: increment(1) }).catch(() => { });
+        });
+    });
+}}
+        >
+    {/* Cover — identical dimensions to BookCard */ }
+    < div style = {{ position: 'relative', marginBottom: '12px', background: '#e8e4dc' }}>
+        <img
+            src={ad.image}
+            alt={ad.title}
+            className="lan-book-img"
+            style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }}
+            onError={e => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }}
+        />
+{/* PDF badge */ }
+<div style={{
+    position: 'absolute', top: '10px', left: '10px',
+    display: 'flex', alignItems: 'center', gap: '5px',
+    background: NAVY, padding: '4px 10px',
+}}>
+    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+    <span style={{ fontSize: '9px', fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif", letterSpacing: '0.1em', textTransform: 'uppercase' }}>PDF</span>
+</div>
+{/* AD badge */ }
+<div style={{
+    position: 'absolute', top: '10px', right: '10px',
+    background: GOLD, color: NAVY,
+    fontSize: '9px', fontWeight: 700, padding: '3px 8px',
+    fontFamily: "'Lato',sans-serif",
+}}>AD</div>
+{/* Tier ribbon */ }
+<div style={{
+    position: 'absolute', bottom: '8px', left: '8px',
+    background: 'rgba(13,34,68,0.82)', padding: '3px 8px',
+    fontSize: '9px', fontWeight: 700, color: tierColor,
+    fontFamily: "'Lato',sans-serif",
+}}>{ad.adTier?.toUpperCase()} SPONSOR</div>
+            </div >
+
+    {/* Meta — identical layout to BookCard */ }
+    < div >
+                <h4 style={{
+                    fontFamily: "'Playfair Display',serif",
+                    fontSize: '13px', fontWeight: 700, color: NAVY,
+                    margin: '0 0 4px', lineHeight: 1.35,
+                    display: '-webkit-box', WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                }}>{ad.title}</h4>
+                <p style={{
+                    fontSize: '11px', color: '#888', margin: '0 0 8px',
+                    fontFamily: "'Lato',sans-serif",
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{ad.author}</p>
+{
+    ad.category && (
+        <span style={{
+            fontSize: '9px', fontWeight: 700,
+            background: CREAM, border: `0.5px solid rgba(184,150,62,0.35)`,
+            color: GOLD, padding: '3px 8px',
+            fontFamily: "'Lato',sans-serif", letterSpacing: '0.08em',
+            textTransform: 'uppercase', whiteSpace: 'nowrap',
+            display: 'inline-block',
+        }}>{ad.category}</span>
+    )
+}
+{
+    ad.price && (
+        <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: '6px 0 0', fontFamily: "'Lato',sans-serif" }}>
+            ₦{Number(ad.price).toLocaleString()}
+        </p>
+    )
+}
+            </div >
+        </a >
+    );
+}
 /* ═══════════════════════════════════════════════════════════════
    SHARED BOOK CARD  —  identical to AllBooksClient
 ═══════════════════════════════════════════════════════════════ */
@@ -119,6 +208,10 @@ export default function CategoryPage() {
     const [allBooks,         setAllBooks]         = useState([]);
     const [loading,          setLoading]          = useState(true);
     const [bookSalesCount,   setBookSalesCount]   = useState({});
+    const goldAds   = useAds("Gold",   3);
+    const silverAds = useAds("Silver", 3);
+    const bronzeAds = useAds("Bronze", 3);
+    const allCatAds = [...goldAds, ...silverAds, ...bronzeAds];
 
     /* ── helpers ── */
     const getThumbnailUrl = (book) => {
@@ -391,7 +484,7 @@ export default function CategoryPage() {
                         ))}
                     </div>
                 </section>
-
+                
                 {/* ── Breadcrumb ── */}
                 <div style={{ background: CREAM, borderBottom: '0.5px solid #e5ddd0', padding: '10px 24px' }}>
                     <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#888', fontFamily: "'Lato',sans-serif" }}>
@@ -473,14 +566,18 @@ export default function CategoryPage() {
                                     {/* Horizontal scroll row */}
                                     <div className="sbar-none" style={{ overflowX: 'auto', margin: '0 -4px', padding: '0 4px 12px' }}>
                                         <div style={{ display: 'flex', gap: '20px', paddingBottom: '4px' }}>
-                                            {rowBooks.map(book => (
-                                                <BookCard
-                                                    key={book.id}
-                                                    book={book}
-                                                    isPurchased={isPurchased}
-                                                    bookSalesCount={bookSalesCount}
-                                                />
-                                            ))}
+                                            {injectAds(rowBooks, ri === 0 ? allCatAds : [], 3).map(item =>
+                                                item.isAd ? (
+                                                    <AdBookCard key={item.id} ad={item} />
+                                                ) : (
+                                                    <BookCard
+                                                        key={item.id}
+                                                        book={item}
+                                                        isPurchased={isPurchased}
+                                                        bookSalesCount={bookSalesCount}
+                                                    />
+                                                )
+                                            )}
                                         </div>
                                     </div>
 

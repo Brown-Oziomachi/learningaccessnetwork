@@ -3,7 +3,7 @@ import TermsOfServiceClient from "./terms";
 
 export const metadata = {
   title: "Terms Of Service | LAN Library",
-  description: "Learn and understand LAN privacy policies and how we use your data and also protect your information"
+  description: "Learn and understand LAN Terms of Services and how we use your data and also protect your information"
 }
 
 export default function TermsOfServicePage() {

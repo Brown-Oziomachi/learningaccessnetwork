@@ -17,6 +17,16 @@ const GOLD = "#b8963e";
 const GOLDD = "#d4aa5a";
 const BG = "#f5f1ea";
 
+/* ─── slug helper (matches LecturersClient) ───────────────── */
+const makeSlug = (title, name) => {
+    const full = `${title ? title + " " : ""}${name}`.trim();
+    return full
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-");
+};
+
 /* ─── thumbnail helper ────────────────────────────────────── */
 const thumb = (book) => {
     if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
@@ -56,6 +66,10 @@ const getInitials = (name) => {
     if (parts.length === 1) return parts[0][0].toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
+
+/* ─── profile href helper (matches LecturersClient) ──────── */
+const profileHref = (person) =>
+    `/profile/${person.slug || makeSlug(person.title, person.name) || person.profileId || person.id}`;
 
 /* ════ AVATAR ══════════════════════════════════════════════ */
 function Avatar({ person, size = 38, ring = false }) {
@@ -109,8 +123,8 @@ function ContributorStrip({ contributors }) {
                 {visible.map((c, i) => (
                     <Link
                         key={c.id}
-                        href={`/seller-profile?sellerId=${c.profileId || c.id}`}
-                        title={`${c.name}${c.department ? ` · ${c.department}` : ""}`}
+                        href={profileHref(c)}
+                        title={`${c.title ? c.title + " " : ""}${c.name}${c.department ? ` · ${c.department}` : ""}`}
                         style={{
                             display: "block",
                             marginLeft: i === 0 ? 0 : -OVERLAP,
@@ -155,7 +169,7 @@ function ContributorCard({ person }) {
     const displayName = person.title ? `${person.title} ${person.name}` : person.name;
 
     return (
-        <Link href={`/seller-profile?sellerId=${person.profileId || person.id}`} style={{ textDecoration: "none" }}>
+        <Link href={profileHref(person)} style={{ textDecoration: "none" }}>
             <div className="hub-contributor-card">
                 <Avatar person={person} size={44} />
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -194,12 +208,19 @@ function LecturerChip({ book }) {
     const initials = getInitials(book.contributorName || "?");
     const SIZE = 18;
 
+    // build slug same way as LecturersClient
+    const slug = book.contributorSlug || makeSlug(book.contributorTitle, book.contributorName || "");
+    const chipHref = `/profile/${slug || book.contributorProfileId || book.contributorId}`;
+    const displayName = book.contributorTitle
+        ? `${book.contributorTitle} ${book.contributorName}`
+        : book.contributorName;
+
     return (
         <Link
-            href={`/seller-profile?sellerId=${book.contributorProfileId || book.contributorId}`}
+            href={chipHref}
             onClick={e => e.stopPropagation()}
             style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 5, padding: "4px 7px 4px 4px", background: "rgba(13,34,68,0.04)", border: "0.5px solid rgba(184,150,62,0.2)", maxWidth: "100%", overflow: "hidden" }}
-            title={`${book.contributorTitle ? book.contributorTitle + " " : ""}${book.contributorName}`}
+            title={displayName}
         >
             {/* Tiny avatar */}
             <div style={{ width: SIZE, height: SIZE, borderRadius: "50%", flexShrink: 0, overflow: "hidden", border: `1.5px solid ${GOLD}` }}>
@@ -228,16 +249,14 @@ function LecturerChip({ book }) {
                 </div>
             </div>
 
-            {/* Name */}
+            {/* Name — same displayName pattern as LecturersClient */}
             <span style={{
                 fontSize: 9, fontWeight: 700, color: NAVY,
                 fontFamily: "'Lato',sans-serif",
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 letterSpacing: "0.02em",
             }}>
-                {book.contributorTitle
-                    ? `${book.contributorTitle} ${book.contributorName}`
-                    : book.contributorName}
+                {displayName}
             </span>
         </Link>
     );
@@ -355,14 +374,25 @@ function RequestModal({ uni, onClose }) {
                         </div>
                     ) : (
                         <>
-                            <div style={{ marginBottom: 16 }}><label style={lbl}>Course Code *</label><input type="text" value={form.courseCode} onChange={e => setForm(f => ({ ...f, courseCode: e.target.value }))} placeholder="e.g. ACC 101, GST 201" style={inp} /></div>
-                            <div style={{ marginBottom: 16 }}><label style={lbl}>Material Type</label>
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={lbl}>Course Code *</label>
+                                <input type="text" value={form.courseCode} onChange={e => setForm(f => ({ ...f, courseCode: e.target.value }))} placeholder="e.g. ACC 101, GST 201" style={inp} />
+                            </div>
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={lbl}>Material Type</label>
                                 <select value={form.materialType} onChange={e => setForm(f => ({ ...f, materialType: e.target.value }))} style={inp}>
                                     {["Textbook", "Past Questions", "Lecture Notes", "Research", "Project"].map(t => <option key={t}>{t}</option>)}
                                 </select>
                             </div>
-                            <div style={{ marginBottom: 20 }}><label style={lbl}>Additional Notes (optional)</label><input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="e.g. 2023 edition preferred" style={inp} /></div>
-                            <button onClick={handleSubmit} disabled={submitting || !form.courseCode.trim()} style={{ width: "100%", background: submitting ? "#888" : NAVY, color: "#fff", border: "none", padding: 13, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: submitting ? "not-allowed" : "pointer", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                            <div style={{ marginBottom: 20 }}>
+                                <label style={lbl}>Additional Notes (optional)</label>
+                                <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="e.g. 2023 edition preferred" style={inp} />
+                            </div>
+                            <button
+                                onClick={handleSubmit}
+                                disabled={submitting || !form.courseCode.trim()}
+                                style={{ width: "100%", background: submitting ? "#888" : NAVY, color: "#fff", border: "none", padding: 13, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: submitting ? "not-allowed" : "pointer", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}
+                            >
                                 <Send size={12} /> {submitting ? "Submitting…" : "Submit Request"}
                             </button>
                         </>
@@ -376,7 +406,9 @@ function RequestModal({ uni, onClose }) {
 
 /* ════ MAIN CLIENT COMPONENT ══════════════════════════════ */
 export default function UniversityHubClient({
-    slug, uni, initialBooks,
+    slug,
+    uni,
+    initialBooks,
     contributors = [],
     studentCount = null,
 }) {
@@ -458,8 +490,6 @@ export default function UniversityHubClient({
 
                 {/* ══ HERO ══════════════════════════════════════════════ */}
                 <div style={{ position: "relative", overflow: "hidden", minHeight: 420 }}>
-
-                    {/* Campus background image */}
                     <div style={{
                         position: "absolute", inset: 0,
                         backgroundImage: `url(https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?w=1400&q=80)`,
@@ -467,31 +497,22 @@ export default function UniversityHubClient({
                         backgroundPosition: "center 30%",
                         filter: "brightness(0.98) saturate(0.0)",
                     }} />
-
-                    {/* Navy gradient overlay */}
                     <div style={{
                         position: "absolute", inset: 0,
                         background: `linear-gradient(10deg, ${NAVY}f0 20%, ${NAVY}cc 10%, rgba(3,3,8,0.5) 100%)`,
                     }} />
-
-                    {/* Dot pattern */}
                     <div style={{
                         position: "absolute", inset: 0,
                         backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px, transparent 1px)",
                         backgroundSize: "28px 28px",
                     }} />
-
-                    {/* Decorative corners */}
                     <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, border: "0.5px solid rgba(184,150,62,0.12)", transform: "rotate(45deg)" }} />
                     <div style={{ position: "absolute", bottom: -40, left: -40, width: 160, height: 160, border: "0.5px solid rgba(184,150,62,0.08)", transform: "rotate(45deg)" }} />
 
-                    {/* Content */}
                     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "56px 24px 48px", position: "relative", zIndex: 1 }}>
 
-                        {/* ── Top bar: LAN logo + breadcrumb ── */}
+                        {/* Top bar */}
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
-
-                            {/* Breadcrumb */}
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                 <Link href="/home" style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, fontFamily: "'Lato',sans-serif", textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>
                                     <ArrowLeft size={12} /> Home
@@ -503,14 +524,8 @@ export default function UniversityHubClient({
                                     <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, fontFamily: "'Lato',sans-serif" }}>{uni.short}</span>
                                 </>}
                             </div>
-
-                            {/* LAN Library logo */}
                             <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.06)", border: "0.5px solid rgba(184,150,62,0.25)", padding: "8px 14px" }}>
-                                <div style={{
-                                    width: 28, height: 28, background: GOLD,
-                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                    flexShrink: 0,
-                                }}>
+                                <div style={{ width: 28, height: 28, background: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                                     <BookOpen size={15} color={NAVY} strokeWidth={2.5} />
                                 </div>
                                 <div>

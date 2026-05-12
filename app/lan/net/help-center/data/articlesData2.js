@@ -756,7 +756,7 @@ export const articlesP2 = {
       },
       {
         type: 'note',
-        text: 'Questions about your data? Contact our privacy team at privacy@learningaccess.net'
+        text: 'Questions about your data? Contact our privacy team at legal@learningaccessnetwork.com'
       }
     ],
     relatedArticles: [
@@ -879,7 +879,7 @@ export const articlesP2 = {
       },
       {
         type: 'paragraph',
-        text: 'For privacy questions: privacy@learningaccess.net'
+        text: 'For privacy questions: legal@learningaccessnetwork.com'
       },
       {
         type: 'note',

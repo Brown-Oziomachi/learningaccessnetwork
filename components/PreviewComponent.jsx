@@ -50,6 +50,8 @@ import Link from "next/link";
 import { fetchBookDetails } from "@/utils/bookUtils";
 import BookAIChat from "./BookAIChat";
 import AiAskButton from "./AiAskButton";
+import FeaturedAdsCarousel from "./FeaturedAdsCarousel";
+import StudyBuddyTracker from "./StudyBuddyTracker";
 
 /* ── palette — matches the app ── */
 const NAVY   = "#0d2244";
@@ -2899,8 +2901,41 @@ export default function BookPreviewPage() {
                   </div>
                 </div>
 
+                {user && (
+                  <StudyBuddyTracker
+                    bookId={bookId}
+                    userId={user.uid}
+                    userName={user.displayName || "Student"}
+                    userPhoto={user.photoURL || null}
+                    bookTitle={book?.title || ""}
+                  />
+                )}
+
                 <PhysicalStockBadge />
                 <PdfViewer heightClass="400px" fullHeight="900px" />
+
+                {/* Gold sponsored strip — below purchase CTA */}
+                <FeaturedAdsCarousel
+                  tier="Gold"
+                  maxAds={2}
+                  autoPlay={true}
+                  autoPlayMs={4000}
+                  style={{ marginTop: "1px" }}
+                />
+                <FeaturedAdsCarousel
+                  tier="Silver"
+                  maxAds={2}
+                  autoPlay={true}
+                  autoPlayMs={4000}
+                  style={{ marginTop: "1px" }}
+                />
+                <FeaturedAdsCarousel
+                  tier="Bronze"
+                  maxAds={2}
+                  autoPlay={true}
+                  autoPlayMs={4000}
+                  style={{ marginTop: "1px" }}
+                />
               </div>
 
               {/* Mobile lecturers */}

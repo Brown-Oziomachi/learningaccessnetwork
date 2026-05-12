@@ -932,6 +932,7 @@ export default function LandingPage() {
         © 2026 LAN Library — Learning Access Network. All rights reserved.
       </p>
 
+             
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div
           style={{
@@ -949,11 +950,26 @@ export default function LandingPage() {
           }}
         >
           All systems operational
-        </span>
+                </span>
       </div>
-    </div>
-  </div>
-</footer>
+            </div>
+          </div>
+          <div
+            style={{
+              fontSize: 10,
+              color: "rgba(245,240,232,0.35)",
+              fontFamily: "'Lato',sans-serif",
+              paddingTop: 24,
+              alignItems: "center",
+              textAlign: "center",
+
+            }}
+            >
+
+            <p>LAN Library is operated by Learning Access Network Ltd., a digital academic resource platform dedicated to connecting African students and educators with quality learning materials. We are headquartered in Nigeria, Abuja, and serve learners across the African continent.</p>
+                </div>
+         
+      </footer>
 
 
         {/* ══════ VIDEO MODAL ══════ */}

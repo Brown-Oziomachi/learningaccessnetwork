@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Navbar from "@/components/NavBar";
+import { onAuthStateChanged } from "firebase/auth";
 
 /* ─── design tokens ─────────────────────────────────────── */
 const NAVY  = "#0d2244";
@@ -179,8 +180,17 @@ export default function SellerProfileClient({ sellerIdProp }) {
   const [followLoading, setFollowLoad]  = useState(false);
   const [stats, setStats]               = useState({ totalSold:0, totalEarnings:0, totalBooks:0 });
   const [resolvedUid, setResolvedUid]   = useState(null);
+  const [authReady, setAuthReady] = useState(!!auth.currentUser);
+  const [user, setUser] = useState(auth.currentUser);
 
-  const user = auth.currentUser;
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthReady(true);
+    });
+    return () => unsub();
+  }, []);
 
   /* ── follow check — uses resolvedUid ── */
   useEffect(() => {
@@ -455,25 +465,81 @@ export default function SellerProfileClient({ sellerIdProp }) {
   );
 
   /* ── not found ── */
-  if (!seller) return (
-    <div className="lan-root" style={{ minHeight:"100vh" }}>
-      <S/><Navbar/>
-      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"80px 24px", textAlign:"center" }}>
-        <div style={{ width:"64px", height:"64px", border:`2px solid #e5ddd0`, transform:"rotate(45deg)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px" }}>
-          <BookOpen size={24} style={{ color:"#e5ddd0", transform:"rotate(-45deg)" }}/>
-        </div>
-        <h2 className="lan-serif" style={{ fontSize:"24px", color:NAVY, marginBottom:"8px" }}>Profile Not Found</h2>
-        <p style={{ fontSize:"13px", color:"#aaa", fontFamily:"'Lato',sans-serif", marginBottom:"20px" }}>
-          The seller profile you're looking for doesn't exist or the link may be incorrect.
-        </p>
-        <button onClick={()=>router.push("/")}
-          style={{ background:NAVY, color:"#fff", padding:"10px 24px", border:"none", cursor:"pointer", fontSize:"12px", fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'Lato',sans-serif" }}>
-          Go Home
+ /* ── not authenticated ── */
+if (!user) return (
+  <div className="lan-root" style={{ minHeight: "100vh" }}>
+    <S /><Navbar />
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 24px", textAlign: "center" }}>
+      {/* lock icon diamond */}
+      <div style={{ width: "64px", height: "64px", border: `2px solid rgba(184,150,62,.4)`, transform: "rotate(45deg)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", background: NAVY }}>
+        <GraduationCap size={24} style={{ color: GOLD, transform: "rotate(-45deg)" }} />
+      </div>
+
+      {/* eyebrow */}
+      <div style={{ display: "inline-flex", alignItems: "center", gap: "7px", background: "rgba(184,150,62,.1)", border: `1px solid rgba(184,150,62,.3)`, borderRadius: "999px", padding: "5px 14px", marginBottom: "16px" }}>
+        <Sparkles size={10} style={{ color: GOLD }} />
+        <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: GOLDD, fontFamily: "'Lato',sans-serif" }}>
+          Sign in Required
+        </span>
+      </div>
+
+      <h2 className="lan-serif" style={{ fontSize: "clamp(22px,4vw,34px)", fontWeight: 700, color: NAVY, margin: "0 0 10px" }}>
+        This profile is<br />
+        <span style={{ color: GOLD, fontStyle: "italic" }}>members only.</span>
+      </h2>
+
+      <p style={{ fontSize: "13px", color: "#888", fontFamily: "'Lato',sans-serif", lineHeight: 1.75, maxWidth: "360px", margin: "0 0 28px" }}>
+        Create a free account or sign in to view this profile, browse their materials, and follow your favourite educators.
+      </p>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
+        <button
+          onClick={() => router.push(`/auth/signin?redirect=${encodeURIComponent(window.location.pathname)}`)}
+          style={{ display: "inline-flex", alignItems: "center", gap: "7px", padding: "11px 24px", background: NAVY, color: "#fff", border: "none", fontSize: "12px", fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Lato',sans-serif" }}
+        >
+          <UserPlus size={13} /> Sign In
+        </button>
+        <button
+          onClick={() => router.push("/auth/signup")}
+          style={{ display: "inline-flex", alignItems: "center", gap: "7px", padding: "11px 24px", background: "transparent", color: NAVY, border: `0.5px solid ${NAVY}`, fontSize: "12px", fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Lato',sans-serif" }}
+        >
+          Create Account
+        </button>
+      </div>
+
+      <button onClick={() => router.back()} style={{ marginTop: "16px", background: "none", border: "none", fontSize: "11px", color: "#bbb", cursor: "pointer", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", gap: "4px" }}>
+        <ArrowLeft size={11} /> Go back
+      </button>
+    </div>
+  </div>
+);
+
+/* ── authenticated but profile genuinely not found ── */
+if (!seller) return (
+  <div className="lan-root" style={{ minHeight: "100vh" }}>
+    <S /><Navbar />
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 24px", textAlign: "center" }}>
+      <div style={{ width: "64px", height: "64px", border: `2px solid #e5ddd0`, transform: "rotate(45deg)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+        <BookOpen size={24} style={{ color: "#e5ddd0", transform: "rotate(-45deg)" }} />
+      </div>
+      <h2 className="lan-serif" style={{ fontSize: "24px", color: NAVY, marginBottom: "8px" }}>Profile Not Found</h2>
+      <p style={{ fontSize: "13px", color: "#aaa", fontFamily: "'Lato',sans-serif", marginBottom: "20px", maxWidth: "320px", lineHeight: 1.7 }}>
+        This profile doesn't exist or the link may be incorrect.
+      </p>
+      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>
+        <button onClick={() => router.back()}
+          style={{ background: "transparent", color: NAVY, padding: "10px 20px", border: `0.5px solid ${NAVY}`, cursor: "pointer", fontSize: "12px", fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", gap: "6px" }}>
+          <ArrowLeft size={12} /> Go Back
+        </button>
+        <button onClick={() => router.push("/lecturers")}
+          style={{ background: NAVY, color: "#fff", padding: "10px 20px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", gap: "6px" }}>
+          <Users size={12} /> Browse Educators
         </button>
       </div>
     </div>
+  </div>
   );
-
+  
   /* ── About card (mobile) ── */
   const AboutCard = () => (
     <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"24px", marginBottom:"16px" }}>

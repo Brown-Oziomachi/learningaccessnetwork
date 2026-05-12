@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { DollarSign, TrendingUp, ShoppingBag, Download, Book, Globe, Settings, X, Camera, Save, AlertCircle, ChevronRight, User, Building, Users, ArrowUpRight, ArrowDownLeft, Sparkles, Package } from "lucide-react";
+import { DollarSign, TrendingUp, ShoppingBag, Download, Book, Globe, Settings, X, Camera, Save, AlertCircle, ChevronRight, User, Building, Users, ArrowUpRight, ArrowDownLeft, Sparkles, Package, Zap, Eye, EyeOff, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, increment, setDoc } from "firebase/firestore";
@@ -561,6 +561,10 @@ export default function SellerAccountClient() {
     const [resetPinSuccess, setResetPinSuccess] = useState(false);
     const [showSwitchModal, setShowSwitchModal] = useState(false);
     const router = useRouter();
+    const [showPhysicalOrdersModal, setShowPhysicalOrdersModal] = useState(false);
+    const [physicalOrders, setPhysicalOrders]  = useState([]);
+    const [physicalOrdersLoading, setPhysicalOrdersLoading] = useState(false);
+    const [revealedCodes, setRevealedCodes] = useState({}); 
     const [showExportModal, setShowExportModal] = useState(false);
     const [sellerBooks, setSellerBooks] = useState([]);
     const [showBankModal, setShowBankModal] = useState(false);
@@ -624,6 +628,28 @@ export default function SellerAccountClient() {
         return flags[country] || "🌍";
     }
 
+    const fetchPhysicalOrders = async () => {
+  if (!user?.uid) return;
+  setPhysicalOrdersLoading(true);
+  try {
+    const snap = await getDocs(
+      query(collection(db, "physicalOrders"), where("userId", "==", user.uid))
+    );
+    const orders = snap.docs
+      .map(d => ({
+        id: d.id,
+        ...d.data(),
+        createdAtDate: d.data().createdAt?.toDate?.() || new Date(),
+      }))
+      .sort((a, b) => b.createdAtDate - a.createdAtDate);
+    setPhysicalOrders(orders);
+  } catch (err) {
+    console.error("Failed to fetch physical orders:", err.message);
+  } finally {
+    setPhysicalOrdersLoading(false);
+  }
+    };
+    
     const fetchSellerTransactions = async (uid) => {
         try {
             let allTransactions = [];
@@ -1011,7 +1037,13 @@ export default function SellerAccountClient() {
                                     { href: "/documents", icon: <Globe size={16} style={{ color: NAVY }} />, title: 'Browse documents', sub: 'Explore library' },
                                     { href: "/upload-document", icon: <TrendingUp size={16} style={{ color: NAVY }} />, title: 'Upload documents', sub: 'Add new document' },
                                     { href: "/upload-document/my-pending-books", icon: <TrendingUp size={16} style={{ color: NAVY }} />, title: 'Pending documents', sub: 'Track documents' },
-                                    { href: "/my-account/seller-account/share-profile", icon: <Globe size={16} style={{ color: NAVY }} />, title: 'Share My Profile', sub: 'Copy your public link' },
+                                    { href: "/my-account/seller-account/share-profile", icon: <Globe size={16} style={{ color: NAVY }} />, title: 'Share Profile', sub: 'Copy your public link' },
+                                    // {
+                                    //     href: "/advertise",
+                                    //     icon: <TrendingUp size={16} style={{ color: GOLD }} />,
+                                    //     title: 'Boost your visibility',
+                                    //     sub: 'Run a sponsored ad'
+                                    // },
                                 ].map(({ href, icon, title, sub }) => (
                                     <Link key={href} href={href} className="action-row" style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', border: '0.5px solid #e5ddd0', background: '#fff', textDecoration: 'none', transition: 'all 0.18s' }}>
                                         <div style={{ width: '34px', height: '34px', border: `0.5px solid #e5ddd0`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: CREAM }}>{icon}</div>
@@ -1022,7 +1054,35 @@ export default function SellerAccountClient() {
                                         <ChevronRight size={14} style={{ color: '#ccc', flexShrink: 0 }} />
                                     </Link>
                                 ))}
+                                
                             </div>
+
+                            {/* Boost Visibility Banner */}
+                            <a href="/my-account/seller-account/ads" style={{
+                                display: "flex", alignItems: "center", gap: "14px",
+                                background: "#fff", border: `1.5px solid ${GOLD}`,
+                                padding: "16px 18px", textDecoration: "none", transition: "all 0.18s",
+                            }}
+                                onMouseEnter={e => e.currentTarget.style.background = CREAM}
+                                onMouseLeave={e => e.currentTarget.style.background = "#fff"}
+                            >
+                                <div style={{
+                                    width: "40px", height: "40px", background: "rgba(184,150,62,0.12)",
+                                    border: `0.5px solid rgba(184,150,62,0.35)`,
+                                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                                }}>
+                                    <Zap size={18} style={{ color: GOLD }} />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <p style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>
+                                        Boost Your Visibility
+                                    </p>
+                                    <p style={{ fontSize: "11px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                                        Reach 2.4M+ students with a sponsored ad
+                                    </p>
+                                </div>
+                                <ChevronRight size={14} style={{ color: GOLD, flexShrink: 0 }} />
+                            </a>
 
                             {/* Referral Banner */}
                             <div style={{ background: NAVY, backgroundImage: 'radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)', backgroundSize: '20px 20px', padding: '24px', position: 'relative', overflow: 'hidden' }}>
@@ -1111,7 +1171,31 @@ export default function SellerAccountClient() {
                                     { label: 'Bank Details', icon: <Building size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setShowBankModal(true); if (user?.bankDetails) setBankFormData({ accountName: user.bankDetails.accountName || "", accountNumber: user.bankDetails.accountNumber || "", bankName: user.bankDetails.bankName || "", bankCode: user.bankDetails.bankCode || "" }); } },
                                     { label: 'Transaction History', icon: <TrendingUp size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setShowTransactionHistory(true); } },
                                     { label: 'Physical Repository', icon: <Package size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); router.push('/my-account/seller-account/repository'); } },
-
+                                    {
+                                        label: "My Physical Orders",
+                                        icon: <Package size={18} style={{ color: GOLD }} />,
+                                        onClick: () => {
+                                            setShowProfileModal(false);
+                                            fetchPhysicalOrders();
+                                            setShowPhysicalOrdersModal(true);
+                                        },
+                                    },
+                                    {
+                                    label: "Promotion Analytics",
+                                    icon: (
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                        stroke={GOLD} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="20" x2="18" y2="10" />
+                                        <line x1="12" y1="20" x2="12" y2="4" />
+                                        <line x1="6"  y1="20" x2="6"  y2="14" />
+                                        <line x1="2"  y1="20" x2="22" y2="20" />
+                                        </svg>
+                                    ),
+                                    onClick: () => {
+                                        setShowProfileModal(false);
+                                        router.push("/my-account/seller-account/promotion-analytics");
+                                    },
+                                    },
                                     {
                                         label: user?.lecturerVerificationStatus === 'pending'
                                             ? 'Impact Analytics (Pending)'
@@ -1430,6 +1514,184 @@ export default function SellerAccountClient() {
                     </div>
                 )}
 
+                {showPhysicalOrdersModal && (
+  <div className="modal-overlay mt-25">
+    <div className="modal-inner">
+      {/* Header */}
+      <div style={{
+        background: NAVY,
+        padding: "20px 24px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        position: "sticky",
+        top: 0,
+      }}>
+        <div>
+          <p style={{ color: GOLD, fontSize: "10px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "4px", fontFamily: "'Lato',sans-serif" }}>
+            Physical Copies
+          </p>
+          <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: "20px", fontWeight: 700, color: "#fff", margin: 0 }}>
+            My Physical Orders
+          </h2>
+        </div>
+        <button
+          onClick={() => { setShowPhysicalOrdersModal(false); setRevealedCodes({}); }}
+          style={{ background: "transparent", border: "none", cursor: "pointer", color: "#fff" }}
+        >
+          <X size={22} />
+        </button>
+      </div>
+ 
+      {/* Body */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px", background: BG }}>
+        {physicalOrdersLoading ? (
+          <div style={{ textAlign: "center", padding: "60px 0" }}>
+            <div style={{ width: "40px", height: "40px", border: `3px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+            <p style={{ fontSize: "13px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>Loading orders…</p>
+          </div>
+        ) : physicalOrders.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 0" }}>
+            <Package size={40} style={{ color: "#ddd", margin: "0 auto 12px" }} />
+            <p style={{ fontSize: "14px", fontWeight: 700, color: NAVY, fontFamily: "'Playfair Display',serif", marginBottom: "6px" }}>No physical orders yet</p>
+            <p style={{ fontSize: "12px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>
+              When you reserve a physical copy, your orders will appear here.
+            </p>
+          </div>
+        ) : (
+          physicalOrders.map(order => {
+            const isRevealed = !!revealedCodes[order.id];
+            const maskedCode = isRevealed
+              ? order.pickupCode
+              : order.pickupCode?.replace(/./g, "•");
+            const isCancelled = order.status === "cancelled";
+            const isPending   = order.status === "pending_pickup";
+ 
+            return (
+              <div key={order.id} style={{
+                background: "#fff",
+                border: `0.5px solid ${isCancelled ? "#fecaca" : "#e5ddd0"}`,
+                padding: "0",
+                marginBottom: "12px",
+                overflow: "hidden",
+                opacity: isCancelled ? 0.7 : 1,
+              }}>
+                {/* Perforated top strip */}
+                {!isCancelled && (
+                  <div style={{ height: "4px", background: `repeating-linear-gradient(90deg, ${GOLD} 0, ${GOLD} 8px, transparent 8px, transparent 14px)` }} />
+                )}
+                {isCancelled && (
+                  <div style={{ height: "4px", background: "repeating-linear-gradient(90deg, #fecaca 0, #fecaca 8px, transparent 8px, transparent 14px)" }} />
+                )}
+ 
+                <div style={{ padding: "18px 20px" }}>
+                  {/* Book title + status */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", gap: "10px" }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "14px", fontWeight: 700, color: NAVY, margin: "0 0 3px", lineHeight: 1.3 }}>
+                        {order.bookTitle}
+                      </p>
+                      <p style={{ fontSize: "11px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                        {order.createdAtDate?.toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      background: isCancelled ? "#fef2f2" : isPending ? "#fef9c3" : "#f0fdf4",
+                      border: `0.5px solid ${isCancelled ? "#fecaca" : isPending ? "#fde68a" : "#86efac"}`,
+                      padding: "3px 10px",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      color: isCancelled ? "#dc2626" : isPending ? "#a16207" : "#16a34a",
+                      flexShrink: 0,
+                      fontFamily: "'Lato',sans-serif",
+                    }}>
+                      <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: isCancelled ? "#dc2626" : isPending ? "#a16207" : "#16a34a", display: "inline-block" }} />
+                      {isCancelled ? "Cancelled" : isPending ? "Awaiting Pickup" : order.status}
+                    </span>
+                  </div>
+ 
+                  {/* Pickup Code — hidden until revealed; hidden entirely if cancelled */}
+                  {!isCancelled && (
+                    <>
+                      <div style={{ background: NAVY, padding: "14px 16px", textAlign: "center", marginBottom: "12px" }}>
+                        <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "0 0 6px", fontFamily: "'Lato',sans-serif" }}>
+                          Pickup Code
+                        </p>
+                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "24px", fontWeight: 900, color: "#fff", margin: 0, letterSpacing: "0.12em" }}>
+                          {maskedCode}
+                        </p>
+                      </div>
+ 
+                      {/* Reveal / Hide toggle */}
+                      <button
+                        onClick={() => setRevealedCodes(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
+                        style={{
+                          width: "100%",
+                          background: isRevealed ? CREAM : NAVY,
+                          color: isRevealed ? NAVY : "#fff",
+                          border: `0.5px solid ${isRevealed ? "#e5ddd0" : NAVY}`,
+                          padding: "10px",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          fontFamily: "'Lato',sans-serif",
+                          letterSpacing: "0.05em",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "7px",
+                          transition: "all 0.18s",
+                          marginBottom: "12px",
+                        }}
+                        onMouseEnter={e => { if (!isRevealed) e.currentTarget.style.background = "#1a3a6e"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = isRevealed ? CREAM : NAVY; }}
+                      >
+                        {isRevealed
+                          ? <><EyeOff size={13} /> Hide Code</>
+                          : <><Eye size={13} /> Reveal Pickup Code</>
+                        }
+                      </button>
+                    </>
+                  )}
+ 
+                  {/* Cancelled message */}
+                  {isCancelled && (
+                    <div style={{ background: "#fef2f2", border: "0.5px solid #fecaca", padding: "10px 14px", marginBottom: "12px" }}>
+                      <p style={{ fontSize: "12px", color: "#dc2626", fontFamily: "'Lato',sans-serif", margin: 0, textAlign: "center" }}>
+                        This order was cancelled. You may place a new order for this book.
+                      </p>
+                    </div>
+                  )}
+ 
+                  {/* Order meta */}
+                  {[
+                    ["Order ID",      order.orderId],
+                    ["Collection",    "LAN Head Office, Abuja Registry"],
+                    ["Location",      [order.section, order.shelfLocation].filter(Boolean).join(" — ") || "Ask staff"],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", padding: "5px 0", borderBottom: "0.5px solid #f5f0e8" }}>
+                      <span style={{ color: "#aaa", fontFamily: "'Lato',sans-serif" }}>{label}</span>
+                      <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", textAlign: "right", maxWidth: "60%" }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+ 
+                {/* Perforated bottom strip */}
+                {!isCancelled && (
+                  <div style={{ height: "4px", background: `repeating-linear-gradient(90deg, ${GOLD} 0, ${GOLD} 8px, transparent 8px, transparent 14px)` }} />
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  </div>
+                )}
+                
                 {/* PIN Modal */}
                 {showPinModal && (
                     <PinModal amount={withdrawAmount} bankDetails={user?.bankDetails} pinValue={pinValue} pinError={pinError}

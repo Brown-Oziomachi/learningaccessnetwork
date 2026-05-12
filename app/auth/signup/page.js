@@ -17,7 +17,7 @@ export default function SignUpPage() {
 function SignUpLoading() {
     return (
         <div className="min-h-screen flex items-center justify-center">
-            <p className="text-gray-600">Loading sign up page…</p>
+            <p className="text-gray-600">Working on it</p>
         </div>
     );
 }

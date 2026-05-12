@@ -18,6 +18,9 @@ import { onAuthStateChanged } from 'firebase/auth';
 import Link from 'next/link';
 import Navbar from '@/components/NavBar';
 import NotificationBell from '@/components/NotificationBell';
+import FeaturedAdsCarousel from '@/components/FeaturedAdsCarousel';
+import { increment } from 'firebase/firestore';
+import { useAds } from "@/lib/useAds";  
 
 /* ─── Design tokens ─── */
 const NAVY  = "#0d2244";
@@ -447,6 +450,83 @@ function ActiveStudentRow({ student, rank }) {
 }
 
 /* ══════════════════════════════════════════
+   INLINE AD CARD — fits inside .bg grid
+══════════════════════════════════════════ */
+function InlineAdCard({ ad }) {
+    const handleClick = async () => {
+        const id = ad.adId || ad.id;
+        if (id) {
+            try { await updateDoc(doc(db, "promotions", id), { clicks: increment(1) }); } catch { }
+        }
+        const link = ad.adLink || ad.link;
+        if (link) window.open(link, '_blank');
+    };
+
+    // Handle different field names useAds might return
+    const imgSrc = ad.image || ad.imageUrl || ad.coverImage || ad.thumbnail || null;
+    const title = ad.title || ad.bookTitle || ad.name || 'Sponsored';
+    const author = ad.author || ad.sponsor || ad.sellerName || 'Sponsored Content';
+
+    return (
+        <div onClick={handleClick} className="book-card" style={{ cursor: 'pointer' }}>
+            <div style={{ position: 'relative', background: '#ede8df', overflow: 'hidden' }}>
+                {imgSrc
+                    ? <img src={imgSrc} alt={title}
+                        style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }}
+                        onError={e => e.target.style.display = 'none'} />
+                    : <div style={{
+                        width: '100%', aspectRatio: '3/4', background: '#ede8df',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                        <BookOpen size={24} style={{ color: '#ccc' }} />
+                    </div>
+                }
+                {/* "FEATURED · GOLD" label matching image 2 style */}
+                <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0,
+                    background: 'rgba(13,34,68,.75)', padding: '4px 7px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                }}>
+                    <span style={{
+                        fontSize: 7, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase',
+                        color: GOLDD, fontFamily: "'Lato',sans-serif"
+                    }}>
+                        Featured · {ad.tier || 'Gold'}
+                    </span>
+                    <span style={{
+                        fontSize: 7, fontWeight: 700, background: GOLD, color: NAVY,
+                        padding: '1px 5px', fontFamily: "'Lato',sans-serif"
+                    }}>AD</span>
+                </div>
+                {/* PDF badge */}
+                <div style={{
+                    position: 'absolute', bottom: 6, left: 6, background: NAVY, color: '#fff', fontSize: 7,
+                    fontWeight: 700, padding: '2px 6px', letterSpacing: '.06em', display: 'flex', alignItems: 'center',
+                    gap: 3, fontFamily: "'Lato',sans-serif"
+                }}>
+                    <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />PDF
+                </div>
+            </div>
+            <div style={{ padding: '9px 9px 11px', borderTop: '0.5px solid #f0ebe0' }}>
+                <p style={{
+                    fontFamily: "'Playfair Display',serif", fontSize: 11, fontWeight: 700, color: NAVY,
+                    margin: '0 0 3px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden', lineHeight: 1.3
+                }}>
+                    {title}
+                </p>
+                <p style={{
+                    fontSize: 9, color: '#888', margin: 0, overflow: 'hidden',
+                    textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Lato',sans-serif"
+                }}>
+                    {author}
+                </p>
+            </div>
+        </div>
+    );
+}
+
+/* ══════════════════════════════════════════
    MAIN DASHBOARD
 ══════════════════════════════════════════ */
 export default function StudentDashboardClient() {
@@ -465,7 +545,9 @@ export default function StudentDashboardClient() {
     const [campusBooks,    setCampusBooks]    = useState([]);
     const [selectedLecturer, setSelectedLecturer] = useState(null);
     const [showAllLecturers, setShowAllLecturers] = useState(false);    
-    
+    const goldAds  = useAds("Gold",   3);
+    const silverAds = useAds("Silver", 2);
+
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (u) => {
             if (u) await fetchAll(u.uid);
@@ -675,7 +757,13 @@ export default function StudentDashboardClient() {
             {library.length > 0 && (
                 <section>
                     <SH label="My Library" title="Jump Back In" action={<button onClick={()=>setActiveTab('library')} className="slink">Full Library <ChevronRight size={11}/></button>}/>
-                    <div className="bg">{library.slice(0,5).map((b,i)=><BookCard key={b.bookId||i} book={b} owned/>)}</div>
+<div className="bg">
+    {[...library.slice(0,5)].reduce((acc, b, i) => {
+        acc.push(<BookCard key={b.bookId||i} book={b} owned/>);
+        if (i === 1 && goldAds[0]) acc.push(<InlineAdCard key="ad-lib-0" ad={goldAds[0]}/>);
+        return acc;
+    }, [])}
+                    </div>
                 </section>
             )}
 
@@ -794,7 +882,13 @@ export default function StudentDashboardClient() {
                 <SH label="Faculty Uploads" title="New from Lecturers" action={<Link href="/documents?filter=lecturer" className="slink">Browse All <ChevronRight size={11}/></Link>}/>
                 {lecturerBooks.length===0
                     ? <div className="eb"><BookMarked size={28} style={{color:'#e5ddd0',margin:'0 auto 8px'}}/><p className="et">No lecturer books yet</p></div>
-                    : <div className="bg">{lecturerBooks.slice(0,5).map((b,i)=><BookCard key={b.firestoreId||i} book={b} badge="Lecturer"/>)}</div>
+                    : <div className="bg">
+    {[...lecturerBooks.slice(0,5)].reduce((acc, b, i) => {
+        acc.push(<BookCard key={b.firestoreId||i} book={b} badge="Lecturer"/>);
+        if (i === 1 && silverAds[0]) acc.push(<InlineAdCard key="ad-lec-0" ad={silverAds[0]}/>);
+        return acc;
+    }, [])}
+</div>
                 }
             </section>
 
@@ -833,7 +927,13 @@ export default function StudentDashboardClient() {
                 <SH label="Fresh Uploads" title="Just Added" action={<Link href="/documents" className="slink">All Books <ChevronRight size={11}/></Link>}/>
                 {latestBooks.length===0
                     ? <div className="eb"><Zap size={28} style={{color:'#e5ddd0',margin:'0 auto 8px'}}/><p className="et">No books yet</p></div>
-                    : <div className="bg">{latestBooks.slice(0,5).map((b,i)=><BookCard key={b.firestoreId||i} book={b}/>)}</div>
+                    : <div className="bg">
+    {[...latestBooks.slice(0,5)].reduce((acc, b, i) => {
+        acc.push(<BookCard key={b.firestoreId||i} book={b}/>);
+        if (i === 2 && goldAds[1]) acc.push(<InlineAdCard key="ad-new-0" ad={goldAds[1]}/>);
+        return acc;
+    }, [])}
+</div>
                 }
             </section>
 
@@ -858,6 +958,9 @@ export default function StudentDashboardClient() {
             </section>
 
             <section>
+                <section style={{ padding: '0 0 32px' }}>
+                <FeaturedAdsCarousel tier="Gold" maxAds={5} autoPlay={true} />
+            </section>
                 <div className="sp">
                     <div style={{position:'absolute',top:-20,right:-20,width:80,height:80,border:'0.5px solid rgba(184,150,62,.15)',transform:'rotate(45deg)',pointerEvents:'none'}}/>
                     {user?.isSeller?(
@@ -904,6 +1007,9 @@ export default function StudentDashboardClient() {
     /* ── LIBRARY ── */
     const renderLibrary = () => (
         <div>
+              <section style={{ padding: '0 0 32px' }}>
+                <FeaturedAdsCarousel tier="Gold" maxAds={5} autoPlay={true} />
+            </section>
             <div style={{marginBottom:22}}><p className="sl">Your Collection</p><h2 className="lan-serif" style={{fontSize:24,fontWeight:700,color:NAVY,margin:'3px 0 0'}}>My Library</h2></div>
             {library.length===0
                 ? <div className="eb" style={{padding:'56px 24px'}}>
@@ -913,8 +1019,14 @@ export default function StudentDashboardClient() {
                     <Link href="/documents"><button className="btn-navy">Browse Documents</button></Link>
                   </div>
                 : <>
-                    <div className="bg">{library.map((b,i)=><BookCard key={b.bookId||i} book={b} owned/>)}</div>
-                    <div style={{marginTop:22,borderTop:'0.5px solid #f0ebe0',paddingTop:22}}>
+<div className="bg">
+    {[...library.slice(0,5)].reduce((acc, b, i) => {
+        acc.push(<BookCard key={b.bookId||i} book={b} owned/>);
+        if (i === 1 && goldAds[0]) acc.push(<InlineAdCard key="ad-lib-0" ad={goldAds[0]}/>);
+        return acc;
+    }, [])}
+                    </div>
+                    <div style={{ marginTop: 22, borderTop: '0.5px solid #f0ebe0', paddingTop: 22 }}>
                         <p className="sl" style={{marginBottom:10}}>AI Tutor</p>
                         <h3 className="lan-serif" style={{fontSize:17,color:NAVY,margin:'0 0 12px'}}>Chat About Your Books</h3>
                         <div style={{display:'flex',flexDirection:'column',gap:7}}>
@@ -1354,6 +1466,13 @@ export default function StudentDashboardClient() {
                                     </div>
                                 )}
                             </div>
+                         <FeaturedAdsCarousel
+                                        tier="Bronze"
+                                        maxAds={2}
+                                        autoPlay={true}
+                                        autoPlayMs={4000}
+                                        style={{ marginTop: "1px" }}
+                                      />
                         </div>
                     </div>
                 );

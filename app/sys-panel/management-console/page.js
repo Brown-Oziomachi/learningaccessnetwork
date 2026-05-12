@@ -16,11 +16,12 @@ import {
   Download, Book, Phone, MapPin, CreditCard, Building,
   Clock, ThumbsUp, Smartphone, Bell, ChevronDown, Menu, Home,
   LayoutDashboard, Activity, PieChart, Layers, Star, ArrowUp, ArrowDown,
-  MoreHorizontal, Filter, Plus, Minus, CheckCircle, Info, Package, Receipt, ShoppingBag, GraduationCap
+  MoreHorizontal, Filter, Plus, Minus, CheckCircle, Info, Package, Receipt, ShoppingBag, GraduationCap, Zap
 } from 'lucide-react';
 import { BookApprovalModal, ReplyModal, TransactionModal, UserModal } from '@/components/ApprovalModal';
-import FlwBalanceWidget from '@/components/admin/FlwBalanceWidget';
 import { db, auth } from '@/lib/firebaseConfig';
+import PromotionsAdminSection from './promotions-admin-section/page';
+import TrafficAnalyticsSection from './trafficAnalyticsSection/page';
 
 /* ── CSS Variables & Global Styles ─────────────────────────────────────── */
 const globalStyles = `
@@ -30,7 +31,7 @@ const globalStyles = `
     --sidebar-bg: #111c2e;
     --sidebar-width: 220px;
     --card-bg: #162033;
-    --card-border: rgba(255,255,255,0.07);
+    --card-border: rgba(255,255,255,0.07)
     --surface: #1a2740;
     --surface2: #1f2f47;
     --accent: #3b82f6;
@@ -348,6 +349,7 @@ const NAV_SECTIONS = [
     label: 'Dashboard',
     items: [
       { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
+      { id: 'traffic', icon: BarChart3, label: 'Page Traffic' }
     ]
   },
   {
@@ -355,6 +357,7 @@ const NAV_SECTIONS = [
     items: [
       { id: 'advertisements', icon: BookOpen, label: 'Books', badgeKey: 'pendingAds' },
       { id: 'announcements', icon: Bell, label: 'Announcements' }, 
+      { id: 'promotions', icon: Zap, label: 'Ad Promotions', badgeKey: 'pendingPromotions', badgeType: 'warn' },
       { id: 'schools', icon: Building, label: 'Schools', badgeKey: 'pendingSchools' },
       { id: 'school-documents', icon: FileText, label: 'School Docs', badgeKey: 'pendingSchoolDocs' },
       { id: 'physical-orders', icon: ShoppingBag, label: 'Physical Orders', badgeKey: 'pendingPhysicalOrders', badgeType: 'warn' },
@@ -805,6 +808,7 @@ export default function ComprehensiveAdminPanel() {
   const [paymentConfirmed, setPaymentConfirmed] = useState({});
   const [sellersData, setSellersData] = useState([]);
   const [contactMessages, setContactMessages] = useState([]);
+  const [promotions, setPromotions] = useState([]);
   const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
 
   useEffect(() => {
@@ -815,6 +819,12 @@ export default function ComprehensiveAdminPanel() {
     return () => unsubscribe();
   }, []);
 
+  const fetchPromotions = async () => {
+  const q = query(collection(db, 'promotions'), orderBy('createdAt', 'desc'));
+  const snap = await getDocs(q);
+  setPromotions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  };
+  
   const fetchSellers = async () => {
     try {
       const s = await getDocs(query(collection(db, 'users'), where('isSeller', '==', true)));
@@ -863,7 +873,8 @@ export default function ComprehensiveAdminPanel() {
         fetchTransactions(), fetchUsers(), fetchWithdrawals(),
         fetchSchoolApplications(), fetchSchoolDocuments(),
         fetchFeedbacks(), fetchArticleFeedbacks(),
-        fetchPhysicalOrders(), fetchSellers(), fetchContactMessages(), // ← must be here
+        fetchPhysicalOrders(), fetchSellers(), fetchContactMessages(),
+        fetchPromotions(),
       ]);
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
@@ -1169,6 +1180,7 @@ export default function ComprehensiveAdminPanel() {
     pendingPhysicalOrders: physicalOrders?.filter(o => o.status === 'pending_pickup').length || 0, // ← ADD
     openContactMessages: contactMessages?.filter(m => m.status === 'open').length || 0,
     pendingFaculty: users?.filter(u => u.lecturerVerificationStatus === 'pending').length || 0,
+    pendingPromotions: promotions?.filter(p => p.status === 'pending').length || 0,
   };
 
   if (checkingAdmin) return (
@@ -1382,6 +1394,8 @@ export default function ComprehensiveAdminPanel() {
               </div>
             </div>
           )}
+
+          {activeSection === 'traffic' && <TrafficAnalyticsSection />}
 
           {/* ── BOOKS ─────────────────────────────────────────────────── */}
           {activeSection === 'advertisements' && (
@@ -2157,6 +2171,15 @@ export default function ComprehensiveAdminPanel() {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeSection === 'promotions' && (
+            <div>
+              <div className="section-header">
+                <div className="section-title"><Zap size={18} color="#b8963e" />Ad Promotions</div>
+              </div>
+              <PromotionsAdminSection adminUser={user} />
             </div>
           )}
 

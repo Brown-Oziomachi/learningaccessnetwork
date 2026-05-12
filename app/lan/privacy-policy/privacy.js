@@ -181,7 +181,7 @@ export default function PrivacyPolicyClient() {
             <section id="who-we-are" className="prose-section">
               <h2>Who We Are And Our Company Information</h2>
               <hr className="gold-rule" />
-              <p>LAN Library is operated by Learning Access Network Ltd., a digital academic resource platform dedicated to connecting African students and educators with quality learning materials. We are headquartered in Nigeria and serve learners across the African continent.</p>
+              <p>LAN Library is operated by Learning Access Network Ltd., a digital academic resource platform dedicated to connecting African students and educators with quality learning materials. We are headquartered in Nigeria, Abuja, and serve learners across the African continent.</p>
               <p>Our platform serves over 2.4 million learners across various academic institutions, from secondary schools to postgraduate programs, providing access to textbooks, lecture notes, past questions, theses, and a wide range of academic resources.</p>
             </section>
 
@@ -250,13 +250,13 @@ export default function PrivacyPolicyClient() {
             <section id="contact" className="prose-section">
               <h2>Contact Us</h2>
               <hr className="gold-rule" />
-              <p>If you have questions, concerns, or requests regarding this Privacy Policy or our privacy practices, please contact us at <strong style={{ color: NAVY }}>legal@lanlibrary.com</strong>. We are committed to resolving any privacy concerns you may have.</p>
+              <p>If you have questions, concerns, or requests regarding this Privacy Policy or our privacy practices, please contact us at <strong style={{ color: NAVY }}>legal@learningaccessnetwork.com</strong>. We are committed to resolving any privacy concerns you may have.</p>
               {/* Contact card */}
               <div style={{ background: "#fff", border: `0.5px solid #e5ddd0`, padding: "28px 32px", marginTop: "16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
                 <div>
                   <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, marginBottom: "6px" }}>Legal Team</p>
                   <p style={{ fontSize: "16px", fontFamily: "'Playfair Display', serif", fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>LAN Library Legal</p>
-                  <p style={{ fontSize: "13px", color: "#888", margin: 0, fontWeight: 300 }}>legal@lanlibrary.com</p>
+                  <p style={{ fontSize: "13px", color: "#888", margin: 0, fontWeight: 300 }}>legal@learningaccessnetwork.com</p>
                 </div>
                 <a href="mailto:legal@lanlibrary.com" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "11px 22px", background: NAVY, color: "#fff", fontSize: "12px", fontWeight: 700, fontFamily: "'Lato',sans-serif", textDecoration: "none", letterSpacing: "0.06em" }}>
                   Send Message <ChevronRight size={13} />

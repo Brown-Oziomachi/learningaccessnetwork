@@ -48,7 +48,7 @@ function LecturerCard({ lecturer, isFollowing, onFollow, user }) {
     const initials  = getInitials(lecturer.sellerName || "?");
     const titleDisplay = lecturer.title?.toLowerCase().includes("lecturer")
         ? "Lecturer" : lecturer.title;
-const profileHref = `/faculty/${lecturer.slug || lecturer.sellerId}`;
+    const profileHref = `/profile/${lecturer.slug || lecturer.sellerId}`;
     const displayName  = lecturer.title
         ? `${lecturer.title} ${lecturer.sellerName}` : lecturer.sellerName;
 

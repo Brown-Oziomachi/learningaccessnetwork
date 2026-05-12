@@ -137,7 +137,7 @@ export default function TermsOfServiceClient() {
               {[
                 { label: "Effective Date", val: "December 31, 2025" },
                 { label: "Jurisdiction", val: "Federal Republic of Nigeria" },
-                { label: "Contact", val: "legal@lanlibrary.com" },
+                { label: "Contact", val: "legal@learningaccessnetwork.com" },
               ].map(({ label, val }) => (
                 <div key={label}>
                   <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(184,150,62,0.65)", fontFamily: "'Lato',sans-serif", marginBottom: "4px" }}>{label}</div>
@@ -185,7 +185,7 @@ export default function TermsOfServiceClient() {
             <section id="service-description" className="prose-section">
               <h2>2. Service Description</h2>
               <hr className="gold-rule" />
-              <p>LAN Library is a comprehensive library management system designed to operate within local area networks. Our platform provides tools and features for catalog management, book borrowing and returns, user account management, search and discovery functionality, reading recommendations, digital resource access, and administrative reporting and analytics.</p>
+              <p>LAN Library is a comprehensive library management system designed to operate within African countries. Our platform provides tools and features for catalog management, book purchasing, user account management, search and discovery functionality, reading recommendations, digital resource access, and administrative reporting and analytics.</p>
               <p>We reserve the right to modify, suspend, or discontinue any aspect of the service at any time, with or without notice. We may also impose limits on certain features or restrict access to parts of the service without liability.</p>
               <p>The availability and functionality of LAN Library depend on your local network infrastructure and configuration. We are not responsible for network issues, connectivity problems, or limitations imposed by your organization's IT policies.</p>
             </section>
@@ -206,11 +206,11 @@ export default function TermsOfServiceClient() {
             </section>
 
             <section id="borrowing" className="prose-section">
-              <h2>5. Library Materials and Borrowing</h2>
+              <h2>5. Library Access and Content Usage</h2>
               <hr className="gold-rule" />
-              <p>LAN Library facilitates the borrowing and management of library materials. When you borrow materials through our platform, you agree to comply with all borrowing policies, including due dates and renewal procedures; return borrowed materials in the condition received, subject to normal wear and tear; pay any applicable fines, fees, or replacement costs for late, lost, or damaged materials; and respect intellectual property rights and copyright laws regarding library materials.</p>
-              <p>Specific borrowing limits, loan periods, and renewal policies are determined by your library or organization and may vary. You are responsible for knowing and complying with these policies.</p>
-              <p>Digital materials accessed through LAN Library may be subject to additional terms, including digital rights management restrictions and licensing agreements. You agree to comply with all such terms when accessing digital content.</p>
+              <p>LAN Library provides users with access to a wide range of academic materials. When you purchase or access content through our platform, you agree to use these materials for personal, non-commercial educational purposes only.</p>
+              <p>We collect data on your content interactions to ensure secure delivery and to protect the intellectual property rights of our authors and sellers.</p>
+              <p>You are responsible for maintaining the security of your access credentials and respecting copyright laws regarding all downloaded or viewed materials.</p>
             </section>
 
             <section id="intellectual-property" className="prose-section">
@@ -288,15 +288,15 @@ export default function TermsOfServiceClient() {
             <section id="contact" className="prose-section">
               <h2>16. Contact Information</h2>
               <hr className="gold-rule" />
-              <p>If you have any questions about these Terms of Service, please contact us at <strong style={{ color: NAVY }}>legal@lanlibrary.com</strong>. We will respond to your inquiries as promptly as possible.</p>
+              <p>If you have any questions about these Terms of Service, please contact us at <strong style={{ color: NAVY }}>legal@learningaccessnetwork.com</strong>. We will respond to your inquiries as promptly as possible.</p>
               {/* Contact card */}
               <div style={{ background: "#fff", border: `0.5px solid #e5ddd0`, padding: "28px 32px", marginTop: "16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
                 <div>
                   <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, marginBottom: "6px" }}>Legal Team</p>
                   <p style={{ fontSize: "16px", fontFamily: "'Playfair Display', serif", fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>LAN Library Legal</p>
-                  <p style={{ fontSize: "13px", color: "#888", margin: 0, fontWeight: 300 }}>legal@lanlibrary.com</p>
+                  <p style={{ fontSize: "13px", color: "#888", margin: 0, fontWeight: 300 }}>legal@learningaccessnetwork.com</p>
                 </div>
-                <a href="mailto:legal@lanlibrary.com" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "11px 22px", background: NAVY, color: "#fff", fontSize: "12px", fontWeight: 700, fontFamily: "'Lato',sans-serif", textDecoration: "none", letterSpacing: "0.06em" }}>
+                <a href="mailto:legal@learningaccessnetwork.com" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "11px 22px", background: NAVY, color: "#fff", fontSize: "12px", fontWeight: 700, fontFamily: "'Lato',sans-serif", textDecoration: "none", letterSpacing: "0.06em" }}>
                   Send Message <ChevronRight size={13} />
                 </a>
               </div>

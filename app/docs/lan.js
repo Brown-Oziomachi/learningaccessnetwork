@@ -641,7 +641,7 @@ export default function LANDocsClient() {
                     <section id="security" className="py-11 border-b border-white/[0.08]">
                         <SectionTitle id="security">Security and Trust</SectionTitle>
                         <ImgPlaceholder label="Security & Trust Foundation" />
-                        <Para>Security is at the heart of everything we do. Every transaction is encrypted and protected using industry-standard security protocols. User data is kept private and secure, and we never share personal information with third parties without explicit consent.</Para>
+                        <Para>Security is at the heart of everything we do. Every transaction is encrypted and protected using industry-standard security protocols. User data is kept private and secure, and we never share personal information with third parties without explicit consent. <a href="/lan/terms-of-service" className="underline text-blue-600">Learn More</a></Para>
                         <Cards items={[
                             { icon: "💳", title: "Payment Security", body: "International security standards protect your money and financial information. We partner with trusted payment providers and use end-to-end encryption." },
                             { icon: "🛡️", title: "Content Protection", body: "Digital watermarking and tracking systems identify and address misuse. Continuous monitoring prevents fraud, unauthorized sharing, and copyright violations." },

@@ -509,7 +509,7 @@ useEffect(() => {
                   }}>
                     {announcement.message}
                     {announcement.linkUrl && (
-                      <a href={announcement.linkUrl} style={{ color: GOLD, fontWeight: 700, marginLeft: '12px', textDecoration: 'underline' }}>
+                      <a href={announcement.linkUrl} style={{ color: GOLD, fontWeight: 700, marginLeft: '12px', textDecoration: 'underline' }} target="_blank">
                         {announcement.linkText || 'Learn more →'}
                       </a>
                     )}

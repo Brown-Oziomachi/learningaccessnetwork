@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import LecturersClient from "./lecturers";
 
 export const metadata = {
-    title: "Verified LAN Lecturers | LAN Library",
+    title: "Verified LAN Faculties | LAN Library",
     description: "Welcome the best sellers porter, where the worlds sees the most recognizes writers in LAN Libs"
 };
 

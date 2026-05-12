@@ -208,7 +208,7 @@ export default function SignInClient() {
               {error && !activeBanner && (
                 <div style={{ background: "#fef2f2", border: "0.5px solid #fecaca", padding: "12px 16px", display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 16 }}>
                   <AlertCircle size={15} color="#dc2626" style={{ flexShrink: 0, marginTop: 1 }} />
-                  <p style={{ fontSize: 12, color: "#991b1b" }}>{error}</p>
+                  <p style={{ fontSize: 12, color: "#991b1b" }}>Your Network is Bad</p>
                 </div>
               )}
 
