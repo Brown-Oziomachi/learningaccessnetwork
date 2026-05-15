@@ -45,6 +45,7 @@ import {
   MapPin,
   AlertCircle,
   Star,
+  Unlock,
 } from "lucide-react";
 import Link from "next/link";
 import { fetchBookDetails } from "@/utils/bookUtils";
@@ -52,16 +53,24 @@ import BookAIChat from "./BookAIChat";
 import AiAskButton from "./AiAskButton";
 import FeaturedAdsCarousel from "./FeaturedAdsCarousel";
 import StudyBuddyTracker from "./StudyBuddyTracker";
+import OpenAccessModal from "./Openaccessmodal";
+import GoogleAdComponent from "./GoogleAdComponent";
 
 /* ── palette — matches the app ── */
-const NAVY   = "#0d2244";
-const GOLD   = "#b8963e";
-const CREAM  = "#f5f0e8";
-const BG     = "#f5f1ea";
+const NAVY = "#0d2244";
+const GOLD = "#b8963e";
+const CREAM = "#f5f0e8";
+const BG = "#f5f1ea";
 const BORDER = "#e5ddd0";
-const MUTED  = "#aaa";
-const TEXT   = NAVY;
-const CARD   = "#fff";
+const MUTED = "#aaa";
+const TEXT = NAVY;
+const CARD = "#fff";
+
+/* ── helpers ── */
+const isOpenAccess = (book) =>
+  book?.isFree === true ||
+  book?.accessType === "free" ||
+  Number(book?.price) === 0;
 
 export default function BookPreviewPage() {
   const router = useRouter();
@@ -105,10 +114,12 @@ export default function BookPreviewPage() {
   const [physicalInventory, setPhysicalInventory] = useState(null);
   const [loadingPhysical, setLoadingPhysical] = useState(true);
   const [feedbackRating, setFeedbackRating] = useState(0);
+
+  /* ── NEW: Open Access modal ── */
+  const [showOAModal, setShowOAModal] = useState(false);
+
   const getThumbnailUrl = (book) => {
     const direct = book.coverImage || book.image;
-
-    // Already resolved to lh3 or unsplash — use as-is
     if (
       direct &&
       (direct.includes("lh3.googleusercontent.com") ||
@@ -116,9 +127,7 @@ export default function BookPreviewPage() {
     ) {
       return direct;
     }
-
     if (direct && !direct.includes("drive.google.com")) return direct;
-
     let fileId = book.driveFileId;
     if (!fileId && book.embedUrl) {
       const m = book.embedUrl.match(/\/d\/([\w-]{25,})|id=([\w-]{25,})/);
@@ -132,11 +141,9 @@ export default function BookPreviewPage() {
       const m = direct.match(/\/d\/([\w-]{25,})|id=([\w-]{25,})/);
       if (m) fileId = m[1] || m[2];
     }
-
     if (fileId) {
       return `https://lh3.googleusercontent.com/d/${fileId}=w400`;
     }
-
     return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
   };
 
@@ -235,11 +242,8 @@ export default function BookPreviewPage() {
       try {
         setLoadingPhysical(true);
         const cleanId = bookId.replace("firestore-", "");
-
-        // Full collection scan — no index needed
         const allSnap = await getDocs(collection(db, "physicalInventory"));
         let found = null;
-
         allSnap.forEach((d) => {
           const data = d.data();
           if (
@@ -250,7 +254,6 @@ export default function BookPreviewPage() {
             found = { id: d.id, ...data };
           }
         });
-
         setPhysicalInventory(found);
       } catch (e) {
         console.error("fetchPhysicalInventory failed:", e);
@@ -330,7 +333,7 @@ export default function BookPreviewPage() {
             title: data.title || "",
             institution:
               data.institution || data.university || data.school || "",
-            photoURL: data.photoURL || data.photoBase64 || null, // ← ADD THIS
+            photoURL: data.photoURL || data.photoBase64 || null,
             uploadedBooks: 0,
           });
         });
@@ -355,6 +358,7 @@ export default function BookPreviewPage() {
     };
     fetchLecturers();
   }, []);
+
   useEffect(() => {
     const fetchFollowing = async () => {
       if (!user) return;
@@ -464,54 +468,41 @@ export default function BookPreviewPage() {
     }
   };
 
- useEffect(() => {
-  const fetchSales = async () => {
-    try {
-      // Use a Set to track unique sale IDs already counted
-      // so the same Firestore doc can't be counted twice
-      const map = {};
-
-      const addSale = (rawId) => {
-        if (!rawId) return;
-        const id    = String(rawId);
-        const clean = id.replace("firestore-", "");
-        const full  = `firestore-${clean}`;
-        // Both variants point to the same book — increment ONCE,
-        // then mirror so lookup works regardless of which format is used
-        const current = map[full] || map[clean] || 0;
-        map[full]  = current + 1;
-        map[clean] = current + 1;
-      };
-
-      // 1. Digital purchases
-      const usersSnap = await getDocs(collection(db, "users"));
-      usersSnap.docs.forEach((u) => {
-        Object.values(u.data().purchasedBooks || {}).forEach((p) => {
-          addSale(p.bookId || p.id || p.firestoreId);
-        });
-      });
-
-      // 2. Physical completed sales ONLY (authoritative record)
+  useEffect(() => {
+    const fetchSales = async () => {
       try {
-        const physSalesSnap = await getDocs(collection(db, "physicalSales"));
-        physSalesSnap.docs.forEach((d) => {
-          const data = d.data();
-          addSale(data.bookId || data.inventoryId);
+        const map = {};
+        const addSale = (rawId) => {
+          if (!rawId) return;
+          const id = String(rawId);
+          const clean = id.replace("firestore-", "");
+          const full = `firestore-${clean}`;
+          const current = map[full] || map[clean] || 0;
+          map[full] = current + 1;
+          map[clean] = current + 1;
+        };
+        const usersSnap = await getDocs(collection(db, "users"));
+        usersSnap.docs.forEach((u) => {
+          Object.values(u.data().purchasedBooks || {}).forEach((p) => {
+            addSale(p.bookId || p.id || p.firestoreId);
+          });
         });
+        try {
+          const physSalesSnap = await getDocs(collection(db, "physicalSales"));
+          physSalesSnap.docs.forEach((d) => {
+            const data = d.data();
+            addSale(data.bookId || data.inventoryId);
+          });
+        } catch (e) {
+          console.warn("physicalSales fetch failed:", e);
+        }
+        setBookSalesCount(map);
       } catch (e) {
-        console.warn("physicalSales fetch failed:", e);
+        console.error("fetchSales error:", e);
       }
-
-      // physicalOrders intentionally excluded — reservations, not sales
-
-      setBookSalesCount(map);
-    } catch (e) {
-      console.error("fetchSales error:", e);
-    }
-  };
-
-  fetchSales();
-}, []);
+    };
+    fetchSales();
+  }, []);
 
   useEffect(() => {
     const handleVisibility = async () => {
@@ -573,6 +564,8 @@ export default function BookPreviewPage() {
               author: data.author,
               category: data.category,
               price: data.price,
+              isFree: data.isFree,
+              accessType: data.accessType,
               pages: data.pages,
               format: data.format || "PDF",
               description: data.description,
@@ -678,6 +671,11 @@ export default function BookPreviewPage() {
     router.push(`/payment?bookId=${cId}`);
   };
 
+  /* Open Access: open the modal instead of redirecting */
+  const handleFreeAccess = () => {
+    setShowOAModal(true);
+  };
+
   const handleShare = () => {
     if (navigator.share)
       navigator.share({
@@ -704,12 +702,12 @@ export default function BookPreviewPage() {
         userName:
           user?.displayName || user?.email?.split("@")[0] || "Anonymous",
         feedback: feedbackText.trim(),
-        rating: feedbackRating, // ← new
-        helpfulCount: 0, // ← new
-        unhelpfulCount: 0, // ← new
+        rating: feedbackRating,
+        helpfulCount: 0,
+        unhelpfulCount: 0,
         createdAt: serverTimestamp(),
       });
-      setFeedbackRating(0); // ← reset after submit
+      setFeedbackRating(0);
       setFeedbackText("");
       setShowFeedbackModal(false);
       setBookFeedbackCount((prev) => prev + 1);
@@ -767,7 +765,6 @@ export default function BookPreviewPage() {
         </div>
       );
 
-    /* State 3: No deposit at all */
     if (!physicalInventory)
       return (
         <div
@@ -827,7 +824,6 @@ export default function BookPreviewPage() {
     const shelf = physicalInventory.shelfLocation || "";
     const section = physicalInventory.section || "";
 
-    /* State 2: Out of stock */
     if (stock === 0)
       return (
         <div
@@ -882,16 +878,12 @@ export default function BookPreviewPage() {
         </div>
       );
 
-    /* State 1: Available — gold pulse border */
     return (
       <>
         <style>{`
-        @keyframes goldPulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(184,150,62,0.4); }
-          50%       { box-shadow: 0 0 0 6px rgba(184,150,62,0); }
-        }
-        .physical-available { animation: goldPulse 2.4s ease-in-out infinite; }
-      `}</style>
+          @keyframes goldPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(184,150,62,0.4); } 50% { box-shadow: 0 0 0 6px rgba(184,150,62,0); } }
+          .physical-available { animation: goldPulse 2.4s ease-in-out infinite; }
+        `}</style>
         <div
           className="physical-available"
           style={{
@@ -1029,58 +1021,93 @@ export default function BookPreviewPage() {
     );
   };
 
-  /* ── PDF Viewer ── */
-  const PdfViewer = ({ heightClass = "600px", fullHeight = "900px" }) => (
-    <div style={{ background: BG }}>
-      {isPurchased ? (
-        <div style={{ padding: "16px" }}>
-          {book.embedUrl ? (
-            <div style={{ position: "relative" }}>
-              <iframe
-                src={book.embedUrl}
-                style={{
-                  width: "100%",
-                  height: fullHeight,
-                  border: "none",
-                  display: "block",
-                }}
-                title={book.title}
-                allow="autoplay"
-              />
+  /* ── PDF Viewer — updated for open access ── */
+  const PdfViewer = ({ heightClass = "600px", fullHeight = "900px" }) => {
+    const free = book && isOpenAccess(book);
+    const hasAccess = isPurchased || free;
+
+    return (
+      <div style={{ background: BG }}>
+        {hasAccess ? (
+          <div style={{ padding: "16px" }}>
+            {/* Free access notice banner */}
+            {free && !isPurchased && (
               <div
                 style={{
-                  position: "absolute",
-                  top: 0,
-                  right: 0,
-                  height: "76px",
-                  width: "220px",
-                  background: "#323639",
-                  zIndex: 10,
+                  background: "rgba(22,163,74,0.08)",
+                  border: "0.5px solid rgba(22,163,74,0.25)",
+                  padding: "12px 16px",
+                  marginBottom: "14px",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "flex-end",
-                  padding: "0 20px",
-                  gap: "8px",
+                  gap: "10px",
                 }}
-                onContextMenu={(e) => e.preventDefault()}
               >
-                <span
+                <Unlock size={15} style={{ color: "#16a34a", flexShrink: 0 }} />
+                <p
                   style={{
-                    color: GOLD,
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
+                    fontSize: "12px",
+                    color: "#15803d",
+                    margin: 0,
                     fontFamily: "'Lato',sans-serif",
+                    fontWeight: 700,
                   }}
                 >
-                  LAN Library
-                </span>
-                <Lock size={14} style={{ color: "#888" }} />
+                  This is an Open Access document — reading is free. Downloads
+                  require a brief ad view.
+                </p>
               </div>
-            </div>
-          ) : book.pdfUrl ? (
-            <div style={{ position: "relative" }}>
+            )}
+
+            {book.embedUrl ? (
+              <div style={{ position: "relative" }}>
+                <iframe
+                  src={book.embedUrl}
+                  style={{
+                    width: "100%",
+                    height: fullHeight,
+                    border: "none",
+                    display: "block",
+                  }}
+                  title={book.title}
+                  allow="autoplay"
+                />
+                {/* Only show branding overlay for paid-owned, not free */}
+                {!free && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      right: 0,
+                      height: "76px",
+                      width: "220px",
+                      background: "#323639",
+                      zIndex: 10,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
+                      padding: "0 20px",
+                      gap: "8px",
+                    }}
+                    onContextMenu={(e) => e.preventDefault()}
+                  >
+                    <span
+                      style={{
+                        color: GOLD,
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        fontFamily: "'Lato',sans-serif",
+                      }}
+                    >
+                      LAN Library
+                    </span>
+                    <Lock size={14} style={{ color: "#888" }} />
+                  </div>
+                )}
+              </div>
+            ) : book.pdfUrl ? (
               <iframe
                 src={`${book.pdfUrl}#view=FitH`}
                 style={{
@@ -1091,210 +1118,251 @@ export default function BookPreviewPage() {
                 }}
                 title={book.title}
               />
+            ) : (
               <div
                 style={{
-                  position: "absolute",
-                  top: 0,
-                  right: 0,
-                  height: "56px",
-                  width: "220px",
-                  background: "#323639",
-                  zIndex: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "flex-end",
-                  padding: "0 20px",
-                  gap: "8px",
+                  background: "#fff",
+                  padding: "24px",
+                  border: "0.5px solid #e5ddd0",
                 }}
-                onContextMenu={(e) => e.preventDefault()}
               >
-                <span
+                <div
                   style={{
-                    color: GOLD,
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    fontFamily: "'Lato',sans-serif",
+                    background: "#f0fdf4",
+                    border: "0.5px solid #86efac",
+                    padding: "14px 18px",
+                    marginBottom: "20px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
                   }}
                 >
-                  LAN Library
-                </span>
-                <Lock size={14} style={{ color: "#888" }} />
+                  <CheckCircle
+                    size={20}
+                    style={{ color: "#16a34a", flexShrink: 0 }}
+                  />
+                  <div>
+                    <p
+                      style={{
+                        fontWeight: 700,
+                        color: "#15803d",
+                        margin: "0 0 2px",
+                        fontSize: "13px",
+                        fontFamily: "'Lato',sans-serif",
+                      }}
+                    >
+                      {free ? "Open Access Document" : "Full Access Granted"}
+                    </p>
+                    <p
+                      style={{
+                        fontSize: "12px",
+                        color: "#166534",
+                        margin: 0,
+                        fontFamily: "'Lato',sans-serif",
+                      }}
+                    >
+                      You have full access to {book.title}
+                    </p>
+                  </div>
+                </div>
+                <h3
+                  style={{
+                    fontFamily: "'Playfair Display',serif",
+                    fontSize: "20px",
+                    fontWeight: 700,
+                    color: NAVY,
+                    margin: "0 0 12px",
+                  }}
+                >
+                  {book.title}
+                </h3>
+                <p
+                  style={{ fontSize: "13px", color: "#666", lineHeight: 1.75 }}
+                >
+                  {book.description}
+                </p>
               </div>
-            </div>
-          ) : (
-            <div
-              style={{
-                background: "#fff",
-                padding: "24px",
-                border: "0.5px solid #e5ddd0",
-              }}
-            >
+            )}
+
+            {/* Free download CTA at bottom of viewer */}
+            {free && (
               <div
                 style={{
-                  background: "#f0fdf4",
-                  border: "0.5px solid #86efac",
-                  padding: "14px 18px",
-                  marginBottom: "20px",
+                  marginTop: "16px",
+                  background: "#fff",
+                  border: `0.5px solid rgba(184,150,62,0.3)`,
+                  padding: "18px 20px",
                   display: "flex",
                   alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
                   gap: "12px",
                 }}
               >
-                <CheckCircle
-                  size={20}
-                  style={{ color: "#16a34a", flexShrink: 0 }}
-                />
                 <div>
                   <p
                     style={{
+                      fontSize: "11px",
                       fontWeight: 700,
-                      color: "#15803d",
+                      color: GOLD,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
                       margin: "0 0 2px",
-                      fontSize: "13px",
                       fontFamily: "'Lato',sans-serif",
                     }}
                   >
-                    Full Access Granted
+                    Open Access
                   </p>
                   <p
                     style={{
-                      fontSize: "12px",
-                      color: "#166534",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      color: NAVY,
                       margin: 0,
                       fontFamily: "'Lato',sans-serif",
                     }}
                   >
-                    You have full access to {book.title}
+                    Save a copy to your device
                   </p>
                 </div>
+                <button
+                  onClick={handleFreeAccess}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: NAVY,
+                    color: GOLD,
+                    padding: "11px 22px",
+                    border: `0.5px solid ${GOLD}`,
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: "'Lato',sans-serif",
+                    letterSpacing: "0.06em",
+                    transition: "background 0.18s",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background = "#1a3a6e")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = NAVY)
+                  }
+                >
+                  <Download size={14} />
+                  Download Free PDF
+                </button>
               </div>
-              <h3
-                style={{
-                  fontFamily: "'Playfair Display',serif",
-                  fontSize: "20px",
-                  fontWeight: 700,
-                  color: NAVY,
-                  margin: "0 0 12px",
-                }}
-              >
-                {book.title}
-              </h3>
-              <p style={{ fontSize: "13px", color: "#666", lineHeight: 1.75 }}>
-                {book.description}
-              </p>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div>
-          {/* Replace this in PdfViewer, in the non-purchased section */}
-          <div
-            style={{
-              position: "relative",
-              overflow: "hidden",
-              height: !book.embedUrl && !book.pdfUrl ? "0px" : heightClass, // ← collapse if no PDF
-            }}
-          >
-            {book.embedUrl ? (
-              <iframe
-                src={book.embedUrl}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  border: "none",
-                  pointerEvents: "none",
-                }}
-                title={`${book.title} - Preview`}
-                scrolling="no"
-              />
-            ) : book.pdfUrl ? (
-              <iframe
-                src={`${book.pdfUrl}#view=FitH&page=1&toolbar=0`}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  border: "none",
-                  pointerEvents: "none",
-                }}
-                title={`${book.title} - Preview`}
-                scrolling="no"
-              />
-            ) : null}{" "}
-            {/* ← remove the fallback text div, the purchase CTA below handles it */}
+            )}
           </div>
-
-          {/* Purchase CTA */}
-          <div
-            style={{
-              background: "#fff",
-              border: "0.5px solid #e5ddd0",
-              margin: "16px",
-              padding: "32px 24px",
-              textAlign: "center",
-            }}
-          >
+        ) : (
+          <div>
             <div
               style={{
-                width: "56px",
-                height: "56px",
-                border: `0.5px solid #e5ddd0`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto 16px",
-                background: CREAM,
+                position: "relative",
+                overflow: "hidden",
+                height: !book.embedUrl && !book.pdfUrl ? "0px" : heightClass,
               }}
             >
-              <Lock size={22} style={{ color: NAVY }} />
+              {book.embedUrl ? (
+                <iframe
+                  src={book.embedUrl}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    border: "none",
+                    pointerEvents: "none",
+                  }}
+                  title={`${book.title} - Preview`}
+                  scrolling="no"
+                />
+              ) : book.pdfUrl ? (
+                <iframe
+                  src={`${book.pdfUrl}#view=FitH&page=1&toolbar=0`}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    border: "none",
+                    pointerEvents: "none",
+                  }}
+                  title={`${book.title} - Preview`}
+                  scrolling="no"
+                />
+              ) : null}
             </div>
-            <p
+            {/* Purchase CTA */}
+            <div
               style={{
-                fontFamily: "'Playfair Display',serif",
-                fontSize: "18px",
-                fontWeight: 700,
-                color: NAVY,
-                margin: "0 0 6px",
+                background: "#fff",
+                border: "0.5px solid #e5ddd0",
+                margin: "16px",
+                padding: "32px 24px",
+                textAlign: "center",
               }}
             >
-              Purchase to unlock full access
-            </p>
-            <p
-              style={{
-                fontSize: "12px",
-                color: "#888",
-                marginBottom: "20px",
-                fontFamily: "'Lato',sans-serif",
-              }}
-            >
-              Get instant access to all {book.pages} pages
-            </p>
-            <button
-              onClick={handlePurchase}
-              style={{
-                width: "100%",
-                background: NAVY,
-                color: "#fff",
-                padding: "14px 24px",
-                border: "none",
-                fontSize: "14px",
-                fontWeight: 700,
-                cursor: "pointer",
-                fontFamily: "'Lato',sans-serif",
-                letterSpacing: "0.04em",
-                transition: "background 0.18s",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "#1a3a6e")
-              }
-              onMouseLeave={(e) => (e.currentTarget.style.background = NAVY)}
-            >
-              Purchase for ₦{book.price?.toLocaleString()}
-            </button>
+              <div
+                style={{
+                  width: "56px",
+                  height: "56px",
+                  border: `0.5px solid #e5ddd0`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                  background: CREAM,
+                }}
+              >
+                <Lock size={22} style={{ color: NAVY }} />
+              </div>
+              <p
+                style={{
+                  fontFamily: "'Playfair Display',serif",
+                  fontSize: "18px",
+                  fontWeight: 700,
+                  color: NAVY,
+                  margin: "0 0 6px",
+                }}
+              >
+                Purchase to unlock full access
+              </p>
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "#888",
+                  marginBottom: "20px",
+                  fontFamily: "'Lato',sans-serif",
+                }}
+              >
+                Get instant access to all {book.pages} pages
+              </p>
+              <button
+                onClick={handlePurchase}
+                style={{
+                  width: "100%",
+                  background: NAVY,
+                  color: "#fff",
+                  padding: "14px 24px",
+                  border: "none",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "'Lato',sans-serif",
+                  letterSpacing: "0.04em",
+                  transition: "background 0.18s",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "#1a3a6e")
+                }
+                onMouseLeave={(e) => (e.currentTarget.style.background = NAVY)}
+              >
+                Purchase for ₦{book.price?.toLocaleString()}
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        )}
+      </div>
+    );
+  };
 
   /* ── Loading ── */
   if (loading)
@@ -1371,11 +1439,11 @@ export default function BookPreviewPage() {
       </div>
     );
 
+  const free = isOpenAccess(book);
   const suggestedBooks = (allBooks.length > 0 ? allBooks : booksData)
     .filter((b) => b.id !== bookId)
     .slice(0, 12);
   const cleanId = String(book.id || "").replace("firestore-", "");
-
   const sold =
     bookSalesCount[book.id] ||
     bookSalesCount[book.firestoreId] ||
@@ -1387,14 +1455,8 @@ export default function BookPreviewPage() {
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
-// REPLACE the two .lan-root rules with ONE clean rule:
-.lan-root {
-  font-family:'Lato',sans-serif;
-  background:${BG};
-  overflow-x: hidden;
-  max-width: 100vw;
-  box-sizing: border-box;
-}        .lan-serif { font-family:'Playfair Display',Georgia,serif; }
+        .lan-root { font-family:'Lato',sans-serif; background:${BG}; overflow-x:hidden; max-width:100vw; box-sizing:border-box; }
+        .lan-serif { font-family:'Playfair Display',Georgia,serif; }
         .action-btn { display:flex; flex-direction:column; align-items:center; gap:5px; background:transparent; border:none; cursor:pointer; color:${NAVY}; font-family:'Lato',sans-serif; transition:opacity 0.18s; }
         .action-btn:hover { opacity:0.7; }
         .action-btn span { font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; }
@@ -1414,9 +1476,19 @@ export default function BookPreviewPage() {
         @keyframes pulse2 { 0%,100%{opacity:1} 50%{opacity:0.4} }
         @media(min-width:1024px){ .lg-grid { grid-template-columns:280px 1fr 240px !important; } .lg-hide { display:none !important; } .lg-show { display:block !important; } }
         .lg-show { display:none; }
-        *, *::before, *::after { box-sizing: border-box; }
-        body { overflow-x: hidden; }
+        *, *::before, *::after { box-sizing:border-box; }
+        body { overflow-x:hidden; }
+        @keyframes oa-shimmer { 0% { background-position:-200% center; } 100% { background-position:200% center; } }
+        .oa-header-badge { background:linear-gradient(90deg,#16a34a 0%,#22c55e 40%,#16a34a 80%); background-size:200% auto; animation:oa-shimmer 2.4s linear infinite; color:#fff; font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:6px 14px; font-family:'Lato',sans-serif; display:inline-flex; align-items:center; gap:5px; }
       `}</style>
+
+      {/* ── Open Access Download Modal ── */}
+      <OpenAccessModal
+        isOpen={showOAModal}
+        onClose={() => setShowOAModal(false)}
+        book={book}
+        countdownSec={10}
+      />
 
       <div className="lan-root" style={{ minHeight: "100vh" }}>
         {/* ══ HEADER ════════════════════════════════════════════════ */}
@@ -1489,7 +1561,29 @@ export default function BookPreviewPage() {
               </Link>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              {!isPurchased && (
+              {/* CTA changes based on free vs paid */}
+              {free ? (
+                <button
+                  onClick={handleFreeAccess}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    background: "rgba(22,163,74,0.15)",
+                    color: "#86efac",
+                    padding: "8px 16px",
+                    border: "0.5px solid rgba(22,163,74,0.4)",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: "'Lato',sans-serif",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  <Unlock size={13} />
+                  ACCESS FREE
+                </button>
+              ) : !isPurchased ? (
                 <button
                   onClick={handlePurchase}
                   style={{
@@ -1506,8 +1600,7 @@ export default function BookPreviewPage() {
                 >
                   PURCHASE ₦{book.price?.toLocaleString()}
                 </button>
-              )}
-              {isPurchased && (
+              ) : (
                 <div
                   style={{
                     display: "flex",
@@ -1539,6 +1632,15 @@ export default function BookPreviewPage() {
                   </span>
                 </div>
               )}
+
+              {/* Free badge in header */}
+              {free && (
+                <span className="oa-header-badge">
+                  <Unlock size={11} />
+                  Open Access
+                </span>
+              )}
+
               <button
                 onClick={() => setShowOptionsModal(true)}
                 style={{
@@ -1615,7 +1717,32 @@ export default function BookPreviewPage() {
                     <X size={20} />
                   </button>
                 </div>
-                {!isPurchased && (
+                {free ? (
+                  <button
+                    onClick={() => {
+                      setShowNavMenu(false);
+                      handleFreeAccess();
+                    }}
+                    style={{
+                      width: "100%",
+                      background: "#16a34a",
+                      color: "#fff",
+                      padding: "11px",
+                      border: "none",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: "'Lato',sans-serif",
+                      letterSpacing: "0.06em",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <Unlock size={14} /> Access Free Document
+                  </button>
+                ) : !isPurchased ? (
                   <button
                     onClick={() => {
                       setShowNavMenu(false);
@@ -1636,7 +1763,7 @@ export default function BookPreviewPage() {
                   >
                     PURCHASE THIS BOOK
                   </button>
-                )}
+                ) : null}
               </div>
               <div style={{ padding: "12px" }}>
                 {[
@@ -1748,7 +1875,7 @@ export default function BookPreviewPage() {
                               fontSize: "11px",
                               color: "#888",
                               textDecoration: "none",
-                              fontFamily: "'Lato',sans-serif'",
+                              fontFamily: "'Lato',sans-serif",
                             }}
                           >
                             {b.title}
@@ -1784,8 +1911,7 @@ export default function BookPreviewPage() {
                     "Loading…"
                   ) : isSeller ? (
                     <>
-                      <Upload size={14} />
-                      Upload Document
+                      <Upload size={14} /> Upload Document
                     </>
                   ) : (
                     "Become a Seller"
@@ -1805,7 +1931,6 @@ export default function BookPreviewPage() {
             className="lg-grid"
           >
             {/* ── LEFT SIDEBAR ── */}
-            {/* ── LEFT SIDEBAR ── */}
             <div className="lg-show" style={{ display: "none" }}>
               <div
                 style={{
@@ -1824,7 +1949,7 @@ export default function BookPreviewPage() {
                 >
                   <div style={{ position: "relative" }}>
                     <img
-                      src={book.image || getThumbnailUrl(book)} // ← use pre-processed image first
+                      src={book.image || getThumbnailUrl(book)}
                       alt={book.title}
                       style={{
                         width: "100%",
@@ -1833,25 +1958,10 @@ export default function BookPreviewPage() {
                         display: "block",
                       }}
                       onError={(e) => {
-                        const src = e.target.src;
-                        if (src.includes("lh3.googleusercontent.com")) {
-                          e.target.src =
-                            "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-                        } else {
-                          const m = src.match(
-                            /\/d\/([\w-]{25,})|id=([\w-]{25,})/,
-                          );
-                          if (m) {
-                            const fileId = m[1] || m[2];
-                            e.target.src = `https://lh3.googleusercontent.com/d/${fileId}=w400`;
-                          } else {
-                            e.target.src =
-                              "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-                          }
-                        }
+                        e.target.src =
+                          "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
                       }}
                     />
-                    {/* LIVE badge */}
                     <div
                       style={{
                         position: "absolute",
@@ -1880,7 +1990,26 @@ export default function BookPreviewPage() {
                       />
                       PDF
                     </div>
-                    {isPurchased && (
+                    {free ? (
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: "10px",
+                          right: "10px",
+                          background: "#16a34a",
+                          color: "#fff",
+                          fontSize: "9px",
+                          fontWeight: 700,
+                          padding: "3px 8px",
+                          fontFamily: "'Lato',sans-serif",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        <Unlock size={9} /> FREE
+                      </span>
+                    ) : isPurchased ? (
                       <span
                         style={{
                           position: "absolute",
@@ -1896,10 +2025,9 @@ export default function BookPreviewPage() {
                       >
                         OWNED
                       </span>
-                    )}
+                    ) : null}
                   </div>
                   <div style={{ padding: "14px" }}>
-                    {/* Rating + views */}
                     <div
                       style={{
                         display: "flex",
@@ -2022,15 +2150,21 @@ export default function BookPreviewPage() {
                 >
                   {[
                     {
-                      icon: isPurchased ? (
-                        <Download size={18} />
+                      icon: free ? (
+                        <Unlock size={18} style={{ color: "#16a34a" }} />
                       ) : (
                         <Download size={18} />
                       ),
-                      label: isPurchased ? "Open" : "Purchase",
-                      onClick: isPurchased
-                        ? () => router.push("/my-books")
-                        : handlePurchase,
+                      label: free
+                        ? "Download"
+                        : isPurchased
+                          ? "Open"
+                          : "Purchase",
+                      onClick: free
+                        ? handleFreeAccess
+                        : isPurchased
+                          ? () => router.push("/my-books")
+                          : handlePurchase,
                     },
                     {
                       icon: (
@@ -2082,11 +2216,17 @@ export default function BookPreviewPage() {
                 >
                   <div className="stat-pill">
                     <Layers size={13} style={{ color: GOLD }} />
-                    <span>₦{book.price?.toLocaleString()}</span>
+                    {free ? (
+                      <span style={{ color: "#86efac" }}>FREE</span>
+                    ) : (
+                      <span>₦{book.price?.toLocaleString()}</span>
+                    )}
                   </div>
                   <div className="stat-pill">
                     <ShoppingBag size={13} style={{ color: GOLD }} />
-                    <span>{sold} sold</span>
+                    <span>
+                      {sold} {free ? "downloads" : "sold"}
+                    </span>
                   </div>
                   <button
                     className="stat-pill"
@@ -2167,6 +2307,38 @@ export default function BookPreviewPage() {
                       </span>
                     </div>
                   ))}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "11px",
+                      padding: "6px 0",
+                    }}
+                  >
+                    <span
+                      style={{ color: "#aaa", fontFamily: "'Lato',sans-serif" }}
+                    >
+                      Access
+                    </span>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        color: free ? "#16a34a" : NAVY,
+                        fontFamily: "'Lato',sans-serif",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      {free ? (
+                        <>
+                          <Unlock size={11} /> Open Access
+                        </>
+                      ) : (
+                        "Premium"
+                      )}
+                    </span>
+                  </div>
                 </div>
 
                 {/* LAN Lecturers */}
@@ -2287,8 +2459,6 @@ export default function BookPreviewPage() {
                           background: CREAM,
                         }}
                       >
-                        {/* Top row: avatar + name + follow */}
-                        {/* Top row: avatar + name + follow */}
                         <div
                           style={{
                             display: "flex",
@@ -2297,7 +2467,6 @@ export default function BookPreviewPage() {
                             marginBottom: "8px",
                           }}
                         >
-                          {/* SINGLE avatar link — shows photo if available, else initial */}
                           <Link
                             href={`/seller-profile?sellerId=${lec.sellerId}`}
                             style={{
@@ -2337,8 +2506,6 @@ export default function BookPreviewPage() {
                               lec.sellerName?.charAt(0)?.toUpperCase() || "?"
                             )}
                           </Link>
-
-                          {/* Name + files count */}
                           <Link
                             href={`/seller-profile?sellerId=${lec.sellerId}`}
                             style={{
@@ -2374,8 +2541,6 @@ export default function BookPreviewPage() {
                               {lec.uploadedBooks} files uploaded
                             </p>
                           </Link>
-
-                          {/* Follow button */}
                           <button
                             onClick={(e) =>
                               handleFollowLecturer(
@@ -2410,8 +2575,6 @@ export default function BookPreviewPage() {
                                 : "+ Follow"}
                           </button>
                         </div>
-
-                        {/* Verified Faculty badge */}
                         <div
                           style={{
                             display: "flex",
@@ -2453,8 +2616,6 @@ export default function BookPreviewPage() {
                             </span>
                           )}
                         </div>
-
-                        {/* Institution row */}
                         {lec.institution && (
                           <div
                             style={{
@@ -2510,7 +2671,6 @@ export default function BookPreviewPage() {
                 style={{ background: "#fff", border: "0.5px solid #e5ddd0" }}
               >
                 <div style={{ display: "flex", gap: "14px", padding: "16px" }}>
-                  {/* Cover */}
                   <div
                     style={{
                       position: "relative",
@@ -2559,6 +2719,26 @@ export default function BookPreviewPage() {
                       />
                       LIVE
                     </div>
+                    {free && (
+                      <span
+                        style={{
+                          position: "absolute",
+                          bottom: "6px",
+                          left: "6px",
+                          background: "#16a34a",
+                          color: "#fff",
+                          fontSize: "8px",
+                          fontWeight: 700,
+                          padding: "2px 6px",
+                          fontFamily: "'Lato',sans-serif",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "3px",
+                        }}
+                      >
+                        <Unlock size={8} /> FREE
+                      </span>
+                    )}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
@@ -2608,6 +2788,25 @@ export default function BookPreviewPage() {
                       >
                         • {book.pages}p
                       </span>
+                      {free && (
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            fontWeight: 700,
+                            color: "#16a34a",
+                            background: "rgba(22,163,74,0.1)",
+                            border: "0.5px solid rgba(22,163,74,0.3)",
+                            padding: "2px 7px",
+                            fontFamily: "'Lato',sans-serif",
+                            letterSpacing: "0.06em",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "3px",
+                          }}
+                        >
+                          <Unlock size={8} /> Open Access
+                        </span>
+                      )}
                     </div>
                     <h1
                       style={{
@@ -2673,11 +2872,21 @@ export default function BookPreviewPage() {
                 >
                   {[
                     {
-                      icon: <Download size={18} />,
-                      label: isPurchased ? "Open" : "Purchase",
-                      onClick: isPurchased
-                        ? () => router.push("/my-books")
-                        : handlePurchase,
+                      icon: free ? (
+                        <Unlock size={18} style={{ color: "#16a34a" }} />
+                      ) : (
+                        <Download size={18} />
+                      ),
+                      label: free
+                        ? "Download"
+                        : isPurchased
+                          ? "Open"
+                          : "Purchase",
+                      onClick: free
+                        ? handleFreeAccess
+                        : isPurchased
+                          ? () => router.push("/my-books")
+                          : handlePurchase,
                     },
                     {
                       icon: (
@@ -2731,23 +2940,27 @@ export default function BookPreviewPage() {
                   {[
                     [
                       <Layers size={13} style={{ color: GOLD }} />,
-                      `₦${book.price?.toLocaleString()}`,
+                      free ? "FREE" : `₦${book.price?.toLocaleString()}`,
+                      free,
                     ],
                     [
                       <ShoppingBag size={13} style={{ color: GOLD }} />,
-                      `${sold} sold`,
+                      `${sold} ${free ? "dl" : "sold"}`,
+                      false,
                     ],
                     [
                       <ThumbsUp size={13} style={{ color: GOLD }} />,
                       positiveRatingPercent !== null
                         ? `${positiveRatingPercent}%`
                         : "0%",
+                      false,
                     ],
                     [
                       <FileText size={13} style={{ color: GOLD }} />,
                       `${book.pages}p`,
+                      false,
                     ],
-                  ].map(([icon, val], i) => (
+                  ].map(([icon, val, highlight], i) => (
                     <div
                       key={i}
                       style={{
@@ -2764,7 +2977,7 @@ export default function BookPreviewPage() {
                         style={{
                           fontSize: "9px",
                           fontWeight: 700,
-                          color: "#fff",
+                          color: highlight ? "#86efac" : "#fff",
                           fontFamily: "'Lato',sans-serif",
                           textAlign: "center",
                         }}
@@ -2827,10 +3040,42 @@ export default function BookPreviewPage() {
                           fontFamily: "'Lato',sans-serif",
                         }}
                       >
-                        {isPurchased ? "Full Access" : "Preview"}
+                        {free
+                          ? "Open Access"
+                          : isPurchased
+                            ? "Full Access"
+                            : "Preview"}
                       </span>
                     </div>
-                    {isPurchased && (
+                    {free && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "5px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "5px",
+                            height: "5px",
+                            borderRadius: "50%",
+                            background: "#22c55e",
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            color: "#86efac",
+                            fontWeight: 700,
+                            fontFamily: "'Lato',sans-serif",
+                          }}
+                        >
+                          FREE DOCUMENT
+                        </span>
+                      </div>
+                    )}
+                    {!free && isPurchased && (
                       <div
                         style={{
                           display: "flex",
@@ -2876,8 +3121,7 @@ export default function BookPreviewPage() {
                         fontFamily: "'Lato',sans-serif",
                       }}
                     >
-                      <Layers size={12} />
-                      Overview
+                      <Layers size={12} /> Overview
                     </button>
                     <button
                       onClick={() => setShowSummary(true)}
@@ -2895,8 +3139,7 @@ export default function BookPreviewPage() {
                         fontFamily: "'Lato',sans-serif",
                       }}
                     >
-                      <FileText size={12} />
-                      Summary
+                      <FileText size={12} /> Summary
                     </button>
                   </div>
                 </div>
@@ -2914,7 +3157,6 @@ export default function BookPreviewPage() {
                 <PhysicalStockBadge />
                 <PdfViewer heightClass="400px" fullHeight="900px" />
 
-                {/* Gold sponsored strip — below purchase CTA */}
                 <FeaturedAdsCarousel
                   tier="Gold"
                   maxAds={2}
@@ -2936,6 +3178,11 @@ export default function BookPreviewPage() {
                   autoPlayMs={4000}
                   style={{ marginTop: "1px" }}
                 />
+
+                {/* ── Google AdSense — visible to crawlers on page load ── */}
+                <div style={{ padding: "0 16px 16px" }}>
+                  <GoogleAdComponent />
+                </div>
               </div>
 
               {/* Mobile lecturers */}
@@ -3292,7 +3539,6 @@ export default function BookPreviewPage() {
                                 "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
                             }}
                             loading="lazy"
-                            className="book-thumb"
                           />
                           <span
                             style={{
@@ -3416,7 +3662,6 @@ export default function BookPreviewPage() {
                 WebkitOverflowScrolling: "touch",
               }}
             >
-              {/* Sticky Header */}
               <div
                 style={{
                   background: NAVY,
@@ -3453,8 +3698,6 @@ export default function BookPreviewPage() {
                   <X size={22} />
                 </button>
               </div>
-
-              {/* Scrollable Content */}
               <div style={{ padding: "24px", paddingBottom: "80px", flex: 1 }}>
                 <img
                   src={getThumbnailUrl(book)}
@@ -3603,7 +3846,6 @@ export default function BookPreviewPage() {
                 WebkitOverflowScrolling: "touch",
               }}
             >
-              {/* Sticky Header */}
               <div
                 style={{
                   background: NAVY,
@@ -3640,8 +3882,6 @@ export default function BookPreviewPage() {
                   <X size={22} />
                 </button>
               </div>
-
-              {/* Scrollable Content */}
               <div style={{ padding: "24px", paddingBottom: "80px", flex: 1 }}>
                 <img
                   src={getThumbnailUrl(book)}
@@ -3842,7 +4082,6 @@ export default function BookPreviewPage() {
                   overflow: "hidden",
                 }}
               >
-                {/* Header */}
                 <div
                   style={{
                     padding: "20px 24px",
@@ -3895,8 +4134,6 @@ export default function BookPreviewPage() {
                     <X size={20} />
                   </button>
                 </div>
-
-                {/* Body */}
                 <div style={{ padding: "20px 24px" }}>
                   {book?.title && (
                     <p
@@ -3911,8 +4148,6 @@ export default function BookPreviewPage() {
                       {book.title}
                     </p>
                   )}
-
-                  {/* Star picker */}
                   <p
                     style={{
                       fontSize: "11px",
@@ -3974,7 +4209,6 @@ export default function BookPreviewPage() {
                       </span>
                     )}
                   </div>
-
                   <div
                     style={{
                       height: "0.5px",
@@ -3982,8 +4216,6 @@ export default function BookPreviewPage() {
                       marginBottom: "20px",
                     }}
                   />
-
-                  {/* Text */}
                   <p
                     style={{
                       fontSize: "11px",
@@ -4032,8 +4264,6 @@ export default function BookPreviewPage() {
                   >
                     {feedbackText.length}/500
                   </p>
-
-                  {/* View all link */}
                   <button
                     onClick={() =>
                       router.push(`/book/feedbacks?bookId=${bookId}`)
@@ -4053,8 +4283,6 @@ export default function BookPreviewPage() {
                   >
                     View all reviews →
                   </button>
-
-                  {/* Actions */}
                   <div style={{ display: "flex", gap: "10px" }}>
                     <button
                       onClick={() => {

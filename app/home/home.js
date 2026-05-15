@@ -920,8 +920,8 @@ export default function HomeClient() {
                                 </div>
                             )}
                             <div style={{ textAlign: "center", marginTop: "32px" }}>
-                                <Link href="/documents" style={{ fontSize: "13px", fontWeight: 700, color: NAVY, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                                    Explore all categories <ChevronRight size={14} />
+                                <Link href="/departments" style={{ fontSize: "13px", fontWeight: 700, color: NAVY, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                    Explore all Department <ChevronRight size={14} />
                                 </Link>
                             </div>
                         </>

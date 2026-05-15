@@ -1,28 +1,28 @@
 // app/api/resend-receipt/route.js
-// ─────────────────────────────────────────────────────────────────
-// Called from the "Resend Receipt" button in Transaction History.
-// Validates the requesting user owns the transaction, then fires
-// a receipt email via Resend.
-//
-// POST body: { orderId: string }
-// Auth:      Bearer token in Authorization header (Firebase ID token)
-// ─────────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { db } from "@/lib/firebaseConfig";
-import { doc, getDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, addDoc, collection, serverTimestamp, updateDoc, increment } from "firebase/firestore";
 import { buildOrderReceipt } from "@/lib/emailTemplates";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 
 /* ── Firebase Admin init (server-only) ── */
-if (!getApps().length) {
-    initializeApp({
+const formatKey = (key) => {
+    if (!key) throw new Error("FIREBASE_PRIVATE_KEY_BASE64 is not set");
+    const decoded = Buffer.from(key, "base64").toString("utf-8");
+    return decoded.trim().replace(/^"+|"+$/g, "").replace(/\\n/g, "\n");
+};
+
+function getAdminApp() {
+    if (getApps().length) return getApps()[0];
+
+    return initializeApp({
         credential: cert({
             projectId: process.env.FIREBASE_PROJECT_ID,
             clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+            privateKey: formatKey(process.env.FIREBASE_PRIVATE_KEY_BASE64),
         }),
     });
 }
@@ -45,7 +45,7 @@ export async function POST(request) {
 
         let decodedToken;
         try {
-            decodedToken = await getAuth().verifyIdToken(idToken);
+            decodedToken = await getAuth(getAdminApp()).verifyIdToken(idToken);
         } catch {
             return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
         }
@@ -71,7 +71,7 @@ export async function POST(request) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        /* ── 5. Rate-limit: max 3 resends per order (stored in the tx doc) ── */
+        /* ── 5. Rate-limit: max 3 resends per order ── */
         const resendCount = tx.resendCount ?? 0;
         if (resendCount >= 3) {
             return NextResponse.json(
@@ -105,7 +105,6 @@ export async function POST(request) {
 
         /* ── 7. Increment resend counter on the transaction doc ── */
         try {
-            const { updateDoc, increment } = await import("firebase/firestore");
             await updateDoc(doc(db, "transactions", orderId), {
                 resendCount: increment(1),
                 lastResentAt: serverTimestamp(),
@@ -115,7 +114,7 @@ export async function POST(request) {
             console.warn("[resend-receipt] Failed to update resend counter:", updateErr.message);
         }
 
-        /* ── 8. Also write to mail collection as an audit log ── */
+        /* ── 8. Audit log in mail collection ── */
         try {
             await addDoc(collection(db, "mail"), {
                 to: buyerEmail,

@@ -61,10 +61,50 @@ const STEPS = [
 
 // Conditional document types per intent
 const DOC_TYPES = {
-    academic: ["Lecture Note", "Textbook", "Handwritten Notes", "Syllabus", "Course Outline", "Lab Manual", "Assignment", "Past Question", "Thesis", "Research Proposal", "Seminar Paper", "Summary", "Study Guide", "Mind Map", "Cheat Sheet", "Lab Report", "Journal Article"],
-    "student-prep": ["Past Question", "WAEC Past Questions", "JAMB CBT Practice", "NECO Past Questions", "GCE Past Questions", "Exam Revision", "Mock Exam", "Quiz Bank", "Study Guide", "Post-UTME Past Questions"],
-    divinity: ["Sacred Text", "Sermon Notes", "Tafsir", "Bible Commentary", "Hadith Collection", "Theological Manuscript", "Religious Journal", "Prayer Book", "Catechism", "Exegesis"],
-    commercial: ["Novel", "E-Book", "Biography", "Self-Help", "Academic Reference", "Children's Book", "Poetry Collection", "Memoir", "Short Stories", "Non-Fiction"],
+    academic: [
+        // ── Academic ──
+        "Textbook", "Lecture Note", "Handwritten Notes", "Syllabus", "Course Outline",
+        "Summary", "Study Guide", "Reading List", "Mind Map", "Flashcards",
+        "Cheat Sheet", "Annotated Bibliography", "Tutorial Sheet", "Community Timetable",
+        // ── Research ──
+        "Thesis", "Research Proposal", "Seminar Paper", "Case Study", "Journal Article",
+        "Literature Review", "Conference Paper", "Essay", "Dissertation Chapter",
+        "Group Project Report",
+        // ── Practical ──
+        "Lab Manual", "Lab Report", "Technical Drawing", "Project", "Field Report",
+        "Software Documentation", "Circuit Diagram", "Code Sample", "Algorithm Sheet",
+        // ── Administrative ──
+        "Internship Report", "Clearance Guide", "Scholarship Guide", "Student Handbook",
+        "Hostel Guide", "Admission Letter", "Academic Transcript", "Fellowship Application",
+        // ── Professional (Academic) ──
+        "Medical Notes", "Law Case Brief", "Nursing Guide", "Accounting Workbook",
+        "Engineering Formula Sheet", "Pharmacy Notes", "Architecture Portfolio",
+        "Workshop Material", "Motivational Resource", "Translation Resource",
+        // ── Digital ──
+        "Presentation Slides", "Infographic", "Video Lecture Notes", "Podcast Transcript",
+    ],
+
+    "student-prep": [
+        "Past Question", "WAEC Past Questions", "JAMB CBT Practice", "NECO Past Questions",
+        "GCE Past Questions", "Post-UTME Past Questions", "Exam Revision", "Mock Exam",
+        "Quiz Bank", "Assignment", "Study Guide",
+    ],
+
+    divinity: [
+        "Sacred Text", "Sermon Notes", "Tafsir", "Bible Commentary", "Hadith Collection",
+        "Theological Manuscript", "Religious Journal", "Prayer Book", "Catechism", "Exegesis",
+    ],
+
+    commercial: [
+        // ── Books ──
+        "Novel", "E-Book", "Biography", "Self-Help", "Academic Reference",
+        "Children's Book", "Poetry Collection", "Memoir", "Short Stories", "Non-Fiction",
+        // ── Career ──
+        "CV Template", "Cover Letter Template", "Portfolio", "Career Guide",
+        "Interview Prep", "Networking Guide",
+        // ── Cooking & Lifestyle ──
+        "Recipe Book", "Culinary Notes", "Food Science Notes", "Nutrition Guide", "Meal Plan",
+    ],
 };
 
 const EXAM_BODIES = ["WAEC", "NECO", "JAMB", "GCE", "Post-UTME", "NABTEB", "NACOS"];
@@ -83,6 +123,43 @@ const LEVELS = [
     { value: "ss1", label: "SS1" }, { value: "ss2", label: "SS2" },
     { value: "ss3", label: "SS3" },
 ];
+const DEPARTMENTS_BY_FACULTY = {
+    "Sciences": [
+        "Medicine & Health Sciences", "Pharmacy", "Nursing", "Biochemistry",
+        "Microbiology", "Biology", "Chemistry", "Physics", "Mathematics",
+        "Statistics", "Veterinary Medicine", "Dentistry", "Nutrition & Dietetics", "Optometry",
+    ],
+    "Engineering & Technology": [
+        "Computer Science", "Electrical Engineering", "Mechanical Engineering",
+        "Civil Engineering", "Chemical Engineering", "Petroleum Engineering",
+        "Architecture", "Information Technology", "Agricultural Engineering",
+        "Environmental Engineering", "Mining Engineering",
+    ],
+    "Arts & Social Sciences": [
+        "Law", "Economics", "Accounting", "Business Administration",
+        "Political Science", "Sociology", "Psychology", "Mass Communication",
+        "History & International Studies", "Public Administration",
+        "Geography", "Philosophy", "Linguistics",
+    ],
+    "Humanities & Creative Arts": [
+        "Literature", "Fine & Applied Arts", "Music",
+        "Theatre & Performing Arts", "Languages & Linguistics", "Religious Studies",
+    ],
+    "Agriculture & Environment": [
+        "Agriculture", "Forestry & Wildlife", "Fisheries & Aquaculture",
+        "Environmental Sciences", "Food Science & Technology",
+    ],
+    "Education": [
+        "Education", "Guidance & Counselling", "Early Childhood Education",
+        "Special Education", "Physical & Health Education",
+    ],
+    "Professional": [
+        "Finance & Banking", "Insurance", "Estate Management",
+        "Hospitality & Tourism", "Library & Information Science",
+        "Quantity Surveying", "Urban & Regional Planning", "Social Work",
+    ],
+};
+
 const FACULTY_TITLES = ["Dr.", "Prof.", "Engr.", "Pharm.", "Barr.", "Lecturer"];
 
 /* ─────────────────────────────────────────────────────────────────
@@ -160,6 +237,9 @@ export default function AdvertiseClient() {
         theologicalCategory: "", doctrine: "",
         // commercial
         isbn: "", genre: "", edition: "",
+        // Paid
+        accessType: "paid",
+
     });
 
     const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -245,8 +325,13 @@ export default function AdvertiseClient() {
             if (intent === "student-prep" && !form.examBody) return false;
             return true;
         }
-        if (step === 3) return (selectedFile || form.driveLink) && form.price && form.pages;
-        return true;
+        if (step === 3) {
+            const hasFile = selectedFile || form.driveLink;
+            const hasPages = !!form.pages;
+            if (!hasFile || !hasPages) return false;
+            if (form.accessType === "paid" && (!form.price || Number(form.price) <= 0)) return false;
+            return true;
+        }
     };
 
     /* ── Submit ── */
@@ -312,6 +397,8 @@ export default function AdvertiseClient() {
                 // Meta
                 status: "pending", views: 0, purchases: 0,
                 createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+                isFree: form.accessType === "free",
+                price: form.accessType === "free" ? 0 : Number(form.price),
             });
 
             alert("Submitted! We'll review within 24–48 hours.");
@@ -585,8 +672,22 @@ export default function AdvertiseClient() {
                                             </div>
 
                                             <div className="two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                                                <Field label="Department" hint="Pre-filled from your profile">
-                                                    <Inp name="department" value={form.department} onChange={handle} placeholder="e.g. Chemical Engineering" />
+                                                <Field label="Department" hint="Pre-filled from your profile — change if needed">
+                                                    <Sel
+                                                        name="department"
+                                                        value={form.department}
+                                                        onChange={handle}
+                                                    >
+                                                        <option value="">— Select Department —</option>
+                                                        {Object.entries(DEPARTMENTS_BY_FACULTY).map(([faculty, depts]) => (
+                                                            <optgroup key={faculty} label={faculty}>
+                                                                {depts.map(d => (
+                                                                    <option key={d} value={d}>{d}</option>
+                                                                ))}
+                                                            </optgroup>
+                                                        ))}
+                                                        <option value="Other">Other (specify in description)</option>
+                                                    </Sel>
                                                 </Field>
                                                 <Field label="Course Code">
                                                     <Inp name="courseCode" value={form.courseCode} onChange={handle} placeholder="e.g. CHE 301" />
@@ -805,33 +906,85 @@ export default function AdvertiseClient() {
 
                                     <Divider label="Pricing" />
 
+                                    {/* ── Access Type Toggle ── */}
+                                    <div>
+                                        <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#6b7280", marginBottom: 10 }}>
+                                            Access Type <span style={{ color: "#ea580c" }}>*</span>
+                                        </p>
+                                        <div style={{ display: "flex", gap: 0, border: "2px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
+                                            {[
+                                                { value: "paid", label: "💰 Paid", desc: "Readers purchase to access", color: "#1a3a5c" },
+                                                { value: "free", label: "🔓 Free", desc: "Open access for everyone", color: "#16a34a" },
+                                            ].map(opt => (
+                                                <button
+                                                    key={opt.value}
+                                                    type="button"
+                                                    onClick={() => { set("accessType", opt.value); if (opt.value === "free") set("price", "0"); }}
+                                                    style={{
+                                                        flex: 1, padding: "14px 12px", border: "none", cursor: "pointer",
+                                                        background: form.accessType === opt.value ? opt.color : "#fff",
+                                                        color: form.accessType === opt.value ? "#fff" : "#6b7280",
+                                                        transition: "all 0.18s", display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                                                    }}
+                                                >
+                                                    <span style={{ fontSize: 14, fontWeight: 700 }}>{opt.label}</span>
+                                                    <span style={{ fontSize: 11, opacity: form.accessType === opt.value ? 0.8 : 0.6 }}>{opt.desc}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Free info banner */}
+                                        {form.accessType === "free" && (
+                                            <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(22,163,74,0.07)", border: "1px solid rgba(22,163,74,0.25)", borderRadius: 10, display: "flex", alignItems: "flex-start", gap: 10 }}>
+                                                <Check size={15} style={{ color: "#16a34a", marginTop: 1, flexShrink: 0 }} />
+                                                <div>
+                                                    <p style={{ fontSize: 13, fontWeight: 700, color: "#15803d", margin: "0 0 2px" }}>Open Access Document</p>
+                                                    <p style={{ fontSize: 12, color: "#16a34a", margin: 0, lineHeight: 1.5 }}>
+                                                        This document will be listed on the <strong>Open Access</strong> page and freely downloadable by all students. Great for building your reputation and reach.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
                                     {/* ── Price + Pages + Format ── */}
                                     <div className="two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
 
-                                        {/* Price block with 80/20 split */}
-                                        <div>
-                                            <Field label="Price (₦)" required>
-                                                <div style={{ position: "relative" }}>
-                                                    <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontWeight: 700, fontSize: 14 }}>₦</span>
-                                                    <Inp type="number" name="price" value={form.price} onChange={handle}
-                                                        placeholder="0" sx={{ paddingLeft: 30 }} />
-                                                </div>
-                                            </Field>
-                                            {form.price && (
-                                                <div style={{ marginTop: 10, padding: "13px 15px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10 }}>
-                                                    <p style={{ fontSize: 10, color: "#15803d", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 2px" }}>Your earnings per sale</p>
-                                                    <p className="pf" style={{ fontSize: 26, fontWeight: 800, color: "#15803d", margin: "0 0 1px" }}>₦{earnings}</p>
-                                                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#16a34a", borderTop: "1px solid #bbf7d0", paddingTop: 6, marginTop: 6 }}>
-                                                        <span>Your share (80%)</span>
-                                                        <span style={{ fontWeight: 700 }}>₦{earnings}</span>
+                                        {/* Price block — hidden when free */}
+                                        {form.accessType !== "free" && (
+                                            <div>
+                                                <Field label="Price (₦)" required>
+                                                    <div style={{ position: "relative" }}>
+                                                        <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontWeight: 700, fontSize: 14 }}>₦</span>
+                                                        <Inp type="number" name="price" value={form.price} onChange={handle}
+                                                            placeholder="0" sx={{ paddingLeft: 30 }} />
                                                     </div>
-                                                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9ca3af" }}>
-                                                        <span>Platform (20%)</span>
-                                                        <span>₦{platformFee}</span>
+                                                </Field>
+                                                {form.price && Number(form.price) > 0 && (
+                                                    <div style={{ marginTop: 10, padding: "13px 15px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10 }}>
+                                                        <p style={{ fontSize: 10, color: "#15803d", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 2px" }}>Your earnings per sale</p>
+                                                        <p className="pf" style={{ fontSize: 26, fontWeight: 800, color: "#15803d", margin: "0 0 1px" }}>₦{earnings}</p>
+                                                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#16a34a", borderTop: "1px solid #bbf7d0", paddingTop: 6, marginTop: 6 }}>
+                                                            <span>Your share (80%)</span>
+                                                            <span style={{ fontWeight: 700 }}>₦{earnings}</span>
+                                                        </div>
+                                                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9ca3af" }}>
+                                                            <span>Platform (20%)</span>
+                                                            <span>₦{platformFee}</span>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Free earnings placeholder */}
+                                        {form.accessType === "free" && (
+                                            <div style={{ padding: "13px 15px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, display: "flex", flexDirection: "column", justifyContent: "center", gap: 4 }}>
+                                                <p style={{ fontSize: 10, fontWeight: 700, color: "#15803d", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>Open Access</p>
+                                                <p className="pf" style={{ fontSize: 22, fontWeight: 800, color: "#15803d", margin: 0 }}>Free for all</p>
+                                                <p style={{ fontSize: 11, color: "#16a34a", margin: 0 }}>No wallet balance needed to read</p>
+                                            </div>
+                                        )}
 
                                         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                                             <Field label="Number of Pages" required>
@@ -855,21 +1008,23 @@ export default function AdvertiseClient() {
                                         </div>
                                     </div>
 
-                                    {/* Pricing guide */}
-                                    <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "15px 18px" }}>
-                                        <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6b7280", margin: "0 0 10px" }}>💡 Pricing Guide</p>
-                                        {[
-                                            ["Past Questions / Notes", "₦500 – ₦1,500"],
-                                            ["Lecture Notes / Summaries", "₦1,000 – ₦3,000"],
-                                            ["Textbooks / Full Projects", "₦2,500 – ₦8,000"],
-                                            ["Premium Thesis / Dissertation", "₦5,000 – ₦15,000"],
-                                        ].map(([t, r]) => (
-                                            <div key={t} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "2px 0" }}>
-                                                <span style={{ color: "#6b7280" }}>{t}</span>
-                                                <span style={{ fontWeight: 700, color: "#111827" }}>{r}</span>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    {/* Pricing guide — only shown for paid */}
+                                    {form.accessType !== "free" && (
+                                        <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "15px 18px" }}>
+                                            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6b7280", margin: "0 0 10px" }}>💡 Pricing Guide</p>
+                                            {[
+                                                ["Past Questions / Notes", "₦500 – ₦1,500"],
+                                                ["Lecture Notes / Summaries", "₦1,000 – ₦3,000"],
+                                                ["Textbooks / Full Projects", "₦2,500 – ₦8,000"],
+                                                ["Premium Thesis / Dissertation", "₦5,000 – ₦15,000"],
+                                            ].map(([t, r]) => (
+                                                <div key={t} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "2px 0" }}>
+                                                    <span style={{ color: "#6b7280" }}>{t}</span>
+                                                    <span style={{ fontWeight: 700, color: "#111827" }}>{r}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
 
                                     {uploadMsg && (
                                         <p style={{ textAlign: "center", fontSize: 13, fontWeight: 600, color: "#1a3a5c" }}>{uploadMsg}</p>

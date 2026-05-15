@@ -511,6 +511,168 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* ══════ FOR LECTURERS ══════ */}
+        <section style={{ background: "#fff", padding: "96px 24px", borderTop: "0.5px solid #e5ddd0" }}>
+          <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+
+            {/* ── Top Label ── */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+              <div style={{ height: "0.5px", width: 32, background: "rgba(184,150,62,0.4)" }} />
+              <svg width="9" height="9" viewBox="0 0 9 9">
+                <rect x="1" y="1" width="7" height="7" fill="none" stroke={GOLD} strokeWidth="1.2" transform="rotate(45 4.5 4.5)" />
+              </svg>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".22em", textTransform: "uppercase", color: GOLD, fontFamily: "'Lato',sans-serif" }}>For Lecturers & Faculty</span>
+              <svg width="9" height="9" viewBox="0 0 9 9">
+                <rect x="1" y="1" width="7" height="7" fill="none" stroke={GOLD} strokeWidth="1.2" transform="rotate(45 4.5 4.5)" />
+              </svg>
+              <div style={{ height: "0.5px", flex: 1, background: "rgba(184,150,62,0.4)" }} />
+            </div>
+
+            {/* ── Two-Column Layout ── */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 56, alignItems: "center" }}>
+
+              {/* ── LEFT: text ── */}
+              <div>
+                <h2 className="lan-serif" style={{ fontSize: "clamp(30px,4vw,52px)", fontWeight: 700, color: NAVY, margin: "0 0 6px", lineHeight: 1.08 }}>
+                  The Faculty
+                </h2>
+                <h2 className="lan-serif" style={{ fontSize: "clamp(30px,4vw,52px)", fontWeight: 900, color: GOLD, fontStyle: "italic", margin: "0 0 20px", lineHeight: 1.08 }}>
+                  Podium.
+                </h2>
+                <p style={{ fontSize: 15, color: "#777", lineHeight: 1.85, maxWidth: 460, fontWeight: 300, fontFamily: "'Lato',sans-serif", marginBottom: 32 }}>
+                  Publish your course materials. Build your academic legacy across Africa.
+                  Earn from the knowledge you've spent years developing — one upload,
+                  millions of students.
+                </p>
+
+                {/* Feature rows */}
+                <div style={{ border: "0.5px solid #e5ddd0", background: "#fff", marginBottom: 32 }}>
+                  {[
+                    {
+                      icon: <BookOpen size={15} style={{ color: GOLD }} />,
+                      title: "Publish Course Materials",
+                      body: "Lecture notes, syllabi, past questions, and full course packs — organised by course code, semester, and level.",
+                    },
+                    {
+                      icon: <DollarSign size={15} style={{ color: "#16a34a" }} />,
+                      title: "Earn Passive Income",
+                      body: "Set your own price. Earn every time a student downloads your material. Your life's work keeps paying.",
+                    },
+                    {
+                      icon: <Users size={15} style={{ color: "#7c3aed" }} />,
+                      title: "Reach Beyond Your Class",
+                      body: "Your materials reach students at universities, polytechnics, and secondary schools across the continent.",
+                    },
+                    {
+                      icon: <Shield size={15} style={{ color: "#0891b2" }} />,
+                      title: "Faculty Verified Badge",
+                      body: "Get officially verified. Your materials display your institution, rank, and department — establishing trust instantly.",
+                    },
+                  ].map(({ icon, title, body }, i, arr) => (
+                    <div key={title} style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "18px 20px", borderBottom: i < arr.length - 1 ? "0.5px solid #f0ebe0" : "none" }}>
+                      <div style={{ width: 32, height: 32, border: "0.5px solid rgba(184,150,62,0.25)", background: CREAM, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                        {icon}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 4, fontFamily: "'Lato',sans-serif" }}>{title}</div>
+                        <div style={{ fontSize: 12, color: "#888", lineHeight: 1.65, fontFamily: "'Lato',sans-serif" }}>{body}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* CTA buttons */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                  <button
+                    onClick={goSignIn}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", background: NAVY, color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: "'Lato',sans-serif", letterSpacing: ".06em", textTransform: "uppercase", border: "none", cursor: "pointer", transition: "background .18s" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "#1a3560"}
+                    onMouseLeave={e => e.currentTarget.style.background = NAVY}
+                  >
+                    <GraduationCap size={15} /> Join Faculty Podium
+                  </button>
+                  <button
+                    onClick={goSignIn}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", background: "transparent", color: NAVY, fontSize: 13, fontWeight: 700, fontFamily: "'Lato',sans-serif", letterSpacing: ".06em", textTransform: "uppercase", border: "0.5px solid #e5ddd0", cursor: "pointer", transition: "background .18s" }}
+                    onMouseEnter={e => e.currentTarget.style.background = CREAM}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <Upload size={15} /> Upload Materials
+                  </button>
+                </div>
+              </div>
+
+              {/* ── RIGHT: visual stack ── */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+                {/* Image with testimonial overlay */}
+                <div style={{ position: "relative", border: "0.5px solid #e5ddd0", overflow: "hidden" }}>
+                  <img
+                    src="https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=800"
+                    alt="Lecturer at podium"
+                    style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }}
+                    onError={e => { e.target.src = "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800"; }}
+                  />
+
+                  {/* Gradient overlay */}
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(13,34,68,0.95) 0%, rgba(13,34,68,0.45) 50%, transparent 100%)" }} />
+
+                  {/* Testimonial on image bottom */}
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 24px 20px" }}>
+                    <div className="lan-serif" style={{ fontSize: 56, color: "rgba(184,150,62,0.4)", lineHeight: 1, marginBottom: -6, userSelect: "none" }}>"</div>
+                    <p className="lan-serif" style={{ fontSize: "clamp(13px,1.6vw,15px)", fontStyle: "italic", color: "rgba(245,240,232,0.92)", margin: "0 0 16px", lineHeight: 1.7 }}>
+                      "I uploaded my 400-level Economics lecture notes and within two weeks, students from three African universities had purchased them. It's the most rewarding thing I've done outside the classroom."
+                    </p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, borderTop: "0.5px solid rgba(184,150,62,0.25)", paddingTop: 14 }}>
+                      <div style={{ width: 38, height: 38, background: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>DO</span>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: "'Lato',sans-serif" }}>Dr. Obiora</div>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 3, fontSize: 10, fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif", letterSpacing: ".06em" }}>
+                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: GOLD, display: "inline-block" }} />
+                          Verified Faculty · 
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Top-left status badge */}
+                  <div style={{ position: "absolute", top: 20, left: 20, background: NAVY, padding: "10px 16px", display: "flex", flexDirection: "column", gap: 3 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: GOLD, fontFamily: "'Lato',sans-serif" }}>Faculty Active Now</span>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Lato',sans-serif" }}>Publishing content · Earning monthly</span>
+                  </div>
+                </div>
+
+                {/* How it works strip */}
+                <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", padding: "24px 24px 20px" }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: GOLD, marginBottom: 16, fontFamily: "'Lato',sans-serif" }}>
+                    How it works
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {[
+                      "Apply for Faculty Verification",
+                      "Upload your course materials",
+                      "Set pricing — free or paid",
+                      "Students discover & purchase",
+                      "Earnings paid monthly",
+                    ].map((step, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ width: 22, height: 22, background: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{i + 1}</span>
+                        </div>
+                        <p style={{ fontSize: 12, color: "rgba(245,240,232,0.75)", margin: 0, lineHeight: 1.5, fontFamily: "'Lato',sans-serif", fontWeight: 300 }}>{step}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </section>
+        
+
         {/* ══════ APP SHOWCASE BANNER ══════ */}
         <section className="crest-bg" style={{ padding:"88px 24px", overflow:"hidden" }}>
           <div style={{ maxWidth:1200, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:48, alignItems:"center" }}>

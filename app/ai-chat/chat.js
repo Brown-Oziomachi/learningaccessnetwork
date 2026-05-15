@@ -450,23 +450,7 @@ function BookPickerScreen({ onSelectBook }) {
 
     return (
         <div className="lan-root" style={{ display: "flex", flexDirection: "column", height: "100dvh", overflow: "hidden" }}>
-            <header className="hero-bg" style={{ padding: "18px 28px", display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
-                <div style={{ width: 38, height: 38, border: `0.5px solid ${GOLD}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <GraduationCap size={18} style={{ color: GOLD }} />
-                </div>
-                <div>
-                    <p className="lan-serif" style={{ fontSize: 16, fontWeight: 700, color: "#fff", lineHeight: 1.1 }}>LAN Library AI</p>
-                    <p style={{ fontSize: 10, color: "rgba(245,240,232,.5)", fontFamily: "'Lato',sans-serif", letterSpacing: ".06em", textTransform: "uppercase" }}>Select a book to begin</p>
-                </div>
-                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-                    <Sparkles size={13} style={{ color: GOLD }} />
-                    <span style={{ fontSize: 10, color: "rgba(184,150,62,.7)", fontFamily: "'Lato',sans-serif", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase" }}>LAN Flash</span>
-                </div>
-            </header>
             <div className="cream-bg" style={{ padding: "40px 28px 32px", textAlign: "center", flexShrink: 0 }}>
-                <div style={{ width: 64, height: 64, border: `1.5px solid ${GOLD}`, transform: "rotate(45deg)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-                    <BookMarked size={26} style={{ color: NAVY, transform: "rotate(-45deg)" }} />
-                </div>
                 <h1 className="lan-serif" style={{ fontSize: "clamp(24px,5vw,42px)", fontWeight: 700, color: NAVY, marginBottom: 10 }}>
                     Which book do you need help with?
                 </h1>
@@ -483,7 +467,7 @@ function BookPickerScreen({ onSelectBook }) {
                     <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                         placeholder="Search by title, author, or category…"
                         className="lan-input"
-                        style={{ width: "100%", padding: "10px 14px 10px 38px", border: `0.5px solid #e5ddd0` }} />
+                        style={{ width: "100%", padding: "10px 14px 10px 38px", border: `0.5px solid #e5ddd0`, color: 'black' }} />
                     {searchQuery && (
                         <button onClick={() => setSearchQuery("")}
                             style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#bbb", cursor: "pointer" }}>
