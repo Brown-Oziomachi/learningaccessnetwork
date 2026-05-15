@@ -17,7 +17,6 @@ import { useAds } from "@/lib/useAds";
 /* ─── colour tokens (match homepage) ─── */
 const NAVY  = "#0d2244";
 const GOLD  = "#b8963e";
-const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
 const BG    = "#f5f1ea";
 
@@ -469,6 +468,12 @@ export default function SearchClient() {
                 color: GOLD, fontFamily: "'Lato',sans-serif", margin: '0 0 10px' }}>
                 Featured · Gold
             </p>
+              <p style={{
+                fontSize: 20, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase',
+                color: NAVY, fontFamily: "'Playfair Display', serif", margin: '0 0 10px'
+              }}>
+                RECOMMENDED FOR YOU
+              </p>
             <div className="sbar-none" style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8 }}>
                 {goldAds.map(ad => <SearchAdCard key={ad.adId} ad={ad} tier="Gold" />)}
             </div>

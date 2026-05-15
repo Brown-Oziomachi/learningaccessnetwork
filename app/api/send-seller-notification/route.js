@@ -1,265 +1,195 @@
 // app/api/send-seller-notification/route.js
+// ─────────────────────────────────────────────────────────────────
+// Unified outbound email endpoint powered by Resend.
+// Called by:
+//   • Firebase Cloud Functions (all 5 triggers)
+//   • /api/webhooks/flutterwave   (book purchase → seller alert)
+//   • /api/resend-receipt         (manual buyer resend)
+//
+// Body shape:
+// {
+//   type: "sale_alert" | "book_approved" | "seller_welcome" |
+//         "low_balance" | "payout_success" | "abandoned_cart" |
+//         "order_receipt" | "ad_boost",
+//
+//   // recipient
+//   to:          string,          // required
+//   userId?:     string,          // for opt-out check
+//
+//   // per-type payload (see each builder below)
+//   ...rest
+// }
+// ─────────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";
+import { Resend } from "resend";
 import { db } from "@/lib/firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
+import {
+    buildSellerWelcome,
+    buildBookApproved,
+    buildLowBalance,
+    buildPayoutSuccess,
+    buildAbandonedCart,
+    buildOrderReceipt,
+    buildSaleAlert,
+    buildAdBoost,
+} from "@/lib/emailTemplates";   // ← copy emailTemplates.js → lib/emailTemplates.js
 
-export async function POST(request) {
+const resend = new Resend(process.env.RESEND_API_KEY);
+const FROM = "LAN Library <noreply@lanlibrary.com>";
+
+/* ── email category used for opt-out checks ── */
+const CATEGORY_MAP = {
+    seller_welcome: "transactional",
+    book_approved: "transactional",
+    low_balance: "transactional",
+    payout_success: "transactional",
+    order_receipt: "transactional",
+    sale_alert: "transactional",
+    ad_boost: "transactional",
+    abandoned_cart: "marketing",
+};
+
+/* ── subject lines ── */
+const SUBJECTS = {
+    seller_welcome: "Welcome to LAN Library — Your Seller Account is Active",
+    book_approved: (d) => `🎉 "${d.bookTitle}" is now Live on LAN Library`,
+    low_balance: "⚠️ Your LAN Library balance is running low",
+    payout_success: (d) => `✅ Payout of ₦${Number(d.amount).toLocaleString()} Processed`,
+    order_receipt: (d) => `Your Receipt — "${d.bookTitle}"`,
+    sale_alert: (d) => `🎉 New Sale — "${d.bookTitle}" — ₦${Number(d.netEarning).toLocaleString()} earned`,
+    ad_boost: (d) => `✅ Your Ad Boost is Active — ${d.tier} · ${d.durationDays} days`,
+    abandoned_cart: "📚 You left something behind in your LAN Library cart",
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   Opt-out guard
+   Transactional emails cannot be opted out of.
+   Marketing / educational respect emailSettings.
+───────────────────────────────────────────────────────────────── */
+async function isOptedOut(userId, category) {
+    if (!userId || category === "transactional") return false;
     try {
-        const { sellerId, bookTitle, amount, netEarning, buyerEmail } = await request.json();
-
-        // Get seller details
-        const sellerDoc = await getDoc(doc(db, "users", sellerId));
-
-        if (!sellerDoc.exists()) {
-            return NextResponse.json({ error: "Seller not found" }, { status: 404 });
-        }
-
-        const sellerData = sellerDoc.data();
-        const sellerEmail = sellerData.email;
-        const sellerName = sellerData.displayName || `${sellerData.firstName} ${sellerData.surname}`;
-
-        // Get updated balance
-        const sellerAccountDoc = await getDoc(doc(db, "sellers", sellerId));
-        const currentBalance = sellerAccountDoc.exists()
-            ? sellerAccountDoc.data().accountBalance
-            : netEarning;
-        
-        const { Resend } = require('resend');
-        const resend = new Resend(process.env.RESEND_API_KEY);
-
-        await resend.emails.send({
-            from: 'LAN Library <noreply@yourdomain.com>',
-            to: sellerEmail,
-            subject: '🎉 You made a sale on LAN Library!',
-            html: getEmailTemplate({
-                sellerName,
-                bookTitle,
-                amount,
-                netEarning,
-                buyerEmail,
-                currentBalance
-            })
-        });
-        
-        // For now, just log the notification
-        console.log('Seller notification:', {
-            to: sellerEmail,
-            bookTitle,
-            amount,
-            netEarning,
-            buyerEmail
-        });
-
-        return NextResponse.json({
-            success: true,
-            message: "Notification sent successfully"
-        });
-
-    } catch (error) {
-        console.error("Notification error:", error);
-        return NextResponse.json({
-            error: error.message
-        }, { status: 500 });
+        const snap = await getDoc(doc(db, "users", userId));
+        const settings = snap.data()?.emailSettings || {};
+        return settings[category] === false;
+    } catch {
+        return false; // fail-open: send anyway if we can't check
     }
 }
 
-function getEmailTemplate(data) {
-    return `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                body {
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    line-height: 1.6;
-                    color: #333;
-                    background-color: #f4f4f4;
-                    margin: 0;
-                    padding: 0;
-                }
-                .container {
-                    max-width: 600px;
-                    margin: 20px auto;
-                    background: white;
-                    border-radius: 10px;
-                    overflow: hidden;
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                }
-                .header {
-                    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-                    color: white;
-                    padding: 30px 20px;
-                    text-align: center;
-                }
-                .header h1 {
-                    margin: 0;
-                    font-size: 28px;
-                    font-weight: bold;
-                }
-                .content {
-                    padding: 30px;
-                }
-                .greeting {
-                    font-size: 18px;
-                    color: #1e3a8a;
-                    margin-bottom: 20px;
-                }
-                .highlight {
-                    background: #f0f9ff;
-                    border-left: 4px solid #3b82f6;
-                    padding: 20px;
-                    margin: 20px 0;
-                    border-radius: 4px;
-                }
-                .amount {
-                    font-size: 36px;
-                    color: #16a34a;
-                    font-weight: bold;
-                    margin: 10px 0;
-                }
-                .details {
-                    background: #f9fafb;
-                    padding: 20px;
-                    border-radius: 8px;
-                    margin: 20px 0;
-                }
-                .details-row {
-                    display: flex;
-                    justify-content: space-between;
-                    padding: 10px 0;
-                    border-bottom: 1px solid #e5e7eb;
-                }
-                .details-row:last-child {
-                    border-bottom: none;
-                }
-                .label {
-                    color: #6b7280;
-                    font-weight: 500;
-                }
-                .value {
-                    color: #111827;
-                    font-weight: 600;
-                }
-                .button {
-                    display: inline-block;
-                    background: #16a34a;
-                    color: white;
-                    padding: 14px 30px;
-                    text-decoration: none;
-                    border-radius: 6px;
-                    font-weight: 600;
-                    margin: 20px 0;
-                    text-align: center;
-                }
-                .button:hover {
-                    background: #15803d;
-                }
-                .footer {
-                    background: #f9fafb;
-                    padding: 20px;
-                    text-align: center;
-                    color: #6b7280;
-                    font-size: 14px;
-                }
-                .info-box {
-                    background: #fef3c7;
-                    border-left: 4px solid #f59e0b;
-                    padding: 15px;
-                    margin: 20px 0;
-                    border-radius: 4px;
-                }
-                @media only screen and (max-width: 600px) {
-                    .container {
-                        margin: 0;
-                        border-radius: 0;
-                    }
-                    .content {
-                        padding: 20px;
-                    }
-                    .amount {
-                        font-size: 28px;
-                    }
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🎉 Congratulations!</h1>
-                    <p style="margin: 10px 0 0 0; font-size: 16px;">You just made a sale!</p>
-                </div>
-                
-                <div class="content">
-                    <p class="greeting">Hi ${data.sellerName},</p>
-                    
-                    <p>Great news! Your book <strong>"${data.bookTitle}"</strong> has been purchased.</p>
-                    
-                    <div class="highlight">
-                        <p style="margin: 0; color: #6b7280; font-size: 14px;">Your Earning</p>
-                        <div class="amount">₦${data.netEarning.toLocaleString()}</div>
-                        <p style="margin: 0; color: #6b7280; font-size: 14px;">
-                            (80% of ₦${data.amount.toLocaleString()})
-                        </p>
-                    </div>
-                    
-                    <div class="details">
-                        <h3 style="margin-top: 0; color: #1e3a8a;">Sale Details</h3>
-                        <div class="details-row">
-                            <span class="label">Book Title:</span>
-                            <span class="value">${data.bookTitle}</span>
-                        </div>
-                        <div class="details-row">
-                            <span class="label">Sale Amount:</span>
-                            <span class="value">₦${data.amount.toLocaleString()}</span>
-                        </div>
-                        <div class="details-row">
-                            <span class="label">Platform Fee (20%):</span>
-                            <span class="value" style="color: #ef4444;">-₦${(data.amount * 0.20).toLocaleString()}</span>
-                        </div>
-                        <div class="details-row">
-                            <span class="label">Your Earning (80%):</span>
-                            <span class="value" style="color: #16a34a;">₦${data.netEarning.toLocaleString()}</span>
-                        </div>
-                        <div class="details-row">
-                            <span class="label">Buyer:</span>
-                            <span class="value">${data.buyerEmail}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="info-box">
-                        <strong>💰 New Account Balance:</strong> ₦${data.currentBalance.toLocaleString()}
-                        <br>
-                        <small style="color: #78716c;">
-                            You can withdraw your earnings anytime. Minimum withdrawal is ₦1,000.
-                        </small>
-                    </div>
-                    
-                    <div style="text-align: center;">
-                        <a href="https://yourdomain.com/my-account/seller-account" class="button">
-                            View Seller Dashboard →
-                        </a>
-                    </div>
-                    
-                    <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
-                        Keep up the great work! Every sale brings you closer to your goals.
-                    </p>
-                </div>
-                
-                <div class="footer">
-                    <p style="margin: 0 0 10px 0;"><strong>LAN Library</strong></p>
-                    <p style="margin: 0; font-size: 12px;">
-                        This is an automated notification. Please do not reply to this email.
-                    </p>
-                    <p style="margin: 10px 0 0 0; font-size: 12px;">
-                        <a href="https://yourdomain.com" style="color: #3b82f6; text-decoration: none;">Visit Website</a> | 
-                        <a href="https://yourdomain.com/support" style="color: #3b82f6; text-decoration: none;">Support</a>
-                    </p>
-                </div>
-            </div>
-        </body>
-        </html>
-    `;
+/* ─────────────────────────────────────────────────────────────────
+   POST /api/send-seller-notification
+───────────────────────────────────────────────────────────────── */
+export async function POST(request) {
+    try {
+        const body = await request.json();
+        const { type, to, userId, ...data } = body;
+
+        /* ── Basic validation ── */
+        if (!type || !to) {
+            return NextResponse.json({ error: "Missing type or to" }, { status: 400 });
+        }
+
+        /* ── Opt-out check ── */
+        const category = CATEGORY_MAP[type] ?? "transactional";
+        if (await isOptedOut(userId, category)) {
+            console.log(`[mail] Skipped ${type} to ${to} — opted out`);
+            return NextResponse.json({ skipped: true, reason: "opted_out" });
+        }
+
+        /* ── Build HTML + subject ── */
+        let html;
+        let subject;
+
+        switch (type) {
+            /* ── 1. Sale alert → seller ── */
+            case "sale_alert": {
+                const { sellerName, bookTitle, amount, netEarning, buyerEmail, currentBalance } = data;
+                subject = typeof SUBJECTS.sale_alert === "function"
+                    ? SUBJECTS.sale_alert({ bookTitle, netEarning })
+                    : SUBJECTS.sale_alert;
+                html = buildSaleAlert({ sellerName, bookTitle, amount, netEarning, buyerEmail, currentBalance });
+                break;
+            }
+
+            /* ── 2. Seller welcome ── */
+            case "seller_welcome": {
+                subject = SUBJECTS.seller_welcome;
+                html = buildSellerWelcome({ name: data.name || data.sellerName || "Seller" });
+                break;
+            }
+
+            /* ── 3. Book approved ── */
+            case "book_approved": {
+                const { bookTitle, sellerName } = data;
+                subject = SUBJECTS.book_approved({ bookTitle });
+                html = buildBookApproved({ name: sellerName || "Seller", bookTitle });
+                break;
+            }
+
+            /* ── 4. Low balance ── */
+            case "low_balance": {
+                subject = SUBJECTS.low_balance;
+                html = buildLowBalance({ name: data.name || data.sellerName || "Seller", balance: data.balance ?? data.accountBalance ?? 0 });
+                break;
+            }
+
+            /* ── 5. Payout success ── */
+            case "payout_success": {
+                const { amount, bankName, accountName, withdrawalId, sellerName } = data;
+                subject = SUBJECTS.payout_success({ amount });
+                html = buildPayoutSuccess({ name: sellerName || "Seller", amount: Number(amount).toLocaleString(), bankName, accountName, withdrawalId: withdrawalId || "N/A" });
+                break;
+            }
+
+            /* ── 6. Order receipt → buyer ── */
+            case "order_receipt": {
+                const { buyerName, bookTitle, amount, sellerName, orderId } = data;
+                subject = SUBJECTS.order_receipt({ bookTitle });
+                html = buildOrderReceipt({ name: buyerName || "Reader", bookTitle, amount: Number(amount).toLocaleString(), sellerName, orderId: orderId || "N/A" });
+                break;
+            }
+
+            /* ── 7. Abandoned cart ── */
+            case "abandoned_cart": {
+                const { name, cartItems = [] } = data;
+                subject = SUBJECTS.abandoned_cart;
+                html = buildAbandonedCart({ name: name || "Reader", cartItems });
+                break;
+            }
+
+            /* ── 8. Ad boost confirmation ── */
+            case "ad_boost": {
+                const { sellerName, tier, durationDays, amount } = data;
+                subject = SUBJECTS.ad_boost({ tier, durationDays });
+                html = buildAdBoost({ name: sellerName || "Seller", tier, durationDays, amount: Number(amount).toLocaleString() });
+                break;
+            }
+
+            default:
+                return NextResponse.json({ error: `Unknown email type: ${type}` }, { status: 400 });
+        }
+
+        /* ── Send via Resend ── */
+        const { data: resendData, error: resendError } = await resend.emails.send({
+            from: FROM,
+            to: [to],
+            subject,
+            html,
+        });
+
+        if (resendError) {
+            console.error("[mail] Resend error:", resendError);
+            return NextResponse.json({ error: resendError.message }, { status: 500 });
+        }
+
+        console.log(`[mail] ✓ ${type} → ${to} (id: ${resendData?.id})`);
+        return NextResponse.json({ success: true, id: resendData?.id });
+
+    } catch (err) {
+        console.error("[mail] Unexpected error:", err);
+        return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
+    }
 }

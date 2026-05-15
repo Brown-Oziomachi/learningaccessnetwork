@@ -102,7 +102,12 @@ export default function HomeClient() {
     const router = useRouter();
     const goldAds = useAds("Gold", 10);
     const silverAds = useAds("Silver", 10);
+    const topAd = useAds("Gold", 10);   // ← ADD THIS
 
+
+    const topAdIds = new Set(topAd.map(a => a.adId));
+    const gridGoldAds = goldAds.filter(a => !topAdIds.has(a.adId));
+    const gridSilverAds = silverAds.filter(a => !topAdIds.has(a.adId));
 
     const filteredCategories = categories.filter(c =>
         c.name.toLowerCase().includes(browseSearch.toLowerCase()) ||
@@ -338,594 +343,765 @@ export default function HomeClient() {
                         </p>
 
                         {/* CTA buttons */}
-                     
+
 
                     </div>
-                        {/* stats strip */}
-                        <div style={{ borderTop: "0.5px solid rgba(184,150,62,0.2)", paddingTop: "0", display: "flex", flexWrap: "wrap" }}>
-                            {[
-                                { val: "90M+", label: "Documents" },
-                                { val: "2.4M+", label: "Learners" },
-                                { val: "12+", label: "Institutions" },
-                                { val: "Free", label: "Basic Access" },
-                            ].map(({ val, label }) => (
-                                <div key={label} style={{ flex: "1 1 120px", padding: "24px 20px 0", borderRight: "0.5px solid rgba(184,150,62,0.12)" }}>
-                                    <div className="lan-serif" style={{ fontSize: "28px", fontWeight: 700, color: "#fff" }}>{val}</div>
-                                    <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", marginTop: "4px" }}>{label}</div>
-                                </div>
-                            ))}
-                        </div>
+                    {/* stats strip */}
+                    <div style={{ borderTop: "0.5px solid rgba(184,150,62,0.2)", paddingTop: "0", display: "flex", flexWrap: "wrap" }}>
+                        {[
+                            { val: "90M+", label: "Documents" },
+                            { val: "2.4M+", label: "Learners" },
+                            { val: "12+", label: "Institutions" },
+                            { val: "Free", label: "Basic Access" },
+                        ].map(({ val, label }) => (
+                            <div key={label} style={{ flex: "1 1 120px", padding: "24px 20px 0", borderRight: "0.5px solid rgba(184,150,62,0.12)" }}>
+                                <div className="lan-serif" style={{ fontSize: "28px", fontWeight: 700, color: "#fff" }}>{val}</div>
+                                <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", marginTop: "4px" }}>{label}</div>
+                            </div>
+                        ))}
+                    </div>
                 </section>
 
-                {/* ══════════════════════════════════════════════════════════
+                {/* ── TOP FEATURED AD ── */}
+{topAd.length > 0 && (
+    <div style={{ background: CREAM, borderBottom: "0.5px solid #e5ddd0", padding: "24px" }}>
+        <style>{`
+            .top-ads-grid {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 12px;
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+            @media (max-width: 640px) {
+                .top-ads-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+            }
+            .top-ad-card {
+                background: #fff;
+                border: 0.5px solid #e5ddd0;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 12px;
+                text-decoration: none;
+                transition: border-color 0.18s;
+                overflow: hidden;
+            }
+            .top-ad-card:hover { border-color: ${GOLD}; }
+        `}</style>
+
+                    <p style={{
+                    fontSize: 20, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase',
+                    color: NAVY, fontFamily: "'Playfair Display', serif", margin: '0 0 10px', textAlign: 'center'
+                    }}>
+                        RECOMMENDED FOR YOU
+                    </p>
+                        
+        <div className="top-ads-grid">
+            {topAd.slice(0, 4).map((ad, idx) => (
+                <a
+                    key={ad.adId || idx}
+                    href={ad.adLink || "#"}
+                    className="top-ad-card"
+                    onClick={() => {
+                        import("firebase/firestore").then(({ doc: fDoc, updateDoc, increment }) => {
+                            import("@/lib/firebaseConfig").then(({ db: fDb }) => {
+                                updateDoc(fDoc(fDb, "promotions", ad.adId), { clicks: increment(1) }).catch(() => {});
+                            });
+                        });
+                    }}
+                >
+                    {/* Thumbnail */}
+                    {ad.image && (
+                        <img
+                            src={ad.image}
+                            alt={ad.title}
+                            style={{
+                                width: "44px",
+                                aspectRatio: "3/4",
+                                objectFit: "cover",
+                                flexShrink: 0,
+                                border: "0.5px solid #e5ddd0",
+                            }}
+                            onError={e => { e.target.style.display = "none"; }}
+                        />
+                    )}
+
+                    {/* Text */}
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "12px", fontWeight: 700, color: NAVY, margin: "0 0 2px", overflow: "hidden",  }}>
+                            {ad.title}
+                        </p>
+                        {ad.author && (
+                            <p style={{ fontSize: "10px", color: "#888", margin: "0 0 4px", fontFamily: "'Lato',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {ad.author}
+                            </p>
+                        )}
+                        {ad.price && (
+                            <p style={{ fontSize: "11px", fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                                ₦{Number(ad.price).toLocaleString()}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* AD badge */}
+                    <span style={{ flexShrink: 0, alignSelf: "flex-start", fontSize: "8px", fontWeight: 700, letterSpacing: "0.1em", color: GOLD, border: `0.5px solid ${GOLD}`, padding: "2px 5px", fontFamily: "'Lato',sans-serif" }} className="max-lg:hidden">
+                        SPONSORED
+                    </span>
+                    <span style={{ flexShrink: 0, alignSelf: "flex-start", fontSize: "8px", fontWeight: 700, letterSpacing: "0.1em", color: GOLD, border: `0.5px solid ${GOLD}`, padding: "2px 5px", fontFamily: "'Lato',sans-serif" }} className="lg:hidden">
+                        AD
+                    </span>
+                </a>
+            ))}
+        </div>
+    </div>
+)}
+            {/* ══════════════════════════════════════════════════════════
             TRENDING ACADEMIC AREAS
         ══════════════════════════════════════════════════════════ */}
-                <section className="trending-bg" style={{ padding: "72px 24px" }}>
-                    <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-                        {/* header */}
-                        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "40px" }}>
-                            <div>
-                                <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: "8px", fontFamily: "'Lato', sans-serif" }}>
-                                    Popular This Term
-                                </p>
-                                <h2 className="lan-serif" style={{ fontSize: "clamp(26px, 4vw, 40px)", fontWeight: 700, color: NAVY, margin: 0 }}>
-                                    Trending Academic Areas
-                                </h2>
+                {/* ══ DIVINITY VAULT BANNER ══════════════════════════════════ */}
+                <section style={{
+                    background: `linear-gradient(135deg, #0d1f3c 0%, #1a0a2e 50%, #0d2244 100%)`,
+                    borderTop: "0.5px solid rgba(179,139,89,0.3)",
+                    borderBottom: "0.5px solid rgba(179,139,89,0.3)",
+                    padding: "48px 24px",
+                    position: "relative",
+                    overflow: "hidden",
+                }}>
+                    {/* background cross-hatch */}
+                    <div style={{
+                        position: "absolute", inset: 0, opacity: 0.06,
+                        backgroundImage: `repeating-linear-gradient(45deg, ${GOLD} 0, ${GOLD} 1px, transparent 0, transparent 50%)`,
+                        backgroundSize: "18px 18px"
+                    }} />
+
+                    <div style={{
+                        maxWidth: 1200, margin: "0 auto",
+                        display: "flex", flexWrap: "wrap",
+                        alignItems: "center", justifyContent: "space-between", gap: 32,
+                        position: "relative",
+                    }}>
+                        {/* left: text */}
+                        <div style={{ flex: 1, minWidth: 260 }}>
+                            {/* ornament */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                                <div style={{ height: "0.5px", width: 28, background: `rgba(179,139,89,0.6)` }} />
+                                <svg width="10" height="10" viewBox="0 0 10 10" fill={GOLD}>
+                                    <polygon points="5,0 6.2,3.8 10,3.8 6.9,6.2 8.1,10 5,7.6 1.9,10 3.1,6.2 0,3.8 3.8,3.8" />
+                                </svg>
+                                <div style={{ height: "0.5px", width: 28, background: `rgba(179,139,89,0.6)` }} />
                             </div>
-                            <Link href="/browse-resources"
-                                style={{ display: "none", alignItems: "center", gap: "5px", fontSize: "12px", fontWeight: 700, color: NAVY, textDecoration: "none", letterSpacing: "0.04em" }}
-                                className="show-md"
+
+                            <h2 style={{
+                                fontFamily: "'Playfair Display', Georgia, serif",
+                                fontSize: "clamp(28px,4vw,44px)", fontWeight: 900,
+                                color: "#fff", margin: "0 0 12px", fontStyle: "italic", lineHeight: 1.1,
+                            }}>
+                                The Divinity Vault
+                            </h2>
+                            <p style={{
+                                fontFamily: "'EB Garamond', Georgia, serif",
+                                fontSize: "clamp(15px,2vw,18px)",
+                                color: "rgba(245,240,230,0.65)",
+                                lineHeight: 1.75, margin: "0 0 8px",
+                                maxWidth: 480, fontStyle: "italic",
+                            }}>
+                                Contribute your theological works, sermon notes, and sacred commentaries to Africa's most comprehensive digital divinity archive. Your scholarship will reach seekers across the continent                            </p>
+                            <p style={{
+                                fontFamily: "'Lato', sans-serif", fontSize: 10, fontWeight: 700,
+                                letterSpacing: "0.22em", textTransform: "uppercase",
+                                color: "rgba(179,139,89,0.55)", margin: 0,
+                            }}>
+                                Christian · Islamic · Comparative · Sacred Texts
+                            </p>
+                        </div>
+
+                        {/* right: CTA */}
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 14 }}>
+                            <Link
+                                href="/divinity/religious-studies"
+                                style={{
+                                    display: "inline-flex", alignItems: "center", gap: 10,
+                                    padding: "14px 32px",
+                                    background: "transparent",
+                                    color: GOLD,
+                                    fontFamily: "'Lato',sans-serif", fontSize: 12, fontWeight: 700,
+                                    letterSpacing: "0.12em", textTransform: "uppercase",
+                                    textDecoration: "none",
+                                    border: `1px solid ${GOLD}`,
+                                    // ── sacred gold glow ──
+                                    boxShadow: `0 0 12px rgba(179,139,89,0.35), 0 0 32px rgba(179,139,89,0.15), inset 0 0 12px rgba(179,139,89,0.06)`,
+                                    transition: "box-shadow 0.3s, background 0.3s",
+                                    position: "relative",
+                                }}
+                                onMouseEnter={e => {
+                                    e.currentTarget.style.background = "rgba(179,139,89,0.12)";
+                                    e.currentTarget.style.boxShadow = `0 0 20px rgba(179,139,89,0.55), 0 0 48px rgba(179,139,89,0.25), inset 0 0 16px rgba(179,139,89,0.1)`;
+                                }}
+                                onMouseLeave={e => {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.boxShadow = `0 0 12px rgba(179,139,89,0.35), 0 0 32px rgba(179,139,89,0.15), inset 0 0 12px rgba(179,139,89,0.06)`;
+                                }}
                             >
-                                View All <ArrowRight size={13} />
+                                Enter the Vault
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                             </Link>
-                        </div>
-
-                        {/* scrollable cards */}
-                        <div className="sbar-none" style={{ display: "flex", gap: "16px", overflowX: "auto", paddingBottom: "12px", margin: "0 -4px", padding: "0 4px 12px" }}>
-                            {trendingAcademicAreas.map(area => {
-                                const Icon = area.icon;
-                                return (
-                                    <a key={area.id} href={`/institutional/category/${area.slug}`} className="trend-card" style={{ flexShrink: 0, width: "230px", padding: "24px 20px" }}>
-                                        {/* icon box */}
-                                        <div style={{ width: "46px", height: "46px", border: `0.5px solid #e5ddd0`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "16px" }}>
-                                            <Icon size={20} style={{ color: NAVY }} strokeWidth={1.5} />
-                                        </div>
-                                        <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "14px", fontWeight: 700, color: NAVY, margin: "0 0 8px", lineHeight: 1.25 }}>{area.name}</h3>
-                                        <p style={{ fontSize: "12px", color: "#888", lineHeight: 1.6, margin: "0 0 18px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{area.description}</p>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                                            <TrendingUp size={11} style={{ color: GOLD }} />
-                                            <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: GOLD }}>Trending</span>
-                                        </div>
-                                    </a>
-                                );
-                            })}
-                        </div>
-
-                        <div style={{ marginTop: "24px", textAlign: "center" }}>
-                            <Link href="/browse-resources" style={{ fontSize: "12px", fontWeight: 700, color: NAVY, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                                View All Institutions <ArrowRight size={13} />
+                            <Link
+                                href="/upload-document"
+                                style={{
+                                    display: "inline-flex", alignItems: "center", gap: 10,
+                                    padding: "14px 32px",
+                                    background: "transparent",
+                                    color: GOLD,
+                                    fontFamily: "'Lato',sans-serif", fontSize: 12, fontWeight: 700,
+                                    letterSpacing: "0.12em", textTransform: "uppercase",
+                                    textDecoration: "none",
+                                    border: `1px solid ${GOLD}`,
+                                    // ── sacred gold glow ──
+                                    boxShadow: `0 0 12px rgba(179,139,89,0.35), 0 0 32px rgba(179,139,89,0.15), inset 0 0 12px rgba(179,139,89,0.06)`,
+                                    transition: "box-shadow 0.3s, background 0.3s",
+                                    position: "relative",
+                                }}
+                                onMouseEnter={e => {
+                                    e.currentTarget.style.background = "rgba(179,139,89,0.12)";
+                                    e.currentTarget.style.boxShadow = `0 0 20px rgba(179,139,89,0.55), 0 0 48px rgba(179,139,89,0.25), inset 0 0 16px rgba(179,139,89,0.1)`;
+                                }}
+                                onMouseLeave={e => {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.boxShadow = `0 0 12px rgba(179,139,89,0.35), 0 0 32px rgba(179,139,89,0.15), inset 0 0 12px rgba(179,139,89,0.06)`;
+                                }}
+                            >
+                                Contribute
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                             </Link>
+                            <p style={{
+                                fontFamily: "'Lato',sans-serif", fontSize: 9, fontWeight: 700,
+                                letterSpacing: "0.16em", textTransform: "uppercase",
+                                color: "rgba(179,139,89,0.4)", margin: 0
+                            }}>
+                                4 Traditions · Sacred Archive · Open Access
+                            </p>
                         </div>
                     </div>
                 </section>
 
-                {/* ══════════════════════════════════════════════════════════
+            {/* ══════════════════════════════════════════════════════════
     UNIVERSITY HUBS
 ══════════════════════════════════════════════════════════ */}
-<section style={{ background: "#fff", padding: "72px 24px", borderTop: "0.5px solid #e5ddd0" }}>
-  <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+            <section style={{ background: "#fff", padding: "72px 24px", borderTop: "0.5px solid #e5ddd0" }}>
+                <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
 
-    {/* Header */}
-    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "36px", flexWrap: "wrap", gap: 12 }}>
-      <div>
-        <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: "8px", fontFamily: "'Lato', sans-serif" }}>
-          Find Your Institution
-        </p>
-        <h2 className="lan-serif" style={{ fontSize: "clamp(26px, 4vw, 40px)", fontWeight: 700, color: NAVY, margin: 0 }}>
-         African University Hubs
-        </h2>
-        <p style={{ fontSize: "13px", color: "#888", margin: "8px 0 0", fontWeight: 300, fontFamily: "'Lato',sans-serif" }}>
-          Course materials sorted by your exact institution/Uploaded by Facuties
-        </p>
-      </div>
-      <Link href="/uni"
-        style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "12px", fontWeight: 700, color: NAVY, textDecoration: "none", letterSpacing: "0.04em", border: "0.5px solid #e5ddd0", padding: "9px 16px", whiteSpace: "nowrap" }}>
-        All Universities <ArrowRight size={13} />
-      </Link>
-    </div>
-
-    {/* University Picker Grid */}
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px" }}>
-      {[
-        { slug: "unn",       name: "University of Nigeria, Nsukka",  short: "UNN",      state: "Enugu" },
-        { slug: "ubuea",     name: "University of Buea",             short: "UB",       state: "Buea" },
-        { slug: "ug",        name: "University of Ghana",            short: "UG",       state: "Accra" },
-        { slug: "uon_ke",    name: "University of Nairobi",          short: "UoN",      state: "Nairobi" },
-        { slug: "unisa",     name: "University of South Africa",     short: "unisa",    state: "Pretoria" },
-        { slug: "aau",       name: "Addis Ababa University",         short: "AAU",      state: "Addis Ababa" },
-        { slug: "uam",       name: "Abdou Moumouni University",      short: "UAM",      state: "Niamey" },
-        { slug: "usthb",     name: "University of Science and Technology Houari Boumediene",      short: "USTHB",     state: "Algiers" },
-        { slug: "utripoli",  name: "University of Tripoli",          short: "UoT",      state: "Tripoli" },
-        { slug: "ulo",       name: "University of Lomé",             short: "UL",       state: "Lomé" },
-      ].map(uni => (
-        <Link key={uni.slug} href={`/uni/${uni.slug}`}
-          style={{ textDecoration: "none", display: "block" }}>
-          <div className="trend-card" style={{ padding: "18px 16px", cursor: "pointer" }}>
-            {/* Short name badge */}
-            <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: NAVY, padding: "4px 10px", marginBottom: "12px" }}>
-              <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", color: GOLD, fontFamily: "'Lato',sans-serif" }}>{uni.short}</span>
-            </div>
-            {/* Full name */}
-            <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 5px", lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-              {uni.name}
-            </h3>
-            {/* State */}
-            <p style={{ fontSize: "10px", color: "#bbb", fontFamily: "'Lato',sans-serif", margin: "0 0 14px", display: "flex", alignItems: "center", gap: 4 }}>
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              {uni.state}
-            </p>
-            {/* CTA */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "0.5px solid #f0ebe0", paddingTop: "12px" }}>
-              <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, fontFamily: "'Lato',sans-serif" }}>Browse Hub</span>
-              <ChevronRight size={13} style={{ color: GOLD }} />
-            </div>
-          </div>
-        </Link>
-      ))}
-    </div>
-
-    {/* Bottom CTA strip */}
-    <div style={{ marginTop: "24px", background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", padding: "20px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14 }}>
-      <div>
-        <p style={{ fontSize: "12px", fontWeight: 700, color: "#fff", fontFamily: "'Lato',sans-serif", margin: "0 0 3px" }}>
-          Don't see your university?
-        </p>
-        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontFamily: "'Lato',sans-serif", margin: 0 }}>
-          We're adding more institutions every week.
-        </p>
-      </div>
-      <Link href="/uni"
-        style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", background: GOLD, color: NAVY, fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato',sans-serif", whiteSpace: "nowrap" }}>
-        View All Hubs <ArrowRight size={12} />
-      </Link>
-    </div>
-
-  </div>
-</section>
-
-                  
-                    <section style={{ background: "#fff", padding: "72px 24px" }}>
-                        <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+                    {/* Header */}
+                    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "36px", flexWrap: "wrap", gap: 12 }}>
+                        <div>
                             <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: "8px", fontFamily: "'Lato', sans-serif" }}>
-                                Community Uploads
+                                Find Your Institution
                             </p>
-                            <h2 className="lan-serif" style={{ fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 700, color: NAVY, margin: "0 0 6px" }}>
-                                Newest Documents
+                            <h2 className="lan-serif" style={{ fontSize: "clamp(26px, 4vw, 40px)", fontWeight: 700, color: NAVY, margin: 0 }}>
+                                African University Hubs
                             </h2>
-                            <p style={{ fontSize: "14px", color: "#888", marginBottom: "36px", fontWeight: 300 }}>
-                                Fresh uploads from students and educators across Africa
+                            <p style={{ fontSize: "13px", color: "#888", margin: "8px 0 0", fontWeight: 300, fontFamily: "'Lato',sans-serif" }}>
+                                Course materials sorted by your exact institution/Uploaded by Facuties
                             </p>
+                        </div>
+                        <Link href="/uni"
+                            style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "12px", fontWeight: 700, color: NAVY, textDecoration: "none", letterSpacing: "0.04em", border: "0.5px solid #e5ddd0", padding: "9px 16px", whiteSpace: "nowrap" }}>
+                            All Universities <ArrowRight size={13} />
+                        </Link>
+                    </div>
 
-                            {allBooks.length === 0 ? (
-                                <div style={{ background: BG, border: `0.5px solid #e5ddd0`, padding: "64px 24px", textAlign: "center" }}>
-                                    <FileText style={{ width: "48px", height: "48px", color: "#ddd", margin: "0 auto 12px" }} />
-                                    <h3 className="lan-serif" style={{ fontSize: "22px", color: NAVY, marginBottom: "8px" }}>No Books Found</h3>
-                                    <p style={{ fontSize: "13px", color: "#aaa", marginBottom: "20px" }}>This is a network problem. You can read our docs while waiting.</p>
-                                    <Link href="/docs" style={{ display: "inline-block", padding: "10px 24px", background: NAVY, color: "#fff", fontSize: "13px", fontWeight: 700, textDecoration: "none" }}>
-                                        LAN Docs
-                                    </Link>
+                    {/* University Picker Grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px" }}>
+                        {[
+                            { slug: "unn", name: "University of Nigeria, Nsukka", short: "UNN", state: "Enugu" },
+                            { slug: "ubuea", name: "University of Buea", short: "UB", state: "Buea" },
+                            { slug: "ug", name: "University of Ghana", short: "UG", state: "Accra" },
+                            { slug: "uon_ke", name: "University of Nairobi", short: "UoN", state: "Nairobi" },
+                            { slug: "unisa", name: "University of South Africa", short: "unisa", state: "Pretoria" },
+                            { slug: "aau", name: "Addis Ababa University", short: "AAU", state: "Addis Ababa" },
+                            { slug: "uam", name: "Abdou Moumouni University", short: "UAM", state: "Niamey" },
+                            { slug: "usthb", name: "University of Science and Technology Houari Boumediene", short: "USTHB", state: "Algiers" },
+                            { slug: "utripoli", name: "University of Tripoli", short: "UoT", state: "Tripoli" },
+                            { slug: "ulo", name: "University of Lomé", short: "UL", state: "Lomé" },
+                        ].map(uni => (
+                            <Link key={uni.slug} href={`/uni/${uni.slug}`}
+                                style={{ textDecoration: "none", display: "block" }}>
+                                <div className="trend-card" style={{ padding: "18px 16px", cursor: "pointer" }}>
+                                    {/* Short name badge */}
+                                    <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: NAVY, padding: "4px 10px", marginBottom: "12px" }}>
+                                        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", color: GOLD, fontFamily: "'Lato',sans-serif" }}>{uni.short}</span>
+                                    </div>
+                                    {/* Full name */}
+                                    <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 5px", lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                                        {uni.name}
+                                    </h3>
+                                    {/* State */}
+                                    <p style={{ fontSize: "10px", color: "#bbb", fontFamily: "'Lato',sans-serif", margin: "0 0 14px", display: "flex", alignItems: "center", gap: 4 }}>
+                                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                                        {uni.state}
+                                    </p>
+                                    {/* CTA */}
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "0.5px solid #f0ebe0", paddingTop: "12px" }}>
+                                        <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, fontFamily: "'Lato',sans-serif" }}>Browse Hub</span>
+                                        <ChevronRight size={13} style={{ color: GOLD }} />
+                                    </div>
                                 </div>
-                            ) : (
-                                <>
-                                    {/* ── Row 1: books 0-5 ── */}
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "20px", marginBottom: "24px" }}>
-                                        {allBooks.slice(0, 6).map(book => {
-                                            const soldCount = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
-                                            const topSold = allBooks.slice(0, 12).reduce((m, b) => Math.max(m, bookSalesCount[b.id] || 0), 0);
-                                            const isTrending = soldCount > 0 && soldCount === topSold;
-                                            const owned = isPurchased(book.id);
+                            </Link>
+                        ))}
+                    </div>
 
-                                            if (book.isAd) {
-                                                return (
-                                                    <a key={book.id} href={book.adLink} style={{ textDecoration: "none", display: "block", background: "#fff" }}
-                                                        onClick={() => {
-                                                            import("firebase/firestore").then(({ doc: fDoc, updateDoc, increment }) => {
-                                                                import("@/lib/firebaseConfig").then(({ db: fDb }) => {
-                                                                    updateDoc(fDoc(fDb, "promotions", book.adId), { clicks: increment(1) }).catch(() => { });
-                                                                });
-                                                            });
-                                                        }}
-                                                    >
-                                                        <div style={{ position: "relative", background: "#ede8df" }}>
-                                                            <img src={book.image} alt={book.title}
-                                                                style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block" }}
-                                                                onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
-                                                            />
-                                                            <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff", fontFamily: "'Lato',sans-serif" }}>
-                                                                <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />PDF
-                                                            </div>
-                                                            <div style={{ position: "absolute", top: "8px", right: "8px", background: GOLD, color: NAVY, fontSize: "9px", fontWeight: 700, padding: "3px 8px", fontFamily: "'Lato',sans-serif" }}>AD</div>
-                                                            <div style={{ position: "absolute", bottom: "8px", left: "8px", background: "rgba(13,34,68,0.82)", padding: "3px 8px", fontSize: "9px", fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif" }}>
-                                                                {book.adTier.toUpperCase()} SPONSOR
-                                                            </div>
-                                                        </div>
-                                                        <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0" }}>
-                                                            <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>{book.title}</h4>
-                                                            <p style={{ fontSize: "11px", color: "#888", margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
-                                                        </div>
-                                                    </a>
-                                                );
-                                            }
-
-                                            return (
-                                                <Link key={book.id} href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block", background: "#fff" }}>
-                                                    <div style={{ position: "relative", background: "#ede8df" }}>
-                                                        <img src={book.image} alt={book.title}
-                                                            style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", transition: "box-shadow 0.2s" }}
-                                                            onError={e => { e.target.style.display = "none"; if (e.target.nextSibling) e.target.nextSibling.style.display = "flex"; }}
-                                                            className="book-thumb"
-                                                        />
-                                                        <div style={{ display: "none", width: "100%", aspectRatio: "3/4", alignItems: "center", justifyContent: "center", background: "#ede8df" }}>
-                                                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
-                                                        </div>
-                                                        <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontFamily: "'Lato',sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff" }}>
-                                                            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />PDF
-                                                        </div>
-                                                        {owned && <span style={{ position: "absolute", top: "8px", right: "8px", background: "#16a34a", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>OWNED</span>}
-                                                        {!owned && isTrending && <span style={{ position: "absolute", bottom: "8px", left: "8px", background: "#ea580c", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>🔥 Trending</span>}
-                                                    </div>
-                                                    <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0" }}>
-                                                        <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>{book.title}</h4>
-                                                        <p style={{ fontSize: "11px", color: NAVY, margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
-                                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "wrap" }}>
-                                                            {book.category && !owned && (
-                                                                <span style={{ display: "inline-block", background: CREAM, border: `0.5px solid rgba(184,150,62,0.3)`, color: GOLD, fontSize: "8px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 7px", fontFamily: "'Lato',sans-serif", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.category}</span>
-                                                            )}
-                                                        </div>
-                                                        {soldCount > 0 && <p style={{ fontSize: "10px", color: NAVY, margin: "5px 0 0", display: "flex", alignItems: "center", gap: "4px", fontFamily: "'Lato',sans-serif" }}><ShoppingBag size={9} /> {soldCount} sold</p>}
-                                                    </div>
-                                                </Link>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* ── Gold Carousel after row 1 ── */}
-                                    <FeaturedAdsCarousel tier="Gold" maxAds={2} autoPlay={true} autoPlayMs={4000} style={{ marginBottom: "24px" }} />
-
-                                    {/* ── Row 2: books 6-11 ── */}
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "20px", marginBottom: "24px" }}>
-                                        {allBooks.slice(6, 12).map(book => {
-                                            const soldCount = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
-                                            const owned = isPurchased(book.id);
-                                            return (
-                                                <Link key={book.id} href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block", background: "#fff" }}>
-                                                    <div style={{ position: "relative", background: "#ede8df" }}>
-                                                        <img src={book.image} alt={book.title}
-                                                            style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", transition: "box-shadow 0.2s" }}
-                                                            onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
-                                                            className="book-thumb"
-                                                        />
-                                                        <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontFamily: "'Lato',sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff" }}>
-                                                            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />PDF
-                                                        </div>
-                                                        {owned && <span style={{ position: "absolute", top: "8px", right: "8px", background: "#16a34a", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>OWNED</span>}
-                                                    </div>
-                                                    <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0" }}>
-                                                        <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>{book.title}</h4>
-                                                        <p style={{ fontSize: "11px", color: NAVY, margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
-                                                        {book.category && !owned && (
-                                                            <span style={{ display: "inline-block", background: CREAM, border: `0.5px solid rgba(184,150,62,0.3)`, color: GOLD, fontSize: "8px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 7px", fontFamily: "'Lato',sans-serif", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.category}</span>
-                                                        )}
-                                                        {soldCount > 0 && <p style={{ fontSize: "10px", color: NAVY, margin: "5px 0 0", display: "flex", alignItems: "center", gap: "4px", fontFamily: "'Lato',sans-serif" }}><ShoppingBag size={9} /> {soldCount} sold</p>}
-                                                    </div>
-                                                </Link>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* ── Silver Carousel after row 2 ── */}
-                                    <FeaturedAdsCarousel tier="Silver" maxAds={2} autoPlay={true} autoPlayMs={5000} style={{ marginBottom: "24px" }} />
-
-                                    {/* ── Row 3: books 12-17 ── */}
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "20px", marginBottom: "24px" }}>
-                                        {allBooks.slice(12, 18).map(book => {
-                                            const soldCount = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
-                                            const owned = isPurchased(book.id);
-                                            return (
-                                                <Link key={book.id} href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block", background: "#fff" }}>
-                                                    <div style={{ position: "relative", background: "#ede8df" }}>
-                                                        <img src={book.image} alt={book.title}
-                                                            style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", transition: "box-shadow 0.2s" }}
-                                                            onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
-                                                            className="book-thumb"
-                                                        />
-                                                        <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontFamily: "'Lato',sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff" }}>
-                                                            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />PDF
-                                                        </div>
-                                                        {owned && <span style={{ position: "absolute", top: "8px", right: "8px", background: "#16a34a", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>OWNED</span>}
-                                                    </div>
-                                                    <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0" }}>
-                                                        <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>{book.title}</h4>
-                                                        <p style={{ fontSize: "11px", color: NAVY, margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
-                                                        {book.category && !owned && (
-                                                            <span style={{ display: "inline-block", background: CREAM, border: `0.5px solid rgba(184,150,62,0.3)`, color: GOLD, fontSize: "8px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 7px", fontFamily: "'Lato',sans-serif", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.category}</span>
-                                                        )}
-                                                        {soldCount > 0 && <p style={{ fontSize: "10px", color: NAVY, margin: "5px 0 0", display: "flex", alignItems: "center", gap: "4px", fontFamily: "'Lato',sans-serif" }}><ShoppingBag size={9} /> {soldCount} sold</p>}
-                                                    </div>
-                                                </Link>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* ── Bronze Carousel after row 3 ── */}
-                                    <FeaturedAdsCarousel tier="Bronze" maxAds={2} autoPlay={true} autoPlayMs={4500} style={{ marginBottom: "0" }} />
-                                </>
-                            )}
-                        </div>
-                    </section>
-
-                {/* ══════════════════════════════════════════════════════════
-            BROWSE THE LIBRARY
-        ══════════════════════════════════════════════════════════ */}
-                <section style={{ background: BG, padding: "80px 24px" }}>
-                    <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
-                        {/* header */}
-                        <div style={{ textAlign: "center", marginBottom: "48px" }}>
-                            <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: "10px", fontFamily: "'Lato', sans-serif" }}>
-                                Explore the Full Collection
+                    {/* Bottom CTA strip */}
+                    <div style={{ marginTop: "24px", background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", padding: "20px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14 }}>
+                        <div>
+                            <p style={{ fontSize: "12px", fontWeight: 700, color: "#fff", fontFamily: "'Lato',sans-serif", margin: "0 0 3px" }}>
+                                Don't see your university?
                             </p>
-                            <h2 className="lan-serif" style={{ fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>
-                                Browse the Library
-                            </h2>
-                            {/* gold diamond divider */}
-                            <div className="gold-line" style={{ maxWidth: "300px", margin: "0 auto 16px" }}>
-                                <div style={{ width: "8px", height: "8px", background: GOLD, transform: "rotate(45deg)", flexShrink: 0 }} />
-                            </div>
-                            <p style={{ fontSize: "14px", color: "#888", maxWidth: "520px", margin: "0 auto", lineHeight: 1.7, fontWeight: 300 }}>
-                                Explore our comprehensive collection tailored to every academic level and discipline
+                            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontFamily: "'Lato',sans-serif", margin: 0 }}>
+                                We're adding more institutions every week.
                             </p>
                         </div>
+                        <Link href="/uni"
+                            style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", background: GOLD, color: NAVY, fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato',sans-serif", whiteSpace: "nowrap" }}>
+                            View All Hubs <ArrowRight size={12} />
+                        </Link>
+                    </div>
 
-                        {/* search + tabs */}
-                        <div style={{ background: "#fff", border: `0.5px solid #e5ddd0`, padding: "16px 20px", marginBottom: "32px", display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
-                            <div style={{ flex: 1, minWidth: "220px", position: "relative" }}>
-                                <Search size={14} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#bbb" }} />
-                                <input
-                                    type="text"
-                                    value={browseSearch}
-                                    onChange={e => setBrowseSearch(e.target.value)}
-                                    placeholder={activeTab === "subjects" ? "Search departments…" : "Search resource types…"}
-                                    style={{ width: "100%", padding: "9px 12px 9px 34px", border: `0.5px solid #e5ddd0`, borderRadius: "6px", fontSize: "13px", fontFamily: "'Lato', sans-serif", outline: "none", color: NAVY, boxSizing: "border-box" }}
-                                />
-                            </div>
-                            <div style={{ display: "flex", gap: "4px" }}>
-                                {[{ key: "subjects", label: "Departments" }, { key: "documents", label: "Resources" }].map(({ key, label }) => (
-                                    <button key={key} className={`lan-tab ${activeTab === key ? "lan-tab-active" : "lan-tab-inactive"}`}
-                                        onClick={() => { setActiveTab(key); setBrowseSearch(""); }}
-                                    >{label}</button>
-                                ))}
-                            </div>
+                </div>
+            </section>
+
+
+            <section style={{ background: "#fff", padding: "72px 24px" }}>
+                <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+                    <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: "8px", fontFamily: "'Lato', sans-serif" }}>
+                        Community Uploads
+                    </p>
+                    <h2 className="lan-serif" style={{ fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 700, color: NAVY, margin: "0 0 6px" }}>
+                        Newest Documents
+                    </h2>
+                    <p style={{ fontSize: "14px", color: "#888", marginBottom: "36px", fontWeight: 300 }}>
+                        Fresh uploads from students and educators across Africa
+                    </p>
+
+                    {allBooks.length === 0 ? (
+                        <div style={{ background: BG, border: `0.5px solid #e5ddd0`, padding: "64px 24px", textAlign: "center" }}>
+                            <FileText style={{ width: "48px", height: "48px", color: "#ddd", margin: "0 auto 12px" }} />
+                            <h3 className="lan-serif" style={{ fontSize: "22px", color: NAVY, marginBottom: "8px" }}>No Books Found</h3>
+                            <p style={{ fontSize: "13px", color: "#aaa", marginBottom: "20px" }}>This is a network problem. You can read our docs while waiting.</p>
+                            <Link href="/docs" style={{ display: "inline-block", padding: "10px 24px", background: NAVY, color: "#fff", fontSize: "13px", fontWeight: 700, textDecoration: "none" }}>
+                                LAN Docs
+                            </Link>
                         </div>
+                    ) : (
+                        <>
+                            {/* ── Row 1: books 0-5 ── */}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "20px", marginBottom: "24px" }}>
+                                {allBooks.slice(0, 6).map(book => {
+                                    const soldCount = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
+                                    const topSold = allBooks.slice(0, 12).reduce((m, b) => Math.max(m, bookSalesCount[b.id] || 0), 0);
+                                    const isTrending = soldCount > 0 && soldCount === topSold;
+                                    const owned = isPurchased(book.id);
 
-                        {/* departments grid */}
-                        {activeTab === "subjects" && (
-                            <>
-                                {filteredCategories.length === 0 ? (
-                                    <div style={{ textAlign: "center", padding: "64px 24px", background: "#fff", border: `0.5px solid #e5ddd0` }}>
-                                        <BookOpen size={36} style={{ color: "#e5ddd0", margin: "0 auto 12px" }} />
-                                        <h3 className="lan-serif" style={{ fontSize: "20px", color: NAVY, marginBottom: "6px" }}>No Departments Found</h3>
-                                        <p style={{ fontSize: "13px", color: "#bbb" }}>Try a different search term</p>
-                                    </div>
-                                ) : (
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "18px" }}>
-                                        {filteredCategories.map((cat, i) => (
-                                            <a key={i} href={`/category/${cat.name.toLowerCase().replace(/ & /g, "-").replace(/ /g, "-")}`} className="browse-card">
-                                                <div style={{ height: "180px", overflow: "hidden", position: "relative" }}>
-                                                    <img src={cat.image} alt={cat.name} className="browse-img" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                                    <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to top, rgba(13,34,68,0.9) 0%, rgba(13,34,68,0.4) 55%, transparent 100%)` }} />
-                                                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "16px" }}>
-                                                        <h3 className="lan-serif" style={{ fontSize: "17px", fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>{cat.name}</h3>
-                                                        <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", gap: "4px" }}>
-                                                            <Layers size={9} /> {cat.sub} subcategories
-                                                        </span>
+                                    if (book.isAd) {
+                                        return (
+                                            <a key={book.id} href={book.adLink} style={{ textDecoration: "none", display: "block", background: "#fff" }}
+                                                onClick={() => {
+                                                    import("firebase/firestore").then(({ doc: fDoc, updateDoc, increment }) => {
+                                                        import("@/lib/firebaseConfig").then(({ db: fDb }) => {
+                                                            updateDoc(fDoc(fDb, "promotions", book.adId), { clicks: increment(1) }).catch(() => { });
+                                                        });
+                                                    });
+                                                }}
+                                            >
+                                                <div style={{ position: "relative", background: "#ede8df" }}>
+                                                    <img src={book.image} alt={book.title}
+                                                        style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block" }}
+                                                        onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
+                                                    />
+                                                    <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff", fontFamily: "'Lato',sans-serif" }}>
+                                                        <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />PDF
+                                                    </div>
+                                                    <div style={{ position: "absolute", top: "8px", right: "8px", background: GOLD, color: NAVY, fontSize: "9px", fontWeight: 700, padding: "3px 8px", fontFamily: "'Lato',sans-serif" }}>AD</div>
+                                                    <div style={{ position: "absolute", bottom: "8px", left: "8px", background: "rgba(13,34,68,0.82)", padding: "3px 8px", fontSize: "9px", fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif" }}>
+                                                        {book.adTier.toUpperCase()} SPONSOR
                                                     </div>
                                                 </div>
-                                                <div style={{ padding: "16px" }}>
-                                                    <p style={{ fontSize: "12px", color: "#888", lineHeight: 1.6, margin: "0 0 14px" }}>{cat.description}</p>
-                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: `0.5px solid #f0ebe0`, paddingTop: "12px" }}>
-                                                        <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: NAVY }}>Browse Resources</span>
-                                                        <div style={{ width: "28px", height: "28px", border: `0.5px solid rgba(13,34,68,0.15)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                                            <ArrowRight size={12} style={{ color: NAVY }} />
-                                                        </div>
-                                                    </div>
+                                                <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0" }}>
+                                                    <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>{book.title}</h4>
+                                                    <p style={{ fontSize: "11px", color: "#888", margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
                                                 </div>
                                             </a>
-                                        ))}
-                                    </div>
-                                )}
-                                <div style={{ textAlign: "center", marginTop: "32px" }}>
-                                    <Link href="/documents" style={{ fontSize: "13px", fontWeight: 700, color: NAVY, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                                        Explore all categories <ChevronRight size={14} />
-                                    </Link>
-                                </div>
-                            </>
-                        )}
+                                        );
+                                    }
 
-                        {/* resources grid */}
-                        {activeTab === "documents" && (
-                            <>
-                                {filteredDocTypes.length === 0 ? (
-                                    <div style={{ textAlign: "center", padding: "64px 24px", background: "#fff", border: `0.5px solid #e5ddd0` }}>
-                                        <BookOpen size={36} style={{ color: "#e5ddd0", margin: "0 auto 12px" }} />
-                                        <h3 className="lan-serif" style={{ fontSize: "20px", color: NAVY, marginBottom: "6px" }}>No Resource Types Found</h3>
-                                        <p style={{ fontSize: "13px", color: "#bbb" }}>Try a different search term</p>
-                                    </div>
-                                ) : (
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "14px" }}>
-                                        {filteredDocTypes.map((dt, i) => (
-                                            <div key={i} className="doc-card" onClick={() => router.push(`/document-type/${dt.slug}`)}>
-                                                <div style={{ height: "120px", overflow: "hidden", position: "relative" }}>
-                                                    <img src={dt.image} alt={dt.name} className="doc-img" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(13,34,68,0.6), transparent 55%)" }} />
+                                    return (
+                                        <Link key={book.id} href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block", background: "#fff" }}>
+                                            <div style={{ position: "relative", background: "#ede8df" }}>
+                                                <img src={book.image} alt={book.title}
+                                                    style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", transition: "box-shadow 0.2s" }}
+                                                    onError={e => { e.target.style.display = "none"; if (e.target.nextSibling) e.target.nextSibling.style.display = "flex"; }}
+                                                    className="book-thumb"
+                                                />
+                                                <div style={{ display: "none", width: "100%", aspectRatio: "3/4", alignItems: "center", justifyContent: "center", background: "#ede8df" }}>
+                                                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
                                                 </div>
-                                                <div style={{ padding: "14px" }}>
-                                                    <h3 className="lan-serif" style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 5px" }}>{dt.name}</h3>
-                                                    <p style={{ fontSize: "11px", color: "#888", margin: "0 0 12px", lineHeight: 1.5 }}>{dt.description}</p>
-                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: `0.5px solid #f0ebe0`, paddingTop: "10px" }}>
-                                                        <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: GOLD }}>View All</span>
+                                                <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontFamily: "'Lato',sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff" }}>
+                                                    <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />PDF
+                                                </div>
+                                                {owned && <span style={{ position: "absolute", top: "8px", right: "8px", background: "#16a34a", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>OWNED</span>}
+                                                {!owned && isTrending && <span style={{ position: "absolute", bottom: "8px", left: "8px", background: "#ea580c", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>🔥 Trending</span>}
+                                            </div>
+                                            <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0" }}>
+                                                <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>{book.title}</h4>
+                                                <p style={{ fontSize: "11px", color: NAVY, margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
+                                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "wrap" }}>
+                                                    {book.category && !owned && (
+                                                        <span style={{ display: "inline-block", background: CREAM, border: `0.5px solid rgba(184,150,62,0.3)`, color: GOLD, fontSize: "8px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 7px", fontFamily: "'Lato',sans-serif", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.category}</span>
+                                                    )}
+                                                </div>
+                                                {soldCount > 0 && <p style={{ fontSize: "10px", color: NAVY, margin: "5px 0 0", display: "flex", alignItems: "center", gap: "4px", fontFamily: "'Lato',sans-serif" }}><ShoppingBag size={9} /> {soldCount} sold</p>}
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+
+                            {/* ── Gold Carousel after row 1 ── */}
+                            <FeaturedAdsCarousel tier="Gold" maxAds={2} autoPlay={true} autoPlayMs={4000} style={{ marginBottom: "24px" }} />
+
+                            {/* ── Row 2: books 6-11 ── */}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "20px", marginBottom: "24px" }}>
+                                {allBooks.slice(6, 12).map(book => {
+                                    const soldCount = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
+                                    const owned = isPurchased(book.id);
+                                    return (
+                                        <Link key={book.id} href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block", background: "#fff" }}>
+                                            <div style={{ position: "relative", background: "#ede8df" }}>
+                                                <img src={book.image} alt={book.title}
+                                                    style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", transition: "box-shadow 0.2s" }}
+                                                    onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
+                                                    className="book-thumb"
+                                                />
+                                                <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontFamily: "'Lato',sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff" }}>
+                                                    <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />PDF
+                                                </div>
+                                                {owned && <span style={{ position: "absolute", top: "8px", right: "8px", background: "#16a34a", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>OWNED</span>}
+                                            </div>
+                                            <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0" }}>
+                                                <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>{book.title}</h4>
+                                                <p style={{ fontSize: "11px", color: NAVY, margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
+                                                {book.category && !owned && (
+                                                    <span style={{ display: "inline-block", background: CREAM, border: `0.5px solid rgba(184,150,62,0.3)`, color: GOLD, fontSize: "8px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 7px", fontFamily: "'Lato',sans-serif", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.category}</span>
+                                                )}
+                                                {soldCount > 0 && <p style={{ fontSize: "10px", color: NAVY, margin: "5px 0 0", display: "flex", alignItems: "center", gap: "4px", fontFamily: "'Lato',sans-serif" }}><ShoppingBag size={9} /> {soldCount} sold</p>}
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+
+                            {/* ── Silver Carousel after row 2 ── */}
+                            <FeaturedAdsCarousel tier="Silver" maxAds={2} autoPlay={true} autoPlayMs={5000} style={{ marginBottom: "24px" }} />
+
+                            {/* ── Row 3: books 12-17 ── */}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "20px", marginBottom: "24px" }}>
+                                {allBooks.slice(12, 18).map(book => {
+                                    const soldCount = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
+                                    const owned = isPurchased(book.id);
+                                    return (
+                                        <Link key={book.id} href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block", background: "#fff" }}>
+                                            <div style={{ position: "relative", background: "#ede8df" }}>
+                                                <img src={book.image} alt={book.title}
+                                                    style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", transition: "box-shadow 0.2s" }}
+                                                    onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
+                                                    className="book-thumb"
+                                                />
+                                                <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontFamily: "'Lato',sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff" }}>
+                                                    <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />PDF
+                                                </div>
+                                                {owned && <span style={{ position: "absolute", top: "8px", right: "8px", background: "#16a34a", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>OWNED</span>}
+                                            </div>
+                                            <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0" }}>
+                                                <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>{book.title}</h4>
+                                                <p style={{ fontSize: "11px", color: NAVY, margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
+                                                {book.category && !owned && (
+                                                    <span style={{ display: "inline-block", background: CREAM, border: `0.5px solid rgba(184,150,62,0.3)`, color: GOLD, fontSize: "8px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 7px", fontFamily: "'Lato',sans-serif", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.category}</span>
+                                                )}
+                                                {soldCount > 0 && <p style={{ fontSize: "10px", color: NAVY, margin: "5px 0 0", display: "flex", alignItems: "center", gap: "4px", fontFamily: "'Lato',sans-serif" }}><ShoppingBag size={9} /> {soldCount} sold</p>}
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+
+                        </>
+                    )}
+                </div>
+            </section>
+
+            {/* ══════════════════════════════════════════════════════════
+            BROWSE THE LIBRARY
+        ══════════════════════════════════════════════════════════ */}
+            <section style={{ background: BG, padding: "80px 24px" }}>
+                <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
+                    {/* header */}
+                    <div style={{ textAlign: "center", marginBottom: "48px" }}>
+                        <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: GOLD, marginBottom: "10px", fontFamily: "'Lato', sans-serif" }}>
+                            Explore the Full Collection
+                        </p>
+                        <h2 className="lan-serif" style={{ fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>
+                            Browse the Library
+                        </h2>
+                        {/* gold diamond divider */}
+                        <div className="gold-line" style={{ maxWidth: "300px", margin: "0 auto 16px" }}>
+                            <div style={{ width: "8px", height: "8px", background: GOLD, transform: "rotate(45deg)", flexShrink: 0 }} />
+                        </div>
+                        <p style={{ fontSize: "14px", color: "#888", maxWidth: "520px", margin: "0 auto", lineHeight: 1.7, fontWeight: 300 }}>
+                            Explore our comprehensive collection tailored to every academic level and discipline
+                        </p>
+                    </div>
+
+                    {/* search + tabs */}
+                    <div style={{ background: "#fff", border: `0.5px solid #e5ddd0`, padding: "16px 20px", marginBottom: "32px", display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
+                        <div style={{ flex: 1, minWidth: "220px", position: "relative" }}>
+                            <Search size={14} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#bbb" }} />
+                            <input
+                                type="text"
+                                value={browseSearch}
+                                onChange={e => setBrowseSearch(e.target.value)}
+                                placeholder={activeTab === "subjects" ? "Search departments…" : "Search resource types…"}
+                                style={{ width: "100%", padding: "9px 12px 9px 34px", border: `0.5px solid #e5ddd0`, borderRadius: "6px", fontSize: "13px", fontFamily: "'Lato', sans-serif", outline: "none", color: NAVY, boxSizing: "border-box" }}
+                            />
+                        </div>
+                        <div style={{ display: "flex", gap: "4px" }}>
+                            {[{ key: "subjects", label: "Departments" }, { key: "documents", label: "Resources" }].map(({ key, label }) => (
+                                <button key={key} className={`lan-tab ${activeTab === key ? "lan-tab-active" : "lan-tab-inactive"}`}
+                                    onClick={() => { setActiveTab(key); setBrowseSearch(""); }}
+                                >{label}</button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* departments grid */}
+                    {activeTab === "subjects" && (
+                        <>
+                            {filteredCategories.length === 0 ? (
+                                <div style={{ textAlign: "center", padding: "64px 24px", background: "#fff", border: `0.5px solid #e5ddd0` }}>
+                                    <BookOpen size={36} style={{ color: "#e5ddd0", margin: "0 auto 12px" }} />
+                                    <h3 className="lan-serif" style={{ fontSize: "20px", color: NAVY, marginBottom: "6px" }}>No Departments Found</h3>
+                                    <p style={{ fontSize: "13px", color: "#bbb" }}>Try a different search term</p>
+                                </div>
+                            ) : (
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "18px" }}>
+                                    {filteredCategories.map((cat, i) => (
+                                        <a key={i} href={`/category/${cat.name.toLowerCase().replace(/ & /g, "-").replace(/ /g, "-")}`} className="browse-card">
+                                            <div style={{ height: "180px", overflow: "hidden", position: "relative" }}>
+                                                <img src={cat.image} alt={cat.name} className="browse-img" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to top, rgba(13,34,68,0.9) 0%, rgba(13,34,68,0.4) 55%, transparent 100%)` }} />
+                                                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "16px" }}>
+                                                    <h3 className="lan-serif" style={{ fontSize: "17px", fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>{cat.name}</h3>
+                                                    <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", gap: "4px" }}>
+                                                        <Layers size={9} /> {cat.sub} subcategories
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div style={{ padding: "16px" }}>
+                                                <p style={{ fontSize: "12px", color: "#888", lineHeight: 1.6, margin: "0 0 14px" }}>{cat.description}</p>
+                                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: `0.5px solid #f0ebe0`, paddingTop: "12px" }}>
+                                                    <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: NAVY }}>Browse Resources</span>
+                                                    <div style={{ width: "28px", height: "28px", border: `0.5px solid rgba(13,34,68,0.15)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                                                         <ArrowRight size={12} style={{ color: NAVY }} />
                                                     </div>
                                                 </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
-                                <div style={{ textAlign: "center", marginTop: "32px" }}>
-                                    <Link href="/resources" style={{ fontSize: "13px", fontWeight: 700, color: NAVY, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                                        Explore all student resources <ChevronRight size={14} />
-                                    </Link>
+                                        </a>
+                                    ))}
                                 </div>
-                            </>
-                        )}
-                    </div>
-                </section>
+                            )}
+                            <div style={{ textAlign: "center", marginTop: "32px" }}>
+                                <Link href="/documents" style={{ fontSize: "13px", fontWeight: 700, color: NAVY, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                    Explore all categories <ChevronRight size={14} />
+                                </Link>
+                            </div>
+                        </>
+                    )}
 
-                {/* ══════════════════════════════════════════════════════════
+                    {/* resources grid */}
+                    {activeTab === "documents" && (
+                        <>
+                            {filteredDocTypes.length === 0 ? (
+                                <div style={{ textAlign: "center", padding: "64px 24px", background: "#fff", border: `0.5px solid #e5ddd0` }}>
+                                    <BookOpen size={36} style={{ color: "#e5ddd0", margin: "0 auto 12px" }} />
+                                    <h3 className="lan-serif" style={{ fontSize: "20px", color: NAVY, marginBottom: "6px" }}>No Resource Types Found</h3>
+                                    <p style={{ fontSize: "13px", color: "#bbb" }}>Try a different search term</p>
+                                </div>
+                            ) : (
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "14px" }}>
+                                    {filteredDocTypes.map((dt, i) => (
+                                        <div key={i} className="doc-card" onClick={() => router.push(`/document-type/${dt.slug}`)}>
+                                            <div style={{ height: "120px", overflow: "hidden", position: "relative" }}>
+                                                <img src={dt.image} alt={dt.name} className="doc-img" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(13,34,68,0.6), transparent 55%)" }} />
+                                            </div>
+                                            <div style={{ padding: "14px" }}>
+                                                <h3 className="lan-serif" style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 5px" }}>{dt.name}</h3>
+                                                <p style={{ fontSize: "11px", color: "#888", margin: "0 0 12px", lineHeight: 1.5 }}>{dt.description}</p>
+                                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: `0.5px solid #f0ebe0`, paddingTop: "10px" }}>
+                                                    <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: GOLD }}>View All</span>
+                                                    <ArrowRight size={12} style={{ color: NAVY }} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            <div style={{ textAlign: "center", marginTop: "32px" }}>
+                                <Link href="/resources" style={{ fontSize: "13px", fontWeight: 700, color: NAVY, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                    Explore all student resources <ChevronRight size={14} />
+                                </Link>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </section>
+
+            {/* ══════════════════════════════════════════════════════════
             EDUCATOR NOTICE BOARD
         ══════════════════════════════════════════════════════════ */}
-                <section style={{ background: "#fff", borderTop: `1px solid #e5ddd0`, borderBottom: `1px solid #e5ddd0`, padding: "64px 24px" }}>
-                    <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", flexWrap: "wrap", gap: "40px", alignItems: "center" }}>
-                        {/* crest icon */}
-                        <div style={{ textAlign: "center", flexShrink: 0 }}>
-                            <div style={{ width: "72px", height: "72px", margin: "0 auto 12px", border: `2px solid ${NAVY}`, transform: "rotate(45deg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <GraduationCap size={28} style={{ color: NAVY, transform: "rotate(-45deg)" }} />
-                            </div>
-                            <p className="lan-serif" style={{ fontSize: "11px", color: "#bbb", fontStyle: "italic" }}>Est. LAN Library</p>
+            <section style={{ background: "#fff", borderTop: `1px solid #e5ddd0`, borderBottom: `1px solid #e5ddd0`, padding: "64px 24px" }}>
+                <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", flexWrap: "wrap", gap: "40px", alignItems: "center" }}>
+                    {/* crest icon */}
+                    <div style={{ textAlign: "center", flexShrink: 0 }}>
+                        <div style={{ width: "72px", height: "72px", margin: "0 auto 12px", border: `2px solid ${NAVY}`, transform: "rotate(45deg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <GraduationCap size={28} style={{ color: NAVY, transform: "rotate(-45deg)" }} />
                         </div>
-
-                        <div style={{ width: "1px", height: "80px", background: "#e5ddd0", flexShrink: 0 }} />
-
-                        <div style={{ flex: 1, minWidth: "240px" }}>
-                            <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, marginBottom: "10px", fontFamily: "'Lato', sans-serif" }}>
-                                Notice to All Scholars
-                            </p>
-                            <h3 className="lan-serif" style={{ fontSize: "clamp(20px, 3vw, 30px)", fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>
-                                Are you an Educator or Institution?
-                            </h3>
-                            <p style={{ fontSize: "14px", color: "#777", lineHeight: 1.75, maxWidth: "520px", fontWeight: 300 }}>
-                                Join thousands of educators contributing to Africa's largest digital academic library.
-                                Upload course materials, past questions, and research papers to reach millions of students.
-                            </p>
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0 }}>
-                            <button onClick={HandleClick} disabled={checkingSeller}
-                                style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 24px", background: NAVY, color: "#fff", fontSize: "13px", fontWeight: 700, fontFamily: "'Lato', sans-serif", border: "none", cursor: "pointer", letterSpacing: "0.04em" }}
-                            >
-                                {checkingSeller
-                                    ? <><span style={{ width: "12px", height: "12px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />Loading…</>
-                                    : isSeller ? <><Upload size={14} />Upload Materials</> : "Become a Seller"
-                                }
-                            </button>
-                            <Link href="/documents"
-                                style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 24px", border: `0.5px solid ${NAVY}`, color: NAVY, fontSize: "13px", fontWeight: 700, fontFamily: "'Lato', sans-serif", textDecoration: "none", letterSpacing: "0.04em", transition: "background 0.15s" }}
-                                onMouseEnter={e => e.currentTarget.style.background = "rgba(13,34,68,0.05)"}
-                                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                            >
-                                <Search size={14} /> Browse Library
-                            </Link>
-                        </div>
+                        <p className="lan-serif" style={{ fontSize: "11px", color: "#bbb", fontStyle: "italic" }}>Est. LAN Library</p>
                     </div>
-                </section>
 
-                {/* ══════════════════════════════════════════════════════════
+                    <div style={{ width: "1px", height: "80px", background: "#e5ddd0", flexShrink: 0 }} />
+
+                    <div style={{ flex: 1, minWidth: "240px" }}>
+                        <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, marginBottom: "10px", fontFamily: "'Lato', sans-serif" }}>
+                            Notice to All Scholars
+                        </p>
+                        <h3 className="lan-serif" style={{ fontSize: "clamp(20px, 3vw, 30px)", fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>
+                            Are you an Educator or Institution?
+                        </h3>
+                        <p style={{ fontSize: "14px", color: "#777", lineHeight: 1.75, maxWidth: "520px", fontWeight: 300 }}>
+                            Join thousands of educators contributing to Africa's largest digital academic library.
+                            Upload course materials, past questions, and research papers to reach millions of students.
+                        </p>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0 }}>
+                        <button onClick={HandleClick} disabled={checkingSeller}
+                            style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 24px", background: NAVY, color: "#fff", fontSize: "13px", fontWeight: 700, fontFamily: "'Lato', sans-serif", border: "none", cursor: "pointer", letterSpacing: "0.04em" }}
+                        >
+                            {checkingSeller
+                                ? <><span style={{ width: "12px", height: "12px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />Loading…</>
+                                : isSeller ? <><Upload size={14} />Upload Materials</> : "Become a Seller"
+                            }
+                        </button>
+                        <Link href="/documents"
+                            style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 24px", border: `0.5px solid ${NAVY}`, color: NAVY, fontSize: "13px", fontWeight: 700, fontFamily: "'Lato', sans-serif", textDecoration: "none", letterSpacing: "0.04em", transition: "background 0.15s" }}
+                            onMouseEnter={e => e.currentTarget.style.background = "rgba(13,34,68,0.05)"}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                        >
+                            <Search size={14} /> Browse Library
+                        </Link>
+                    </div>
+                </div>
+            </section>
+
+            {/* ══════════════════════════════════════════════════════════
             SHARE THE WEALTH
         ══════════════════════════════════════════════════════════ */}
-                <section style={{ background: BG, padding: "72px 24px" }}>
-                    <div style={{ maxWidth: "900px", margin: "0 auto", textAlign: "center" }}>
-                        <h2 className="lan-serif" style={{ fontSize: "clamp(30px, 5vw, 52px)", fontWeight: 900, color: NAVY, margin: "0 0 16px", lineHeight: 1.08 }}>
-                            Share the wealth{" "}
-                            <span style={{ color: "#999", fontWeight: 400, fontStyle: "italic" }}>[of knowledge].</span>
-                        </h2>
-                        <p style={{ fontSize: "16px", color: "#777", maxWidth: "600px", margin: "0 auto 48px", lineHeight: 1.75, fontWeight: 300 }}>
-                            Turn your books into income. Upload your work, reach a global audience{" "}
-                            <strong style={{ color: NAVY }}>[90M+]</strong>, and earn whenever readers discover your content.
-                        </p>
-
-                        <div style={{ background: "#fff", border: `0.5px solid #e5ddd0`, padding: "60px 24px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                            {/* device icons */}
-                            <div style={{ display: "flex", alignItems: "center", gap: "28px", marginBottom: "36px", color: "#ccc" }}>
-                                <Monitor size={56} strokeWidth={1.2} />
-                                <Upload size={36} strokeWidth={2} style={{ color: GOLD }} />
-                                <Smartphone size={48} strokeWidth={1.2} />
-                            </div>
-
-                            <button
-                                onClick={HandleClick}
-                                disabled={checkingSeller}
-                                style={{ display: "flex", alignItems: "center", gap: "8px", padding: "15px 36px", background: GOLD, color: NAVY, fontSize: "15px", fontWeight: 700, fontFamily: "'Lato', sans-serif", border: "none", cursor: "pointer", letterSpacing: "0.04em", transition: "background 0.18s" }}
-                                onMouseEnter={e => e.currentTarget.style.background = GOLDD}
-                                onMouseLeave={e => e.currentTarget.style.background = GOLD}
-                            >
-                                {checkingSeller
-                                    ? "Loading…"
-                                    : isSeller ? <><Upload size={16} />Upload Document</> : "Become a Seller"
-                                }
-                            </button>
-
-                            {!checkingSeller && isSeller && (
-                                <p style={{ fontSize: "12px", color: "#16a34a", marginTop: "14px", display: "flex", alignItems: "center", gap: "5px" }}>
-                                    <span style={{ width: "7px", height: "7px", background: "#16a34a", borderRadius: "50%", display: "inline-block" }} />
-                                    You're a verified seller
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                </section>
-
-                {/* ══════════════════════════════════════════════════════════
-            CTA BANNER
-        ══════════════════════════════════════════════════════════ */}
-                <section className="crest-bg" style={{ padding: "80px 24px", textAlign: "center" }}>
-                    {/* gold star divider */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", marginBottom: "28px" }}>
-                        <div style={{ height: "1px", width: "60px", background: "rgba(184,150,62,0.4)" }} />
-                        <Star size={14} style={{ color: GOLD, fill: GOLD }} />
-                        <div style={{ height: "1px", width: "60px", background: "rgba(184,150,62,0.4)" }} />
-                    </div>
-
-                    <h2 className="lan-serif" style={{ fontSize: "clamp(28px, 5vw, 52px)", fontWeight: 700, color: "#fff", margin: "0 0 16px" }}>
-                        Ready to Excel in Your Studies?
+            <section style={{ background: BG, padding: "72px 24px" }}>
+                <div style={{ maxWidth: "900px", margin: "0 auto", textAlign: "center" }}>
+                    <h2 className="lan-serif" style={{ fontSize: "clamp(30px, 5vw, 52px)", fontWeight: 900, color: NAVY, margin: "0 0 16px", lineHeight: 1.08 }}>
+                        Share the wealth{" "}
+                        <span style={{ color: "#999", fontWeight: 400, fontStyle: "italic" }}>[of knowledge].</span>
                     </h2>
-                    <p style={{ fontSize: "15px", color: "rgba(255,255,255,0.5)", maxWidth: "500px", margin: "0 auto 40px", lineHeight: 1.75, fontWeight: 300 }}>
-                        Access premium academic resources and join a community of over 2.4 million learners
-                        dedicated to educational excellence across Nigeria and beyond.
+                    <p style={{ fontSize: "16px", color: "#777", maxWidth: "600px", margin: "0 auto 48px", lineHeight: 1.75, fontWeight: 300 }}>
+                        Turn your books into income. Upload your work, reach a global audience{" "}
+                        <strong style={{ color: NAVY }}>[90M+]</strong>, and earn whenever readers discover your content.
                     </p>
 
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", justifyContent: "center" }}>
-                        <Link href="/documents"
-                            style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "14px 28px", background: GOLD, color: NAVY, fontSize: "13px", fontWeight: 700, textDecoration: "none", fontFamily: "'Lato', sans-serif", letterSpacing: "0.04em", transition: "background 0.18s" }}
+                    <div style={{ background: "#fff", border: `0.5px solid #e5ddd0`, padding: "60px 24px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                        {/* device icons */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "28px", marginBottom: "36px", color: "#ccc" }}>
+                            <Monitor size={56} strokeWidth={1.2} />
+                            <Upload size={36} strokeWidth={2} style={{ color: GOLD }} />
+                            <Smartphone size={48} strokeWidth={1.2} />
+                        </div>
+
+                        <button
+                            onClick={HandleClick}
+                            disabled={checkingSeller}
+                            style={{ display: "flex", alignItems: "center", gap: "8px", padding: "15px 36px", background: GOLD, color: NAVY, fontSize: "15px", fontWeight: 700, fontFamily: "'Lato', sans-serif", border: "none", cursor: "pointer", letterSpacing: "0.04em", transition: "background 0.18s" }}
                             onMouseEnter={e => e.currentTarget.style.background = GOLDD}
                             onMouseLeave={e => e.currentTarget.style.background = GOLD}
                         >
-                            <Search size={14} /> Browse All Documents
-                        </Link>
-                        <Link href="/upload-document"
-                            style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "14px 28px", border: "0.5px solid rgba(255,255,255,0.2)", color: CREAM, fontSize: "13px", fontWeight: 700, textDecoration: "none", fontFamily: "'Lato', sans-serif", letterSpacing: "0.04em", transition: "background 0.18s" }}
-                            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.07)"}
-                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                        >
-                            <Upload size={14} /> Contribute Resources
-                        </Link>
+                            {checkingSeller
+                                ? "Loading…"
+                                : isSeller ? <><Upload size={16} />Upload Document</> : "Become a Seller"
+                            }
+                        </button>
+
+                        {!checkingSeller && isSeller && (
+                            <p style={{ fontSize: "12px", color: "#16a34a", marginTop: "14px", display: "flex", alignItems: "center", gap: "5px" }}>
+                                <span style={{ width: "7px", height: "7px", background: "#16a34a", borderRadius: "50%", display: "inline-block" }} />
+                                You're a verified seller
+                            </p>
+                        )}
                     </div>
-                </section>
+                </div>
+            </section>
 
-                <Footer />
+            {/* ══════════════════════════════════════════════════════════
+            CTA BANNER
+        ══════════════════════════════════════════════════════════ */}
+            <section className="crest-bg" style={{ padding: "80px 24px", textAlign: "center" }}>
+                {/* gold star divider */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", marginBottom: "28px" }}>
+                    <div style={{ height: "1px", width: "60px", background: "rgba(184,150,62,0.4)" }} />
+                    <Star size={14} style={{ color: GOLD, fill: GOLD }} />
+                    <div style={{ height: "1px", width: "60px", background: "rgba(184,150,62,0.4)" }} />
+                </div>
 
-                <style>{`
+                <h2 className="lan-serif" style={{ fontSize: "clamp(28px, 5vw, 52px)", fontWeight: 700, color: "#fff", margin: "0 0 16px" }}>
+                    Ready to Excel in Your Studies?
+                </h2>
+                <p style={{ fontSize: "15px", color: "rgba(255,255,255,0.5)", maxWidth: "500px", margin: "0 auto 40px", lineHeight: 1.75, fontWeight: 300 }}>
+                    Access premium academic resources and join a community of over 2.4 million learners
+                    dedicated to educational excellence across Nigeria and beyond.
+                </p>
+
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", justifyContent: "center" }}>
+                    <Link href="/documents"
+                        style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "14px 28px", background: GOLD, color: NAVY, fontSize: "13px", fontWeight: 700, textDecoration: "none", fontFamily: "'Lato', sans-serif", letterSpacing: "0.04em", transition: "background 0.18s" }}
+                        onMouseEnter={e => e.currentTarget.style.background = GOLDD}
+                        onMouseLeave={e => e.currentTarget.style.background = GOLD}
+                    >
+                        <Search size={14} /> Browse All Documents
+                    </Link>
+                    <Link href="/upload-document"
+                        style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "14px 28px", border: "0.5px solid rgba(255,255,255,0.2)", color: CREAM, fontSize: "13px", fontWeight: 700, textDecoration: "none", fontFamily: "'Lato', sans-serif", letterSpacing: "0.04em", transition: "background 0.18s" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.07)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                    >
+                        <Upload size={14} /> Contribute Resources
+                    </Link>
+                </div>
+            </section>
+
+            <Footer />
+
+            <style>{`
           @keyframes spin { to { transform: rotate(360deg); } }
         `}</style>
-            </div>
+        </div >
         </>
     );
 }

@@ -116,7 +116,9 @@ export default function AllBooksClient() {
     const [visibleRows, setVisibleRows] = useState(5);
     const [bookFeedbackCounts, setBookFeedbackCounts] = useState({});
 
-    const goldAds = useAds("Gold", 4);
+    const goldAds   = useAds("Gold",   4);
+    const silverAds = useAds("Silver", 3);
+    const bronzeAds = useAds("Bronze", 3);
     const booksPerRow = 10;
     const rowsPerLoad = 2;
     const searchParams = useSearchParams();
@@ -417,56 +419,82 @@ export default function AllBooksClient() {
                         </div>
                     ) : (
                         <>
-                            {bookRows.map((rowBooks, ri) => (
-                                <React.Fragment key={ri}>
-                                    <div style={{ marginBottom: '32px' }}>
-
-                                        {/* Section heading — first row only */}
+                                {bookRows.map((rowBooks, ri) => (
+                                    <React.Fragment key={ri}>
+                                      <div style={{ marginBottom: "32px" }}>
                                         {ri === 0 && (
-                                            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '24px' }}>
-                                                <div>
-                                                    <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: GOLD, marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>
-                                                        {selectedCategory === 'all' ? 'Full Collection' : categories.find(c => c.value === selectedCategory)?.label}
-                                                    </p>
-                                                    <h2 className="lan-serif" style={{ fontSize: 'clamp(22px,3vw,32px)', fontWeight: 700, color: NAVY, margin: 0 }}>
-                                                        {sortedBooks.length} Documents Available
-                                                    </h2>
-                                                </div>
+                                          <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom:"24px" }}>
+                                            <div>
+                                              <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:"0.22em", textTransform:"uppercase", color:GOLD, marginBottom:"6px", fontFamily:"'Lato',sans-serif" }}>
+                                                {selectedCategory === "all" ? "Full Collection" : categories.find(c => c.value === selectedCategory)?.label}
+                                              </p>
+                                              <h2 className="lan-serif" style={{ fontSize:"clamp(22px,3vw,32px)", fontWeight:700, color:NAVY, margin:0 }}>
+                                                {sortedBooks.length} Documents Available
+                                              </h2>
                                             </div>
+                                          </div>
                                         )}
-
-                                        {/* Horizontal scroll row */}
-                                        <div className="sbar-none" style={{ overflowX: 'auto', margin: '0 -4px', padding: '0 4px 12px' }}>
-                                            <div style={{ display: 'flex', gap: '20px', paddingBottom: '4px' }}>
-                                                {injectAds(rowBooks, ri === 0 ? goldAds : [], 1).map(book =>
-                                                    book.isAd ? (
-                                                        <AdCard key={book.id} book={book} />
-                                                    ) : (
-                                                        <BookCard key={book.id} book={book} isPurchased={isPurchased} bookSalesCount={bookSalesCount} getFeedbackCount={getFeedbackCount} />
-                                                    )
-                                                )}
-                                            </div>
+                                
+                                        {/* Horizontal scroll row — inject ad at slot 2 */}
+                                        <div className="sbar-none" style={{ overflowX:"auto", margin:"0 -4px", padding:"0 4px 12px" }}>
+                                          <div style={{ display:"flex", gap:"20px", paddingBottom:"4px" }}>
+                                            {injectAds(rowBooks, ri === 0 ? goldAds : [], 1).reduce((acc, book, i) => {
+                                              acc.push(book.isAd
+                                                ? <AdCard key={book.id} book={book} />
+                                                : <BookCard key={book.id} book={book} isPurchased={isPurchased} bookSalesCount={bookSalesCount} getFeedbackCount={getFeedbackCount} />
+                                              );
+                                              // Inject silver ad at index 2 in every row
+                                              if (i === 1 && silverAds[ri % silverAds.length]) {
+                                                const ad = silverAds[ri % silverAds.length];
+                                                acc.push(
+                                                  <a key={`silver-${ri}`} href={ad.adLink || ad.link || "#"}
+                                                    style={{ flexShrink:0, width:"200px", textDecoration:"none", display:"block" }}>
+                                                    <div style={{ position:"relative", background:"#ede8df" }}>
+                                                      <img src={ad.image || ad.imageUrl} alt={ad.title || "Sponsored"}
+                                                        style={{ width:"100%", aspectRatio:"3/4", objectFit:"cover", display:"block" }}
+                                                        onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }} />
+                                                      <div style={{ position:"absolute", top:"8px", left:"8px", background:NAVY, color:"#fff", fontSize:"9px", fontWeight:700, padding:"3px 8px", fontFamily:"'Lato',sans-serif", display:"flex", alignItems:"center", gap:4 }}>
+                                                        <span style={{ width:5, height:5, borderRadius:"50%", background:"#22c55e", display:"inline-block" }} />PDF
+                                                      </div>
+                                                      <div style={{ position:"absolute", top:"8px", right:"8px", background:GOLD, color:NAVY, fontSize:"9px", fontWeight:700, padding:"3px 8px", fontFamily:"'Lato',sans-serif" }}>AD</div>
+                                                      <div style={{ position:"absolute", bottom:"8px", left:"8px", background:"rgba(13,34,68,0.82)", padding:"3px 8px", fontSize:"9px", fontWeight:700, color:GOLD, fontFamily:"'Lato',sans-serif" }}>
+                                                        SILVER SPONSOR
+                                                      </div>
+                                                    </div>
+                                                    <div style={{ padding:"10px 10px 12px", borderTop:"0.5px solid #f0ebe0" }}>
+                                                      <h4 style={{ fontFamily:"'Playfair Display',serif", fontSize:"13px", fontWeight:700, color:NAVY, margin:"0 0 3px", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden", lineHeight:1.35 }}>
+                                                        {ad.title || ad.bookTitle || "Sponsored"}
+                                                      </h4>
+                                                      <p style={{ fontSize:"11px", color:"#888", margin:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", fontFamily:"'Lato',sans-serif" }}>
+                                                        {ad.author || ad.sellerName || "Sponsored Content"}
+                                                      </p>
+                                                    </div>
+                                                  </a>
+                                                );
+                                              }
+                                              return acc;
+                                            }, [])}
+                                          </div>
                                         </div>
-                                    </div>
-
-                                    {/* ── Rotating FeaturedAdsCarousel between every 2 book rows ── */}
-                                    {(ri + 1) % 2 === 0 && ri < bookRows.length - 1 && (
-                                        <div style={{ marginBottom: '40px' }}>
-                                            <FeaturedAdsCarousel
-                                                tier={CAROUSEL_TIERS[Math.floor(ri / 2) % CAROUSEL_TIERS.length]}
-                                                maxAds={2}
-                                                autoPlay={true}
-                                                autoPlayMs={4000 + (ri * 500)} // slightly stagger each carousel
-                                            />
+                                      </div>
+                                
+                                      {/* FeaturedAdsCarousel between every 2 rows — Gold → Silver → Bronze cycling */}
+                                      {(ri + 1) % 2 === 0 && ri < bookRows.length - 1 && (
+                                        <div style={{ marginBottom:"40px" }}>
+                                          <FeaturedAdsCarousel
+                                            tier={CAROUSEL_TIERS[Math.floor(ri / 2) % CAROUSEL_TIERS.length]}
+                                            maxAds={2}
+                                            autoPlay={true}
+                                            autoPlayMs={4000 + ri * 500}
+                                          />
                                         </div>
-                                    )}
-
-                                    {/* Gold divider between rows (not after carousel) */}
-                                    {(ri + 1) % 2 !== 0 && ri < bookRows.length - 1 && (
-                                        <div style={{ borderBottom: '0.5px solid rgba(184,150,62,0.2)', marginBottom: '40px' }} />
-                                    )}
-                                </React.Fragment>
-                            ))}
+                                      )}
+                                
+                                      {(ri + 1) % 2 !== 0 && ri < bookRows.length - 1 && (
+                                        <div style={{ borderBottom:"0.5px solid rgba(184,150,62,0.2)", marginBottom:"40px" }} />
+                                      )}
+                                    </React.Fragment>
+                                  ))}
 
                             {/* Load More */}
                             {hasMoreRows && (

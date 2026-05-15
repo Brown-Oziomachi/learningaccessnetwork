@@ -78,6 +78,349 @@ function VerifiedFacultyBadge({ user, seller }) {
     );
 }
 
+function VerificationTimeline({ user, seller }) {
+    const NAVY = "#0d2244";
+    const GOLD = "#b8963e";
+    const CREAM = "#f5f0e8";
+
+    // Only render for faculty/lecturer roles
+    const isFaculty =
+        user?.isLecturer === true ||
+        user?.role === "faculty" ||
+        user?.role === "lecturer" ||
+        ["Dr.", "Prof.", "Mr.", "Mrs.", "Ms.", "Engr.", "Pharm.", "Barr.", "Lecturer"].includes(seller?.title);
+
+    if (!isFaculty) return null;
+
+    // ── Determine current step index from Firestore fields ──
+    // Step 0: KYC Submitted   → user has basic profile filled
+    // Step 1: Faculty ID Verified → admin approved (lecturerVerificationStatus === 'approved' or 'verified')
+    // Step 2: Payout Active   → fully_verified + has bank details
+    const isIdVerified =
+        user?.lecturerVerificationStatus === "approved" ||
+        user?.lecturerVerificationStatus === "verified" ||
+        user?.isVerified === true;
+
+    const isPayoutActive =
+        isIdVerified &&
+        (user?.bankDetails?.accountNumber || seller?.bankDetails?.accountNumber) &&
+        user?.lecturerVerificationStatus !== "pending" &&
+        user?.lecturerVerificationStatus !== "rejected";
+
+    const currentStepIndex =
+        user?.verificationStatus === "fully_verified" || isPayoutActive ? 2
+            : isIdVerified ? 1
+                : 0;
+
+    const steps = [
+        {
+            id: "kyc",
+            label: "KYC Submitted",
+            sublabel: "Profile & basic details",
+            icon: (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                </svg>
+            ),
+        },
+        {
+            id: "id_verified",
+            label: "Faculty ID Verified",
+            sublabel: "University ID approved",
+            icon: (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="2" />
+                    <path d="M2 10h20" />
+                </svg>
+            ),
+        },
+        {
+            id: "payout",
+            label: "Payout Active",
+            sublabel: "Ready to receive earnings",
+            icon: (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+            ),
+        },
+    ];
+
+    // ── If fully verified, show compact badge instead ──
+    if (currentStepIndex === 2) {
+        return (
+            <div style={{
+                background: "linear-gradient(135deg, #0d2244 0%, #1a3a6e 100%)",
+                border: `1.5px solid ${GOLD}`,
+                padding: "14px 20px",
+                marginBottom: "20px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "10px",
+            }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    {/* Gold shield checkmark */}
+                    <div style={{
+                        width: "40px", height: "40px",
+                        background: GOLD,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0,
+                    }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            <path d="M9 12l2 2 4-4" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "15px", fontWeight: 700, color: "#fff", margin: "0 0 2px" }}>
+                            Fully Verified Faculty
+                        </p>
+                        <p style={{ fontSize: "11px", color: "rgba(184,150,62,0.8)", fontFamily: "'Lato',sans-serif", margin: 0 }}>
+                            All 3 verification steps complete · Payouts enabled
+                        </p>
+                    </div>
+                </div>
+                <div style={{
+                    display: "inline-flex", alignItems: "center", gap: "6px",
+                    background: "rgba(184,150,62,0.15)", border: `0.5px solid rgba(184,150,62,0.4)`,
+                    padding: "5px 12px",
+                }}>
+                    <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e" }} />
+                    <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: GOLD, fontFamily: "'Lato',sans-serif" }}>
+                        Active
+                    </span>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Rejected state ──
+    if (user?.lecturerVerificationStatus === "rejected") {
+        return (
+            <div style={{
+                background: "#fff",
+                border: "0.5px solid #fecaca",
+                padding: "16px 20px",
+                marginBottom: "20px",
+            }}>
+                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "14px", fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>
+                    Verification Status
+                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "#fef2f2", padding: "12px 14px" }}>
+                    <div style={{ width: "32px", height: "32px", background: "#fee2e2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p style={{ fontSize: "12px", fontWeight: 700, color: "#dc2626", margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>Verification Rejected</p>
+                        <p style={{ fontSize: "11px", color: "#991b1b", margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                            {user?.verificationRejectedReason || "Your documents could not be verified. Please contact support."}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Full timeline (steps 0 or 1 in progress) ──
+    const progressPercent = (currentStepIndex / (steps.length - 1)) * 100;
+
+    return (
+        <div style={{
+            background: "#fff",
+            border: "0.5px solid #e5ddd0",
+            padding: "20px 24px",
+            marginBottom: "20px",
+            position: "relative",
+            overflow: "hidden",
+        }}>
+            {/* Subtle dot-grid background */}
+            <div style={{
+                position: "absolute", inset: 0,
+                backgroundImage: "radial-gradient(rgba(13,34,68,0.04) 1px,transparent 1px)",
+                backgroundSize: "18px 18px",
+                pointerEvents: "none",
+            }} />
+
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px", position: "relative" }}>
+                <div>
+                    <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: GOLD, margin: "0 0 4px", fontFamily: "'Lato',sans-serif" }}>
+                        Faculty Onboarding
+                    </p>
+                    <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: "16px", fontWeight: 700, color: NAVY, margin: 0 }}>
+                        Verification Status
+                    </h3>
+                </div>
+                {/* Step counter */}
+                <div style={{
+                    background: NAVY,
+                    padding: "5px 12px",
+                    display: "flex", alignItems: "center", gap: "5px",
+                }}>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif" }}>
+                        {currentStepIndex + 1}
+                    </span>
+                    <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", fontFamily: "'Lato',sans-serif" }}>/ {steps.length}</span>
+                </div>
+            </div>
+
+            {/* ── Progress bar track ── */}
+            <div style={{ position: "relative", marginBottom: "24px" }}>
+                {/* Track background */}
+                <div style={{
+                    height: "3px",
+                    background: "#e5ddd0",
+                    position: "absolute",
+                    top: "18px",
+                    left: "18px",
+                    right: "18px",
+                    zIndex: 0,
+                }} />
+                {/* Filled track */}
+                <div style={{
+                    height: "3px",
+                    background: `linear-gradient(90deg, ${GOLD}, rgba(184,150,62,0.6))`,
+                    position: "absolute",
+                    top: "18px",
+                    left: "18px",
+                    width: `calc(${progressPercent}% * (100% - 36px) / 100)`,
+                    zIndex: 1,
+                    transition: "width 0.6s cubic-bezier(0.4,0,0.2,1)",
+                }} />
+
+                {/* Step circles */}
+                <div style={{ display: "flex", justifyContent: "space-between", position: "relative", zIndex: 2 }}>
+                    {steps.map((step, idx) => {
+                        const isCompleted = idx < currentStepIndex;
+                        const isCurrent = idx === currentStepIndex;
+                        const isUpcoming = idx > currentStepIndex;
+
+                        return (
+                            <div key={step.id} style={{
+                                display: "flex", flexDirection: "column", alignItems: "center", gap: "8px",
+                                flex: 1,
+                            }}>
+                                {/* Circle */}
+                                <div style={{
+                                    width: "36px", height: "36px",
+                                    borderRadius: "50%",
+                                    background: isCompleted ? GOLD : isCurrent ? NAVY : "#f0ebe0",
+                                    border: isCompleted
+                                        ? `2px solid ${GOLD}`
+                                        : isCurrent
+                                            ? `2px solid ${GOLD}`
+                                            : "2px solid #e5ddd0",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    flexShrink: 0,
+                                    position: "relative",
+                                    transition: "all 0.3s",
+                                    // Pulsing ring for current step
+                                    boxShadow: isCurrent
+                                        ? `0 0 0 4px rgba(184,150,62,0.2), 0 0 0 8px rgba(184,150,62,0.08)`
+                                        : "none",
+                                    animation: isCurrent ? "verif-pulse 2s ease-in-out infinite" : "none",
+                                }}>
+                                    {isCompleted ? (
+                                        // Checkmark
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M20 6L9 17l-5-5" />
+                                        </svg>
+                                    ) : (
+                                        // Step icon
+                                        <span style={{ color: isCurrent ? "#fff" : "#bbb" }}>
+                                            {step.icon}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Label */}
+                                <div style={{ textAlign: "center", maxWidth: "90px" }}>
+                                    <p style={{
+                                        fontSize: "11px",
+                                        fontWeight: isCompleted || isCurrent ? 700 : 400,
+                                        color: isCompleted ? GOLD : isCurrent ? NAVY : "#bbb",
+                                        margin: "0 0 2px",
+                                        fontFamily: "'Lato',sans-serif",
+                                        lineHeight: 1.3,
+                                    }}>
+                                        {step.label}
+                                    </p>
+                                    <p style={{
+                                        fontSize: "9px",
+                                        color: isUpcoming ? "#ccc" : "#aaa",
+                                        margin: 0,
+                                        fontFamily: "'Lato',sans-serif",
+                                        lineHeight: 1.4,
+                                        display: "-webkit-box",
+                                        WebkitLineClamp: 2,
+                                        WebkitBoxOrient: "vertical",
+                                        overflow: "hidden",
+                                    }}>
+                                        {step.sublabel}
+                                    </p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* ── Current step info banner ── */}
+            <div style={{
+                background: CREAM,
+                border: `0.5px solid rgba(184,150,62,0.25)`,
+                borderLeft: `3px solid ${GOLD}`,
+                padding: "12px 14px",
+                display: "flex", alignItems: "flex-start", gap: "10px",
+            }}>
+                {/* Animated dot */}
+                <div style={{
+                    width: "8px", height: "8px", borderRadius: "50%",
+                    background: currentStepIndex === 0 ? "#f59e0b" : GOLD,
+                    flexShrink: 0, marginTop: "3px",
+                    animation: "verif-blink 1.8s ease-in-out infinite",
+                }} />
+                <div>
+                    <p style={{
+                        fontSize: "12px", fontWeight: 700, color: NAVY,
+                        margin: "0 0 3px", fontFamily: "'Lato',sans-serif",
+                    }}>
+                        {currentStepIndex === 0 && "Awaiting admin review of your documents"}
+                        {currentStepIndex === 1 && "Faculty ID verified — add your bank details to activate payouts"}
+                    </p>
+                    <p style={{
+                        fontSize: "11px", color: "#888", margin: 0,
+                        fontFamily: "'Lato',sans-serif", lineHeight: 1.6,
+                    }}>
+                        {currentStepIndex === 0 &&
+                            "Your credentials are under review. This usually takes 24–48 hours. You'll receive a notification once approved."}
+                        {currentStepIndex === 1 &&
+                            "Go to Profile → Bank Details and add your account number to complete the final step and start receiving payments."}
+                    </p>
+                </div>
+            </div>
+
+            {/* Keyframe animations injected inline */}
+            <style>{`
+                @keyframes verif-pulse {
+                    0%, 100% { box-shadow: 0 0 0 4px rgba(184,150,62,0.2), 0 0 0 8px rgba(184,150,62,0.08); }
+                    50%       { box-shadow: 0 0 0 6px rgba(184,150,62,0.3), 0 0 0 12px rgba(184,150,62,0.05); }
+                }
+                @keyframes verif-blink {
+                    0%, 100% { opacity: 1; }
+                    50%       { opacity: 0.4; }
+                }
+            `}</style>
+        </div>
+    );
+}
+
+
 /* ─── PinModal ───────────────────────────────────────────────── */
 function PinModal({ amount, bankDetails, pinError, onDigit, onDelete, onConfirm, onClose, pinValue }) {
     const dots = Array.from({ length: 4 }, (_, i) => i < pinValue.length);
@@ -294,18 +637,16 @@ function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
         <>
             {/* BACKDROP */}
             <div
-                className={`fixed inset-0 z-[80] transition-all duration-300 ${
-                    isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-                }`}
+                className={`fixed inset-0 z-[80] transition-all duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+                    }`}
                 style={{ background: "rgba(13,34,68,0.55)" }}
                 onClick={handleClose}
             />
 
             {/* SHEET */}
             <div
-                className={`fixed bottom-0 left-0 right-0 z-[90] transition-transform duration-300 ease-out ${
-                    isOpen ? "translate-y-0" : "translate-y-full"
-                }`}
+                className={`fixed bottom-0 left-0 right-0 z-[90] transition-transform duration-300 ease-out ${isOpen ? "translate-y-0" : "translate-y-full"
+                    }`}
             >
                 <div
                     className="max-w-lg mx-auto rounded-t-3xl shadow-2xl"
@@ -341,11 +682,10 @@ function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
                                 }
                             }}
                             disabled={!isStudent}
-                            className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all ${
-                                isStudent
+                            className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all ${isStudent
                                     ? "border-white bg-white hover:shadow-md active:scale-[0.98]"
                                     : "border-gray-200 opacity-60 cursor-not-allowed"
-                            }`}
+                                }`}
                         >
                             <div
                                 className="w-12 h-12 rounded-xl flex items-center justify-center text-white flex-shrink-0"
@@ -436,11 +776,10 @@ function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
 
             {/* ─── ENROLL CONFIRM ─── */}
             <div
-                className={`fixed inset-0 z-[100] flex items-end justify-center transition-all duration-300 ${
-                    showEnrollConfirm
+                className={`fixed inset-0 z-[100] flex items-end justify-center transition-all duration-300 ${showEnrollConfirm
                         ? "opacity-100 pointer-events-auto"
                         : "opacity-0 pointer-events-none"
-                }`}
+                    }`}
             >
                 <div
                     className="absolute inset-0"
@@ -452,9 +791,8 @@ function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
                 />
 
                 <div
-                    className={`relative w-full max-w-lg rounded-t-3xl shadow-2xl transition-transform duration-300 ${
-                        showEnrollConfirm ? "translate-y-0" : "translate-y-full"
-                    }`}
+                    className={`relative w-full max-w-lg rounded-t-3xl shadow-2xl transition-transform duration-300 ${showEnrollConfirm ? "translate-y-0" : "translate-y-full"
+                        }`}
                     style={{ background: CREAM }}
                 >
                     <div className="flex justify-center pt-3 pb-1">
@@ -562,15 +900,25 @@ export default function SellerAccountClient() {
     const [showSwitchModal, setShowSwitchModal] = useState(false);
     const router = useRouter();
     const [showPhysicalOrdersModal, setShowPhysicalOrdersModal] = useState(false);
-    const [physicalOrders, setPhysicalOrders]  = useState([]);
+    const [physicalOrders, setPhysicalOrders] = useState([]);
     const [physicalOrdersLoading, setPhysicalOrdersLoading] = useState(false);
-    const [revealedCodes, setRevealedCodes] = useState({}); 
+    const [revealedCodes, setRevealedCodes] = useState({});
     const [showExportModal, setShowExportModal] = useState(false);
     const [sellerBooks, setSellerBooks] = useState([]);
     const [showBankModal, setShowBankModal] = useState(false);
     const [bankFormData, setBankFormData] = useState({ accountName: "", accountNumber: "", bankName: "", bankCode: "" });
     const [savingBank, setSavingBank] = useState(false);
-    const [formData, setFormData] = useState({ firstName: "", surname: "", dateOfBirth: "", phone: "", address: "", country: "" });
+    const [formData, setFormData] = useState({
+        firstName: "",
+        surname: "",
+        dateOfBirth: "",
+        phone: "",
+        phoneNumber: "",
+        address: "",
+        country: "",
+        department: "",
+        institution: "",
+    });
     const { processing: pinProcessing, requestPinReset, verifyOtpAndSetPin } = usePayment(null, formData, null);
     const isPendingLecturer = user?.lecturerVerificationStatus === 'pending';
 
@@ -616,7 +964,17 @@ export default function SellerAccountClient() {
                     setAccountBalance(0); setTotalEarnings(0); setBooksSold(0);
                 }
                 setUser({ uid, ...userData, bankDetails });
-                setFormData({ firstName: userData.firstName || "", surname: userData.surname || "", dateOfBirth: userData.dateOfBirth || "", phone: userData.phone || "", address: userData.address || "", country: userData.country || "" });
+                setFormData({
+                    firstName: userData.firstName || "",
+                    surname: userData.surname || "",
+                    dateOfBirth: userData.dateOfBirth || "",
+                    phone: userData.phone || userData.phoneNumber || "",
+                    phoneNumber: userData.phoneNumber || userData.phone || "",
+                    address: userData.address || "",
+                    country: userData.country || "",
+                    department: userData.department || "",        // ✅ already has fallback
+                    institution: userData.institution || userData.selectedUniversity || "",
+                });
                 await fetchSellerTransactions(uid);
             }
         } catch (error) { console.error("Error fetching user data:", error); }
@@ -629,27 +987,27 @@ export default function SellerAccountClient() {
     }
 
     const fetchPhysicalOrders = async () => {
-  if (!user?.uid) return;
-  setPhysicalOrdersLoading(true);
-  try {
-    const snap = await getDocs(
-      query(collection(db, "physicalOrders"), where("userId", "==", user.uid))
-    );
-    const orders = snap.docs
-      .map(d => ({
-        id: d.id,
-        ...d.data(),
-        createdAtDate: d.data().createdAt?.toDate?.() || new Date(),
-      }))
-      .sort((a, b) => b.createdAtDate - a.createdAtDate);
-    setPhysicalOrders(orders);
-  } catch (err) {
-    console.error("Failed to fetch physical orders:", err.message);
-  } finally {
-    setPhysicalOrdersLoading(false);
-  }
+        if (!user?.uid) return;
+        setPhysicalOrdersLoading(true);
+        try {
+            const snap = await getDocs(
+                query(collection(db, "physicalOrders"), where("userId", "==", user.uid))
+            );
+            const orders = snap.docs
+                .map(d => ({
+                    id: d.id,
+                    ...d.data(),
+                    createdAtDate: d.data().createdAt?.toDate?.() || new Date(),
+                }))
+                .sort((a, b) => b.createdAtDate - a.createdAtDate);
+            setPhysicalOrders(orders);
+        } catch (err) {
+            console.error("Failed to fetch physical orders:", err.message);
+        } finally {
+            setPhysicalOrdersLoading(false);
+        }
     };
-    
+
     const fetchSellerTransactions = async (uid) => {
         try {
             let allTransactions = [];
@@ -679,9 +1037,9 @@ export default function SellerAccountClient() {
                 return { id: `incoming-${d.id}`, ...data, bookTitle: `Transfer from ${data.senderName || 'Unknown'}`, buyerName: data.senderName || 'Unknown', amount: data.amount, sellerAmount: data.amount, buyerCountry, createdAtDate: data.createdAt?.toDate?.() || new Date(), type: 'transfer_in' };
             }));
 
-             const physicalSalesQuery = query(
-            collection(db, "physicalSales"),
-            where("sellerId", "==", uid)
+            const physicalSalesQuery = query(
+                collection(db, "physicalSales"),
+                where("sellerId", "==", uid)
             );
             const physicalSalesSnap = await getDocs(physicalSalesQuery);
             const physicalSalesList = physicalSalesSnap.docs.map(d => {
@@ -694,9 +1052,9 @@ export default function SellerAccountClient() {
                     ...data,
                     bookTitle: `📦 ${data.bookTitle} (Registry Pickup)`,
                     buyerName: data.studentName || data.buyerName || "Student",
-                    amount: fullPrice,       
-                    sellerAmount: payout,     
-                    platformFee: fee,         
+                    amount: fullPrice,
+                    sellerAmount: payout,
+                    platformFee: fee,
                     createdAtDate: data.soldAt?.toDate?.() || new Date(),
                     type: "physical_sale",
                 };
@@ -743,10 +1101,34 @@ export default function SellerAccountClient() {
 
     const handleSave = async () => {
         try {
-            await updateDoc(doc(db, "users", user.uid), { firstName: formData.firstName, surname: formData.surname, dateOfBirth: formData.dateOfBirth, phone: formData.phone, address: formData.address, country: formData.country, displayName: `${formData.firstName} ${formData.surname}`, updatedAt: serverTimestamp() });
-            setUser(prev => ({ ...prev, ...formData, displayName: `${formData.firstName} ${formData.surname}`, updatedAt: new Date() }));
-            setIsEditing(false); alert("Profile updated successfully!");
-        } catch (error) { alert("Failed to save profile: " + error.message); }
+            // Build update object, replacing any undefined with "" so Firestore doesn't reject it
+            const updatePayload = {
+                firstName: formData.firstName || "",
+                surname: formData.surname || "",
+                dateOfBirth: formData.dateOfBirth || "",
+                phone: formData.phone || "",
+                phoneNumber: formData.phone || "",
+                address: formData.address || "",
+                country: formData.country || "",
+                department: formData.department || "",
+                institution: formData.institution || "",
+                selectedUniversity: formData.institution || "",
+                displayName: `${formData.firstName} ${formData.surname}`,
+                updatedAt: serverTimestamp(),
+            };
+
+            await updateDoc(doc(db, "users", user.uid), updatePayload);
+
+            setUser(prev => ({
+                ...prev,
+                ...updatePayload,
+                updatedAt: new Date(),
+            }));
+            setIsEditing(false);
+            alert("Profile updated successfully!");
+        } catch (error) {
+            alert("Failed to save profile: " + error.message);
+        }
     };
 
     const handlePinConfirm = async () => {
@@ -831,66 +1213,8 @@ export default function SellerAccountClient() {
 
                 <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 16px' }}>
 
-                    {/* Pending verification banner — shown only to lecturers awaiting approval */}
-                    {user?.lecturerVerificationStatus === 'pending' && (
-                        <div style={{
-                            background: 'rgba(245,158,11,0.08)',
-                            border: '0.5px solid rgba(245,158,11,0.3)',
-                            padding: '14px 20px',
-                            marginBottom: '20px',
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: '12px',
-                        }}>
-                            <div style={{
-                                width: '36px', height: '36px', borderRadius: '50%',
-                                background: 'rgba(245,158,11,0.15)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                            }}>
-                                <AlertCircle size={18} style={{ color: '#d97706' }} />
-                            </div>
-                            <div>
-                                <p style={{ fontFamily: "'Lato',sans-serif", fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 3px' }}>
-                                    Your Faculty Account is Pending Verification
-                                </p>
-                                <p style={{ fontFamily: "'Lato',sans-serif", fontSize: '12px', color: '#92400e', margin: 0, lineHeight: 1.6 }}>
-                                    Our team is reviewing your credentials. This usually takes <strong>24–48 hours</strong>.
-                                    You'll receive a notification once approved and your seller account will be activated.
-                                </p>
-                            </div>
-                        </div>
-                    )}
+                    <VerificationTimeline user={user} seller={seller} />
 
-                    {user?.lecturerVerificationStatus === 'rejected' && (
-                        <div style={{
-                            background: '#fef2f2',
-                            border: '0.5px solid #fecaca',
-                            padding: '14px 20px',
-                            marginBottom: '20px',
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: '12px',
-                        }}>
-                            <div style={{
-                                width: '36px', height: '36px', borderRadius: '50%',
-                                background: '#fee2e2',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                            }}>
-                                <AlertCircle size={18} style={{ color: '#ef4444' }} />
-                            </div>
-                            <div>
-                                <p style={{ fontFamily: "'Lato',sans-serif", fontSize: '13px', fontWeight: 700, color: '#dc2626', margin: '0 0 3px' }}>
-                                    Verification Not Approved
-                                </p>
-                                <p style={{ fontFamily: "'Lato',sans-serif", fontSize: '12px', color: '#991b1b', margin: '0 0 8px', lineHeight: 1.6 }}>
-                                    {user.verificationRejectedReason || 'Your documents could not be verified.'}
-                                </p>
-                                <a href="/docs" style={{ fontSize: '12px', fontWeight: 700, color: '#dc2626', fontFamily: "'Lato',sans-serif" }}>
-                                    Contact support →
-                                </a>
-                            </div>
-                        </div>
-                    )}
 
                     {/* ── Top Header Bar ── */}
                     <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '16px 24px', marginBottom: '24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
@@ -898,7 +1222,7 @@ export default function SellerAccountClient() {
                             <img src={user?.photoURL || user?.photoBase64 || "/lan-logo.png"} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}` }} alt="Profile" />
                             <div style={{ textAlign: 'left' }}>
                                 <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '16px', fontWeight: 700, color: NAVY, margin: 0, display: 'flex', alignItems: 'center' }}>
-                                 {seller?.title ? `${seller.title} ` : ""}{user?.firstName} {user?.surname}
+                                    {seller?.title ? `${seller.title} ` : ""}{user?.firstName} {user?.surname}
                                     <VerifiedFacultyBadge user={user} seller={seller} />
                                 </p>
                                 <div className="gold-pill" style={{ marginTop: '4px' }}>
@@ -918,7 +1242,7 @@ export default function SellerAccountClient() {
                         </button>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <NotificationBell userId={user?.uid} />
-                            <a href="/docs" style={{ background: GOLD, color: NAVY, fontSize: '11px', fontWeight: 700, padding: '9px 18px', textDecoration: 'none', letterSpacing: '0.06em', fontFamily: "'Lato',sans-serif" }}>GET HELP</a>
+                            <a href="/support" style={{ background: GOLD, color: NAVY, fontSize: '11px', fontWeight: 700, padding: '9px 18px', textDecoration: 'none', letterSpacing: '0.06em', fontFamily: "'Lato',sans-serif" }}>GET HELP</a>
                             <button onClick={() => setShowSwitchModal(true)} style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px' }}>
                                 {[0, 1, 2].map(i => <span key={i} style={{ width: '18px', height: '2px', background: NAVY, display: 'block' }} />)}
                             </button>
@@ -1006,7 +1330,7 @@ export default function SellerAccountClient() {
                                         <div key={txn.id} className="txn-row">
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                 <div style={{ width: '38px', height: '38px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}>
-                                                    {txn.type === 'transfer_out' ? <ArrowUpRight size={16} style={{ color: '#ef4444' }} />  : txn.type === 'physical_sale' ? <Package size={16} style={{ color: GOLD }} />  : <ShoppingBag size={16} style={{ color: NAVY }} />}
+                                                    {txn.type === 'transfer_out' ? <ArrowUpRight size={16} style={{ color: '#ef4444' }} /> : txn.type === 'physical_sale' ? <Package size={16} style={{ color: GOLD }} /> : <ShoppingBag size={16} style={{ color: NAVY }} />}
                                                 </div>
                                                 <div>
                                                     <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>{txn.bookTitle}</p>
@@ -1038,12 +1362,7 @@ export default function SellerAccountClient() {
                                     { href: "/upload-document", icon: <TrendingUp size={16} style={{ color: NAVY }} />, title: 'Upload documents', sub: 'Add new document' },
                                     { href: "/upload-document/my-pending-books", icon: <TrendingUp size={16} style={{ color: NAVY }} />, title: 'Pending documents', sub: 'Track documents' },
                                     { href: "/my-account/seller-account/share-profile", icon: <Globe size={16} style={{ color: NAVY }} />, title: 'Share Profile', sub: 'Copy your public link' },
-                                    // {
-                                    //     href: "/advertise",
-                                    //     icon: <TrendingUp size={16} style={{ color: GOLD }} />,
-                                    //     title: 'Boost your visibility',
-                                    //     sub: 'Run a sponsored ad'
-                                    // },
+
                                 ].map(({ href, icon, title, sub }) => (
                                     <Link key={href} href={href} className="action-row" style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', border: '0.5px solid #e5ddd0', background: '#fff', textDecoration: 'none', transition: 'all 0.18s' }}>
                                         <div style={{ width: '34px', height: '34px', border: `0.5px solid #e5ddd0`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: CREAM }}>{icon}</div>
@@ -1054,7 +1373,7 @@ export default function SellerAccountClient() {
                                         <ChevronRight size={14} style={{ color: '#ccc', flexShrink: 0 }} />
                                     </Link>
                                 ))}
-                                
+
                             </div>
 
                             {/* Boost Visibility Banner */}
@@ -1181,20 +1500,20 @@ export default function SellerAccountClient() {
                                         },
                                     },
                                     {
-                                    label: "Promotion Analytics",
-                                    icon: (
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                                        stroke={GOLD} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                                        <line x1="18" y1="20" x2="18" y2="10" />
-                                        <line x1="12" y1="20" x2="12" y2="4" />
-                                        <line x1="6"  y1="20" x2="6"  y2="14" />
-                                        <line x1="2"  y1="20" x2="22" y2="20" />
-                                        </svg>
-                                    ),
-                                    onClick: () => {
-                                        setShowProfileModal(false);
-                                        router.push("/my-account/seller-account/promotion-analytics");
-                                    },
+                                        label: "Promotion Analytics",
+                                        icon: (
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                                stroke={GOLD} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="18" y1="20" x2="18" y2="10" />
+                                                <line x1="12" y1="20" x2="12" y2="4" />
+                                                <line x1="6" y1="20" x2="6" y2="14" />
+                                                <line x1="2" y1="20" x2="22" y2="20" />
+                                            </svg>
+                                        ),
+                                        onClick: () => {
+                                            setShowProfileModal(false);
+                                            router.push("/my-account/seller-account/promotion-analytics");
+                                        },
                                     },
                                     {
                                         label: user?.lecturerVerificationStatus === 'pending'
@@ -1227,13 +1546,55 @@ export default function SellerAccountClient() {
                                 {/* Other info block */}
                                 <div style={{ border: '0.5px solid #e5ddd0', background: '#fff', padding: '16px', marginBottom: '6px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-                                        <div style={{ width: '36px', height: '36px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}><Settings size={18} style={{ color: NAVY }} /></div>
+                                        <div style={{ width: '36px', height: '36px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}>
+                                            <Settings size={18} style={{ color: NAVY }} />
+                                        </div>
                                         <span style={{ fontSize: '13px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>Other Information</span>
                                     </div>
-                                    {[['Email', user?.email], ['Date of Birth', user?.dateOfBirth || 'Not set'], ['Address', user?.address || 'Not set'], ['Country', user?.country || 'Not set'], ['Account Type', user?.isLecturer || FACULTY_TITLES.includes(seller?.title) ? 'Verified Faculty' : 'Verified Seller']].map(([k, v]) => (
+                                    {[
+                                        ['Email', user?.email],
+                                        ['Phone', user?.phoneNumber || user?.phone || 'Not set'],
+                                        ['Date of Birth', user?.dateOfBirth || 'Not set'],
+                                        ['Address', user?.address || 'Not set'],
+                                        ['Country', user?.country || 'Not set'],
+                                        ...(
+                                            user?.isLecturer === true ||
+                                                user?.role === 'lecturer' ||
+                                                user?.role === 'faculty' ||
+                                                FACULTY_TITLES.includes(seller?.title) ||
+                                                FACULTY_TITLES.includes(user?.lecturerTitle) ||
+                                                user?.lecturerVerificationStatus === 'pending' ||
+                                                user?.lecturerVerificationStatus === 'approved' ||
+                                                user?.lecturerVerificationStatus === 'rejected'
+                                                ? [
+                                                ] : []
+                                        ),
+                                        ['LAN Account No.', user?.lanAccountNumber || 'Not set'],
+                                        ['Referral Code', user?.referralCode || 'Not set'],
+                                        ['Account Type', user?.isLecturer === true ||
+                                            user?.role === 'lecturer' ||
+                                            user?.role === 'faculty' ||
+                                            FACULTY_TITLES.includes(seller?.title) ||
+                                            FACULTY_TITLES.includes(user?.lecturerTitle) ||
+                                            user?.lecturerVerificationStatus === 'pending' ||
+                                            user?.lecturerVerificationStatus === 'approved' ||
+                                            user?.lecturerVerificationStatus === 'rejected'
+                                            ? `${seller?.title || user?.lecturerTitle || ''} · Verified Faculty`.trim()
+                                            : 'Verified Seller'],
+                                        ['Verification', user?.lecturerVerificationStatus === 'approved'
+                                            ? '✅ Approved'
+                                            : user?.lecturerVerificationStatus === 'pending'
+                                                ? '⏳ Pending'
+                                                : user?.lecturerVerificationStatus === 'rejected'
+                                                    ? '❌ Rejected'
+                                                    : 'N/A'],
+                                        ['Member Since', user?.createdAt?.toDate
+                                            ? user.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                                            : 'N/A'],
+                                    ].map(([k, v]) => (
                                         <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '8px 0', borderBottom: '0.5px solid #f0ebe0' }}>
-                                            <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{k}</span>
-                                            <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", textAlign: 'right', maxWidth: '60%' }}>{v}</span>
+                                            <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{k}</span>
+                                            <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", textAlign: 'right', maxWidth: '60%', wordBreak: 'break-word' }}>{v}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -1308,7 +1669,8 @@ export default function SellerAccountClient() {
                                                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0' }}>
                                                         <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{k}</span>
                                                         <span style={{
-                                                            fontWeight: 700, color: k.includes('Fee') ? '#ef4444' : k.includes('Payout') ? '#16a34a' : NAVY, fontFamily: "'Lato',sans-serif" }}>{v}</span>
+                                                            fontWeight: 700, color: k.includes('Fee') ? '#ef4444' : k.includes('Payout') ? '#16a34a' : NAVY, fontFamily: "'Lato',sans-serif"
+                                                        }}>{v}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1406,6 +1768,7 @@ export default function SellerAccountClient() {
                 )}
 
                 {/* Edit Profile Modal */}
+                {/* Edit Profile Modal */}
                 {isEditing && (
                     <div className="modal-overlay mt-25">
                         <div className="modal-inner">
@@ -1414,22 +1777,36 @@ export default function SellerAccountClient() {
                                 <button onClick={() => setIsEditing(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}><X size={22} /></button>
                             </div>
                             <div style={{ padding: '24px' }}>
+                                {/* Avatar */}
                                 <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                                     <div style={{ position: 'relative', display: 'inline-block' }}>
-                                        <img src={user?.photoBase64 || "/api/placeholder/128/128"} style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${GOLD}` }} alt="profile" />
+                                        <img src={user?.photoURL || user?.photoBase64 || "/api/placeholder/128/128"} style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${GOLD}` }} alt="profile" />
                                         <label style={{ position: 'absolute', bottom: 0, right: 0, background: NAVY, width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '2px solid #fff' }}>
                                             <Camera size={15} style={{ color: '#fff' }} />
                                             <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
                                         </label>
                                     </div>
+                                    {uploading && <p style={{ fontSize: '11px', color: GOLD, marginTop: '8px', fontFamily: "'Lato',sans-serif" }}>Uploading photo…</p>}
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                    {[['First Name', 'firstName'], ['Surname', 'surname'], ['Phone', 'phone']].map(([label, key]) => (
+
+                                {/* Section: Personal */}
+                                <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '10px', fontFamily: "'Lato',sans-serif" }}>Personal Details</p>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                                    {[['First Name', 'firstName'], ['Surname', 'surname']].map(([label, key]) => (
                                         <div key={key}>
                                             <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>{label}</label>
                                             <input value={formData[key]} onChange={e => setFormData({ ...formData, [key]: e.target.value })} style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '11px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box' }} />
                                         </div>
                                     ))}
+                                    <div>
+                                        <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Phone Number</label>
+                                        <input
+                                            type="tel"
+                                            value={formData.phoneNumber}
+                                            onChange={e => setFormData({ ...formData, phone: e.target.value, phoneNumber: e.target.value })}
+                                            placeholder="e.g. +2347013727629"
+                                            style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '11px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box' }} />
+                                    </div>
                                     <div>
                                         <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Date of Birth</label>
                                         <input type="date" value={formData.dateOfBirth} onChange={e => setFormData({ ...formData, dateOfBirth: e.target.value })} style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '11px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box' }} />
@@ -1443,7 +1820,9 @@ export default function SellerAccountClient() {
                                         <input value={formData.country} onChange={e => setFormData({ ...formData, country: e.target.value })} placeholder="e.g. Nigeria" style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '11px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box' }} />
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+
+                                {/* Actions */}
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
                                     <button onClick={() => setIsEditing(false)} style={{ flex: 1, background: '#f5f5f5', color: '#666', padding: '13px', border: '0.5px solid #e5ddd0', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>Cancel</button>
                                     <button onClick={handleSave} style={{ flex: 1, background: NAVY, color: '#fff', padding: '13px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                                         <Save size={15} /> Save Changes
@@ -1515,183 +1894,184 @@ export default function SellerAccountClient() {
                 )}
 
                 {showPhysicalOrdersModal && (
-  <div className="modal-overlay mt-25">
-    <div className="modal-inner">
-      {/* Header */}
-      <div style={{
-        background: NAVY,
-        padding: "20px 24px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        position: "sticky",
-        top: 0,
-      }}>
-        <div>
-          <p style={{ color: GOLD, fontSize: "10px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "4px", fontFamily: "'Lato',sans-serif" }}>
-            Physical Copies
-          </p>
-          <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: "20px", fontWeight: 700, color: "#fff", margin: 0 }}>
-            My Physical Orders
-          </h2>
-        </div>
-        <button
-          onClick={() => { setShowPhysicalOrdersModal(false); setRevealedCodes({}); }}
-          style={{ background: "transparent", border: "none", cursor: "pointer", color: "#fff" }}
-        >
-          <X size={22} />
-        </button>
-      </div>
- 
-      {/* Body */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px", background: BG }}>
-        {physicalOrdersLoading ? (
-          <div style={{ textAlign: "center", padding: "60px 0" }}>
-            <div style={{ width: "40px", height: "40px", border: `3px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
-            <p style={{ fontSize: "13px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>Loading orders…</p>
-          </div>
-        ) : physicalOrders.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px 0" }}>
-            <Package size={40} style={{ color: "#ddd", margin: "0 auto 12px" }} />
-            <p style={{ fontSize: "14px", fontWeight: 700, color: NAVY, fontFamily: "'Playfair Display',serif", marginBottom: "6px" }}>No physical orders yet</p>
-            <p style={{ fontSize: "12px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>
-              When you reserve a physical copy, your orders will appear here.
-            </p>
-          </div>
-        ) : (
-          physicalOrders.map(order => {
-            const isRevealed = !!revealedCodes[order.id];
-            const maskedCode = isRevealed
-              ? order.pickupCode
-              : order.pickupCode?.replace(/./g, "•");
-            const isCancelled = order.status === "cancelled";
-            const isPending   = order.status === "pending_pickup";
- 
-            return (
-              <div key={order.id} style={{
-                background: "#fff",
-                border: `0.5px solid ${isCancelled ? "#fecaca" : "#e5ddd0"}`,
-                padding: "0",
-                marginBottom: "12px",
-                overflow: "hidden",
-                opacity: isCancelled ? 0.7 : 1,
-              }}>
-                {/* Perforated top strip */}
-                {!isCancelled && (
-                  <div style={{ height: "4px", background: `repeating-linear-gradient(90deg, ${GOLD} 0, ${GOLD} 8px, transparent 8px, transparent 14px)` }} />
-                )}
-                {isCancelled && (
-                  <div style={{ height: "4px", background: "repeating-linear-gradient(90deg, #fecaca 0, #fecaca 8px, transparent 8px, transparent 14px)" }} />
-                )}
- 
-                <div style={{ padding: "18px 20px" }}>
-                  {/* Book title + status */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", gap: "10px" }}>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "14px", fontWeight: 700, color: NAVY, margin: "0 0 3px", lineHeight: 1.3 }}>
-                        {order.bookTitle}
-                      </p>
-                      <p style={{ fontSize: "11px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>
-                        {order.createdAtDate?.toLocaleDateString()}
-                      </p>
+                    <div className="modal-overlay mt-25">
+                        <div className="modal-inner">
+                            {/* Header */}
+                            <div style={{
+                                background: NAVY,
+                                padding: "20px 24px",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                position: "sticky",
+                                top: 0,
+                            }}>
+                                <div>
+                                    <p style={{ color: GOLD, fontSize: "10px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "4px", fontFamily: "'Lato',sans-serif" }}>
+                                        Physical Copies
+                                    </p>
+                                    <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: "20px", fontWeight: 700, color: "#fff", margin: 0 }}>
+                                        My Physical Orders
+                                    </h2>
+                                </div>
+                                <button
+                                    onClick={() => { setShowPhysicalOrdersModal(false); setRevealedCodes({}); }}
+                                    style={{ background: "transparent", border: "none", cursor: "pointer", color: "#fff" }}
+                                >
+                                    <X size={22} />
+                                </button>
+                            </div>
+
+                            {/* Body */}
+                            <div style={{ flex: 1, overflowY: "auto", padding: "16px", background: BG }}>
+                                {physicalOrdersLoading ? (
+                                    <div style={{ textAlign: "center", padding: "60px 0" }}>
+                                        <div style={{ width: "40px", height: "40px", border: `3px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+                                        <p style={{ fontSize: "13px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>Loading orders…</p>
+                                    </div>
+                                ) : physicalOrders.length === 0 ? (
+                                    <div style={{ textAlign: "center", padding: "60px 0" }}>
+                                        <Package size={40} style={{ color: "#ddd", margin: "0 auto 12px" }} />
+                                        <p style={{ fontSize: "14px", fontWeight: 700, color: NAVY, fontFamily: "'Playfair Display',serif", marginBottom: "6px" }}>No physical orders yet</p>
+                                        <p style={{ fontSize: "12px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>
+                                            When you reserve a physical copy, your orders will appear here.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    physicalOrders.map(order => {
+                                        const isRevealed = !!revealedCodes[order.id];
+                                        const maskedCode = isRevealed
+                                            ? order.pickupCode
+                                            : order.pickupCode?.replace(/./g, "•");
+                                        const isCancelled = order.status === "cancelled";
+                                        const isPending = order.status === "pending_pickup";
+
+                                        return (
+                                            <div key={order.id} style={{
+                                                background: "#fff",
+                                                border: `0.5px solid ${isCancelled ? "#fecaca" : "#e5ddd0"}`,
+                                                padding: "0",
+                                                marginBottom: "12px",
+                                                overflow: "hidden",
+                                                opacity: isCancelled ? 0.7 : 1,
+                                            }}>
+                                                {/* Perforated top strip */}
+                                                {!isCancelled && (
+                                                    <div style={{ height: "4px", background: `repeating-linear-gradient(90deg, ${GOLD} 0, ${GOLD} 8px, transparent 8px, transparent 14px)` }} />
+                                                )}
+                                                {isCancelled && (
+                                                    <div style={{ height: "4px", background: "repeating-linear-gradient(90deg, #fecaca 0, #fecaca 8px, transparent 8px, transparent 14px)" }} />
+                                                )}
+
+                                                <div style={{ padding: "18px 20px" }}>
+                                                    {/* Book title + status */}
+                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", gap: "10px" }}>
+                                                        <div style={{ flex: 1 }}>
+                                                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "14px", fontWeight: 700, color: NAVY, margin: "0 0 3px", lineHeight: 1.3 }}>
+                                                                {order.bookTitle}
+                                                            </p>
+                                                            <p style={{ fontSize: "11px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                                                                {order.createdAtDate?.toLocaleDateString()}
+                                                            </p>
+                                                        </div>
+                                                        <span style={{
+                                                            display: "inline-flex",
+                                                            alignItems: "center",
+                                                            gap: "5px",
+                                                            background: isCancelled ? "#fef2f2" : isPending ? "#fef9c3" : "#f0fdf4",
+                                                            border: `0.5px solid ${isCancelled ? "#fecaca" : isPending ? "#fde68a" : "#86efac"}`,
+                                                            padding: "3px 10px",
+                                                            fontSize: "10px",
+                                                            fontWeight: 700,
+                                                            color: isCancelled ? "#dc2626" : isPending ? "#a16207" : "#16a34a",
+                                                            flexShrink: 0,
+                                                            fontFamily: "'Lato',sans-serif",
+                                                        }}>
+                                                            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: isCancelled ? "#dc2626" : isPending ? "#a16207" : "#16a34a", display: "inline-block" }} />
+                                                            {isCancelled ? "Cancelled" : isPending ? "Awaiting Pickup" : order.status}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Pickup Code — hidden until revealed; hidden entirely if cancelled */}
+                                                    {!isCancelled && (
+                                                        <>
+                                                            <div style={{ background: NAVY, padding: "14px 16px", textAlign: "center", marginBottom: "12px" }}>
+                                                                <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "0 0 6px", fontFamily: "'Lato',sans-serif" }}>
+                                                                    Pickup Code
+                                                                </p>
+                                                                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "24px", fontWeight: 900, color: "#fff", margin: 0, letterSpacing: "0.12em" }}>
+                                                                    {maskedCode}
+                                                                </p>
+                                                            </div>
+
+                                                            {/* Reveal / Hide toggle */}
+                                                            <button
+                                                                onClick={() => setRevealedCodes(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
+                                                                style={{
+                                                                    width: "100%",
+                                                                    background: isRevealed ? CREAM : NAVY,
+                                                                    color: isRevealed ? NAVY : "#fff",
+                                                                    border: `0.5px solid ${isRevealed ? "#e5ddd0" : NAVY}`,
+                                                                    padding: "10px",
+                                                                    fontSize: "11px",
+                                                                    fontWeight: 700,
+                                                                    cursor: "pointer",
+                                                                    fontFamily: "'Lato',sans-serif",
+                                                                    letterSpacing: "0.05em",
+                                                                    display: "flex",
+                                                                    alignItems: "center",
+                                                                    justifyContent: "center",
+                                                                    gap: "7px",
+                                                                    transition: "all 0.18s",
+                                                                    marginBottom: "12px",
+                                                                }}
+                                                                onMouseEnter={e => { if (!isRevealed) e.currentTarget.style.background = "#1a3a6e"; }}
+                                                                onMouseLeave={e => { e.currentTarget.style.background = isRevealed ? CREAM : NAVY; }}
+                                                            >
+                                                                {isRevealed
+                                                                    ? <><EyeOff size={13} /> Hide Code</>
+                                                                    : <><Eye size={13} /> Reveal Pickup Code</>
+                                                                }
+                                                            </button>
+                                                        </>
+                                                    )}
+
+                                                    {/* Cancelled message */}
+                                                    {isCancelled && (
+                                                        <div style={{ background: "#fef2f2", border: "0.5px solid #fecaca", padding: "10px 14px", marginBottom: "12px" }}>
+                                                            <p style={{ fontSize: "12px", color: "#dc2626", fontFamily: "'Lato',sans-serif", margin: 0, textAlign: "center" }}>
+                                                                This order was cancelled. You may place a new order for this book.
+                                                            </p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Order meta */}
+                                                    {[
+                                                        ["Order ID", order.orderId],
+                                                        ["Collection", "LAN Head Office, Abuja Registry"],
+                                                        ["Location", [order.section, order.shelfLocation].filter(Boolean).join(" — ") || "Ask staff"],
+                                                    ].map(([label, value]) => (
+                                                        <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", padding: "5px 0", borderBottom: "0.5px solid #f5f0e8" }}>
+                                                            <span style={{ color: "#aaa", fontFamily: "'Lato',sans-serif" }}>{label}</span>
+                                                            <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", textAlign: "right", maxWidth: "60%" }}>{value}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Perforated bottom strip */}
+                                                {!isCancelled && (
+                                                    <div style={{ height: "4px", background: `repeating-linear-gradient(90deg, ${GOLD} 0, ${GOLD} 8px, transparent 8px, transparent 14px)` }} />
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    <span style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "5px",
-                      background: isCancelled ? "#fef2f2" : isPending ? "#fef9c3" : "#f0fdf4",
-                      border: `0.5px solid ${isCancelled ? "#fecaca" : isPending ? "#fde68a" : "#86efac"}`,
-                      padding: "3px 10px",
-                      fontSize: "10px",
-                      fontWeight: 700,
-                      color: isCancelled ? "#dc2626" : isPending ? "#a16207" : "#16a34a",
-                      flexShrink: 0,
-                      fontFamily: "'Lato',sans-serif",
-                    }}>
-                      <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: isCancelled ? "#dc2626" : isPending ? "#a16207" : "#16a34a", display: "inline-block" }} />
-                      {isCancelled ? "Cancelled" : isPending ? "Awaiting Pickup" : order.status}
-                    </span>
-                  </div>
- 
-                  {/* Pickup Code — hidden until revealed; hidden entirely if cancelled */}
-                  {!isCancelled && (
-                    <>
-                      <div style={{ background: NAVY, padding: "14px 16px", textAlign: "center", marginBottom: "12px" }}>
-                        <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "0 0 6px", fontFamily: "'Lato',sans-serif" }}>
-                          Pickup Code
-                        </p>
-                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "24px", fontWeight: 900, color: "#fff", margin: 0, letterSpacing: "0.12em" }}>
-                          {maskedCode}
-                        </p>
-                      </div>
- 
-                      {/* Reveal / Hide toggle */}
-                      <button
-                        onClick={() => setRevealedCodes(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
-                        style={{
-                          width: "100%",
-                          background: isRevealed ? CREAM : NAVY,
-                          color: isRevealed ? NAVY : "#fff",
-                          border: `0.5px solid ${isRevealed ? "#e5ddd0" : NAVY}`,
-                          padding: "10px",
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          fontFamily: "'Lato',sans-serif",
-                          letterSpacing: "0.05em",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "7px",
-                          transition: "all 0.18s",
-                          marginBottom: "12px",
-                        }}
-                        onMouseEnter={e => { if (!isRevealed) e.currentTarget.style.background = "#1a3a6e"; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = isRevealed ? CREAM : NAVY; }}
-                      >
-                        {isRevealed
-                          ? <><EyeOff size={13} /> Hide Code</>
-                          : <><Eye size={13} /> Reveal Pickup Code</>
-                        }
-                      </button>
-                    </>
-                  )}
- 
-                  {/* Cancelled message */}
-                  {isCancelled && (
-                    <div style={{ background: "#fef2f2", border: "0.5px solid #fecaca", padding: "10px 14px", marginBottom: "12px" }}>
-                      <p style={{ fontSize: "12px", color: "#dc2626", fontFamily: "'Lato',sans-serif", margin: 0, textAlign: "center" }}>
-                        This order was cancelled. You may place a new order for this book.
-                      </p>
-                    </div>
-                  )}
- 
-                  {/* Order meta */}
-                  {[
-                    ["Order ID",      order.orderId],
-                    ["Collection",    "LAN Head Office, Abuja Registry"],
-                    ["Location",      [order.section, order.shelfLocation].filter(Boolean).join(" — ") || "Ask staff"],
-                  ].map(([label, value]) => (
-                    <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", padding: "5px 0", borderBottom: "0.5px solid #f5f0e8" }}>
-                      <span style={{ color: "#aaa", fontFamily: "'Lato',sans-serif" }}>{label}</span>
-                      <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", textAlign: "right", maxWidth: "60%" }}>{value}</span>
-                    </div>
-                  ))}
-                </div>
- 
-                {/* Perforated bottom strip */}
-                {!isCancelled && (
-                  <div style={{ height: "4px", background: `repeating-linear-gradient(90deg, ${GOLD} 0, ${GOLD} 8px, transparent 8px, transparent 14px)` }} />
                 )}
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  </div>
-                )}
-                
+
+
                 {/* PIN Modal */}
                 {showPinModal && (
                     <PinModal amount={withdrawAmount} bankDetails={user?.bankDetails} pinValue={pinValue} pinError={pinError}

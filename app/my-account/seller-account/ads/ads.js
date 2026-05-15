@@ -436,6 +436,16 @@ const canOpenPay = selectedBook && headline.trim();
         .pay-tab.sel { border-color:${NAVY}; background:${CREAM}; color:${NAVY}; }
         @keyframes spin { to { transform:rotate(360deg) } }
         @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.5} }
+        .tier-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        }
+        @media (max-width: 600px) {
+        .tier-grid {
+            grid-template-columns: 1fr;
+        }
+        }
       `}</style>
 
             <div className="adcr-root" style={{ maxWidth: 780, margin: "0 auto", padding: "40px 24px 80px" }}>
@@ -498,7 +508,7 @@ const canOpenPay = selectedBook && headline.trim();
                 {/* ── STEP 2: Tier ─────────────────────────────────── */}
                 <section style={{ marginBottom: 40 }}>
                     <p className="adcr-label">Step 2 — Choose Your Tier <span style={{ color: "#f87171" }}>*</span></p>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
+                        <div className="tier-grid">
                         {Object.entries(TIERS).map(([key, t]) => {
                             const Icon = t.Icon;
                             const active = selectedTier === key;

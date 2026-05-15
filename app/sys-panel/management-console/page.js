@@ -1053,8 +1053,25 @@ export default function ComprehensiveAdminPanel() {
 
     await updateDoc(doc(db, 'users', userId), updateData);
     fetchUsers();
-  }; const deleteUserAccount = async (userId) => { if (!confirm('DELETE this user? Cannot undo!')) return; try { await deleteDoc(doc(db, 'users', userId)); fetchUsers(); setShowModal(false); } catch (e) { alert('Failed: ' + e.message); } };
-  const deleteFeedback = async (feedbackId) => { if (!confirm('Delete this feedback?')) return; try { await deleteDoc(doc(db, 'bookFeedbacks', feedbackId)); setFeedbacks(feedbacks.filter(f => f.id !== feedbackId)); } catch (e) { alert('Failed: ' + e.message); } };
+  }; const deleteUserAccount = async (userId) => {
+    if (!confirm('DELETE this user? Cannot undo!')) return;
+    try {
+        // Delete from both collections — lecturers page reads from sellers
+        await deleteDoc(doc(db, 'users', userId));
+        try { await deleteDoc(doc(db, 'sellers', userId)); } catch {}
+        
+        // Also remove their follow records so follower counts don't ghost
+        const followsSnap = await getDocs(
+            query(collection(db, 'follows'), where('lecturerId', '==', userId))
+        );
+        const batch = writeBatch(db);
+        followsSnap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+
+        fetchUsers();
+        setShowModal(false);
+    } catch (e) { alert('Failed: ' + e.message); }
+};
 
   const processFlutterwaveTransfer = async (withdrawal) => {
     try {

@@ -15,7 +15,7 @@ import {
 import Link from "next/link";
 import Navbar from "@/components/NavBar";
 import { onAuthStateChanged } from "firebase/auth";
-
+import FacultyTrustCard from "@/components/FacultyTrustCard";
 /* ─── design tokens ─────────────────────────────────────── */
 const NAVY  = "#0d2244";
 const GOLD  = "#b8963e";
@@ -182,6 +182,7 @@ export default function SellerProfileClient({ sellerIdProp }) {
   const [resolvedUid, setResolvedUid]   = useState(null);
   const [authReady, setAuthReady] = useState(!!auth.currentUser);
   const [user, setUser] = useState(auth.currentUser);
+  const [userData, setUserData] = useState(null);
 
 
   useEffect(() => {
@@ -276,6 +277,7 @@ export default function SellerProfileClient({ sellerIdProp }) {
       const ud = await getDoc(doc(db, "users", uid));
       if (ud.exists()) {
         const u = ud.data();
+        setUserData(u);                          
         if (!sellerName || sellerName === "Unknown")
           sellerName = u.displayName || `${u.firstName || ""} ${u.surname || ""}`.trim() || sellerName;
         setSellerPhoto(u.photoBase64 || u.photoURL || u.profilePicture || null);
@@ -320,7 +322,7 @@ export default function SellerProfileClient({ sellerIdProp }) {
       processSnap(snap1);
       processSnap(snap2);
 
-      const cu = auth.currentUser;
+const cu = user;
       if (cu) {
         const md = await getDoc(doc(db, "users", cu.uid));
         if (md.exists()) {
@@ -413,33 +415,48 @@ export default function SellerProfileClient({ sellerIdProp }) {
         gap: 24px;
         align-items: start;
       }
-      .sidebar-mobile-hidden { display: flex; flex-direction: column; gap: 16px; }
-      .hero-inner { max-width: 1100px; margin: 0 auto; padding: 60px 24px 0; }
+    .sidebar-mobile-hidden { display: flex; flex-direction: column; gap: 16px; }
+    .sidebar-hidden-on-about { display: none; }
+    @media (min-width: 769px) {
+      .sidebar-hidden-on-about { display: flex; flex-direction: column; gap: 16px; }
+    }      
+  .hero-inner { max-width: 1100px; margin: 0 auto; padding: 60px 24px 0; }
       .page-inner  { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
       .books-grid  { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
 
-      @media (max-width: 768px) {
-        .profile-content-grid { grid-template-columns: 1fr; }
-        .sidebar-mobile-hidden { display: none; }
-        .hero-inner { padding: 48px 16px 0; }
-        .page-inner { padding: 16px 12px 80px; }
-        .books-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-        .lan-tab { padding: 10px 14px; font-size: 10px; }
-        .hero-avatar { width: 80px !important; height: 80px !important; bottom: -20px !important; }
-        .hero-name { font-size: clamp(18px, 5vw, 28px) !important; }
-        .hero-stat-strip { flex-wrap: wrap; }
-        .hero-stat-item { flex: 1 1 80px; padding: 12px 14px 0 !important; }
-        .hero-stat-val { font-size: 18px !important; }
-        .hero-meta-row { padding-bottom: 24px !important; }
-        .follow-btn { padding: 9px 14px; font-size: 10px; }
-        .sticky-bar-title { font-size: 12px !important; }
-      }
+     @media (max-width: 768px) {
+  .profile-content-grid { grid-template-columns: 1fr; }
+  .sidebar-mobile-hidden { display: none; }
+  .hero-inner { padding: 40px 16px 0; }
+  .page-inner { padding: 16px 12px 80px; }
+  .books-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .lan-tab { padding: 10px 14px; font-size: 10px; }
+  .sticky-bar-title { font-size: 12px !important; }
 
-      @media (max-width: 480px) {
-        .books-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .hero-inner { padding: 40px 12px 0; }
-        .page-inner { padding: 12px 10px 80px; }
-      }
+  .hero-row {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 12px !important;
+  }
+  .hero-avatar {
+    width: 96px !important; height: 96px !important;
+    bottom: 0 !important; position: relative !important;
+  }
+  .hero-meta-row {
+    padding-bottom: 4px !important;
+    flex: none !important; width: 100%;
+  }
+  .hero-name { font-size: clamp(20px, 6vw, 30px) !important; }
+  .hero-follow-wrap { padding-bottom: 20px !important; }
+  .hero-stat-item { flex: 1 1 80px; padding: 12px 12px 0 !important; text-align: center; }
+  .hero-stat-val { font-size: 20px !important; }
+}
+@media (max-width: 480px) {
+  .books-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .hero-inner { padding: 32px 12px 0; }
+  .page-inner { padding: 12px 10px 80px; }
+}
 
       @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
     `}</style>
@@ -631,10 +648,9 @@ if (!seller) return (
         )}
 
         <div className="hero-inner">
-          {/* Avatar row */}
-          <div style={{ display:"flex", alignItems:"flex-end", gap:"16px", flexWrap:"wrap" }}>
+          <div className="hero-row" style={{ display:"flex", alignItems:"flex-end", gap:"16px", flexWrap:"wrap" }}>
 
-            {/* Avatar */}
+            {/* ── Avatar ── */}
             <div className="hero-avatar" style={{ width:"110px", height:"110px", flexShrink:0, position:"relative", bottom:"-28px" }}>
               {sellerPhoto ? (
                 <img src={sellerPhoto} alt={seller.sellerName}
@@ -643,23 +659,30 @@ if (!seller) return (
                 <div style={{ width:"100%", height:"100%", borderRadius:"50%", border:`3px solid ${GOLD}`, background:"rgba(255,255,255,.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
                   {lecturerMode
                     ? <GraduationCap size={40} style={{ color:GOLD }}/>
-                    : <span style={{ color:GOLD, fontSize:"36px", fontFamily:"'Playfair Display',serif", fontWeight:900 }}>{seller.sellerName?.charAt(0)?.toUpperCase()||"?"}</span>}
+                    : <span style={{ color:GOLD, fontSize:"36px", fontFamily:"'Playfair Display',serif", fontWeight:900 }}>
+                        {seller.sellerName?.charAt(0)?.toUpperCase()||"?"}
+                      </span>}
                 </div>
               )}
             </div>
 
-            {/* Name + meta */}
+            {/* ── Name + meta ── */}
             <div className="hero-meta-row" style={{ paddingBottom:"32px", flex:1, minWidth:0 }}>
+              {lecturerMode && seller.sellerTitle && (
+                <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLDD, fontFamily:"'Lato',sans-serif", margin:"0 0 5px" }}>
+                  {seller.sellerTitle}
+                </p>
+              )}
               <h1 className="lan-serif anim-up hero-name" style={{ fontSize:"clamp(20px,4vw,38px)", fontWeight:900, color:"#fff", margin:"0 0 6px", lineHeight:1.05, wordBreak:"break-word" }}>
-                {displayTitle}
+                {seller.sellerName}
               </h1>
               <p style={{ fontSize:"12px", color:"rgba(245,240,232,.6)", margin:0, fontFamily:"'Lato',sans-serif", fontWeight:300 }}>
                 {stats.totalBooks} materials &nbsp;·&nbsp; {followerCount} followers
               </p>
             </div>
 
-            {/* Follow button */}
-            <div style={{ paddingBottom:"32px", flexShrink:0 }}>
+            {/* ── Follow button ── */}
+            <div className="hero-follow-wrap" style={{ paddingBottom:"32px", flexShrink:0 }}>
               <button onClick={toggleFollow} disabled={followLoading}
                 className={`follow-btn ${isFollowing?"following":"not-following"}`}>
                 {isFollowing ? <UserCheck size={13}/> : <UserPlus size={13}/>}
@@ -683,7 +706,7 @@ if (!seller) return (
           </div>
 
           {/* Tabs */}
-          <div className="sbar-none" style={{ display:"flex", marginTop:"20px", gap:"0", borderTop:`0.5px solid rgba(184,150,62,.15)`, paddingTop:"4px", overflowX:"auto" }}>
+          <div className="sbar-none" style={{ display:"flex", marginTop:"20px", borderTop:`0.5px solid rgba(184,150,62,.15)`, paddingTop:"4px", overflowX:"auto" }}>
             {[{id:"materials",label:lecturerMode?"Materials":"Books"},{id:"about",label:"About"}].map(tab=>(
               <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
                 className={`lan-tab ${activeTab===tab.id?"lan-tab-active":"lan-tab-inactive"}`}>
@@ -692,66 +715,69 @@ if (!seller) return (
             ))}
           </div>
         </div>
-      </div>
+      </div> {/* ← closes NAVY hero */}
 
       {/* ══ CONTENT ══ */}
       <div className="page-inner">
         <div className="profile-content-grid">
 
-          {/* ── LEFT SIDEBAR (desktop only) ── */}
-          <div className="sidebar-mobile-hidden">
-            {/* About card */}
-            <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"24px" }}>
-              <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLD, marginBottom:"14px", fontFamily:"'Lato',sans-serif" }}>About</p>
-              <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
-                {seller.sellerTitle && (
-                  <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-                    <GraduationCap size={14} style={{ color:GOLD, flexShrink:0 }}/>
-                    <span style={{ fontSize:"13px", color:NAVY, fontFamily:"'Lato',sans-serif", fontWeight:700 }}>{seller.sellerTitle}</span>
+          {/* ── LEFT SIDEBAR — desktop only, materials tab only ── */}
+          <div className={activeTab === "materials" ? "sidebar-mobile-hidden" : "sidebar-hidden-on-about"}>
+            {activeTab === "materials" && (
+              <>
+                {/* About card */}
+                <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"24px" }}>
+                  <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLD, marginBottom:"14px", fontFamily:"'Lato',sans-serif" }}>About</p>
+                  <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+                    {seller.sellerTitle && (
+                      <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                        <GraduationCap size={14} style={{ color:GOLD, flexShrink:0 }}/>
+                        <span style={{ fontSize:"13px", color:NAVY, fontFamily:"'Lato',sans-serif", fontWeight:700 }}>{seller.sellerTitle}</span>
+                      </div>
+                    )}
+                    {seller.sellerDept && (
+                      <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                        <BookMarked size={14} style={{ color:GOLD, flexShrink:0 }}/>
+                        <span style={{ fontSize:"13px", color:"#666", fontFamily:"'Lato',sans-serif" }}>{seller.sellerDept}</span>
+                      </div>
+                    )}
+                    {seller.sellerUni && (
+                      <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                        <Building2 size={14} style={{ color:GOLD, flexShrink:0 }}/>
+                        <span style={{ fontSize:"13px", color:"#666", fontFamily:"'Lato',sans-serif" }}>{seller.sellerUni}</span>
+                      </div>
+                    )}
+                    {!seller.sellerDept && !seller.sellerUni && !seller.sellerTitle && (
+                      <p style={{ fontSize:"12px", color:"#bbb", fontFamily:"'Lato',sans-serif" }}>No additional info provided.</p>
+                    )}
                   </div>
-                )}
-                {seller.sellerDept && (
-                  <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-                    <BookMarked size={14} style={{ color:GOLD, flexShrink:0 }}/>
-                    <span style={{ fontSize:"13px", color:"#666", fontFamily:"'Lato',sans-serif" }}>{seller.sellerDept}</span>
-                  </div>
-                )}
-                {seller.sellerUni && (
-                  <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-                    <Building2 size={14} style={{ color:GOLD, flexShrink:0 }}/>
-                    <span style={{ fontSize:"13px", color:"#666", fontFamily:"'Lato',sans-serif" }}>{seller.sellerUni}</span>
-                  </div>
-                )}
-                {!seller.sellerDept && !seller.sellerUni && !seller.sellerTitle && (
-                  <p style={{ fontSize:"12px", color:"#bbb", fontFamily:"'Lato',sans-serif" }}>No additional info provided.</p>
-                )}
-              </div>
-            </div>
+                </div>
 
-            {/* Stats card */}
-            <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"24px" }}>
-              <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLD, marginBottom:"14px", fontFamily:"'Lato',sans-serif" }}>Stats</p>
-              <div style={{ display:"flex", flexDirection:"column" }}>
-                {[
-                  { label:"Total Materials", value:stats.totalBooks,  Icon:BookOpen   },
-                  { label:"Total Sold",      value:stats.totalSold,   Icon:ShoppingBag },
-                  { label:"Followers",       value:followerCount,     Icon:Users      },
-                ].map(({label,value,Icon})=>(
-                  <div key={label} className="stat-row" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0" }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"13px", color:"#666", fontFamily:"'Lato',sans-serif" }}>
-                      <Icon size={13} style={{ color:GOLD }}/>{label}
-                    </div>
-                    <span style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, color:NAVY, fontSize:"14px" }}>{value}</span>
+                {/* Stats card */}
+                <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"24px" }}>
+                  <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLD, marginBottom:"14px", fontFamily:"'Lato',sans-serif" }}>Stats</p>
+                  <div style={{ display:"flex", flexDirection:"column" }}>
+                    {[
+                      { label:"Total Materials", value:stats.totalBooks,  Icon:BookOpen   },
+                      { label:"Total Sold",      value:stats.totalSold,   Icon:ShoppingBag },
+                      { label:"Followers",       value:followerCount,     Icon:Users      },
+                    ].map(({label,value,Icon})=>(
+                      <div key={label} className="stat-row" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"13px", color:"#666", fontFamily:"'Lato',sans-serif" }}>
+                          <Icon size={13} style={{ color:GOLD }}/>{label}
+                        </div>
+                        <span style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, color:NAVY, fontSize:"14px" }}>{value}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* ── MAIN FEED ── */}
           {activeTab==="materials" && (
             <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
-              {/* Search + filter */}
               <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"14px 16px" }}>
                 <div style={{ display:"flex", gap:"8px", marginBottom:"12px" }}>
                   <div style={{ flex:1, position:"relative" }}>
@@ -777,12 +803,10 @@ if (!seller) return (
                 </div>
               </div>
 
-              {/* Results */}
               <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"16px" }}>
                 <p style={{ fontSize:"10px", color:"#aaa", marginBottom:"16px", fontFamily:"'Lato',sans-serif", fontWeight:700, letterSpacing:".08em", textTransform:"uppercase" }}>
                   {filteredBooks.length} result{filteredBooks.length!==1?"s":""}
                 </p>
-
                 {filteredBooks.length===0 ? (
                   <div style={{ textAlign:"center", padding:"48px 16px" }}>
                     <div style={{ width:"56px", height:"56px", border:`2px solid #e5ddd0`, transform:"rotate(45deg)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
@@ -792,7 +816,7 @@ if (!seller) return (
                     <p style={{ fontSize:"12px", color:"#bbb", fontFamily:"'Lato',sans-serif" }}>
                       {searchQuery||selectedCategory!=="all"?"Clear your filters to see all materials.":"No materials uploaded yet."}
                     </p>
-                    {(searchQuery||selectedCategory!=="all")&&(
+                    {(searchQuery||selectedCategory!=="all") && (
                       <button onClick={()=>{setSearch("");setCategory("all");}}
                         style={{ marginTop:"12px", background:"none", border:`0.5px solid ${NAVY}`, color:NAVY, padding:"7px 18px", cursor:"pointer", fontSize:"11px", fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", fontFamily:"'Lato',sans-serif" }}>
                         Clear filters
@@ -813,12 +837,9 @@ if (!seller) return (
           )}
 
           {/* ── ABOUT TAB ── */}
-          {activeTab==="about" && (
-            <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
-              <div style={{ display:"none" }} className="mobile-about-cards">
-                <AboutCard/>
-                <StatsCard/>
-              </div>
+          {activeTab === "about" && (
+            <div style={{ gridColumn:"1 / -1", display:"flex", flexDirection:"column", gap:"16px" }}>
+              <FacultyTrustCard userData={userData} />
 
               <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"24px 20px" }}>
                 <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLD, marginBottom:"20px", fontFamily:"'Lato',sans-serif" }}>
@@ -838,13 +859,12 @@ if (!seller) return (
                       </div>
                     </div>
                   ))}
-                  {!seller.sellerDept&&!seller.sellerUni&&!seller.sellerTitle&&(
+                  {!seller.sellerDept && !seller.sellerUni && !seller.sellerTitle && (
                     <p style={{ fontSize:"13px", color:"#bbb", fontFamily:"'Lato',sans-serif" }}>No profile information added yet.</p>
                   )}
                 </div>
               </div>
 
-              {/* Stats in About tab (visible on all screens) */}
               <div style={{ background:"#fff", border:`0.5px solid #e5ddd0`, padding:"24px 20px" }}>
                 <p style={{ fontSize:"10px", fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLD, marginBottom:"14px", fontFamily:"'Lato',sans-serif" }}>Stats</p>
                 <div style={{ display:"flex", flexDirection:"column" }}>
@@ -864,8 +884,9 @@ if (!seller) return (
               </div>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+
+        </div> 
+      </div>   
+    </div>    
   );
 }

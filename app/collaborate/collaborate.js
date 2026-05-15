@@ -17,6 +17,8 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import Navbar from "@/components/NavBar";
+  import { useAds } from "@/lib/useAds";
+  import FeaturedAdsCarousel from "@/components/FeaturedAdsCarousel";
 
 /* ─── Palette ─── */
 const NAVY  = "#0d2244";
@@ -346,7 +348,8 @@ export default function GlobalHubsClient() {
   const [hubPresence, setHubPresence] = useState([]); // users in active hub
   const [mobileView, setMobileView] = useState("grid"); // "grid" | "chat"
   const [myHubs, setMyHubs] = useState([]);
-
+  const goldAds   = useAds("Gold",   2);
+  const silverAds = useAds("Silver", 2);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const unsubMsgs = useRef(null);
@@ -691,6 +694,8 @@ export default function GlobalHubsClient() {
           </div>
         )}
 
+<div style={{ marginTop:"28px" }}><FeaturedAdsCarousel tier="Gold" maxAds={2} autoPlay={true} autoPlayMs={4000} /> </div>
+
         {/* ══ CHAT VIEW ══ */}
         {activeHub && (
           <div className="anim-up chat-panel" style={{ display: mobileView === "chat" || window?.innerWidth > 768 ? "flex" : "none" }}>
@@ -763,6 +768,10 @@ export default function GlobalHubsClient() {
                       Be the first to start a discussion. This is a space for {activeHub.description.toLowerCase()}.
                     </p>
                   </div>
+                  
+  <div style={{ position:"absolute", bottom:0, left:0, right:0 }}>
+    <FeaturedAdsCarousel tier="Silver" maxAds={1} autoPlay={true} autoPlayMs={6000} />
+  </div>
                 </div>
               ) : (
                 <>

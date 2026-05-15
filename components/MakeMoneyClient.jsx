@@ -7,6 +7,8 @@ import {
     Star, Sparkles, GraduationCap,
 } from "lucide-react";
 import Link from "next/link";
+import { useAds } from "@/lib/useAds";
+import FeaturedAdsCarousel from "@/components/FeaturedAdsCarousel";
 
 /* ─── colour tokens (matches HomeClient exactly) ─────────────── */
 const NAVY  = "#0d2244";
@@ -56,6 +58,7 @@ export default function MakeMoneyPage() {
     const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
     const [showModal,  setShowModal]  = useState(false);
     const [selected,   setSelected]   = useState(null);
+  const goldAds = useAds("Gold", 2);
 
     const openVideo  = (v) => { setSelected(v); setShowModal(true); };
     const closeVideo = ()  => { setShowModal(false); setSelected(null); };
@@ -327,6 +330,9 @@ export default function MakeMoneyPage() {
                     </div>
                 </section>
 
+                <div style={{ marginTop:"32px" }}>
+                    <FeaturedAdsCarousel tier="Gold" maxAds={2} autoPlay={true} autoPlayMs={4000} />
+                </div>
                 {/* ══ HOW IT WORKS ══ */}
                 <section id="how-it-works" style={{ background:"#fff", padding:"80px 24px" }}>
                     <div style={{ maxWidth:"1100px", margin:"0 auto" }}>

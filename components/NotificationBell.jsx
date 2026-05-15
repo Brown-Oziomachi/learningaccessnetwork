@@ -188,7 +188,7 @@ export default function NotificationBell({ userId }) {
   const [open,     setOpen]     = useState(false);
   const [showAll,  setShowAll]  = useState(false);
   const dropdownRef = useRef(null);
-  const [dropPos, setDropPos] = useState({ top: 0, left: 0, width: 360 });
+const [dropPos, setDropPos] = useState({ top: 0, left: 0, width: 360, openLeft: false });
 
   /* ── 1. Main notifications — includes physical_* types ── */
   useEffect(() => {
@@ -360,8 +360,8 @@ const physicalTypes = new Set(["physical_sale", "physical_low_stock", "physical_
         }
         .nb-del:hover { border-color:#fecaca; background:#fef2f2; color:#dc2626; }
         @keyframes nbSlide {
-          from { opacity:0; transform:translateY(-8px) scale(.98); }
-          to   { opacity:1; transform:translateY(0) scale(1); }
+          from { opacity:0; transform:translateX(8px) scale(.98); }
+          to   { opacity:1; transform:translateX(0) scale(1); }
         }
         .nb-dropdown { animation:nbSlide .22s cubic-bezier(.4,0,.2,1) both; }
         .nb-type-badge {
@@ -381,26 +381,39 @@ const physicalTypes = new Set(["physical_sale", "physical_low_stock", "physical_
         {/* ── Bell Button ── */}
         <button
           className="nb-bell"
-          onClick={() => {
-            if (!open) {
-              const rect = dropdownRef.current?.getBoundingClientRect();
-              if (rect) {
-                const viewportWidth = window.innerWidth;
-                const dropWidth = Math.min(360, viewportWidth - 32);
-                let left = rect.right - dropWidth;
-                left = Math.max(16, left);
-                if (left + dropWidth > viewportWidth - 16) {
-                  left = viewportWidth - dropWidth - 16;
-                }
-                setDropPos({
-                  top: rect.bottom + 10,
-                  left,
-                  width: dropWidth,
-                });
-              }
-            }
-            setOpen((o) => !o);
-          }}
+         onClick={() => {
+  if (!open) {
+    const rect = dropdownRef.current?.getBoundingClientRect();
+    if (rect) {
+      const viewportWidth  = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const dropWidth      = Math.min(360, viewportWidth - 32);
+
+      // Try to open to the right of the bell first
+      let left     = rect.right + 8;
+      let openLeft = false;
+
+      // If it overflows the right edge, flip to the left of the bell
+      if (left + dropWidth > viewportWidth - 8) {
+        left     = rect.left - dropWidth - 8;
+        openLeft = true;
+      }
+
+      // Clamp left so it never goes off-screen
+      left = Math.max(8, left);
+
+      // Align top with the bell, but clamp so it doesn't overflow bottom
+      const maxHeight = 520; // approx dropdown max height
+      let top = rect.top;
+      if (top + maxHeight > viewportHeight - 8) {
+        top = Math.max(8, viewportHeight - maxHeight - 8);
+      }
+
+      setDropPos({ top, left, width: dropWidth, openLeft });
+    }
+  }
+  setOpen((o) => !o);
+}}
           title="Notifications"
         >
           <Bell size={18} style={{ color: NAVY }} />
@@ -434,17 +447,19 @@ const physicalTypes = new Set(["physical_sale", "physical_low_stock", "physical_
         {open && (
           <div
             className="nb-dropdown"
-            style={{
-              position: "fixed",
-              top: dropPos.top,
-              left: dropPos.left,
-              width: dropPos.width,
-              background: "#fff",
-              border: "0.5px solid #e5ddd0",
-              boxShadow: "0 24px 64px rgba(13,34,68,0.2)",
-              zIndex: 99999,
-              overflow: "hidden",
-            }}
+          style={{
+            position: "fixed",
+            top: dropPos.top,
+            left: dropPos.left,
+            width: dropPos.width,
+            maxHeight: "calc(100vh - 24px)",
+            overflowY: "auto",
+            background: "#fff",
+            border: "0.5px solid #e5ddd0",
+            boxShadow: "0 24px 64px rgba(13,34,68,0.2)",
+            zIndex: 99999,
+            overflow: "hidden",
+          }}
           >
             {/* Header */}
             <div
@@ -591,11 +606,11 @@ const physicalTypes = new Set(["physical_sale", "physical_low_stock", "physical_
 
             {/* Body */}
             <div
-              style={{
-                maxHeight: "440px",
-                overflowY: "auto",
-                scrollbarWidth: "none",
-              }}
+            style={{
+              maxHeight: "440px",
+              overflowY: "auto",
+              scrollbarWidth: "none",
+            }}
             >
               {allNotifications.length === 0 ? (
                 <div style={{ padding: "48px 24px", textAlign: "center" }}>

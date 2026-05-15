@@ -545,8 +545,9 @@ export default function StudentDashboardClient() {
     const [campusBooks,    setCampusBooks]    = useState([]);
     const [selectedLecturer, setSelectedLecturer] = useState(null);
     const [showAllLecturers, setShowAllLecturers] = useState(false);    
-    const goldAds  = useAds("Gold",   3);
-    const silverAds = useAds("Silver", 2);
+   const goldAds   = useAds("Gold",   3);
+const silverAds = useAds("Silver", 2);
+const bronzeAds = useAds("Bronze", 2);  // ← ADD THIS
 
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (u) => {
@@ -757,13 +758,17 @@ export default function StudentDashboardClient() {
             {library.length > 0 && (
                 <section>
                     <SH label="My Library" title="Jump Back In" action={<button onClick={()=>setActiveTab('library')} className="slink">Full Library <ChevronRight size={11}/></button>}/>
-<div className="bg">
-    {[...library.slice(0,5)].reduce((acc, b, i) => {
-        acc.push(<BookCard key={b.bookId||i} book={b} owned/>);
-        if (i === 1 && goldAds[0]) acc.push(<InlineAdCard key="ad-lib-0" ad={goldAds[0]}/>);
-        return acc;
-    }, [])}
-                    </div>
+                    <div className="bg">
+                          {[...library.slice(0,5)].reduce((acc, b, i) => {
+                            acc.push(<BookCard key={b.bookId||i} book={b} owned/>);
+                            if (i === 1 && goldAds[0]) acc.push(<InlineAdCard key="ad-lib-0" ad={goldAds[0]}/>);
+                            if (i === 3 && silverAds[0]) acc.push(<InlineAdCard key="ad-lib-1" ad={silverAds[0]}/>);
+                            return acc;
+                          }, [])}
+                        </div>
+                        <div style={{ marginTop:"20px" }}>
+                          <FeaturedAdsCarousel tier="Silver" maxAds={2} autoPlay={true} autoPlayMs={5000} />
+                        </div>
                 </section>
             )}
 
@@ -927,13 +932,19 @@ export default function StudentDashboardClient() {
                 <SH label="Fresh Uploads" title="Just Added" action={<Link href="/documents" className="slink">All Books <ChevronRight size={11}/></Link>}/>
                 {latestBooks.length===0
                     ? <div className="eb"><Zap size={28} style={{color:'#e5ddd0',margin:'0 auto 8px'}}/><p className="et">No books yet</p></div>
-                    : <div className="bg">
-    {[...latestBooks.slice(0,5)].reduce((acc, b, i) => {
+                    : <>
+    <div className="bg">
+      {[...latestBooks.slice(0,5)].reduce((acc, b, i) => {
         acc.push(<BookCard key={b.firestoreId||i} book={b}/>);
-        if (i === 2 && goldAds[1]) acc.push(<InlineAdCard key="ad-new-0" ad={goldAds[1]}/>);
+        if (i === 1 && goldAds[1]) acc.push(<InlineAdCard key="ad-new-0" ad={goldAds[1]}/>);
+        if (i === 3 && bronzeAds[0]) acc.push(<InlineAdCard key="ad-new-1" ad={bronzeAds[0]}/>);
         return acc;
-    }, [])}
-</div>
+      }, [])}
+    </div>
+    <div style={{ marginTop:"20px" }}>
+      <FeaturedAdsCarousel tier="Bronze" maxAds={2} autoPlay={true} autoPlayMs={4500} />
+    </div>
+  </>
                 }
             </section>
 

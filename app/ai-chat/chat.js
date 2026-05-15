@@ -92,31 +92,47 @@ const GLOBAL_STYLES = `
 ══════════════════════════════════════ */
 function MermaidDiagram({ chart }) {
     const ref = useRef(null);
-    const id = useRef(`mermaid-${Math.random().toString(36).slice(2)}`);
 
     useEffect(() => {
-        if (!ref.current) return;
-        mermaid.initialize({
-            startOnLoad: false,
-            theme: "base",
-            themeVariables: {
-                primaryColor: "#0d2244",
-                primaryTextColor: "#fff",
-                primaryBorderColor: "#b8963e",
-                lineColor: "#b8963e",
-                secondaryColor: "#f5f0e8",
-                tertiaryColor: "#fff",
-                fontFamily: "Lato, sans-serif",
-            },
-        });
-        mermaid.render(id.current, chart)
-            .then(({ svg }) => { if (ref.current) ref.current.innerHTML = svg; })
-            .catch(() => { if (ref.current) ref.current.innerHTML = `<p style="color:#e53e3e;font-size:12px;padding:8px">Diagram could not be rendered.</p>`; });
+        if (!ref.current || !chart) return;
+
+        ref.current.innerHTML = ""; // clear stale content
+
+        const render = async () => {
+            try {
+                mermaid.initialize({
+                    startOnLoad: false,
+                    securityLevel: "loose",   // ← add this
+                    theme: "base",
+                    themeVariables: {
+                        primaryColor: "#0d2244",
+                        primaryTextColor: "#fff",
+                        primaryBorderColor: "#b8963e",
+                        lineColor: "#b8963e",
+                        secondaryColor: "#f5f0e8",
+                        tertiaryColor: "#fff",
+                        fontFamily: "Lato, sans-serif",
+                    },
+                });
+
+                // ✅ Fresh ID every call — avoids the stale-element conflict
+                const uid = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                const { svg } = await mermaid.render(uid, chart);
+
+                if (ref.current) ref.current.innerHTML = svg;
+            } catch (err) {
+                console.error("Mermaid render error:", err);
+                if (ref.current)
+                    ref.current.innerHTML = `<p style="color:#e53e3e;font-size:12px;padding:8px">Diagram could not be rendered.</p>`;
+            }
+        };
+
+        render();
     }, [chart]);
 
     return (
         <div ref={ref}
-            style={{ background: "#fff", border: `0.5px solid #e5ddd0`, padding: "16px", marginTop: 10, marginBottom: 10, overflowX: "auto" }}
+            style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "16px", marginTop: 10, marginBottom: 10, overflowX: "auto" }}
         />
     );
 }

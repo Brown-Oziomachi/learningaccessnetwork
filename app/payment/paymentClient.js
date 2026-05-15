@@ -12,6 +12,8 @@ import { fetchBookDetails, validateBookForPurchase, fetchSellerDetails } from '@
 import { PaymentMethodSelector } from '@/components/PaymentMethodSelector';
 import { PaymentForm } from '@/components/PaymentForm';
 import { OrderSummary } from '@/components/OrderSummary';
+import { useAds } from "@/lib/useAds";
+import FeaturedAdsCarousel from "@/components/FeaturedAdsCarousel";
 
 /* ─── colour tokens ───────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -100,6 +102,8 @@ export default function PaymentClient() {
     const [otpInput, setOtpInput] = useState('');
     const [newResetPin, setNewResetPin] = useState('');
     const [pinLocalError, setPinLocalError] = useState('');
+    const goldAds  = useAds("Gold",  3);
+    const silverAds = useAds("Silver", 2);
     const pendingRegNoRef = useRef(null);
     const [formData, setFormData] = useState({
         email: auth.currentUser?.email || '',
@@ -559,30 +563,95 @@ export default function PaymentClient() {
                     </div>
 
                     {/* You might also like */}
-                    <div style={{ marginTop: '40px' }}>
-                        <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: GOLD, margin: '0 0 4px' }}>Discover</p>
-                        <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: '20px', fontWeight: 700, color: NAVY, margin: '0 0 16px' }}>You Might Also Like</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '12px' }} className="also-grid">
-                            <style>{`@media(min-width:640px){ .also-grid{ grid-template-columns:repeat(3,1fr) !important; } } @media(min-width:1024px){ .also-grid{ grid-template-columns:repeat(5,1fr) !important; } }`}</style>
-                            {(allBooks.length > 0 ? allBooks : booksData)
-                                .filter(rb => rb.id !== bookId)
-                                .slice(0, 10)
-                                .map(rb => (
-                                    <Link key={rb.id} href={`/book/preview?id=${rb.id}`} className="related-card">
-                                        <div style={{ position: 'relative' }}>
-                                            <img src={getThumbnailUrl(rb)} alt={rb.title}
-                                                style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block', border: '0.5px solid #e5ddd0' }}
-                                                onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
-                                                loading="lazy"
-                                            />
-                                            <span style={{ position: 'absolute', top: '5px', left: '5px', background: NAVY, color: GOLD, fontSize: '7px', fontWeight: 700, padding: '2px 5px', fontFamily: "'Lato',sans-serif" }}>PDF</span>
-                                        </div>
-                                        <h4>{rb.title}</h4>
-                                        <p>{rb.author}</p>
-                                    </Link>
-                                ))}
-                        </div>
-                    </div>
+                    <div style={{ marginTop:"40px" }}>
+//     <p style={{ fontSize:"9px", fontWeight:700, letterSpacing:"0.16em", textTransform:"uppercase", color:GOLD, margin:"0 0 4px" }}>Discover</p>
+//     <h3 style={{ fontFamily:"'Playfair Display',serif", fontSize:"20px", fontWeight:700, color:NAVY, margin:"0 0 16px" }}>You Might Also Like</h3>
+//
+//     {/* Row 1 */}
+//     <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:"12px", marginBottom:"20px" }} className="also-grid">
+//       <style>{`.also-grid{ grid-template-columns:repeat(3,1fr) !important; } @media(min-width:1024px){ .also-grid{ grid-template-columns:repeat(5,1fr) !important; } }`}</style>
+//       {(allBooks.length > 0 ? allBooks : booksData)
+        .filter(rb => rb.id !== bookId)
+        .slice(0, 5)
+        .reduce((acc, rb, i) => {
+          acc.push(
+            <Link key={rb.id} href={`/book/preview?id=${rb.id}`} className="related-card">
+              <div style={{ position:"relative" }}>
+                <img src={getThumbnailUrl(rb)} alt={rb.title}
+                  style={{ width:"100%", aspectRatio:"3/4", objectFit:"cover", display:"block", border:"0.5px solid #e5ddd0" }}
+                  onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
+                  loading="lazy" />
+                <span style={{ position:"absolute", top:"5px", left:"5px", background:NAVY, color:GOLD, fontSize:"7px", fontWeight:700, padding:"2px 5px", fontFamily:"'Lato',sans-serif" }}>PDF</span>
+              </div>
+              <h4>{rb.title}</h4>
+              <p>{rb.author}</p>
+            </Link>
+          );
+          // Inject gold ad at slot 2
+          if (i === 1 && goldAds[0]) {
+            acc.push(
+              <a key="pay-ad-0" href={goldAds[0].adLink || goldAds[0].link || "#"} style={{ textDecoration:"none", display:"block" }}>
+                <div style={{ position:"relative", background:"#ede8df" }}>
+                  <img src={goldAds[0].image || goldAds[0].imageUrl} alt="Sponsored"
+                    style={{ width:"100%", aspectRatio:"3/4", objectFit:"cover", display:"block" }}
+                    onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }} />
+                  <div style={{ position:"absolute", top:"5px", left:"5px", background:NAVY, color:GOLD, fontSize:"7px", fontWeight:700, padding:"2px 5px", fontFamily:"'Lato',sans-serif" }}>PDF</div>
+                  <div style={{ position:"absolute", top:"5px", right:"5px", background:GOLD, color:NAVY, fontSize:"7px", fontWeight:700, padding:"2px 5px", fontFamily:"'Lato',sans-serif" }}>AD</div>
+                </div>
+                <h4 style={{ fontFamily:"'Playfair Display',serif", fontSize:"11px", fontWeight:700, color:NAVY, margin:"6px 0 3px", lineHeight:1.3, display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
+                  {goldAds[0].title || goldAds[0].bookTitle || "Sponsored"}
+                </h4>
+                <p style={{ fontSize:"10px", color:"#aaa", margin:0 }}>{goldAds[0].author || "Sponsored"}</p>
+              </a>
+            );
+          }
+          return acc;
+        }, [])}
+    </div>
+
+    {/* Carousel between rows */}
+    <FeaturedAdsCarousel tier="Gold" maxAds={2} autoPlay={true} autoPlayMs={4000} style={{ marginBottom:"20px" }} />
+
+    {/* Row 2 */}
+    <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:"12px" }} className="also-grid">
+      {(allBooks.length > 0 ? allBooks : booksData)
+        .filter(rb => rb.id !== bookId)
+        .slice(5, 10)
+        .reduce((acc, rb, i) => {
+          acc.push(
+            <Link key={rb.id} href={`/book/preview?id=${rb.id}`} className="related-card">
+              <div style={{ position:"relative" }}>
+                <img src={getThumbnailUrl(rb)} alt={rb.title}
+                  style={{ width:"100%", aspectRatio:"3/4", objectFit:"cover", display:"block", border:"0.5px solid #e5ddd0" }}
+                  onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
+                  loading="lazy" />
+                <span style={{ position:"absolute", top:"5px", left:"5px", background:NAVY, color:GOLD, fontSize:"7px", fontWeight:700, padding:"2px 5px", fontFamily:"'Lato',sans-serif" }}>PDF</span>
+              </div>
+              <h4>{rb.title}</h4>
+              <p>{rb.author}</p>
+            </Link>
+          );
+          if (i === 1 && silverAds[0]) {
+            acc.push(
+              <a key="pay-ad-1" href={silverAds[0].adLink || silverAds[0].link || "#"} style={{ textDecoration:"none", display:"block" }}>
+                <div style={{ position:"relative", background:"#ede8df" }}>
+                  <img src={silverAds[0].image || silverAds[0].imageUrl} alt="Sponsored"
+                    style={{ width:"100%", aspectRatio:"3/4", objectFit:"cover", display:"block" }}
+                    onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }} />
+                  <div style={{ position:"absolute", top:"5px", left:"5px", background:NAVY, color:GOLD, fontSize:"7px", fontWeight:700, padding:"2px 5px", fontFamily:"'Lato',sans-serif" }}>PDF</div>
+                  <div style={{ position:"absolute", top:"5px", right:"5px", background:GOLD, color:NAVY, fontSize:"7px", fontWeight:700, padding:"2px 5px", fontFamily:"'Lato',sans-serif" }}>AD</div>
+                </div>
+                <h4 style={{ fontFamily:"'Playfair Display',serif", fontSize:"11px", fontWeight:700, color:NAVY, margin:"6px 0 3px", lineHeight:1.3, display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
+                  {silverAds[0].title || silverAds[0].bookTitle || "Sponsored"}
+                </h4>
+                <p style={{ fontSize:"10px", color:"#aaa", margin:0 }}>{silverAds[0].author || "Sponsored"}</p>
+              </a>
+            );
+          }
+          return acc;
+        }, [])}
+    </div>
+  </div>
                 </main>
 
                 {/* ══════════════════════════════════════════════════════
