@@ -78,9 +78,11 @@ export default function SignUpClient() {
 
                 {/* ── Header ── */}
                 <header className="hero-bg" style={{ padding: "18px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span className="lan-serif" style={{ fontSize: 20, fontWeight: 900, color: "#fff", letterSpacing: -0.5 }}>
-                        [LAN <span style={{ color: GOLD, fontStyle: "italic" }}>Library</span>]
-                    </span>
+                    <Link href="/">
+                        <span className="lan-serif" style={{ fontSize: 20, fontWeight: 900, color: "#fff", letterSpacing: -0.5, cursor: "pointer" }}>
+                            [LAN <span style={{ color: GOLD, fontStyle: "italic" }}>Library</span>]
+                        </span>
+                    </Link>
                     <Link href="/auth/signin" style={{ color: GOLD, textDecoration: "none", fontSize: 12, fontWeight: 700, display: "flex", gap: 6, alignItems: "center" }}>
                         <ArrowLeft size={14} /> Back
                     </Link>
@@ -142,7 +144,7 @@ export default function SignUpClient() {
                         </Link>
 
                         <p style={{ fontSize: 11, color: "#bbb", textAlign: "center", marginTop: 20 }}>
-                            Learning Access Network &nbsp;·&nbsp; Africa's Student Library
+                            Learning Access Network &nbsp;·&nbsp;  Africa's Academic EdTech Marketplace.
                         </p>
                     </div>
                 </main>

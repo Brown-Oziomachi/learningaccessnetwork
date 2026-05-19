@@ -8,8 +8,17 @@ export const metadata = {
 
 export default function CountryPage() {
     return (
-        <Suspense fallback={<div>Working on it...</div>}>
+        <Suspense fallback={< CountryLoading />}>
             <CountryClient />
         </Suspense>
     );
+}
+
+function CountryLoading() {
+    return (
+        <div style={{ background: "#f5f0e8" }}
+            className="min-h-screen flex items-center justify-center">
+            <p>Working on it</p>
+        </div>
+    )
 }

@@ -11,7 +11,7 @@ import {
     Upload, X, AlertCircle, BookOpen, GraduationCap,
     ChevronRight, Check, FileText, Star,
     ScrollText, ShoppingBag, BookMarked, Image as ImageIcon,
-    Info,
+    Globe, TrendingUp,
 } from "lucide-react";
 import { UNIVERSITIES_BY_COUNTRY, UNIVERSITY_COUNTRIES } from "@/lib/africanUniversities";
 
@@ -21,15 +21,15 @@ import { UNIVERSITIES_BY_COUNTRY, UNIVERSITY_COUNTRIES } from "@/lib/africanUniv
 const INTENTS = [
     {
         id: "academic",
-        label: "Academic",
+        label: "Faculty | Academic",
         icon: GraduationCap,
         color: "#1a3a5c",
         bg: "rgba(26,58,92,0.09)",
         description: "Lecture notes, course materials, handouts for universities & institutions",
     },
     {
-        id: "student-prep",
-        label: "Student Prep",
+        id: "students",
+        label: "Student Prep | Notes",
         icon: BookMarked,
         color: "#0d5c2e",
         bg: "rgba(13,92,46,0.09)",
@@ -37,7 +37,7 @@ const INTENTS = [
     },
     {
         id: "divinity",
-        label: "Divinity Vault",
+        label: "Religion | Divinity Vault",
         icon: ScrollText,
         color: "#7c3aed",
         bg: "rgba(124,58,237,0.09)",
@@ -45,7 +45,7 @@ const INTENTS = [
     },
     {
         id: "commercial",
-        label: "Commercial",
+        label: "Sellers | Commercial",
         icon: ShoppingBag,
         color: "#b45309",
         bg: "rgba(180,83,9,0.09)",
@@ -59,50 +59,37 @@ const STEPS = [
     { id: 3, label: "Upload & Price", icon: Upload },
 ];
 
-// Conditional document types per intent
 const DOC_TYPES = {
     academic: [
-        // ── Academic ──
         "Textbook", "Lecture Note", "Handwritten Notes", "Syllabus", "Course Outline",
         "Summary", "Study Guide", "Reading List", "Mind Map", "Flashcards",
         "Cheat Sheet", "Annotated Bibliography", "Tutorial Sheet", "Community Timetable",
-        // ── Research ──
         "Thesis", "Research Proposal", "Seminar Paper", "Case Study", "Journal Article",
         "Literature Review", "Conference Paper", "Essay", "Dissertation Chapter",
         "Group Project Report",
-        // ── Practical ──
         "Lab Manual", "Lab Report", "Technical Drawing", "Project", "Field Report",
         "Software Documentation", "Circuit Diagram", "Code Sample", "Algorithm Sheet",
-        // ── Administrative ──
         "Internship Report", "Clearance Guide", "Scholarship Guide", "Student Handbook",
         "Hostel Guide", "Admission Letter", "Academic Transcript", "Fellowship Application",
-        // ── Professional (Academic) ──
         "Medical Notes", "Law Case Brief", "Nursing Guide", "Accounting Workbook",
         "Engineering Formula Sheet", "Pharmacy Notes", "Architecture Portfolio",
         "Workshop Material", "Motivational Resource", "Translation Resource",
-        // ── Digital ──
         "Presentation Slides", "Infographic", "Video Lecture Notes", "Podcast Transcript",
     ],
-
     "student-prep": [
         "Past Question", "WAEC Past Questions", "JAMB CBT Practice", "NECO Past Questions",
         "GCE Past Questions", "Post-UTME Past Questions", "Exam Revision", "Mock Exam",
         "Quiz Bank", "Assignment", "Study Guide",
     ],
-
     divinity: [
         "Sacred Text", "Sermon Notes", "Tafsir", "Bible Commentary", "Hadith Collection",
         "Theological Manuscript", "Religious Journal", "Prayer Book", "Catechism", "Exegesis",
     ],
-
     commercial: [
-        // ── Books ──
         "Novel", "E-Book", "Biography", "Self-Help", "Academic Reference",
         "Children's Book", "Poetry Collection", "Memoir", "Short Stories", "Non-Fiction",
-        // ── Career ──
         "CV Template", "Cover Letter Template", "Portfolio", "Career Guide",
         "Interview Prep", "Networking Guide",
-        // ── Cooking & Lifestyle ──
         "Recipe Book", "Culinary Notes", "Food Science Notes", "Nutrition Guide", "Meal Plan",
     ],
 };
@@ -161,6 +148,218 @@ const DEPARTMENTS_BY_FACULTY = {
 };
 
 const FACULTY_TITLES = ["Dr.", "Prof.", "Engr.", "Pharm.", "Barr.", "Lecturer"];
+
+/* ─────────────────────────────────────────────────────────────────
+   MULTI-CURRENCY: shared data (mirrors payment page exactly)
+───────────────────────────────────────────────────────────────── */
+
+/** Subset of African currencies shown in the seller preview grid */
+const PREVIEW_CURRENCIES = [
+    { code: "GH", name: "Ghana", currency: "GHS", flag: "🇬🇭", symbol: "GH₵", region: "West Africa" },
+    { code: "KE", name: "Kenya", currency: "KES", flag: "🇰🇪", symbol: "KSh", region: "East Africa" },
+    { code: "ZA", name: "South Africa", currency: "ZAR", flag: "🇿🇦", symbol: "R", region: "Southern Africa" },
+    { code: "SN", name: "Francophone", currency: "XOF", flag: "🌍", symbol: "CFA", region: "WAEMU Zone" },
+    { code: "CM", name: "Central Africa", currency: "XAF", flag: "🌍", symbol: "CFA", region: "CEMAC Zone" },
+    { code: "UG", name: "Uganda", currency: "UGX", flag: "🇺🇬", symbol: "USh", region: "East Africa" },
+    { code: "TZ", name: "Tanzania", currency: "TZS", flag: "🇹🇿", symbol: "TSh", region: "East Africa" },
+    { code: "EG", name: "Egypt", currency: "EGP", flag: "🇪🇬", symbol: "E£", region: "North Africa" },
+];
+
+/** Fallback exchange rates (NGN as base = 1) */
+const FALLBACK_RATES = {
+    NGN: 1,
+    GHS: 0.010,
+    KES: 0.11,
+    UGX: 2.85,
+    TZS: 2.62,
+    RWF: 1.38,
+    ZMW: 0.028,
+    MWK: 1.77,
+    EGP: 0.051,
+    MAD: 0.105,
+    ZAR: 0.019,
+    XOF: 6.56,
+    XAF: 6.56,
+};
+
+/**
+ * Formats a converted amount cleanly, rounding large-integer currencies.
+ */
+function formatConverted(ngnAmount, currency, rates, symbol) {
+    const rate = rates[currency] ?? FALLBACK_RATES[currency] ?? 1;
+    const local = ngnAmount * rate;
+    const intCurrencies = ["UGX", "RWF", "TZS", "XOF", "XAF", "MWK"];
+    const formatted = intCurrencies.includes(currency)
+        ? Math.round(local).toLocaleString()
+        : local < 10
+            ? local.toFixed(2)
+            : local.toFixed(2).replace(/\.00$/, "");
+    return `${symbol}${formatted}`;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   CURRENCY PREVIEW GRID COMPONENT
+───────────────────────────────────────────────────────────────── */
+function CurrencyPreviewGrid({ ngnPrice, rates, ratesLoaded }) {
+    const price = parseFloat(ngnPrice);
+    const valid = price > 0 && !isNaN(price);
+
+    return (
+        <div style={{
+            marginTop: 14,
+            border: "1px solid rgba(13,34,68,0.12)",
+            borderRadius: 12,
+            overflow: "hidden",
+            background: "#fff",
+            boxShadow: "0 2px 12px rgba(13,34,68,0.06)",
+        }}>
+            {/* Header */}
+            <div style={{
+                background: "#0d2244",
+                backgroundImage: "radial-gradient(rgba(184,150,62,0.08) 1px, transparent 1px)",
+                backgroundSize: "18px 18px",
+                padding: "12px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+            }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{
+                        width: 28, height: 28, borderRadius: 7,
+                        background: "rgba(184,150,62,0.15)",
+                        border: "0.5px solid rgba(184,150,62,0.3)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                        <Globe size={13} style={{ color: "#b8963e" }} />
+                    </div>
+                    <div>
+                        <p style={{
+                            fontSize: 10, fontWeight: 700, letterSpacing: "0.14em",
+                            textTransform: "uppercase", color: "#b8963e", margin: 0,
+                        }}>
+                            African Price Preview
+                        </p>
+                        <p style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", margin: 0 }}>
+                            {ratesLoaded ? "Live market rates · open.er-api.com" : "Loading live rates…"}
+                        </p>
+                    </div>
+                </div>
+                {/* NGN badge */}
+                <div style={{
+                    background: "rgba(184,150,62,0.15)",
+                    border: "0.5px solid rgba(184,150,62,0.3)",
+                    padding: "4px 10px", borderRadius: 6,
+                }}>
+                    <span style={{
+                        fontFamily: "'Playfair Display', Georgia, serif",
+                        fontSize: 14, fontWeight: 800, color: "#fff",
+                    }}>
+                        {valid ? `₦${Number(ngnPrice).toLocaleString()}` : "₦—"}
+                    </span>
+                    <span style={{ fontSize: 9, color: "#b8963e", marginLeft: 4, fontWeight: 700 }}>NGN</span>
+                </div>
+            </div>
+
+            {/* Grid body */}
+            <div style={{ padding: "14px 16px" }}>
+                {!valid ? (
+                    /* Placeholder state */
+                    <div style={{ textAlign: "center", padding: "18px 0" }}>
+                        <TrendingUp size={22} style={{ color: "#e5e7eb", marginBottom: 6, display: "block", margin: "0 auto 8px" }} />
+                        <p style={{ fontSize: 12, color: "#c0c7d1", margin: 0 }}>
+                            Enter a price above to see how much buyers across Africa will pay
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        <div style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))",
+                            gap: 8,
+                        }}>
+                            {PREVIEW_CURRENCIES.map((c, i) => {
+                                const converted = formatConverted(price, c.currency, rates, c.symbol);
+                                return (
+                                    <div
+                                        key={c.currency + i}
+                                        style={{
+                                            background: "#f8f7f5",
+                                            border: "0.5px solid #ede8e0",
+                                            borderRadius: 9,
+                                            padding: "10px 12px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 9,
+                                            transition: "border-color 0.15s, box-shadow 0.15s",
+                                        }}
+                                        onMouseEnter={e => {
+                                            e.currentTarget.style.borderColor = "rgba(184,150,62,0.45)";
+                                            e.currentTarget.style.boxShadow = "0 2px 10px rgba(13,34,68,0.07)";
+                                        }}
+                                        onMouseLeave={e => {
+                                            e.currentTarget.style.borderColor = "#ede8e0";
+                                            e.currentTarget.style.boxShadow = "none";
+                                        }}
+                                    >
+                                        {/* Flag */}
+                                        <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{c.flag}</span>
+
+                                        {/* Info */}
+                                        <div style={{ minWidth: 0, flex: 1 }}>
+                                            <p style={{
+                                                fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
+                                                textTransform: "uppercase", color: "#b8963e", margin: "0 0 1px",
+                                            }}>
+                                                {c.currency}
+                                            </p>
+                                            {ratesLoaded ? (
+                                                <p style={{
+                                                    fontFamily: "'Playfair Display', Georgia, serif",
+                                                    fontSize: 15, fontWeight: 800,
+                                                    color: "#0d2244", margin: 0,
+                                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                                }}>
+                                                    {converted}
+                                                </p>
+                                            ) : (
+                                                <div style={{
+                                                    height: 14, width: "70%", borderRadius: 4,
+                                                    background: "linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)",
+                                                    backgroundSize: "200% 100%",
+                                                    animation: "shimmer 1.4s infinite",
+                                                    marginTop: 3,
+                                                }} />
+                                            )}
+                                            <p style={{ fontSize: 9, color: "#aab0bd", margin: "1px 0 0" }}>{c.region}</p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Footer note */}
+                        <div style={{
+                            marginTop: 12,
+                            padding: "9px 12px",
+                            background: "rgba(13,34,68,0.03)",
+                            border: "0.5px solid rgba(13,34,68,0.08)",
+                            borderRadius: 8,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                        }}>
+                            <TrendingUp size={12} style={{ color: "#b8963e", flexShrink: 0 }} />
+                            <p style={{ fontSize: 11, color: "#6b7280", margin: 0, lineHeight: 1.5 }}>
+                                Buyers are charged in their local currency at live market rates via Flutterwave.
+                                Rates update daily — shown here for planning purposes.
+                            </p>
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
 
 /* ─────────────────────────────────────────────────────────────────
    SHARED STYLE HELPERS
@@ -225,6 +424,10 @@ export default function AdvertiseClient() {
     const [selectedFile, setSelectedFile] = useState(null);
     const [selectedCoverImage, setSelectedCoverImage] = useState(null);
 
+    /* ── Exchange rates (mirrors payment page) ── */
+    const [exchangeRates, setExchangeRates] = useState(FALLBACK_RATES);
+    const [ratesLoaded, setRatesLoaded] = useState(false);
+
     const [form, setForm] = useState({
         bookTitle: "", author: "", docType: "", description: "", tableOfContents: "",
         price: "", format: "PDF", pages: "", driveLink: "", coverImagePreview: null,
@@ -239,11 +442,33 @@ export default function AdvertiseClient() {
         isbn: "", genre: "", edition: "",
         // Paid
         accessType: "paid",
-
     });
 
     const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
     const handle = e => set(e.target.name, e.target.value);
+
+    /* ── Fetch live exchange rates (same source as payment page) ── */
+    useEffect(() => {
+        const fetchRates = async () => {
+            try {
+                const res = await fetch("https://open.er-api.com/v6/latest/NGN");
+                if (!res.ok) throw new Error("rate fetch failed");
+                const data = await res.json();
+                if (data?.rates) {
+                    setExchangeRates(prev => ({
+                        ...FALLBACK_RATES,
+                        ...data.rates,
+                        NGN: 1,
+                    }));
+                }
+            } catch {
+                console.warn("[Exchange] Using fallback rates on advertise page");
+            } finally {
+                setRatesLoaded(true);
+            }
+        };
+        fetchRates();
+    }, []);
 
     /* ── Auth + Smart auto-fill ── */
     useEffect(() => {
@@ -351,23 +576,18 @@ export default function AdvertiseClient() {
             const displayName = userData?.displayName || userData?.name || user.displayName || "";
 
             await addDoc(collection(db, "advertMyBook"), {
-                // Identity
                 userId: user.uid, sellerId: user.uid,
                 sellerEmail: user.email, sellerName: displayName,
                 sellerPhone: userData?.phoneNumber || null,
-                // Core
                 bookTitle: form.bookTitle, author: form.author,
                 docType: form.docType, description: form.description,
                 tableOfContents: form.tableOfContents || null,
                 format: form.format, pages: Number(form.pages),
-                price: Number(form.price),
                 intent,
-                // Files
                 pdfUrl, pdfLink: pdfUrl, embedUrl,
                 driveFileId: driveId || null,
                 coverImage: coverImageUrl, image: coverImageUrl,
                 uploadMethod: selectedFile ? "direct_upload" : "drive_link",
-                // Derived category/institution
                 category: intent === "commercial" ? form.genre
                     : intent === "divinity" ? "Religion & Spirituality"
                         : form.department || "General",
@@ -375,7 +595,6 @@ export default function AdvertiseClient() {
                     intent === "academic" ? "university"
                         : intent === "student-prep" ? "exam-prep"
                             : null,
-                // Academic fields
                 university: ["academic"].includes(intent) ? form.institution : null,
                 universityCountry: ["academic"].includes(intent) ? form.universityCountry : null,
                 department: intent === "academic" ? form.department : null,
@@ -383,18 +602,14 @@ export default function AdvertiseClient() {
                 semester: intent === "academic" ? form.semester : null,
                 session: intent === "academic" ? form.session : null,
                 level: ["academic", "student-prep"].includes(intent) ? form.level : null,
-                // Student prep
                 examBody: intent === "student-prep" ? form.examBody : null,
                 school: intent === "student-prep" ? (form.school || null) : null,
-                // Divinity
                 isReligiousDocument: intent === "divinity",
                 theologicalCategory: intent === "divinity" ? form.theologicalCategory : null,
                 doctrine: intent === "divinity" ? (form.doctrine || null) : null,
-                // Commercial
                 isbn: intent === "commercial" ? (form.isbn || "N/A") : null,
                 genre: intent === "commercial" ? form.genre : null,
                 edition: intent === "commercial" ? (form.edition || null) : null,
-                // Meta
                 status: "pending", views: 0, purchases: 0,
                 createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
                 isFree: form.accessType === "free",
@@ -439,6 +654,10 @@ export default function AdvertiseClient() {
         .pf { font-family:'Playfair Display',Georgia,serif; }
         @keyframes spin { to { transform:rotate(360deg); } }
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes shimmer {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
         .fade-in { animation: fadeIn 0.3s ease forwards; }
         .intent-card {
           transition: all 0.18s ease; cursor:pointer;
@@ -461,10 +680,12 @@ export default function AdvertiseClient() {
           background:#b38b59; color:#fff; font-size:8px; font-weight:800;
           padding:3px 8px; border-radius:4px; letter-spacing:0.07em; text-transform:uppercase;
         }
+        .currency-cell:hover { border-color:rgba(184,150,62,0.45) !important; box-shadow:0 2px 10px rgba(13,34,68,0.07) !important; }
         @media(max-width:768px){
           .pub-layout { grid-template-columns:1fr !important; }
           .intent-grid { grid-template-columns:1fr !important; }
           .two-col     { grid-template-columns:1fr !important; }
+          .currency-grid { grid-template-columns: 1fr 1fr !important; }
         }
       `}</style>
 
@@ -575,7 +796,6 @@ export default function AdvertiseClient() {
                                         })}
                                     </div>
 
-                                    {/* Smart auto-fill preview */}
                                     {userData && (form.author || form.institution || form.department) && (
                                         <div style={{ background: "#eff6ff", border: "1px solid #c7dff7", borderRadius: 12, padding: "13px 16px" }}>
                                             <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#2563eb", margin: "0 0 8px" }}>
@@ -620,7 +840,6 @@ export default function AdvertiseClient() {
 
                                 <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 20 }}>
 
-                                    {/* ── COMMON: Title & Author ── */}
                                     <Field label="Title" required hint="Use the exact title as it appears on the document">
                                         <Inp name="bookTitle" value={form.bookTitle} onChange={handle} placeholder="e.g. Introduction to Organic Chemistry" />
                                     </Field>
@@ -629,7 +848,6 @@ export default function AdvertiseClient() {
                                         <Inp name="author" value={form.author} onChange={handle} placeholder="Full author name" />
                                     </Field>
 
-                                    {/* ── COMMON: Doc Type (intent-filtered) ── */}
                                     <Field label="Document Type" required>
                                         <Sel name="docType" value={form.docType} onChange={handle}>
                                             <option value="">— Select Type —</option>
@@ -637,13 +855,11 @@ export default function AdvertiseClient() {
                                         </Sel>
                                     </Field>
 
-                                    {/* ── COMMON: Description ── */}
                                     <Field label="Description" required hint="2–5 sentences about the content, target readers, and what makes it valuable">
                                         <Txta name="description" value={form.description} onChange={handle}
                                             placeholder="Describe the content, target readers, and what makes this valuable…" rows={4} />
                                     </Field>
 
-                                    {/* ── COMMON: Table of contents (optional) ── */}
                                     <Field label="Table of Contents / Key Topics" hint="Optional — helps with discovery">
                                         <Txta name="tableOfContents" value={form.tableOfContents} onChange={handle}
                                             placeholder={"Chapter 1: Introduction…\nChapter 2: …"} rows={3} />
@@ -673,17 +889,11 @@ export default function AdvertiseClient() {
 
                                             <div className="two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                                                 <Field label="Department" hint="Pre-filled from your profile — change if needed">
-                                                    <Sel
-                                                        name="department"
-                                                        value={form.department}
-                                                        onChange={handle}
-                                                    >
+                                                    <Sel name="department" value={form.department} onChange={handle}>
                                                         <option value="">— Select Department —</option>
                                                         {Object.entries(DEPARTMENTS_BY_FACULTY).map(([faculty, depts]) => (
                                                             <optgroup key={faculty} label={faculty}>
-                                                                {depts.map(d => (
-                                                                    <option key={d} value={d}>{d}</option>
-                                                                ))}
+                                                                {depts.map(d => <option key={d} value={d}>{d}</option>)}
                                                             </optgroup>
                                                         ))}
                                                         <option value="Other">Other (specify in description)</option>
@@ -767,7 +977,7 @@ export default function AdvertiseClient() {
                                                 </p>
                                             </div>
                                             <div className="two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                                                <Field label="ISBN" hint="Leave blank if unpublished">
+                                                <Field label="ISBN" hint="Optional: 13-digit ISBN if registered.">
                                                     <Inp name="isbn" value={form.isbn} onChange={handle} placeholder="978-1234567890" />
                                                 </Field>
                                                 <Field label="Edition">
@@ -933,14 +1143,13 @@ export default function AdvertiseClient() {
                                             ))}
                                         </div>
 
-                                        {/* Free info banner */}
                                         {form.accessType === "free" && (
                                             <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(22,163,74,0.07)", border: "1px solid rgba(22,163,74,0.25)", borderRadius: 10, display: "flex", alignItems: "flex-start", gap: 10 }}>
                                                 <Check size={15} style={{ color: "#16a34a", marginTop: 1, flexShrink: 0 }} />
                                                 <div>
                                                     <p style={{ fontSize: 13, fontWeight: 700, color: "#15803d", margin: "0 0 2px" }}>Open Access Document</p>
                                                     <p style={{ fontSize: 12, color: "#16a34a", margin: 0, lineHeight: 1.5 }}>
-                                                        This document will be listed on the <strong>Open Access</strong> page and freely downloadable by all students. Great for building your reputation and reach.
+                                                        This document will be listed on the <strong>Open Access</strong> page and freely downloadable by all students.
                                                     </p>
                                                 </div>
                                             </div>
@@ -950,7 +1159,7 @@ export default function AdvertiseClient() {
                                     {/* ── Price + Pages + Format ── */}
                                     <div className="two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
 
-                                        {/* Price block — hidden when free */}
+                                        {/* ── Price block ── */}
                                         {form.accessType !== "free" && (
                                             <div>
                                                 <Field label="Price (₦)" required>
@@ -977,7 +1186,7 @@ export default function AdvertiseClient() {
                                             </div>
                                         )}
 
-                                        {/* Free earnings placeholder */}
+                                        {/* ── Free placeholder ── */}
                                         {form.accessType === "free" && (
                                             <div style={{ padding: "13px 15px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, display: "flex", flexDirection: "column", justifyContent: "center", gap: 4 }}>
                                                 <p style={{ fontSize: 10, fontWeight: 700, color: "#15803d", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>Open Access</p>
@@ -1008,7 +1217,19 @@ export default function AdvertiseClient() {
                                         </div>
                                     </div>
 
-                                    {/* Pricing guide — only shown for paid */}
+                                    {/* ══════════════════════════════════════════════════════
+                                        MULTI-CURRENCY PRICE PREVIEW GRID
+                                        Shown only when access type is "paid"
+                                    ══════════════════════════════════════════════════════ */}
+                                    {form.accessType !== "free" && (
+                                        <CurrencyPreviewGrid
+                                            ngnPrice={form.price}
+                                            rates={exchangeRates}
+                                            ratesLoaded={ratesLoaded}
+                                        />
+                                    )}
+
+                                    {/* Pricing guide */}
                                     {form.accessType !== "free" && (
                                         <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "15px 18px" }}>
                                             <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6b7280", margin: "0 0 10px" }}>💡 Pricing Guide</p>
@@ -1055,7 +1276,6 @@ export default function AdvertiseClient() {
                                     Continue <ChevronRight size={16} />
                                 </button>
                             ) : (() => {
-                                // Faculty pending lock
                                 if (isFaculty && isPending) return (
                                     <div style={{
                                         flex: 1, padding: "12px 16px", background: "rgba(245,158,11,0.08)",

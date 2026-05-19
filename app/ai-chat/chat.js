@@ -17,6 +17,7 @@ import { db, auth } from "@/lib/firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { booksData } from "@/lib/booksData";
 import mermaid from "mermaid";
+mermaid.initialize({ startOnLoad: false });
 
 const NAVY = "#0d2244";
 const GOLD = "#b8963e";
@@ -90,16 +91,7 @@ const GLOBAL_STYLES = `
 /* ══════════════════════════════════════
    MERMAID DIAGRAM  ← fixed: outside main component
 ══════════════════════════════════════ */
-function MermaidDiagram({ chart }) {
-    const ref = useRef(null);
 
-    useEffect(() => {
-        if (!ref.current || !chart) return;
-
-        ref.current.innerHTML = ""; // clear stale content
-
-        const render = async () => {
-            try {
                 mermaid.initialize({
                     startOnLoad: false,
                     securityLevel: "loose",   // ← add this
@@ -114,7 +106,17 @@ function MermaidDiagram({ chart }) {
                         fontFamily: "Lato, sans-serif",
                     },
                 });
+                
+function MermaidDiagram({ chart }) {
+    const ref = useRef(null);
 
+    useEffect(() => {
+        if (!ref.current || !chart) return;
+
+        ref.current.innerHTML = ""; // clear stale content
+
+        const render = async () => {
+            try {
                 // ✅ Fresh ID every call — avoids the stale-element conflict
                 const uid = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
                 const { svg } = await mermaid.render(uid, chart);

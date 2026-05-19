@@ -21,16 +21,16 @@ const dancingScript = Dancing_Script({
 });
 
 export const metadata = {
-  title: "LAN Library | The Global Student Library 📚",
+  title: "LAN Library | The Global Student Library",
   description:
-    "Learning Access Network is a digital platform designed to make knowledge easily accessible to everyone. Discover, read, and purchase books across various categories including education, past questions, thesis, lecture notes, personal development, business, technology, and more.",
-  keywords:
+    "The ultimate African EdTech marketplace for university textbooks, lecture materials, and academic research resources.",
+      keywords:
     "learning, books, education, personal development, business books, technology books, online library, digital platform, knowledge access, universities library, documents",
   openGraph: {
-    title: "LAN Library - Digital Platform for Knowledge Access",
+    title: "LAN Library | The Global Student Library",
     description:
-      "Discover, read, and purchase books across various categories. Making knowledge easily accessible to everyone. Africa universities documentation for students",
-    type: "website",
+      "The ultimate African EdTech marketplace for university textbooks, lecture materials, and academic research resources.",
+          type: "website",
   },
 };
 

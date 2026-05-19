@@ -337,14 +337,14 @@ export default function ReportBookPage() {
                                 Report a Problem
                             </h1>
                         </div>
-                        {/* Book title pill — desktop only */}
+                        {/* Book title pill — desktop only
                         <div style={{ display:'flex',alignItems:'center',gap:10,background:'rgba(184,150,62,0.1)',border:'0.5px solid rgba(184,150,62,0.25)',padding:'8px 16px',maxWidth:280,flexShrink:0 }}
-                             className="max-lg:hidden">
+                             className="md:hidden">
                             <Flag size={12} style={{ color:GOLD,flexShrink:0 }} />
                             <span style={{ fontSize:12,color:'rgba(245,240,232,0.8)',fontFamily:"'Lato',sans-serif",overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
                                 {book.title}
                             </span>
-                        </div>
+                        </div> */}
                     </div>
                 </header>
 

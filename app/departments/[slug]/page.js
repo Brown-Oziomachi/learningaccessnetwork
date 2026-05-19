@@ -315,7 +315,7 @@ export default function DepartmentSlugPage() {
                     <div className="anim-up" style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 22, flexWrap: "wrap" }}>
                         <Link href="/" style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", textDecoration: "none", fontWeight: 700 }}>Home</Link>
                         <ChevronRight size={10} style={{ color: "rgba(255,255,255,0.25)" }} />
-                        <Link href="/departments" style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", textDecoration: "none", fontWeight: 700 }}>Departments</Link>
+                        <Link href="/category" style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", textDecoration: "none", fontWeight: 700 }}>Departments</Link>
                         <ChevronRight size={10} style={{ color: "rgba(255,255,255,0.25)" }} />
                         <span style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", fontWeight: 700 }}>{dept.name}</span>
                     </div>
@@ -548,7 +548,7 @@ export default function DepartmentSlugPage() {
                     </h2>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px,1fr))", gap: 10 }}>
                         {ALL_DEPARTMENTS.filter(d => d.faculty === dept.faculty && d.slug !== slug).slice(0, 6).map(d => (
-                            <Link key={d.slug} href={`/department/${d.slug}`}
+                            <Link key={d.slug} href={`/departments/${d.slug}`}
                                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", border: "0.5px solid #e5ddd0", background: BG, textDecoration: "none", transition: "border-color 0.18s, background 0.18s" }}
                                 onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.background = CREAM; }}
                                 onMouseLeave={e => { e.currentTarget.style.borderColor = "#e5ddd0"; e.currentTarget.style.background = BG; }}>

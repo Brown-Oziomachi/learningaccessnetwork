@@ -338,21 +338,23 @@ export default function DocumentTypePage() {
                             {/* Row 1 */}
                             <BookRow
                                 label="Recommended For You"
-                                books={displayBooks.slice(0, 5)}
+                                books={displayBooks.slice(0, 10)}
                                 total={displayBooks.length}
                                 isPurchased={isPurchased}
                                 bookSalesCount={bookSalesCount}
                             />
 
                             {/* Row 2 */}
-                            {displayBooks.length > 5 && (
+                            {displayBooks.length > 20 && (
                                 <BookRow
                                     label={`More ${documentTypeName}s`}
-                                    books={displayBooks.slice(5, 10)}
-                                    total={displayBooks.length - 5}
+                                    books={displayBooks.slice(11, 30)}
+                                    total={displayBooks.length + 50}
                                     isPurchased={isPurchased}
                                     bookSalesCount={bookSalesCount}
-                                />
+                                    />
+                                    
+                                    
                             )}
 
                             {/* Browse Other Types */}
@@ -410,13 +412,6 @@ function BookRow({ label, books, total, isPurchased, bookSalesCount }) {
     );
 }
 
-/* ══════════════════════════════════════════════════════════════
-   BookCard — matches the image exactly
-   ▸ book-cover image (3:4, full width of card)
-   ▸ ● LIVE badge top-left  |  OWNED / NEW badge top-right
-   ▸ White meta area below: title (navy bold serif), author (grey),
-     price (navy bold) + optional category tag (cream/gold)
-══════════════════════════════════════════════════════════════ */
 function BookCard({ book, isPurchased, bookSalesCount }) {
     const sold = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
     const purchased = isPurchased(book.id);
@@ -475,7 +470,7 @@ function BookCard({ book, isPurchased, bookSalesCount }) {
                         background: '#22c55e',
                         display: 'inline-block', flexShrink: 0,
                     }} />
-                    LIVE
+                    PDF
                 </div>
 
                 {/* Owned badge — top right */}
@@ -527,7 +522,6 @@ function BookCard({ book, isPurchased, bookSalesCount }) {
                         color: NAVY, margin: 0,
                         fontFamily: "'Lato',sans-serif",
                     }}>
-                        {purchased ? 'Owned' : `₦${Number(book.price || 0).toLocaleString()}`}
                     </p>
 
                     {/* Category tag — shown when category exists (like "PUBLIC ADMINISTRATION" in image) */}

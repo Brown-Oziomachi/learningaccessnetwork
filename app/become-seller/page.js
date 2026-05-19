@@ -9,14 +9,17 @@ export const metadata = {
 
 export default function BecomeSellerPage() {
     return (
-        <Suspense
-            fallback={
-                <div className="min-h-screen flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-950"></div>
-                </div>
-            }
-        >
+        <Suspense fallback={< BecomeSellerLoading />} >
             <BecomeSellerClient />
         </Suspense>
     );
+}
+
+function BecomeSellerLoading() {
+    return (
+        <div style={{ background: "#f5f0e8" }}
+            className="min-h-screen flex items-center justify-center">
+            <p className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-950">Working on it</p>
+        </div>
+    )
 }

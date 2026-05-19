@@ -192,7 +192,7 @@ export default function EmailClient() {
                     </button>
 
                     <p style={{ fontSize:'11px', color:'#bbb', marginTop:'32px', fontFamily:"'Playfair Display',serif", fontStyle:'italic', textAlign:'center' }}>
-                        LAN Library — Est. for African Scholars
+                        Learning Access Network  ·  African EdTech Marketplace
                     </p>
                 </div>
             </div>

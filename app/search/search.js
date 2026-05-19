@@ -493,7 +493,7 @@ export default function SearchClient() {
     )}
 </div>
                
-
+        <hr style={{ color: "#ddd" }}/>
         {/* ── Content ── */}
         <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "48px 24px" }}>
 

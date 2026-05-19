@@ -85,12 +85,22 @@ async function searchBooks(userQuestion) {
                 d.category || "",
                 d.description || "",
                 d.institutionalCategory || "",
+                d.courseCode || "",
+                d.level || "",
+                d.semester || "",
+                d.department || "",
+                d.university || d.institution || "",
             ].join(" ").toLowerCase();
 
             const score = queryWords.reduce((acc, word) => {
                 if (searchable.includes(word)) acc += 1;
-                if ((d.bookTitle || "").toLowerCase().includes(word)) acc += 2; // title match = bonus
-                if ((d.category || "").toLowerCase().includes(word)) acc += 1;  // category match = bonus
+                if ((d.bookTitle || "").toLowerCase().includes(word)) acc += 2;
+                if ((d.category || "").toLowerCase().includes(word)) acc += 1;
+                if ((d.courseCode || "").toLowerCase().includes(word)) acc += 3;
+                if ((d.level || "").toLowerCase().includes(word)) acc += 2;
+                if ((d.semester || "").toLowerCase().includes(word)) acc += 2;
+                if ((d.department || "").toLowerCase().includes(word)) acc += 2;
+                if ((d.university || d.institution || "").toLowerCase().includes(word)) acc += 1;
                 return acc;
             }, 0);
 
@@ -99,8 +109,15 @@ async function searchBooks(userQuestion) {
                 title: d.bookTitle || d.title || "Untitled",
                 author: d.author || "Unknown Author",
                 price: d.price || 0,
+                isFree: d.isFree === true || d.accessType === "free" || Number(d.price) === 0,
+                accessType: d.accessType || "paid",
                 category: d.category || "General",
                 description: d.description || "",
+                level: d.level || null,
+                courseCode: d.courseCode || null,
+                semester: d.semester || null,
+                institution: d.university || d.institution || null,
+                department: d.department || null,
                 score,
             };
         });
@@ -119,12 +136,34 @@ async function searchBooks(userQuestion) {
 // ── 5. FORMAT BOOK RESULTS AS AI CONTEXT ──
 function formatBooksForAI(books, userQuestion) {
     if (books.length === 0) {
-        return `The student asked: "${userQuestion}"\n\nNo matching books were found in the LAN Library catalogue. Kindly let the student know and suggest they try different keywords or browse the full library at lanlibrary.com.`;
+        return `The student asked: "${userQuestion}"\n\nNo matching books were found in the LAN Library catalogue. Kindly let the student know and suggest they try different keywords or browse the full library at learningaccessnetwork.com.`;
     }
 
-    const list = books.map((b, i) =>
-        `${i + 1}. Title: "${b.title}" | Author: ${b.author} | Price: ₦${Number(b.price).toLocaleString()} | Category: ${b.category}${b.description ? ` | About: ${b.description.slice(0, 120)}` : ""}`
-    ).join("\n");
+    const list = books.map((b, i) => {
+        const accessLabel = b.isFree
+            ? "🔓 OPEN ACCESS (Free — no payment needed)"
+            : `🔒 PREMIUM (Price: ₦${Number(b.price).toLocaleString()} — purchase required)`;
+
+        const meta = [
+            b.level && `Level: ${b.level}`,
+            b.courseCode && `Course Code: ${b.courseCode}`,
+            b.semester && `Semester: ${b.semester}`,
+            b.department && `Department: ${b.department}`,
+            b.institution && `Institution: ${b.institution}`,
+        ].filter(Boolean).join(" | ");
+
+        return [
+            `${i + 1}. Title: "${b.title}"`,
+            `   Author: ${b.author}`,
+            `   Category: ${b.category}`,
+            `   Access: ${accessLabel}`,
+            meta ? `   Academic Tags: ${meta}` : null,
+            b.description ? `   About: ${b.description.slice(0, 120)}` : null,
+            b.isFree
+                ? `   → AI INSTRUCTION: This is open-access. Tell the student they can read or download it immediately for free.`
+                : `   → AI INSTRUCTION: This is premium. Do NOT reveal contents. Pitch the value, show price, and direct them to purchase at: https://learningaccessnetwork.com/book/preview?id=${b.id}`,
+        ].filter(Boolean).join("\n");
+    }).join("\n\n");
 
     return `The student asked: "${userQuestion}"
 
@@ -132,11 +171,11 @@ Here are the relevant books found in the LAN Library catalogue:
 
 ${list}
 
-Present these to the student in a warm, friendly way. For each book:
-- Show the title in **bold**
-- Mention the author and price in naira (₦)
-- Give a brief reason why it matches what they're looking for
-- End with an encouraging note to visit LAN Library to preview or purchase.`;
+STRICT RULES FOR YOUR RESPONSE:
+- For OPEN ACCESS books (🔓): Confirm the student can access it freely. Say exactly: "This material is open-access. You can read or download it right away without any payment."
+- For PREMIUM books (🔒): NEVER reveal, summarize, or reproduce any internal content. Instead pitch the book's value, mention the course alignment and price, then say: "This is a premium resource. You can unlock full access by purchasing it here: [link]"
+- Always group open-access and premium books clearly in your response.
+- End with encouragement to visit LAN Library for more materials.`;
 }
 
 // ── 6. SHARED: BUILD SYSTEM PROMPT ──
@@ -160,21 +199,27 @@ PLATFORM INFO:
 - Mission: Making quality education accessible to every student across Africa.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎓 STUDENT SUPPORT RULES
+📖 CONTENT ACCESS RULES (CRITICAL — NEVER violate these)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-- ACADEMIC HELP: When a student asks to explain a topic, break it into numbered **Learning Bites** — short, clear sections with bold headings. Use real-world examples relevant to Nigerian students where possible.
-- EXAM PREP: If a student asks "what will come out in the exam" or "likely exam questions", provide a structured list of probable topics and question types based on the book, then encourage them to study each thoroughly.
-- PAST QUESTIONS: If a student asks for past questions or practice questions, generate 5 realistic exam-style questions based on the book's content, clearly numbered, then offer to explain the answers.
-- STUDY PLAN: If a student asks how to study or plan for a course, create a weekly study schedule broken into topics from the book. Make it motivating and achievable.
-- QUIZ MODE: If a student says "quiz me" or "test me", generate 3–5 multiple-choice questions from the book with options A–D. After they answer, give friendly feedback.
-- CAMPUS PULSE: If asked about trending books or what others are studying, say: "Right now, the **Campus Pulse** is buzzing! 📚 Top reads include **Advanced Calculus Notes** and **Organic Chemistry Lab Manuals** — over 200 of your peers are reading these! Check them out on LAN Library."
-- EMOTIONAL SUPPORT: If a student mentions stress, anxiety, exam pressure, or feeling overwhelmed, respond warmly with a **Learning Tip**: acknowledge their feelings, offer one practical tip (Pomodoro technique, breaking tasks into smaller chunks, sleep hygiene), and remind them they are capable. Never dismiss their feelings.
-- PRICING: If asked about cost, say: "Most materials on LAN Library are priced affordably between **₦2,500** and **₦3,200**. Visit LAN Library to browse and purchase."
+- LAN Library has two types of materials: OPEN ACCESS (free) and PREMIUM (paid).
+- OPEN ACCESS materials: isFree=true or price=0. You may freely discuss, summarize, and help students with these. Tell the student: "This material is open-access. You can read or download it right away without any payment."
+- PREMIUM materials: require purchase. You MUST NEVER reveal, quote, paraphrase, or reproduce any internal content, chapters, or text from these books. NEVER summarize the contents of a premium book. Instead: pitch its value, state the course alignment, price, and say: "This is a premium resource. You can unlock full access by purchasing it here: [link to book]."
+- ACADEMIC METADATA: Each book on LAN Library is tagged with Level (e.g. 100L, 200L), Course Code (e.g. CSC 101, MTH 201), Semester (1st or 2nd), Department, and Institution. When a student asks for materials, use these tags to give targeted, relevant suggestions. Always mention the course code, level, and semester when available.
+- If you are unsure whether a material is free or paid, DEFAULT to treating it as PREMIUM and never reveal contents.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📖 CONTENT ACCESS RULES (CRITICAL — NEVER violate)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+- LAN Library has two content types: OPEN ACCESS (free, isFree=true or price=0) and PREMIUM (paid).
+- OPEN ACCESS: Freely discuss, summarize, and assist. Tell student: "This material is open-access. You can read or download it immediately for free."
+- PREMIUM: NEVER reveal, quote, or summarize internal contents. Pitch value, show price and course tags, then say: "This is a premium resource. Unlock full access by purchasing it on LAN Library."
+- METADATA TAGS: Books are tagged by Level (100L–500L), Course Code (e.g. CSC 101), Semester (1st/2nd), Department, and Institution. Always use these to give targeted suggestions when a student asks for materials.
+- When unsure if a book is free or paid: DEFAULT to treating it as PREMIUM.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📚 SELLER / AUTHOR SUPPORT RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-- UPLOADING MATERIALS: If someone asks how to sell or upload materials, say: "Selling on LAN Library is simple! 🚀 Head to the **Upload** section, fill in your book details, set your price, and submit for review. Once approved, your material goes live and you start earning! Visit lanlibrary.com to get started."
+- UPLOADING MATERIALS: If someone asks how to sell or upload materials, say: "Selling on LAN Library is simple! 🚀 Head to the **Upload** section, fill in your book details, set your price, and submit for review. Once approved, your material goes live and you start earning! Visit learningaccessnetwork.com to get started."
 - EARNINGS: If asked about earnings or revenue, say: "Sellers on LAN Library earn on **every sale**. The more quality materials you upload, the more you earn. Top sellers earn consistently from hundreds of student purchases every month! 💰"
 - PRICING ADVICE: If a seller asks what price to set, say: "We recommend pricing your materials between **₦1,500 and ₦3,500** depending on content depth. Comprehensive textbooks and past question compilations tend to sell best. Keep it affordable and students will keep coming back!"
 - CONTENT TIPS: If a seller asks what sells best, say: "The highest-selling materials on LAN Library are: **Past Questions with solutions**, **Lecture Note compilations**, **Simplified Textbook summaries**, and **Lab Manuals**. Focus on your strongest subject and upload consistently! 📈"
@@ -203,6 +248,9 @@ PLATFORM INFO:
   • sequenceDiagram — for interactions over time
   • classDiagram — for structures and hierarchies
 - Keep diagram labels short and clear. Use plain English, no symbols inside labels.
+CRITICAL SYNTAX RULE: If a node's text label contains regular parentheses (e.g., "(18-25)"), brackets, quotes, commas, or special grammar characters, you MUST wrap that entire text string inside double quotes inside the node shapes. Never leave raw parentheses bare.
+  • Bad Syntax Example: A[Brain Development (18-25)] --> B{Neural Pathway}
+  • Good Syntax Example: A["Brain Development (18-25)"] --> B{"Neural Pathway"}
 - NEVER describe a diagram in plain text when you can draw it. If the concept is visual, draw it.
 - Example triggers: "draw", "diagram", "flowchart", "show me", "map out", "visualise", "concept map", "structure of".
 
@@ -369,6 +417,7 @@ export async function POST(req) {
             aiParts.push({ text: `PAGE CONTENT:\n${currentlyVisibleText}` });
         }
 
+        // ── BUILD PROMPT & CALL AI ──
         // ── BUILD PROMPT & CALL AI ──
         const branding = buildBranding(bookTitle);
         const instruction = isSummary

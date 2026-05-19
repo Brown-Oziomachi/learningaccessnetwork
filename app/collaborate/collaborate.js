@@ -563,6 +563,7 @@ export default function GlobalHubsClient() {
       <div className="gh-root">
         <Navbar />
 
+        
         {/* ══ GRID VIEW ══ */}
         {(!activeHub || mobileView === "grid") && (
           <div className="anim-up" style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 20px 60px" }}>
@@ -613,6 +614,7 @@ export default function GlobalHubsClient() {
               </div>
             </div>
 
+            
             {/* Study Buddies Active */}
             {studyBuddyHubs.length > 0 && !search && (
               <div style={{ marginBottom: 32 }}>
@@ -694,7 +696,6 @@ export default function GlobalHubsClient() {
           </div>
         )}
 
-<div style={{ marginTop:"28px" }}><FeaturedAdsCarousel tier="Gold" maxAds={2} autoPlay={true} autoPlayMs={4000} /> </div>
 
         {/* ══ CHAT VIEW ══ */}
         {activeHub && (
@@ -768,10 +769,6 @@ export default function GlobalHubsClient() {
                       Be the first to start a discussion. This is a space for {activeHub.description.toLowerCase()}.
                     </p>
                   </div>
-                  
-  <div style={{ position:"absolute", bottom:0, left:0, right:0 }}>
-    <FeaturedAdsCarousel tier="Silver" maxAds={1} autoPlay={true} autoPlayMs={6000} />
-  </div>
                 </div>
               ) : (
                 <>

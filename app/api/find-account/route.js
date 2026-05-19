@@ -8,7 +8,7 @@ function maskEmail(email) {
     return `${local[0]}***@${domain}`;
 }
 
-// Masks phone: +2348012345678 → +234 *** ***5678
+// Masks phone: +234 801 234 5678 → +234 *** *** 5678
 function maskPhone(phone) {
     if (!phone) return '';
     const cleaned = phone.replace(/\s/g, '');

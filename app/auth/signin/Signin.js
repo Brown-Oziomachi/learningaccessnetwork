@@ -142,9 +142,11 @@ export default function SignInClient() {
 
         {/* ── Header ── */}
         <header className="hero-bg" style={{ padding: "18px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span className="lan-serif" style={{ fontSize: 20, fontWeight: 900, color: "#fff", letterSpacing: -0.5 }}>
-            [LAN <span style={{ color: GOLD, fontStyle: "italic" }}>Library</span>]
-          </span>
+          <Link href="/">
+            <span className="lan-serif" style={{ fontSize: 20, fontWeight: 900, color: "#fff", letterSpacing: -0.5, cursor: "pointer" }}>
+              [LAN <span style={{ color: GOLD, fontStyle: "italic" }}>Library</span>]
+            </span>
+          </Link>
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>The Global Student Library 📚</span>
         </header>
 
@@ -212,7 +214,7 @@ export default function SignInClient() {
                 </div>
               )}
 
-              <div className="divider"><span>Continue with email</span></div>
+              <div style={{ color: "#999" }} className="divider"><span style={{color: "#777"}}>Continue with email</span></div>
 
               <input className="lan-input" type="email" placeholder="Email address"
                 value={loginData.email}
@@ -243,7 +245,7 @@ export default function SignInClient() {
 
               <Link href="/auth/signup" className="btn-outline" style={{ marginBottom: 0 }}>Create new account</Link>
 
-              <p style={{ fontSize: 11, color: "#bbb", textAlign: "center", marginTop: 20 }}>Learning Access Network &nbsp;·&nbsp; Africa's Student Library</p>
+              <p style={{ fontSize: 11, color: "#777", textAlign: "center", marginTop: 20 }}>Learning Access Network &nbsp;·&nbsp;  Africa's Academic EdTech Marketplace.</p>
             </div>
           </div>
         </div>

@@ -188,7 +188,7 @@ const getThumbnailUrl = (book) => {
 const STATS = [
   { val: "90M+",   label: "Documents"    },
   { val: "2.4M+",  label: "Learners"     },
-  { val: "₦500K+", label: "Top Monthly Earnings" },
+  { val: "200+", label: "Institutions" },
   { val: "85%",    label: "Revenue Share" },
 ];
 
@@ -240,7 +240,7 @@ const TESTIMONIALS = [
   {
     name: "Bar. Justice Mercy",
     role: "Verified Faculty",
-    text: "I uploaded my course materials once and students across Nigeria are benefiting. LAN is a game changer.",
+    text: "I uploaded my 400-level Economics lecture notes on LAN Library and within two weeks, students from three African universities had purchased them.It's the most rewarding thing I've done outside the classroom.",
   },
 ];
 
@@ -256,7 +256,7 @@ export default function LandingPage() {
   const [showVideo,     setShowVideo]     = useState(false);
   const currentYear = new Date().getFullYear();
 
-  const heroImages = ["/headpics.jpg"];
+  const heroImages = ["/lanstu.png"];
 
   /* auth guard */
   useEffect(() => {
@@ -367,7 +367,7 @@ export default function LandingPage() {
           <AnimatePresence mode="wait">
             <motion.div key={heroIdx} initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} transition={{ duration:1 }}
               style={{ position:"absolute", inset:0 }}>
-              <img src={heroImages[heroIdx]} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", opacity:.22 }} />
+              <img src={heroImages[heroIdx]} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", opacity:.35 }} />
             </motion.div>
           </AnimatePresence>
 
@@ -396,11 +396,12 @@ export default function LandingPage() {
               <button className="btn-primary" onClick={goSignIn}>
                 Browse Books <ArrowRight size={14} />
               </button>
-              <a href="/docs" className="btn-ghost">
+              <a style={{color: GOLD}} href="/docs" className="btn-ghost font-extrabold">
                 Documentation
               </a>
             </div>
 
+            
             {/* stats strip */}
             <div style={{ marginTop:64, borderTop:"0.5px solid rgba(184,150,62,0.2)", display:"flex", flexWrap:"wrap" }}>
               {STATS.map(({ val, label }) => (
@@ -439,7 +440,7 @@ export default function LandingPage() {
                 ))}
               </div>
 
-              <button className="btn-navy" onClick={goSignIn}>
+              <button  className="btn-navy" onClick={goSignIn}>
                 <BookOpenText size={14} /> Start Learning
               </button>
             </div>
@@ -448,12 +449,12 @@ export default function LandingPage() {
             <div style={{ position:"relative" }}>
               <div style={{ position:"absolute", top:-20, right:-20, width:200, height:200, background:`radial-gradient(circle, rgba(184,150,62,0.12), transparent 70%)`, zIndex:0 }} />
               <div style={{ position:"relative", zIndex:1, border:`0.5px solid #e5ddd0`, overflow:"hidden" }}>
-                <img src="/student.jpg" alt="Students using LAN Library"
+                <img src="/studs.png" alt="Students using LAN Library"
                   style={{ width:"100%", aspectRatio:"4/3", objectFit:"cover", display:"block" }}
                   onError={e => { e.target.src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800"; }}
                 />
                 {/* overlay badge */}
-                <div style={{ position:"absolute", bottom:20, left:20, background:NAVY, padding:"12px 18px", display:"flex", flexDirection:"column", gap:3 }}>
+                <div style={{ position:"absolute", bottom:1, left:1, background:NAVY, padding:"12px 18px", display:"flex", flexDirection:"column", gap:3 }}>
                   <span style={{ fontSize:10, fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:GOLD, fontFamily:"'Lato',sans-serif" }}>Students Active Now</span>
                   <span style={{ fontSize:12, color:"rgba(255,255,255,0.7)", fontFamily:"'Lato',sans-serif" }}>Reading purchased books · Browsing materials</span>
                 </div>
@@ -472,7 +473,7 @@ export default function LandingPage() {
               <div style={{ position:"relative", zIndex:1, border:`0.5px solid #e5ddd0`, overflow:"hidden" }}>
                 <img src="https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=800" alt="Seller earning on LAN Library"
                   style={{ width:"100%", aspectRatio:"4/3", objectFit:"cover", display:"block" }} />
-                <div style={{ position:"absolute", bottom:20, left:20, background:"#16a34a", padding:"12px 18px", display:"flex", flexDirection:"column", gap:3 }}>
+                <div style={{ position:"absolute", bottom:1, left:1, background:"#16a34a", padding:"12px 18px", display:"flex", flexDirection:"column", gap:3 }}>
                   <span style={{ fontSize:10, fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:"rgba(255,255,255,0.7)", fontFamily:"'Lato',sans-serif" }}>Sellers Earning Now</span>
                   <span style={{ fontSize:12, color:"rgba(255,255,255,0.85)", fontFamily:"'Lato',sans-serif" }}>Uploading content · Processing transactions</span>
                 </div>
@@ -546,7 +547,8 @@ export default function LandingPage() {
                 </p>
 
                 {/* Feature rows */}
-                <div style={{ border: "0.5px solid #e5ddd0", background: "#fff", marginBottom: 32 }}>
+                <div className="lan-card"
+                 style={{ border: "0.5px solid #e5ddd0", background: "#fff", marginBottom: 32 }}>
                   {[
                     {
                       icon: <BookOpen size={15} style={{ color: GOLD }} />,
@@ -618,30 +620,31 @@ export default function LandingPage() {
                   <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(13,34,68,0.95) 0%, rgba(13,34,68,0.45) 50%, transparent 100%)" }} />
 
                   {/* Testimonial on image bottom */}
-                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 24px 20px" }}>
+                  <div style={{ position: "absolute", bottom: -20, left: 0, right: 0, padding: "24px 24px 20px" }}>
                     <div className="lan-serif" style={{ fontSize: 56, color: "rgba(184,150,62,0.4)", lineHeight: 1, marginBottom: -6, userSelect: "none" }}>"</div>
-                    <p className="lan-serif" style={{ fontSize: "clamp(13px,1.6vw,15px)", fontStyle: "italic", color: "rgba(245,240,232,0.92)", margin: "0 0 16px", lineHeight: 1.7 }}>
-                      "I uploaded my 400-level Economics lecture notes and within two weeks, students from three African universities had purchased them. It's the most rewarding thing I've done outside the classroom."
+                    <p className="lan-serif" style={{ fontSize: "clamp(13px,1.6vw,15px)", fontStyle: "italic", color: "rgba(245,240,232,0.92)", margin: "0 0 16px", lineHeight: 1.5, }}>
+                      "I uploaded my 400-level Economics lecture notes in LAN Library and within two weeks, students from three African universities had purchased them. It's the most rewarding thing I've done outside the classroom."
                     </p>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, borderTop: "0.5px solid rgba(184,150,62,0.25)", paddingTop: 14 }}>
                       <div style={{ width: 38, height: 38, background: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>DO</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>LAN</span>
                       </div>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: "'Lato',sans-serif" }}>Dr. Obiora</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: "'Lato',sans-serif" }}>Barr. Justice Mercy</div>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 3, fontSize: 10, fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif", letterSpacing: ".06em" }}>
                           <span style={{ width: 5, height: 5, borderRadius: "50%", background: GOLD, display: "inline-block" }} />
                           Verified Faculty · 
                         </div>
                       </div>
                     </div>
+                    
                   </div>
-
                   {/* Top-left status badge */}
-                  <div style={{ position: "absolute", top: 20, left: 20, background: NAVY, padding: "10px 16px", display: "flex", flexDirection: "column", gap: 3 }}>
+                  <div style={{ position: "absolute", top: 2, left: 2, background: NAVY, padding: "10px 16px", display: "flex", flexDirection: "column", gap: 3 }}>
                     <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: GOLD, fontFamily: "'Lato',sans-serif" }}>Faculty Active Now</span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Lato',sans-serif" }}>Publishing content · Earning monthly</span>
                   </div>
+
                 </div>
 
                 {/* How it works strip */}
@@ -894,11 +897,10 @@ export default function LandingPage() {
                   <div style={{ width: 68, height: 68, background: "rgba(255,255,255,0.92)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", transition: "transform .2s", boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
                     <Play size={26} style={{ color: NAVY, fill: NAVY, marginLeft: 4 }} />
                   </div>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'Lato',sans-serif", letterSpacing: ".1em", textTransform: "uppercase" }}>Watch Story</span>
+                  <img src="/lanlog.png" alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(184,150,62,0.4)" }} />
                 </div>
                 <div style={{ position: "absolute", bottom: 16, left: 16, display: "flex", alignItems: "center", gap: 10 }}>
-                  <img src="/lanlog.png" alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(184,150,62,0.4)" }} />
-                  <span className="lan-serif" style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>How To Use LAN Library</span>
+                  <span className="lan-serif" style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>How to Monetize Your Knowledge on LAN Library</span>
                 </div>
               </button>
 
@@ -1128,7 +1130,7 @@ export default function LandingPage() {
             }}
             >
 
-            <p>LAN Library is operated by Learning Access Network Ltd., a digital academic resource platform dedicated to connecting African students and educators with quality learning materials. We are headquartered in Nigeria, Abuja, and serve learners across the African continent.</p>
+            <p>LAN Library is operated by Learning Access Network Ltd., a digital academic resource platform dedicated to connecting African students and educators with quality learning materials. We are headquartered in Abuja, Nigeria, and serve learners across the African continent.</p>
                 </div>
          
       </footer>

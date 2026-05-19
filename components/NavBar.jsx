@@ -24,6 +24,7 @@ import {
   Folder,
   Bell,
   Home,
+  WifiOff,
 } from "lucide-react";
 import Link from "next/link";
 import { signOut } from "firebase/auth";
@@ -88,8 +89,23 @@ export default function Navbar() {
   const router = useRouter();
   const searchTagsRef = useRef(null);
   const dropdownTimer = useRef(null);
-  const [isDesktop, setIsDesktop] = useState(false);
-  const [announcement, setAnnouncement] = useState(null);
+ const [isDesktop, setIsDesktop] = useState(false);
+  const [isOnline, setIsOnline] = useState(
+    typeof window !== "undefined" ? window.navigator.onLine : true
+  );
+    const [announcement, setAnnouncement] = useState(null);
+
+    useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
   useEffect(() => {
     const ref = doc(db, 'siteSettings', 'announcement');
     const unsub = onSnapshot(ref, (snap) => {
@@ -437,6 +453,9 @@ useEffect(() => {
         @keyframes fabPop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
         @keyframes spin { to { transform: rotate(360deg); } }
+        .lan-sell-btn-wrap { transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; }
+        .lan-sell-btn-wrap.offline { opacity: 0.7; }
+        .lan-sell-btn-wrap.online { opacity: 1; transform: translateY(0); }
 
        @media (max-width: 900px) {
       #hamburger-btn { display: flex !important; }
@@ -446,7 +465,7 @@ useEffect(() => {
     }
       `}</style>
 
-     {/* ══ TOP ANNOUNCEMENT BAR ══ */}
+      {/* ══ TOP ANNOUNCEMENT BAR ══ */}
       {announcement && (
         <>
           <style>{`
@@ -489,31 +508,70 @@ useEffect(() => {
           `}</style>
 
           <div className="lan-ticker-bar">
-            <div style={{
-              flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6px',
-              background: GOLD, color: NAVY,
-              fontFamily: "'Lato', sans-serif", fontSize: '9px',
-              fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase',
-              padding: '3px 10px', margin: '0 16px', zIndex: 3, position: 'relative',
-            }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: NAVY, display: 'inline-block' }} />
-              {announcement.label || 'NOTICE'}
+            <div
+              style={{
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                background: GOLD,
+                color: NAVY,
+                fontFamily: "'Lato', sans-serif",
+                fontSize: "9px",
+                fontWeight: 900,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                padding: "3px 10px",
+                margin: "0 16px",
+                zIndex: 3,
+                position: "relative",
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: NAVY,
+                  display: "inline-block",
+                }}
+              />
+              {announcement.label || "NOTICE"}
             </div>
-            <div style={{ overflow: 'hidden', flex: 1 }}>
+            <div style={{ overflow: "hidden", flex: 1 }}>
               <div className="lan-ticker-track">
                 {[0, 1].map((i) => (
-                  <span key={i} style={{
-                    fontFamily: "'Lato', sans-serif", fontSize: '12px',
-                    fontWeight: 600, color: announcement.textColor || CREAM,
-                    letterSpacing: '0.03em', paddingRight: '80px',
-                  }}>
+                  <span
+                    key={i}
+                    style={{
+                      fontFamily: "'Lato', sans-serif",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: announcement.textColor || CREAM,
+                      letterSpacing: "0.03em",
+                      paddingRight: "80px",
+                    }}
+                  >
                     {announcement.message}
                     {announcement.linkUrl && (
-                      <a href={announcement.linkUrl} style={{ color: GOLD, fontWeight: 700, marginLeft: '12px', textDecoration: 'underline' }} target="_blank">
-                        {announcement.linkText || 'Learn more →'}
+                      <a
+                        href={announcement.linkUrl}
+                        style={{
+                          color: GOLD,
+                          fontWeight: 700,
+                          marginLeft: "12px",
+                          textDecoration: "underline",
+                        }}
+                        target="_blank"
+                      >
+                        {announcement.linkText || "Learn more →"}
                       </a>
                     )}
-                    <span style={{ margin: '0 32px', color: GOLD, opacity: 0.4 }}>◆</span>
+                    <span
+                      style={{ margin: "0 32px", color: GOLD, opacity: 0.4 }}
+                    >
+                      ◆
+                    </span>
                   </span>
                 ))}
               </div>
@@ -532,37 +590,74 @@ useEffect(() => {
           zIndex: 500,
         }}
       >
-        <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px", height: "64px" }}>
-
+        <div
+          style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 20px" }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "16px",
+              height: "64px",
+            }}
+          >
             {/* hamburger */}
             <button
               className="lan-nav-link"
               style={{ padding: "8px", display: "none" }}
               id="hamburger-btn"
-              onClick={() => { setShowMobileMenu(!showMobileMenu); setShowMobileSearch(false); }}
+              onClick={() => {
+                setShowMobileMenu(!showMobileMenu);
+                setShowMobileSearch(false);
+              }}
               aria-label="Menu"
             >
               {showMobileMenu ? <X size={22} /> : <Menu size={22} />}
             </button>
 
             {/* ── BRAND ── */}
-            <Link href="/home" style={{ textDecoration: "none", flexShrink: 0 }}>
-              <div style={{ fontFamily: "'Playfair Display', Georgia, serif", lineHeight: 1.05 }}>
-                <div style={{ fontSize: "22px", fontWeight: 900, color: CREAM, letterSpacing: "-0.5px" }}>
+            <Link
+              href="/home"
+              style={{ textDecoration: "none", flexShrink: 0 }}
+            >
+              <div
+                style={{
+                  fontFamily: "'Playfair Display', Georgia, serif",
+                  lineHeight: 1.05,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "22px",
+                    fontWeight: 900,
+                    color: CREAM,
+                    letterSpacing: "-0.5px",
+                  }}
+                >
                   [LAN Library]
                 </div>
-                <div style={{
-                  fontSize: "10px", fontWeight: 300, color: GOLD, letterSpacing: "0.15em",
-                  textTransform: "uppercase", fontFamily: "'Lato', sans-serif", marginTop: "1px",
-                }}>
+                <div
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 300,
+                    color: GOLD,
+                    letterSpacing: "0.15em",
+                    textTransform: "uppercase",
+                    fontFamily: "'Lato', sans-serif",
+                    marginTop: "1px",
+                  }}
+                >
                   The Global Student Library
                 </div>
               </div>
             </Link>
 
             {/* ── DESKTOP SEARCH ── */}
-            <div className="lan-search-wrap" ref={searchTagsRef} style={{ margin: "0 12px" }}>
+            <div
+              className="lan-search-wrap"
+              ref={searchTagsRef}
+              style={{ margin: "0 12px" }}
+            >
               <input
                 className="lan-search-input"
                 type="text"
@@ -575,9 +670,15 @@ useEffect(() => {
               <button
                 onClick={handleSearch}
                 style={{
-                  position: "absolute", right: "10px", top: "50%",
-                  transform: "translateY(-50%)", background: "none",
-                  border: "none", cursor: "pointer", color: GOLD, display: "flex",
+                  position: "absolute",
+                  right: "10px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: GOLD,
+                  display: "flex",
                 }}
               >
                 <Search size={16} />
@@ -585,14 +686,26 @@ useEffect(() => {
 
               {showSearchTags && (
                 <div className="lan-tag-dropdown">
-                  <p style={{
-                    fontSize: "10px", fontWeight: 700, color: "#aaa",
-                    letterSpacing: "0.12em", textTransform: "uppercase",
-                    marginBottom: "8px", paddingLeft: "10px",
-                  }}>
+                  <p
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      color: "#aaa",
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      marginBottom: "8px",
+                      paddingLeft: "10px",
+                    }}
+                  >
                     Browse by type
                   </p>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "4px" }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr 1fr",
+                      gap: "4px",
+                    }}
+                  >
                     {searchTags.map((tag) => {
                       const Icon = tag.icon;
                       return (
@@ -605,16 +718,40 @@ useEffect(() => {
                             handleSearch();
                           }}
                         >
-                          <div style={{
-                            width: "30px", height: "30px", borderRadius: "6px",
-                            background: "#f9f6f0", border: `0.5px solid #ede8df`,
-                            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                          }}>
+                          <div
+                            style={{
+                              width: "30px",
+                              height: "30px",
+                              borderRadius: "6px",
+                              background: "#f9f6f0",
+                              border: `0.5px solid #ede8df`,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
                             <Icon size={14} style={{ color: NAVY }} />
                           </div>
                           <div>
-                            <div style={{ fontSize: "12px", fontWeight: 700, color: NAVY }}>{tag.name}</div>
-                            <div style={{ fontSize: "11px", color: "#888", marginTop: "1px" }}>{tag.description}</div>
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: NAVY,
+                              }}
+                            >
+                              {tag.name}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                color: "#888",
+                                marginTop: "1px",
+                              }}
+                            >
+                              {tag.description}
+                            </div>
                           </div>
                         </button>
                       );
@@ -625,36 +762,108 @@ useEffect(() => {
             </div>
 
             {/* ── DESKTOP NAV LINKS ── */}
-            <nav style={{ display: "flex", alignItems: "center", gap: "2px", marginLeft: "auto" }}>
-              <Link href="/my-books" className="lan-nav-link"><Book size={15} /> My Books</Link>
-              <button className="lan-nav-link" onClick={handleMyAccountClick}><User size={15} /> Account</button>
-              <Link href="/lecturers" className="lan-nav-link"><Crown size={15} /> Faculties</Link>
-              <Link href="/saved-my-book" className="lan-nav-link"><Bookmark size={15} /> Saved</Link>
+            <nav
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "2px",
+                marginLeft: "auto",
+              }}
+            >
+              <Link href="/my-books" className="lan-nav-link">
+                <Book size={15} style={{ color: GOLD }} /> My Books
+              </Link>
+              <button className="lan-nav-link" onClick={handleMyAccountClick}>
+                <User size={15} style={{ color: GOLD }} /> Account
+              </button>
+              <Link href="/lecturers" className="lan-nav-link">
+                <Crown size={15} style={{ color: GOLD }} /> Faculties
+              </Link>
+              <Link href="/saved-my-book" className="lan-nav-link">
+                <Bookmark size={15} style={{ color: GOLD }} /> Saved
+              </Link>
 
-              <button
-                className="lan-sell-btn"
-                onClick={HandleClick}
-                disabled={checkingSeller}
+              <div
+                className={`lan-sell-btn-wrap ${isOnline ? "online" : "offline"}`}
                 style={{ marginLeft: "6px" }}
               >
-                {checkingSeller ? (
-                  <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{
-                      width: "12px", height: "12px",
-                      border: "2px solid rgba(13,34,68,0.3)", borderTopColor: NAVY,
-                      borderRadius: "50%", display: "inline-block",
-                      animation: "spin 0.7s linear infinite",
-                    }} />
-                    Checking…
-                  </span>
+                {!isOnline ? (
+                  /* ── OFFLINE STATE ── */
+                  <button
+                    disabled
+                    className="lan-sell-btn"
+                    style={{
+                      background: "rgba(100,100,100,0.18)",
+                      color: "rgba(245,240,232,0.45)",
+                      cursor: "not-allowed",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      border: "0.5px solid rgba(255,255,255,0.1)",
+                    }}
+                  >
+                    <WifiOff size={13} style={{ color: "#f59e0b" }} />
+                    Offline
+                    <span
+                      style={{
+                        width: "6px",
+                        height: "6px",
+                        borderRadius: "50%",
+                        background: "#ef4444",
+                        display: "inline-block",
+                        marginLeft: "2px",
+                      }}
+                    />
+                  </button>
+                ) : checkingSeller ? (
+                  /* ── CHECKING STATE ── */
+                  <button className="lan-sell-btn" disabled>
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: "12px",
+                          height: "12px",
+                          border: "2px solid rgba(13,34,68,0.3)",
+                          borderTopColor: NAVY,
+                          display: "inline-block",
+                          animation: "spin 0.7s linear infinite",
+                        }}
+                      />
+                      Checking…
+                    </span>
+                  </button>
                 ) : isSeller ? (
-                  <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                    <Upload size={13} /> Upload
-                  </span>
-                ) : "Become a Seller"}
-              </button>
+                  /* ── SELLER: Upload ── */
+                  <button className="lan-sell-btn" onClick={HandleClick}>
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "5px",
+                      }}
+                    >
+                      <Upload size={13} /> Upload
+                    </span>
+                  </button>
+                ) : (
+                  /* ── GUEST: Become a Seller ── */
+                  <button className="lan-sell-btn" onClick={HandleClick}>
+                    Become a Seller
+                  </button>
+                )}
+              </div>
 
-              <button className="lan-logout-btn" onClick={handleLogout} style={{ marginLeft: "4px" }}>
+              <button
+                className="lan-logout-btn"
+                onClick={handleLogout}
+                style={{ marginLeft: "4px" }}
+              >
                 <LogOut size={14} />
               </button>
             </nav>
@@ -662,21 +871,53 @@ useEffect(() => {
         </div>
 
         {/* ── CATEGORY BAR ── */}
-          <div className="lan-category-bar" style={{ background: CREAM, borderTop: `1px solid rgba(13,34,68,0.1)`, position: "relative", zIndex: 600, overflow: "visible" }}>
-            <div style={{
-            maxWidth: "1280px", margin: "0 auto", padding: "0 20px",
-            display: "flex", alignItems: "center", gap: "0", overflowX: "auto",
-          }}>
-            <Link href="/docs" target="_blank" style={{
-              fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em",
-              textTransform: "uppercase", padding: "10px 14px",
-              color: "#888", textDecoration: "none", whiteSpace: "nowrap",
-              fontFamily: "'Lato', sans-serif",
-            }}>
+        <div
+          className="lan-category-bar"
+          style={{
+            background: CREAM,
+            borderTop: `1px solid rgba(13,34,68,0.1)`,
+            position: "relative",
+            zIndex: 600,
+            overflow: "visible",
+          }}
+        >
+          <div
+            style={{
+              maxWidth: "1280px",
+              margin: "0 auto",
+              padding: "0 20px",
+              display: "flex",
+              alignItems: "center",
+              gap: "0",
+              overflowX: "auto",
+            }}
+          >
+            <Link
+              href="/docs"
+              target="_blank"
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                padding: "10px 14px",
+                color: "#888",
+                textDecoration: "none",
+                whiteSpace: "nowrap",
+                fontFamily: "'Lato', sans-serif",
+              }}
+            >
               What is LAN?
             </Link>
 
-            <div style={{ width: "1px", height: "18px", background: "rgba(184,150,62,0.3)", flexShrink: 0 }} />
+            <div
+              style={{
+                width: "1px",
+                height: "18px",
+                background: "rgba(184,150,62,0.3)",
+                flexShrink: 0,
+              }}
+            />
 
             {/* ─── DESKTOP DROPDOWN: wrapper div handles both button + panel hover ─── */}
             {NAV_CATS.map(({ key, label, href }) => (
@@ -687,115 +928,215 @@ useEffect(() => {
                 onMouseEnter={() => openDropdown(key)}
                 onMouseLeave={closeDropdown}
               >
-                <button 
-                  ref={(el) => (catButtonRefs.current[key] = el)}  
-                className={`lan-cat-btn ${activeDropdown === key ? "active" : ""}`}>
+                <button
+                  ref={(el) => (catButtonRefs.current[key] = el)}
+                  className={`lan-cat-btn ${activeDropdown === key ? "active" : ""}`}
+                >
                   {label}
                   <ChevronDown
                     size={11}
                     style={{
                       transition: "transform 0.2s",
-                      transform: activeDropdown === key ? "rotate(180deg)" : "none",
+                      transform:
+                        activeDropdown === key ? "rotate(180deg)" : "none",
                     }}
                   />
                 </button>
 
-                  {activeDropdown === key && isDesktop && createPortal(               
+                {activeDropdown === key &&
+                  isDesktop &&
+                  createPortal(
                     <div
-                  className="lan-dropdown"
-                  style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left }}
-                  onMouseEnter={() => openDropdown(key)}
-                  onMouseLeave={closeDropdown}
-                >
-                  {/* dropdown header */}
-                  <div style={{
-                    padding: "20px 24px 16px", borderBottom: `1px solid #f0ebe0`,
-                    background: "#fdfaf6",
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-                      <div style={{ width: "3px", height: "20px", background: GOLD, borderRadius: "2px" }} />
-                      <h3 style={{
-                        fontFamily: "'Playfair Display', serif", fontSize: "18px",
-                        fontWeight: 700, color: NAVY, margin: 0,
-                      }}>
-                        {menuCategories[key]?.title}
-                      </h3>
-                    </div>
-                    <p style={{ fontSize: "12px", color: "#888", margin: "0 0 0 13px", fontFamily: "'Lato', sans-serif" }}>
-                      {menuCategories[key]?.description}
-                    </p>
-                  </div>
-
-                  {menuCategories[key]?.books?.length > 0 ? (
-                    <>
-                      <div style={{ padding: "16px 24px 0" }}>
-                        <p style={{
-                          fontSize: "10px", fontWeight: 700, color: GOLD,
-                          letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 12px",
-                        }}>
-                          Recommended for you
+                      className="lan-dropdown"
+                      style={{
+                        position: "fixed",
+                        top: dropdownPos.top,
+                        left: dropdownPos.left,
+                      }}
+                      onMouseEnter={() => openDropdown(key)}
+                      onMouseLeave={closeDropdown}
+                    >
+                      {/* dropdown header */}
+                      <div
+                        style={{
+                          padding: "20px 24px 16px",
+                          borderBottom: `1px solid #f0ebe0`,
+                          background: "#fdfaf6",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                            marginBottom: "6px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: "3px",
+                              height: "20px",
+                              background: GOLD,
+                              borderRadius: "2px",
+                            }}
+                          />
+                          <h3
+                            style={{
+                              fontFamily: "'Playfair Display', serif",
+                              fontSize: "18px",
+                              fontWeight: 700,
+                              color: NAVY,
+                              margin: 0,
+                            }}
+                          >
+                            {menuCategories[key]?.title}
+                          </h3>
+                        </div>
+                        <p
+                          style={{
+                            fontSize: "12px",
+                            color: "#888",
+                            margin: "0 0 0 13px",
+                            fontFamily: "'Lato', sans-serif",
+                          }}
+                        >
+                          {menuCategories[key]?.description}
                         </p>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
-                          {menuCategories[key].books.map((book) => (
+                      </div>
+
+                      {menuCategories[key]?.books?.length > 0 ? (
+                        <>
+                          <div style={{ padding: "16px 24px 0" }}>
+                            <p
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                color: GOLD,
+                                letterSpacing: "0.14em",
+                                textTransform: "uppercase",
+                                margin: "0 0 12px",
+                              }}
+                            >
+                              Recommended for you
+                            </p>
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(3, 1fr)",
+                                gap: "10px",
+                              }}
+                            >
+                              {menuCategories[key].books.map((book) => (
+                                <Link
+                                  key={book.id}
+                                  href={`/book/preview?id=${book.id}`}
+                                  className="lan-book-card"
+                                  onClick={() => setActiveDropdown(null)}
+                                >
+                                  <h5
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: 700,
+                                      color: NAVY,
+                                      margin: "0 0 4px",
+                                      display: "-webkit-box",
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient: "vertical",
+                                      overflow: "hidden",
+                                    }}
+                                  >
+                                    {book.title}
+                                  </h5>
+                                  <p
+                                    style={{
+                                      fontSize: "11px",
+                                      color: "#888",
+                                      margin: 0,
+                                    }}
+                                  >
+                                    by {book.author}
+                                  </p>
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ padding: "14px 24px 16px" }}>
                             <Link
-                              key={book.id}
-                              href={`/book/preview?id=${book.id}`}
-                              className="lan-book-card"
+                              href={href || `/category/${key}`}
+                              style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: GOLD,
+                                textDecoration: "none",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                letterSpacing: "0.04em",
+                              }}
                               onClick={() => setActiveDropdown(null)}
                             >
-                              <h5 style={{
-                                fontSize: "12px", fontWeight: 700, color: NAVY,
-                                margin: "0 0 4px", display: "-webkit-box",
-                                WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
-                              }}>
-                                {book.title}
-                              </h5>
-                              <p style={{ fontSize: "11px", color: "#888", margin: 0 }}>
-                                by {book.author}
-                              </p>
+                              View all {label} documents{" "}
+                              <ChevronRight size={12} />
                             </Link>
-                          ))}
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ padding: "24px", textAlign: "center" }}>
+                          <BookOpen
+                            size={28}
+                            style={{ color: "#ddd", margin: "0 auto 8px" }}
+                          />
+                          <p
+                            style={{
+                              fontSize: "12px",
+                              color: "#aaa",
+                              fontFamily: "'Lato', sans-serif",
+                            }}
+                          >
+                            No documents yet in this category.
+                          </p>
+                          <Link
+                            href="/upload-document"
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: GOLD,
+                              textDecoration: "none",
+                            }}
+                          >
+                            Be the first to upload →
+                          </Link>
                         </div>
-                      </div>
-                      <div style={{ padding: "14px 24px 16px" }}>
-                        <Link
-                          href={href || `/category/${key}`}
-                          style={{
-                            fontSize: "12px", fontWeight: 700, color: GOLD,
-                            textDecoration: "none", display: "inline-flex",
-                            alignItems: "center", gap: "4px", letterSpacing: "0.04em",
-                          }}
-                          onClick={() => setActiveDropdown(null)}
-                        >
-                          View all {label} documents <ChevronRight size={12} />
-                        </Link>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ padding: "24px", textAlign: "center" }}>
-                      <BookOpen size={28} style={{ color: "#ddd", margin: "0 auto 8px" }} />
-                      <p style={{ fontSize: "12px", color: "#aaa", fontFamily: "'Lato', sans-serif" }}>
-                        No documents yet in this category.
-                      </p>
-                      <Link href="/upload-document" style={{ fontSize: "12px", fontWeight: 700, color: GOLD, textDecoration: "none" }}>
-                        Be the first to upload →
-                      </Link>
-                    </div>
+                      )}
+                    </div>,
+                    document.body,
                   )}
-                </div>,
-                document.body 
-              )}
               </div>
             ))}
 
-            <div style={{ width: "1px", height: "18px", background: "rgba(184,150,62,0.3)", flexShrink: 0 }} />
+            <div
+              style={{
+                width: "1px",
+                height: "18px",
+                background: "rgba(184,150,62,0.3)",
+                flexShrink: 0,
+              }}
+            />
 
-            <Link href="/documents" style={{
-              fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em",
-              textTransform: "uppercase", padding: "10px 14px",
-              color: "#555", textDecoration: "none", whiteSpace: "nowrap",
-              fontFamily: "'Lato', sans-serif",
-            }}>
+            <Link
+              href="/documents"
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                padding: "10px 14px",
+                color: "#555",
+                textDecoration: "none",
+                whiteSpace: "nowrap",
+                fontFamily: "'Lato', sans-serif",
+              }}
+            >
               All Documents
             </Link>
           </div>
@@ -807,19 +1148,46 @@ useEffect(() => {
         <div className="lan-mobile-overlay">
           <div style={{ padding: "16px 20px" }}>
             {/* header row */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", fontWeight: 900, color: NAVY }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "20px",
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: "'Playfair Display', serif",
+                  fontSize: "20px",
+                  fontWeight: 900,
+                  color: NAVY,
+                }}
+              >
                 [LAN Library]
-                <div style={{
-                  fontFamily: "'Lato', sans-serif", fontSize: "10px", color: GOLD,
-                  fontWeight: 300, letterSpacing: "0.12em", textTransform: "uppercase",
-                }}>
+                <div
+                  style={{
+                    fontFamily: "'Lato', sans-serif",
+                    fontSize: "10px",
+                    color: GOLD,
+                    fontWeight: 300,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                  }}
+                >
                   The Global Student Library
                 </div>
               </div>
               <button
                 onClick={() => setShowMobileMenu(false)}
-                style={{ padding: "8px", background: "#f9f6f0", border: "none", borderRadius: "8px", cursor: "pointer", color: NAVY }}
+                style={{
+                  padding: "8px",
+                  background: "#f9f6f0",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  color: NAVY,
+                }}
               >
                 <X size={20} />
               </button>
@@ -834,18 +1202,29 @@ useEffect(() => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 style={{
-                  width: "100%", padding: "11px 40px 11px 14px",
-                  border: `1px solid rgba(13,34,68,0.15)`, borderRadius: "8px",
-                  fontSize: "14px", fontFamily: "'Lato', sans-serif",
-                  outline: "none", color: NAVY, background: "#fdfaf6", boxSizing: "border-box",
+                  width: "100%",
+                  padding: "11px 40px 11px 14px",
+                  border: `1px solid rgba(13,34,68,0.15)`,
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  fontFamily: "'Lato', sans-serif",
+                  outline: "none",
+                  color: NAVY,
+                  background: "#fdfaf6",
+                  boxSizing: "border-box",
                 }}
               />
               <button
                 onClick={handleSearch}
                 style={{
-                  position: "absolute", right: "12px", top: "50%",
-                  transform: "translateY(-50%)", background: "none",
-                  border: "none", cursor: "pointer", color: GOLD,
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: GOLD,
                 }}
               >
                 <Search size={17} />
@@ -855,72 +1234,181 @@ useEffect(() => {
             {/* ─── MOBILE: main menu vs submenu ─── */}
             {mobileSubmenu === null ? (
               <>
-                <button
-                  onClick={HandleClick}
-                  disabled={checkingSeller}
-                  style={{
-                    width: "100%", padding: "14px 20px", background: GOLD,
-                    color: NAVY, border: "none", borderRadius: "8px",
-                    fontSize: "14px", fontWeight: 700, fontFamily: "'Lato', sans-serif",
-                    cursor: "pointer", marginBottom: "20px",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-                  }}
+                <div
+                  className={`lan-sell-btn-wrap ${isOnline ? "online" : "offline"}`}
+                  style={{ marginBottom: "20px" }}
                 >
-                  {checkingSeller ? "Checking…" : isSeller ? <><Upload size={16} />Upload Document</> : "Become a Seller"}
-                </button>
-
-                <div className="lan-divider-gold" />
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginBottom: "12px" }}>
-                  {[
-                    { href: "/home", icon: Home, label: "Home" },
-                    { href: "/my-books", icon: Book, label: "My Books" },
-                    { fn: handleMyAccountClick, icon: User, label: "My Account" },
-                    { href: "/lecturers", icon: Crown, label: "Faculties" },
-                    { href: "/saved-my-book", icon: Bookmark, label: "Saved" },
-                    { href: "/transfer", icon: Bookmark, label: "Transfer" },
-                    { href: "/referrals", icon: Bookmark, label: "Referral" },
-                    { href: "/lan/net/help-center", icon: HelpCircle, label: "Help & FAQ" },
-                  ].map(({ href, fn, icon: Icon, label }) =>
-                    href ? (
-                      <Link key={label} href={href} className="lan-mobile-link" onClick={() => setShowMobileMenu(false)}>
-                        <Icon size={17} style={{ color: GOLD }} /> {label}
-                      </Link>
-                    ) : (
-                      <button key={label} className="lan-mobile-link" onClick={() => { fn?.(); setShowMobileMenu(false); }}>
-                        <Icon size={17} style={{ color: GOLD }} /> {label}
-                      </button>
-                    )
+                  {!isOnline ? (
+                    /* ── OFFLINE ── */
+                    <button
+                      disabled
+                      style={{
+                        width: "100%",
+                        padding: "14px 20px",
+                        background: "rgba(100,100,100,0.12)",
+                        color: "rgba(13,34,68,0.35)",
+                        border: "0.5px solid rgba(13,34,68,0.1)",
+                        fontSize: "14px",
+                        fontWeight: 700,
+                        fontFamily: "'Lato', sans-serif",
+                        cursor: "not-allowed",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      <WifiOff size={16} style={{ color: "#f59e0b" }} />
+                      Offline
+                      <span
+                        style={{
+                          width: "7px",
+                          height: "7px",
+                          borderRadius: "50%",
+                          background: "#ef4444",
+                          display: "inline-block",
+                          marginLeft: "2px",
+                        }}
+                      />
+                    </button>
+                  ) : (
+                    /* ── ONLINE ── */
+                    <button
+                      onClick={HandleClick}
+                      disabled={checkingSeller}
+                      style={{
+                        width: "100%",
+                        padding: "14px 20px",
+                        background: GOLD,
+                        color: NAVY,
+                        border: "none",
+                        fontSize: "14px",
+                        fontWeight: 700,
+                        fontFamily: "'Lato', sans-serif",
+                        cursor: checkingSeller ? "not-allowed" : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
+                        opacity: checkingSeller ? 0.6 : 1,
+                      }}
+                    >
+                      {checkingSeller ? (
+                        "Checking…"
+                      ) : isSeller ? (
+                        <>
+                          <Upload size={16} /> Upload Document
+                        </>
+                      ) : (
+                        "Become a Seller"
+                      )}
+                    </button>
                   )}
                 </div>
 
                 <div className="lan-divider-gold" />
 
-                <p style={{
-                  fontSize: "10px", fontWeight: 700, color: GOLD,
-                  letterSpacing: "0.14em", textTransform: "uppercase",
-                  padding: "12px 0 6px", fontFamily: "'Lato', sans-serif",
-                }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "2px",
+                    marginBottom: "12px",
+                  }}
+                >
+                  {[
+                    { href: "/home", icon: Home, label: "Home" },
+                    { href: "/my-books", icon: Book, label: "My Books" },
+                    {
+                      fn: handleMyAccountClick,
+                      icon: User,
+                      label: "My Account",
+                    },
+                    { href: "/lecturers", icon: Crown, label: "Faculties" },
+                    { href: "/saved-my-book", icon: Bookmark, label: "Saved" },
+                    { href: "/transfer", icon: Bookmark, label: "Transfer" },
+                    { href: "/referrals", icon: Bookmark, label: "Referral" },
+                    {
+                      href: "/lan/net/help-center",
+                      icon: HelpCircle,
+                      label: "Help & FAQ",
+                    },
+                  ].map(({ href, fn, icon: Icon, label }) =>
+                    href ? (
+                      <Link
+                        key={label}
+                        href={href}
+                        className="lan-mobile-link"
+                        onClick={() => setShowMobileMenu(false)}
+                      >
+                        <Icon size={17} style={{ color: GOLD }} /> {label}
+                      </Link>
+                    ) : (
+                      <button
+                        key={label}
+                        className="lan-mobile-link"
+                        onClick={() => {
+                          fn?.();
+                          setShowMobileMenu(false);
+                        }}
+                      >
+                        <Icon size={17} style={{ color: GOLD }} /> {label}
+                      </button>
+                    ),
+                  )}
+                </div>
+
+                <div className="lan-divider-gold" />
+
+                <p
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: GOLD,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    padding: "12px 0 6px",
+                    fontFamily: "'Lato', sans-serif",
+                  }}
+                >
                   Categories
                 </p>
 
                 {/* ─── each category button opens the submenu ─── */}
-                {NAV_CATS.map(({ key, label }) => (   // ← destructure label here
-                  <button
-                    key={key}
-                    className="lan-mobile-link"
-                    onClick={() => setMobileSubmenu(key)}
-                    style={{ justifyContent: "space-between" }}
-                  >
-                    <span style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <BookOpen size={16} style={{ color: GOLD }} />
-                      {menuCategories[key]?.title?.replace(" Documents", "") ?? label}  {/* ← fallback */}
-                    </span>
-                    <ChevronRight size={15} style={{ color: "#ccc" }} />
-                  </button>
-                ))}
+                {NAV_CATS.map(
+                  (
+                    { key, label }, // ← destructure label here
+                  ) => (
+                    <button
+                      key={key}
+                      className="lan-mobile-link"
+                      onClick={() => setMobileSubmenu(key)}
+                      style={{ justifyContent: "space-between" }}
+                    >
+                      <span
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                        }}
+                      >
+                        <BookOpen size={16} style={{ color: GOLD }} />
+                        {menuCategories[key]?.title?.replace(
+                          " Documents",
+                          "",
+                        ) ?? label}{" "}
+                        {/* ← fallback */}
+                      </span>
+                      <ChevronRight size={15} style={{ color: "#ccc" }} />
+                    </button>
+                  ),
+                )}
 
-                <Link href="/documents" className="lan-mobile-link" onClick={() => setShowMobileMenu(false)}>
+                <Link
+                  href="/documents"
+                  className="lan-mobile-link"
+                  onClick={() => setShowMobileMenu(false)}
+                >
                   <Book size={16} style={{ color: GOLD }} /> All Documents
                 </Link>
 
@@ -929,12 +1417,20 @@ useEffect(() => {
                 <button
                   onClick={handleLogout}
                   style={{
-                    display: "flex", alignItems: "center", gap: "8px",
-                    padding: "12px 20px", borderRadius: "8px",
-                    background: "rgba(239,68,68,0.08)", border: "0.5px solid rgba(239,68,68,0.2)",
-                    color: "#ef4444", fontSize: "13px", fontWeight: 700,
-                    fontFamily: "'Lato', sans-serif", cursor: "pointer",
-                    marginTop: "12px", width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "12px 20px",
+                    borderRadius: "8px",
+                    background: "rgba(239,68,68,0.08)",
+                    border: "0.5px solid rgba(239,68,68,0.2)",
+                    color: "#ef4444",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    fontFamily: "'Lato', sans-serif",
+                    cursor: "pointer",
+                    marginTop: "12px",
+                    width: "100%",
                   }}
                 >
                   <LogOut size={16} /> Sign Out
@@ -942,93 +1438,170 @@ useEffect(() => {
               </>
             ) : (
               /* ─── MOBILE SUBMENU: shows books for tapped category ─── */
-            // ─── MOBILE SUBMENU ───
-<div>
-  <button
-    onClick={() => setMobileSubmenu(null)}
-    style={{
-      display: "flex", alignItems: "center", gap: "8px",
-      marginBottom: "20px", background: "none", border: "none",
-      cursor: "pointer", color: NAVY, fontFamily: "'Lato', sans-serif",
-      fontSize: "13px", fontWeight: 700,
-    }}
-  >
-    <ChevronRight size={16} style={{ transform: "rotate(180deg)" }} /> Back
-  </button>
+              // ─── MOBILE SUBMENU ───
+              <div>
+                <button
+                  onClick={() => setMobileSubmenu(null)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginBottom: "20px",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: NAVY,
+                    fontFamily: "'Lato', sans-serif",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                  }}
+                >
+                  <ChevronRight
+                    size={16}
+                    style={{ transform: "rotate(180deg)" }}
+                  />{" "}
+                  Back
+                </button>
 
-  {/* ── Use NAV_CATS label as fallback so heading always shows ── */}
-  <h2 style={{
-    fontFamily: "'Playfair Display', serif", fontSize: "22px",
-    fontWeight: 700, color: NAVY, marginBottom: "4px",
-  }}>
-    {menuCategories[mobileSubmenu]?.title 
-      ?? NAV_CATS.find(c => c.key === mobileSubmenu)?.label}
-  </h2>
-  <p style={{ fontSize: "13px", color: "#888", marginBottom: "20px", fontFamily: "'Lato', sans-serif" }}>
-    {menuCategories[mobileSubmenu]?.description ?? "Browse documents in this category"}
-  </p>
+                {/* ── Use NAV_CATS label as fallback so heading always shows ── */}
+                <h2
+                  style={{
+                    fontFamily: "'Playfair Display', serif",
+                    fontSize: "22px",
+                    fontWeight: 700,
+                    color: NAVY,
+                    marginBottom: "4px",
+                  }}
+                >
+                  {menuCategories[mobileSubmenu]?.title ??
+                    NAV_CATS.find((c) => c.key === mobileSubmenu)?.label}
+                </h2>
+                <p
+                  style={{
+                    fontSize: "13px",
+                    color: "#888",
+                    marginBottom: "20px",
+                    fontFamily: "'Lato', sans-serif",
+                  }}
+                >
+                  {menuCategories[mobileSubmenu]?.description ??
+                    "Browse documents in this category"}
+                </p>
 
-  {/* ── Show loading spinner while books are fetching ── */}
-  {allBooks.length === 0 ? (
-    <div style={{ textAlign: "center", padding: "40px 0" }}>
-      <span style={{
-        width: "24px", height: "24px",
-        border: `2px solid rgba(184,150,62,0.3)`, borderTopColor: GOLD,
-        borderRadius: "50%", display: "inline-block",
-        animation: "spin 0.7s linear infinite",
-      }} />
-      <p style={{ fontSize: "13px", color: "#aaa", marginTop: "12px", fontFamily: "'Lato', sans-serif" }}>
-        Loading documents…
-      </p>
-    </div>
+                {/* ── Show loading spinner while books are fetching ── */}
+                {allBooks.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "40px 0" }}>
+                    <span
+                      style={{
+                        width: "24px",
+                        height: "24px",
+                        border: `2px solid rgba(184,150,62,0.3)`,
+                        borderTopColor: GOLD,
+                        borderRadius: "50%",
+                        display: "inline-block",
+                        animation: "spin 0.7s linear infinite",
+                      }}
+                    />
+                    <p
+                      style={{
+                        fontSize: "13px",
+                        color: "#aaa",
+                        marginTop: "12px",
+                        fontFamily: "'Lato', sans-serif",
+                      }}
+                    >
+                      Loading documents…
+                    </p>
+                  </div>
+                ) : menuCategories[mobileSubmenu]?.books?.length > 0 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px",
+                    }}
+                  >
+                    {menuCategories[mobileSubmenu].books.map((book) => (
+                      <Link
+                        key={book.id}
+                        href={`/book/preview?id=${book.id}`}
+                        className="lan-mobile-book-card"
+                        onClick={() => setShowMobileMenu(false)}
+                      >
+                        <h5
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            color: NAVY,
+                            margin: "0 0 4px",
+                          }}
+                        >
+                          {book.title}
+                        </h5>
+                        <p
+                          style={{ fontSize: "12px", color: "#888", margin: 0 }}
+                        >
+                          by {book.author}
+                        </p>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", padding: "32px 0" }}>
+                    <BookOpen
+                      size={32}
+                      style={{ color: "#ddd", margin: "0 auto 10px" }}
+                    />
+                    <p
+                      style={{
+                        fontSize: "13px",
+                        color: "#aaa",
+                        fontFamily: "'Lato', sans-serif",
+                      }}
+                    >
+                      No documents yet in this category.
+                    </p>
+                    <Link
+                      href="/upload-document"
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: GOLD,
+                        textDecoration: "none",
+                      }}
+                    >
+                      Be the first to upload →
+                    </Link>
+                  </div>
+                )}
 
-  ) : menuCategories[mobileSubmenu]?.books?.length > 0 ? (
-    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-      {menuCategories[mobileSubmenu].books.map((book) => (
-        <Link
-          key={book.id}
-          href={`/book/preview?id=${book.id}`}
-          className="lan-mobile-book-card"
-          onClick={() => setShowMobileMenu(false)}
-        >
-          <h5 style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>
-            {book.title}
-          </h5>
-          <p style={{ fontSize: "12px", color: "#888", margin: 0 }}>
-            by {book.author}
-          </p>
-        </Link>
-      ))}
-    </div>
-
-  ) : (
-    <div style={{ textAlign: "center", padding: "32px 0" }}>
-      <BookOpen size={32} style={{ color: "#ddd", margin: "0 auto 10px" }} />
-      <p style={{ fontSize: "13px", color: "#aaa", fontFamily: "'Lato', sans-serif" }}>
-        No documents yet in this category.
-      </p>
-      <Link href="/upload-document" style={{ fontSize: "13px", fontWeight: 700, color: GOLD, textDecoration: "none" }}>
-        Be the first to upload →
-      </Link>
-    </div>
-  )}
-
-  {menuCategories[mobileSubmenu]?.books?.length > 0 && (
-    <Link
-      href={NAV_CATS.find(c => c.key === mobileSubmenu)?.href || `/category/${mobileSubmenu}`}
-      onClick={() => setShowMobileMenu(false)}
-      style={{
-        display: "block", textAlign: "center", padding: "14px",
-        marginTop: "20px", fontWeight: 700, color: GOLD,
-        textDecoration: "none", fontFamily: "'Lato', sans-serif",
-        fontSize: "13px", borderTop: `1px solid #ede8df`,
-      }}
-    >
-      View all {menuCategories[mobileSubmenu]?.title 
-        ?? NAV_CATS.find(c => c.key === mobileSubmenu)?.label} →
-    </Link>
-  )}
-</div>
+                {menuCategories[mobileSubmenu]?.books?.length > 0 && (
+                  <Link
+                    href={
+                      NAV_CATS.find((c) => c.key === mobileSubmenu)?.href ||
+                      `/category/${mobileSubmenu}`
+                    }
+                    onClick={() => setShowMobileMenu(false)}
+                    style={{
+                      display: "block",
+                      textAlign: "center",
+                      padding: "14px",
+                      marginTop: "20px",
+                      fontWeight: 700,
+                      color: GOLD,
+                      textDecoration: "none",
+                      fontFamily: "'Lato', sans-serif",
+                      fontSize: "13px",
+                      borderTop: `1px solid #ede8df`,
+                    }}
+                  >
+                    View all{" "}
+                    {menuCategories[mobileSubmenu]?.title ??
+                      NAV_CATS.find((c) => c.key === mobileSubmenu)?.label}{" "}
+                    →
+                  </Link>
+                )}
+              </div>
             )}
           </div>
         </div>

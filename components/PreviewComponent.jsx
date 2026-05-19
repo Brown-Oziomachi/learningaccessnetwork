@@ -49,7 +49,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { fetchBookDetails } from "@/utils/bookUtils";
-import BookAIChat from "./BookAIChat";
 import AiAskButton from "./AiAskButton";
 import FeaturedAdsCarousel from "./FeaturedAdsCarousel";
 import StudyBuddyTracker from "./StudyBuddyTracker";
@@ -71,6 +70,14 @@ const isOpenAccess = (book) =>
   book?.isFree === true ||
   book?.accessType === "free" ||
   Number(book?.price) === 0;
+
+/* ── NEW: Detect if a book is seller-uploaded (has a real sellerName/userId) ── */
+const isSellerBook = (book) =>
+  book?.isFromFirestore === true ||
+  (book?.userId && book.userId !== "") ||
+  (book?.sellerName &&
+    book.sellerName !== "" &&
+    book.sellerName !== "LAN Library");
 
 export default function BookPreviewPage() {
   const router = useRouter();
@@ -118,6 +125,10 @@ export default function BookPreviewPage() {
   /* ── NEW: Open Access modal ── */
   const [showOAModal, setShowOAModal] = useState(false);
 
+  /* ── NEW: Dynamic PDF page count (open-access non-seller books only) ── */
+  const [pdfPageCount, setPdfPageCount] = useState(null);
+  const [calculatingPages, setCalculatingPages] = useState(false);
+
   const getThumbnailUrl = (book) => {
     const direct = book.coverImage || book.image;
     if (
@@ -145,6 +156,78 @@ export default function BookPreviewPage() {
       return `https://lh3.googleusercontent.com/d/${fileId}=w400`;
     }
     return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+  };
+
+  /* ── NEW: PDF.js page count effect — only for open-access, non-seller books ── */
+  useEffect(() => {
+    if (!book) return;
+
+    const free = isOpenAccess(book);
+    const sellerUploaded = isSellerBook(book);
+
+    // Only run for open-access books that are NOT seller-uploaded
+    if (!free || sellerUploaded) return;
+
+    const pdfSrc = book.pdfUrl || book.embedUrl;
+    if (!pdfSrc) return;
+
+    // Load PDF.js if not already loaded
+    const loadPdfJs = () => {
+      return new Promise((resolve, reject) => {
+        if (window.pdfjsLib) {
+          resolve(window.pdfjsLib);
+          return;
+        }
+        const script = document.createElement("script");
+        script.src =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+        script.onload = () => {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+          resolve(window.pdfjsLib);
+        };
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    };
+
+    const fetchPageCount = async () => {
+      try {
+        setCalculatingPages(true);
+        const pdfjsLib = await loadPdfJs();
+        const loadingTask = pdfjsLib.getDocument(pdfSrc);
+        const pdf = await loadingTask.promise;
+        setPdfPageCount(pdf.numPages);
+      } catch (err) {
+        console.warn("PDF.js page count failed:", err);
+        // Fall back gracefully — leave pdfPageCount as null, show book.pages
+      } finally {
+        setCalculatingPages(false);
+      }
+    };
+
+    fetchPageCount();
+  }, [book]);
+
+  /* ── Helper: get the effective page count to display ── */
+  const getDisplayPages = () => {
+    if (!book) return null;
+    const free = isOpenAccess(book);
+    const sellerUploaded = isSellerBook(book);
+    // For open-access non-seller books, prefer the live-computed count
+    if (free && !sellerUploaded) {
+      if (calculatingPages) return null; // signals "calculating"
+      if (pdfPageCount !== null) return pdfPageCount;
+    }
+    return book.pages ?? null;
+  };
+
+  /* ── Helper: get uploader display name ── */
+  const getUploaderName = () => {
+    if (!book) return "LAN Library";
+    const name = book.sellerName || book.uploadedBy || book.uploaderName;
+    if (!name || name.trim() === "") return "LAN Library";
+    return name;
   };
 
   const categories = [
@@ -203,7 +286,7 @@ export default function BookPreviewPage() {
   useEffect(() => {
     if (book) {
       setPreviewContent(
-        [book.description, book.introduction, book.message]
+        [book.description, book.introduction, book.tableOfContents]
           .filter(Boolean)
           .join("\n\n")
           .slice(0, 1500),
@@ -318,9 +401,6 @@ export default function BookPreviewPage() {
               "dr.",
               "prof.",
               "professor",
-              "mrs",
-              "mr",
-              "ms.",
               "engr.",
               "pharm.",
               "barr.",
@@ -527,7 +607,7 @@ export default function BookPreviewPage() {
           setPreviewContent(
             bookData.previewText ||
               bookData.introduction ||
-              bookData.message ||
+              bookData.tableOfContents ||
               bookData.description,
           );
         }
@@ -574,6 +654,7 @@ export default function BookPreviewPage() {
               previewUrl: data.previewUrl,
               embedUrl: data.embedUrl,
               isFromFirestore: true,
+              tableOfContents: data.tableOfContents || data.tableOfContent || null,
             };
             b.image = getThumbnailUrl(b);
             fb.push(b);
@@ -726,6 +807,40 @@ export default function BookPreviewPage() {
       : n >= 1000
         ? `${(n / 1000).toFixed(1)}K`
         : n.toString();
+
+  /* ── NEW: Page count display component ── */
+  const PageCountDisplay = ({ style = {}, fontSize = "10px" }) => {
+    const displayPages = getDisplayPages();
+    const free = book && isOpenAccess(book);
+    const sellerUploaded = book && isSellerBook(book);
+    const showCalculating = free && !sellerUploaded && calculatingPages;
+
+    if (showCalculating) {
+      return (
+        <span
+          className="calculating-pages"
+          style={{
+            fontSize,
+            fontFamily: "'Lato',sans-serif",
+            color: GOLD,
+            fontWeight: 700,
+            letterSpacing: "0.04em",
+            ...style,
+          }}
+        >
+          Calculating…
+        </span>
+      );
+    }
+
+    if (displayPages == null) return null;
+
+    return (
+      <span style={{ fontSize, fontFamily: "'Lato',sans-serif", ...style }}>
+        {displayPages}p
+      </span>
+    );
+  };
 
   /* ── Physical Stock Badge ── */
   const PhysicalStockBadge = () => {
@@ -1222,7 +1337,7 @@ export default function BookPreviewPage() {
                       fontFamily: "'Lato',sans-serif",
                     }}
                   >
-                    Save a copy to your device
+                    Save a copy to your library
                   </p>
                 </div>
                 <button
@@ -1440,6 +1555,7 @@ export default function BookPreviewPage() {
     );
 
   const free = isOpenAccess(book);
+  const sellerUploaded = isSellerBook(book);
   const suggestedBooks = (allBooks.length > 0 ? allBooks : booksData)
     .filter((b) => b.id !== bookId)
     .slice(0, 12);
@@ -1450,6 +1566,9 @@ export default function BookPreviewPage() {
     bookSalesCount[`firestore-${cleanId}`] ||
     bookSalesCount[cleanId] ||
     0;
+
+  const displayPages = getDisplayPages();
+  const uploaderName = getUploaderName();
 
   return (
     <>
@@ -1480,6 +1599,36 @@ export default function BookPreviewPage() {
         body { overflow-x:hidden; }
         @keyframes oa-shimmer { 0% { background-position:-200% center; } 100% { background-position:200% center; } }
         .oa-header-badge { background:linear-gradient(90deg,#16a34a 0%,#22c55e 40%,#16a34a 80%); background-size:200% auto; animation:oa-shimmer 2.4s linear infinite; color:#fff; font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:6px 14px; font-family:'Lato',sans-serif; display:inline-flex; align-items:center; gap:5px; }
+
+        /* ── NEW: Calculating pages shimmer animation ── */
+        @keyframes calc-shimmer {
+          0%   { opacity: 1; }
+          50%  { opacity: 0.35; }
+          100% { opacity: 1; }
+        }
+        .calculating-pages {
+          animation: calc-shimmer 1.4s ease-in-out infinite;
+          background: linear-gradient(90deg, ${GOLD} 0%, #e8c46a 50%, ${GOLD} 100%);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+
+        /* ── FIX: Mobile header overflow ── */
+        .lan-header-actions {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-shrink: 0;
+          min-width: 0;
+          overflow: hidden;
+        }
+        /* On very small screens, collapse the OA badge into the button */
+        @media (max-width: 480px) {
+          .oa-header-badge { display: none !important; }
+          .lan-header-cta { font-size: 10px !important; padding: 7px 10px !important; }
+        }
       `}</style>
 
       {/* ── Open Access Download Modal ── */}
@@ -1508,19 +1657,32 @@ export default function BookPreviewPage() {
             style={{
               maxWidth: "1400px",
               margin: "0 auto",
-              padding: "0 16px",
+              /* FIX: prevent overflow on mobile */
+              padding: "0 12px",
               height: "56px",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
+              gap: "8px",
+              overflow: "hidden",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {/* Left: hamburger + wordmark */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                flexShrink: 0,
+                minWidth: 0,
+              }}
+            >
               <button
                 onClick={() => setShowNavMenu(!showNavMenu)}
                 style={{
                   width: "34px",
                   height: "34px",
+                  flexShrink: 0,
                   border: "0.5px solid rgba(255,255,255,0.2)",
                   background: "transparent",
                   cursor: "pointer",
@@ -1532,70 +1694,82 @@ export default function BookPreviewPage() {
               >
                 {showNavMenu ? <X size={18} /> : <Menu size={18} />}
               </button>
-              <Link href="/home" style={{ textDecoration: "none" }}>
+              <Link
+                href="/home"
+                style={{ textDecoration: "none", minWidth: 0 }}
+              >
                 <p
                   style={{
                     fontFamily: "'Playfair Display',serif",
-                    fontSize: "18px",
+                    fontSize: "16px",
                     fontWeight: 900,
                     color: "#fff",
                     margin: 0,
                     letterSpacing: "-0.5px",
+                    whiteSpace: "nowrap",
                   }}
                 >
                   [LAN Library]
                 </p>
                 <p
                   style={{
-                    fontSize: "9px",
+                    fontSize: "8px",
                     color: GOLD,
                     fontFamily: "'Lato',sans-serif",
                     fontWeight: 700,
-                    letterSpacing: "0.1em",
+                    letterSpacing: "0.08em",
                     margin: 0,
                     textTransform: "uppercase",
+                    whiteSpace: "nowrap",
                   }}
                 >
                   The Global Student Library
                 </p>
               </Link>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              {/* CTA changes based on free vs paid */}
+
+            {/* Right: CTAs — FIXED to not overflow */}
+            <div className="lan-header-actions">
               {free ? (
                 <button
+                  className="lan-header-cta"
                   onClick={handleFreeAccess}
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "6px",
+                    gap: "5px",
                     background: "rgba(22,163,74,0.15)",
                     color: "#86efac",
-                    padding: "8px 16px",
+                    padding: "7px 12px",
                     border: "0.5px solid rgba(22,163,74,0.4)",
                     fontSize: "11px",
                     fontWeight: 700,
                     cursor: "pointer",
                     fontFamily: "'Lato',sans-serif",
-                    letterSpacing: "0.06em",
+                    letterSpacing: "0.05em",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
                   }}
                 >
-                  <Unlock size={13} />
+                  <Unlock size={12} />
                   ACCESS FREE
                 </button>
               ) : !isPurchased ? (
                 <button
+                  className="lan-header-cta"
                   onClick={handlePurchase}
                   style={{
                     background: GOLD,
                     color: NAVY,
-                    padding: "8px 18px",
+                    padding: "7px 14px",
                     border: "none",
                     fontSize: "11px",
                     fontWeight: 700,
                     cursor: "pointer",
                     fontFamily: "'Lato',sans-serif",
-                    letterSpacing: "0.06em",
+                    letterSpacing: "0.05em",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
                   }}
                 >
                   PURCHASE ₦{book.price?.toLocaleString()}
@@ -1605,10 +1779,11 @@ export default function BookPreviewPage() {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "6px",
+                    gap: "5px",
                     background: "rgba(22,163,74,0.15)",
                     border: "0.5px solid rgba(22,163,74,0.3)",
-                    padding: "6px 12px",
+                    padding: "5px 10px",
+                    flexShrink: 0,
                   }}
                 >
                   <div
@@ -1633,7 +1808,7 @@ export default function BookPreviewPage() {
                 </div>
               )}
 
-              {/* Free badge in header */}
+              {/* OA badge — hidden on <480px via CSS above */}
               {free && (
                 <span className="oa-header-badge">
                   <Unlock size={11} />
@@ -1646,6 +1821,7 @@ export default function BookPreviewPage() {
                 style={{
                   width: "34px",
                   height: "34px",
+                  flexShrink: 0,
                   border: "0.5px solid rgba(255,255,255,0.2)",
                   background: "transparent",
                   cursor: "pointer",
@@ -1774,9 +1950,12 @@ export default function BookPreviewPage() {
                       handleMyAccountClick();
                     },
                   },
+                  { label: "Ask AI", href: "/ai-chat" },
                   { label: "My Books", href: "/my-books" },
-                  { label: "All Documents", href: "/documents" },
+                  { label: "Saved Books", href: "/saved-my-book" },
                   { label: "Help & Support", href: "/lan/net/help-center" },
+                  { label: "All Documents", href: "/documents" },
+
                 ].map(({ label, href, onClick }) =>
                   href ? (
                     <Link
@@ -2095,6 +2274,7 @@ export default function BookPreviewPage() {
                         {book.author}
                       </span>
                     </p>
+                    {/* ── UPDATED: uploader with fallback ── */}
                     <p
                       style={{
                         fontSize: "11px",
@@ -2104,7 +2284,7 @@ export default function BookPreviewPage() {
                       }}
                     >
                       Uploaded by{" "}
-                      <span style={{ color: "#666" }}>{book.sellerName}</span>
+                      <span style={{ color: "#666" }}>{uploaderName}</span>
                     </p>
                     <p
                       style={{
@@ -2206,7 +2386,7 @@ export default function BookPreviewPage() {
                   ))}
                 </div>
 
-                {/* Stats pills */}
+                {/* Stats pills — UPDATED with dynamic page count */}
                 <div
                   style={{
                     display: "grid",
@@ -2254,7 +2434,7 @@ export default function BookPreviewPage() {
                   </button>
                   <div className="stat-pill">
                     <FileText size={13} style={{ color: GOLD }} />
-                    <span>{book.pages} Pages</span>
+                    <PageCountDisplay fontSize="11px" />
                   </div>
                 </div>
 
@@ -2779,14 +2959,22 @@ export default function BookPreviewPage() {
                         <Eye size={10} />
                         {formatViews(viewCount)}
                       </span>
+                      {/* ── UPDATED: dynamic page count ── */}
                       <span
                         style={{
                           fontSize: "10px",
                           color: "#aaa",
                           fontFamily: "'Lato',sans-serif",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "3px",
                         }}
                       >
-                        • {book.pages}p
+                        •{" "}
+                        <PageCountDisplay
+                          fontSize="10px"
+                          style={{ color: "#aaa" }}
+                        />
                       </span>
                       {free && (
                         <span
@@ -2829,6 +3017,20 @@ export default function BookPreviewPage() {
                       }}
                     >
                       by {book.author}
+                    </p>
+                    {/* ── UPDATED: uploader with fallback ── */}
+                    <p
+                      style={{
+                        fontSize: "11px",
+                        color: "#aaa",
+                        margin: "0 0 4px",
+                        fontFamily: "'Lato',sans-serif",
+                      }}
+                    >
+                      Uploaded by{" "}
+                      <span style={{ color: "#555", fontWeight: 700 }}>
+                        {uploaderName}
+                      </span>
                     </p>
                     <p
                       style={{
@@ -2927,7 +3129,7 @@ export default function BookPreviewPage() {
                     </button>
                   ))}
                 </div>
-                {/* Mobile stats */}
+                {/* Mobile stats — UPDATED with dynamic page count */}
                 <div
                   style={{
                     borderTop: "0.5px solid #e5ddd0",
@@ -2938,29 +3140,31 @@ export default function BookPreviewPage() {
                   }}
                 >
                   {[
-                    [
-                      <Layers size={13} style={{ color: GOLD }} />,
-                      free ? "FREE" : `₦${book.price?.toLocaleString()}`,
-                      free,
-                    ],
-                    [
-                      <ShoppingBag size={13} style={{ color: GOLD }} />,
-                      `${sold} ${free ? "dl" : "sold"}`,
-                      false,
-                    ],
-                    [
-                      <ThumbsUp size={13} style={{ color: GOLD }} />,
-                      positiveRatingPercent !== null
-                        ? `${positiveRatingPercent}%`
-                        : "0%",
-                      false,
-                    ],
-                    [
-                      <FileText size={13} style={{ color: GOLD }} />,
-                      `${book.pages}p`,
-                      false,
-                    ],
-                  ].map(([icon, val, highlight], i) => (
+                    {
+                      icon: <Layers size={13} style={{ color: GOLD }} />,
+                      val: free ? "FREE" : `₦${book.price?.toLocaleString()}`,
+                      highlight: free,
+                    },
+                    {
+                      icon: <ShoppingBag size={13} style={{ color: GOLD }} />,
+                      val: `${sold} ${free ? "dl" : "sold"}`,
+                      highlight: false,
+                    },
+                    {
+                      icon: <ThumbsUp size={13} style={{ color: GOLD }} />,
+                      val:
+                        positiveRatingPercent !== null
+                          ? `${positiveRatingPercent}%`
+                          : "0%",
+                      highlight: false,
+                    },
+                    {
+                      icon: <FileText size={13} style={{ color: GOLD }} />,
+                      val: null, // rendered via PageCountDisplay
+                      highlight: false,
+                      isPageCount: true,
+                    },
+                  ].map(({ icon, val, highlight, isPageCount }, i) => (
                     <div
                       key={i}
                       style={{
@@ -2973,17 +3177,24 @@ export default function BookPreviewPage() {
                       }}
                     >
                       {icon}
-                      <span
-                        style={{
-                          fontSize: "9px",
-                          fontWeight: 700,
-                          color: highlight ? "#86efac" : "#fff",
-                          fontFamily: "'Lato',sans-serif",
-                          textAlign: "center",
-                        }}
-                      >
-                        {val}
-                      </span>
+                      {isPageCount ? (
+                        <PageCountDisplay
+                          fontSize="9px"
+                          style={{ color: "#fff", textAlign: "center" }}
+                        />
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            fontWeight: 700,
+                            color: highlight ? "#86efac" : "#fff",
+                            fontFamily: "'Lato',sans-serif",
+                            textAlign: "center",
+                          }}
+                        >
+                          {val}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -3178,11 +3389,6 @@ export default function BookPreviewPage() {
                   autoPlayMs={4000}
                   style={{ marginTop: "1px" }}
                 />
-
-                {/* ── Google AdSense — visible to crawlers on page load ── */}
-                <div style={{ padding: "0 16px 16px" }}>
-                  <GoogleAdComponent />
-                </div>
               </div>
 
               {/* Mobile lecturers */}
@@ -3747,12 +3953,14 @@ export default function BookPreviewPage() {
                   ["Title", book.title, true],
                   ["Author", book.author, false],
                   ["Category", book.category || "General", false],
+                  ["Uploaded by", uploaderName, false],
                   [
                     "Format",
-                    `${book.format || "PDF"} • ${book.pages || "N/A"} pages`,
+                    `${book.format || "PDF"} • `,
                     false,
+                    true, // isPageField
                   ],
-                ].map(([k, v, isSerif]) => (
+                ].map(([k, v, isSerif, isPageField]) => (
                   <div
                     key={k}
                     style={{
@@ -3774,19 +3982,40 @@ export default function BookPreviewPage() {
                     >
                       {k}
                     </p>
-                    <p
-                      style={{
-                        fontFamily: isSerif
-                          ? "'Playfair Display',serif"
-                          : "'Lato',sans-serif",
-                        fontSize: isSerif ? "16px" : "13px",
-                        fontWeight: isSerif ? 700 : 400,
-                        color: NAVY,
-                        margin: 0,
-                      }}
-                    >
-                      {v}
-                    </p>
+                    {isPageField ? (
+                      <p
+                        style={{
+                          fontFamily: "'Lato',sans-serif",
+                          fontSize: "13px",
+                          color: NAVY,
+                          margin: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        {v}
+                        <PageCountDisplay
+                          fontSize="13px"
+                          style={{ color: NAVY }}
+                        />
+                        {calculatingPages ? null : " pages"}
+                      </p>
+                    ) : (
+                      <p
+                        style={{
+                          fontFamily: isSerif
+                            ? "'Playfair Display',serif"
+                            : "'Lato',sans-serif",
+                          fontSize: isSerif ? "16px" : "13px",
+                          fontWeight: isSerif ? 700 : 400,
+                          color: NAVY,
+                          margin: 0,
+                        }}
+                      >
+                        {v}
+                      </p>
+                    )}
                   </div>
                 ))}
                 <div style={{ marginBottom: "14px" }}>
@@ -3915,16 +4144,16 @@ export default function BookPreviewPage() {
                   By {book.author}
                 </p>
                 <p
-                  style={{
-                    fontSize: "13px",
-                    color: "#555",
-                    lineHeight: 1.75,
-                    fontFamily: "'Lato',sans-serif",
-                    margin: 0,
-                    whiteSpace: "pre-line",
-                  }}
+                    style={{
+                        fontSize: "13px",
+                        color: "#555",
+                        lineHeight: 1.75,
+                        fontFamily: "'Lato',sans-serif",
+                        margin: 0,
+                        whiteSpace: "pre-line",
+                    }}
                 >
-                  {book.message}
+                    {book.tableOfContents || book.tableOfContent || book.summary || book.introduction  || "No summary available for this document."}
                 </p>
               </div>
             </div>

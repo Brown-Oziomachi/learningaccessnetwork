@@ -45,33 +45,33 @@ export const fetchBookDetails = async (bookId) => {
                         pdfUrl: pdfUrl
                     });
 
-                    return {
-                        id: `firestore-${cleanId}`,
-                        firestoreId: cleanId,
-                        title: bookData.bookTitle || bookData.title,
-                        author: bookData.author,
-                        category: bookData.category,
-                        price: bookData.price,
-                        pages: bookData.pages,
-                        format: bookData.format || 'PDF',
-                        description: bookData.description,
-                        message: bookData.message,
-                        introduction: bookData.introduction,
-                        previewText: bookData.previewText,
-                        image: bookData.image || bookData.coverImage,
-                        source: 'firestore',
-
-                        // PDF FIELDS
-                        embedUrl: embedUrl,
-                        pdfUrl: pdfUrl,
-                        driveFileId: bookData.driveFileId,
-                        previewUrl: bookData.previewUrl,
-
-                        // Seller info
-                        sellerId: bookData.userId || bookData.sellerId,
-                        sellerName: bookData.userName || bookData.sellerName,
-                        sellerEmail: bookData.userEmail || bookData.sellerEmail,
-                    };
+                   return {
+                    id: `firestore-${cleanId}`,
+                    firestoreId: cleanId,
+                    title: bookData.bookTitle || bookData.title,
+                    author: bookData.author,
+                    category: bookData.category,
+                    price: bookData.price,
+                    pages: bookData.pages,
+                    format: bookData.format || 'PDF',
+                    description: bookData.description,
+                    message: bookData.message,
+                    introduction: bookData.introduction,
+                    previewText: bookData.previewText,
+                    tableOfContents: bookData.tableOfContents || bookData.tableOfContent || null,
+                    isFree: bookData.isFree || false,
+                    accessType: bookData.accessType || 'paid',
+                    image: bookData.image || bookData.coverImage,
+                    coverImage: bookData.coverImage || null,
+                    source: 'firestore',
+                    embedUrl: embedUrl,
+                    pdfUrl: pdfUrl,
+                    driveFileId: bookData.driveFileId,
+                    previewUrl: bookData.previewUrl,
+                    sellerId: bookData.userId || bookData.sellerId,
+                    sellerName: bookData.userName || bookData.sellerName,
+                    sellerEmail: bookData.userEmail || bookData.sellerEmail,
+                };
                 } else {
                     console.log('Not found in Firestore with ID:', cleanId);
                 }

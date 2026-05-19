@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
+import Navbar from "@/components/NavBar";
 
 const NAVY = "#0d2244";
 const GOLD = "#b8963e";
@@ -223,9 +224,9 @@ export default function UniversityDirectoryClient({
             `}</style>
 
             {/* ── Hero ── */}
+<Navbar  />
             <div className="udir-hero">
                 <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, border: "0.5px solid rgba(184,150,62,0.1)", transform: "rotate(45deg)" }} />
-
                 <div style={{ maxWidth: 1100, margin: "0 auto", position: "relative", zIndex: 1 }}>
                     <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(184,150,62,0.14)", border: "1px solid rgba(184,150,62,0.3)", padding: "4px 14px", marginBottom: 16 }}>
                         <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLDD, fontFamily: "'Lato',sans-serif" }}>University Hubs</span>

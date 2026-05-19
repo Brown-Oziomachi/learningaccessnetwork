@@ -1,18 +1,40 @@
 "use client"
-// app/hooks/usePayment.js
 import { useState, useEffect } from 'react';
 import { db, auth } from '@/lib/firebaseConfig';
 import {
-    collection,
-    addDoc,
-    doc,
-    updateDoc,
-    serverTimestamp,
-    increment,
-    getDoc,
-    runTransaction
+    collection, addDoc, doc, updateDoc, serverTimestamp,
+    increment, getDoc, runTransaction
 } from 'firebase/firestore';
 import { qualifyReferral } from '@/lib/referralUtils';
+
+// 📊 Fallback African Exchange Matrix (NGN base)
+const FALLBACK_EXCHANGE_MATRIX = {
+    NGN: 1.0,
+    GHS: 0.010,
+    KES: 0.11,
+    UGX: 2.85
+};
+
+// 🌐 Fetch live rates from exchangerate-api (free tier, no key needed)
+const fetchLiveExchangeRates = async () => {
+    try {
+        const res = await fetch('https://open.er-api.com/v6/latest/NGN');
+        if (!res.ok) throw new Error('Rate fetch failed');
+        const data = await res.json();
+        if (data?.rates) {
+            return {
+                NGN: 1.0,
+                GHS: data.rates.GHS || FALLBACK_EXCHANGE_MATRIX.GHS,
+                KES: data.rates.KES || FALLBACK_EXCHANGE_MATRIX.KES,
+                UGX: data.rates.UGX || FALLBACK_EXCHANGE_MATRIX.UGX,
+            };
+        }
+        return FALLBACK_EXCHANGE_MATRIX;
+    } catch {
+        console.warn('[Exchange] Live rates unavailable, using fallback matrix');
+        return FALLBACK_EXCHANGE_MATRIX;
+    }
+};
 
 const calculatePaymentDistribution = (book) => {
     const isPlatformBook = book.source === 'platform' || book.isPlatformBook === true;
@@ -33,6 +55,45 @@ const calculatePaymentDistribution = (book) => {
     }
 };
 
+const triggerEmailNotifications = async (buyerEmail, buyerName, bookItem, sellerInfo, orderId) => {
+    const distribution = calculatePaymentDistribution(bookItem);
+    try {
+        fetch('/api/send-seller-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'order_receipt',
+                to: buyerEmail,
+                buyerName: buyerName || "Reader",
+                bookTitle: bookItem.title,
+                amount: bookItem.price,
+                sellerName: sellerInfo?.name || "LAN Library",
+                orderId: orderId
+            })
+        }).catch(err => console.error("[Mail System] Buyer receipt failed:", err));
+
+        if (sellerInfo?.email && !distribution.isPlatformBook) {
+            fetch('/api/send-seller-notification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'sale_alert',
+                    to: sellerInfo.email,
+                    userId: sellerInfo.id,
+                    sellerName: sellerInfo.name || "Seller",
+                    bookTitle: bookItem.title,
+                    amount: bookItem.price,
+                    netEarning: distribution.sellerAmount,
+                    buyerEmail: buyerEmail,
+                    currentBalance: (Number(sellerInfo.accountBalance) || 0) + distribution.sellerAmount
+                })
+            }).catch(err => console.error("[Mail System] Seller sale alert failed:", err));
+        }
+    } catch (e) {
+        console.error("[Mail System] Notification error:", e);
+    }
+};
+
 export const usePayment = (book, formData, sellerDetails) => {
     const [processing, setProcessing] = useState(false);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -40,9 +101,14 @@ export const usePayment = (book, formData, sellerDetails) => {
     const [flutterwaveLoaded, setFlutterwaveLoaded] = useState(false);
     const [newBalance, setNewBalance] = useState(null);
     const [showPin, setShowPin] = useState(false);
-    const [withdrawalStep, setWithdrawalStep] = useState('INIT'); // INIT, OTP_REQUIRED, PROCESSING
+    const [withdrawalStep, setWithdrawalStep] = useState('INIT');
     const [tempWithdrawalData, setTempWithdrawalData] = useState(null);
 
+    // 🌐 Live exchange rates state
+    const [exchangeMatrix, setExchangeMatrix] = useState(FALLBACK_EXCHANGE_MATRIX);
+    const [ratesLoaded, setRatesLoaded] = useState(false);
+
+    // Load Flutterwave script
     useEffect(() => {
         if (typeof window !== 'undefined' && !window.FlutterwaveCheckout) {
             const script = document.createElement('script');
@@ -55,110 +121,40 @@ export const usePayment = (book, formData, sellerDetails) => {
         }
     }, []);
 
+    // 🌐 Fetch live exchange rates on mount
+    useEffect(() => {
+        fetchLiveExchangeRates().then(rates => {
+            setExchangeMatrix(rates);
+            setRatesLoaded(true);
+            console.log('[Exchange] Rates loaded:', rates);
+        });
+    }, []);
 
-    const processWithdrawal = async (amount, pin, otp = null) => {
-        setProcessing(true);
-        setError(null);
-        const WITHDRAWAL_THRESHOLD = 5000;
-
-        try {
-            const currentUser = auth.currentUser;
-            if (!currentUser) throw new Error("Authentication required.");
-
-            // 1. VERIFY PIN (Every withdrawal needs a PIN)
-            const sellerRef = doc(db, 'sellers', currentUser.uid);
-            const sellerSnap = await getDoc(sellerRef);
-            const sellerData = sellerSnap.data();
-
-            if (pin.toString().trim() !== sellerData.transactionPin?.toString().trim()) {
-                throw new Error("Incorrect PIN.");
-            }
-
-            // 2. CHECK THRESHOLD FOR OTP
-            if (amount > WITHDRAWAL_THRESHOLD && !otp) {
-                // This is the first attempt and it's a large amount
-                const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-
-                // Store OTP in Firebase temporarily to verify later
-                await updateDoc(sellerRef, {
-                    withdrawalOtp: generatedOtp,
-                    otpExpiry: Date.now() + 600000 // 10 mins
-                });
-
-                console.log(`[SECURITY] Withdrawal OTP sent: ${generatedOtp}`); // Replace with actual Email service
-
-                setTempWithdrawalData({ amount, pin });
-                setWithdrawalStep('OTP_REQUIRED');
-                return { status: "OTP_SENT" };
-            }
-
-            // 3. VERIFY OTP (If it was required)
-            if (otp) {
-                if (otp !== sellerData.withdrawalOtp || Date.now() > sellerData.otpExpiry) {
-                    throw new Error("Invalid or expired OTP.");
-                }
-            }
-
-            // 4. EXECUTE WITHDRAWAL (Using a Transaction for safety)
-            await runTransaction(db, async (transaction) => {
-                const freshSnap = await transaction.get(sellerRef);
-                const balance = freshSnap.data().accountBalance || 0;
-
-                if (balance < amount) throw new Error("Insufficient funds.");
-
-                // Deduct from balance
-                transaction.update(sellerRef, {
-                    accountBalance: increment(-amount),
-                    withdrawalOtp: null, // Clear OTP after use
-                    otpExpiry: null
-                });
-
-                // Log the withdrawal
-                const withdrawalLogRef = doc(collection(db, 'withdrawals'));
-                transaction.set(withdrawalLogRef, {
-                    userId: currentUser.uid,
-                    amount: amount,
-                    status: 'completed',
-                    type: 'withdrawal',
-                    createdAt: serverTimestamp()
-                });
-            });
-
-            setPaymentSuccess(true);
-            setWithdrawalStep('COMPLETED');
-
-        } catch (err) {
-            setError({ message: err.message });
-        } finally {
-            setProcessing(false);
-        }
-    };
-
-    // Change the function signature to accept extraData
-    const saveTransaction = async (paymentData, status = 'completed', extraData = {}) => {
+    const saveTransaction = async (paymentData, status = 'completed', extraData = {}, targetCurrency = 'NGN') => {
         try {
             const distribution = calculatePaymentDistribution(book);
             const currentUser = auth.currentUser;
             if (!currentUser) throw new Error('User not authenticated');
 
             const transactionData = {
-                transactionId: paymentData.transaction_id || paymentData.tx_ref,
-                transactionRef: paymentData.tx_ref,
+                transactionId: paymentData?.transaction_id || paymentData?.tx_ref || `WAL-${Date.now()}`,
+                transactionRef: paymentData?.tx_ref || `TXN-WAL-${Date.now()}`,
                 status,
                 amount: book.price,
-                currency: 'NGN',
-                paymentMethod: paymentData.payment_type || 'external',
+                currency: targetCurrency,
+                paymentMethod: paymentData?.payment_type || 'lan_wallet',
                 bookId: book.id,
                 bookTitle: book.title,
                 buyerId: currentUser.uid,
                 buyerEmail: formData.email,
-                buyerName: formData.name || null,        // ← ADD
-                buyerPhone: formData.phone || null,       // ← ADD
-                studentRegNo: extraData.studentRegNo || null,  // ← ADD
-                department: extraData.department || null,    // ← ADD
-                sellerId: sellerDetails?.id || null,
+                buyerName: formData.name || null,
+                buyerPhone: formData.phone || null,
+                studentRegNo: extraData.studentRegNo || null,
+                department: extraData.department || null,
+                sellerId: distribution.isPlatformBook ? 'platform' : (sellerDetails?.id || null),
                 platformFee: distribution.platformFee,
                 sellerAmount: distribution.sellerAmount,
+                exchangeRateUsed: exchangeMatrix[targetCurrency] || 1.0, // 📊 Log rate used
                 createdAt: serverTimestamp(),
             };
 
@@ -179,7 +175,7 @@ export const usePayment = (book, formData, sellerDetails) => {
                 await updateDoc(sellersRef, {
                     accountBalance: increment(distribution.sellerAmount),
                     totalEarnings: increment(distribution.sellerAmount),
-                    booksSold: increment(1),   // ← ADD this, was missing
+                    booksSold: increment(1),
                     updatedAt: serverTimestamp()
                 });
             }
@@ -191,8 +187,7 @@ export const usePayment = (book, formData, sellerDetails) => {
         }
     };
 
-    // processFlutterwavePayment — accept studentRegNo
-    const processFlutterwavePayment = (extraData = {}) => {
+    const processFlutterwavePayment = (extraData = {}, targetCurrency = 'NGN') => {
         if (!book || !formData.email) {
             setError({ message: "Please fill in your email before paying." });
             return;
@@ -202,14 +197,23 @@ export const usePayment = (book, formData, sellerDetails) => {
             return;
         }
 
+        // 🎯 Use live rate from exchangeMatrix
+        let regionalChargedAmount;
+        if (targetCurrency === 'NGN') {
+            regionalChargedAmount = Math.round(book.price);
+        } else {
+            const currencyScalar = exchangeMatrix[targetCurrency] || FALLBACK_EXCHANGE_MATRIX[targetCurrency] || 1.0;
+            regionalChargedAmount = Math.round(book.price * currencyScalar * 100) / 100;
+        }
+
         const txRef = `TXN-FLW-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
         window.FlutterwaveCheckout({
             public_key: process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY,
             tx_ref: txRef,
-            amount: book.price,
-            currency: "NGN",
-            payment_options: "card,ussd,banktransfer",
+            amount: regionalChargedAmount,
+            currency: targetCurrency,
+            payment_options: "card,ussd,banktransfer,mobilemoney,mpesa",
             customer: {
                 email: formData.email,
                 phone_number: formData.phone || "",
@@ -224,7 +228,8 @@ export const usePayment = (book, formData, sellerDetails) => {
                 if (response.status === "successful" || response.status === "completed") {
                     try {
                         setProcessing(true);
-                        await saveTransaction(response, 'completed', extraData); // ← pass extraData
+                        const orderId = await saveTransaction(response, 'completed', extraData, targetCurrency);
+                        await triggerEmailNotifications(formData.email, formData.name || formData.email, book, sellerDetails, orderId);
                         setPaymentSuccess(true);
                     } catch (err) {
                         setError({ message: "Payment recorded but failed to save. Contact support." });
@@ -239,7 +244,6 @@ export const usePayment = (book, formData, sellerDetails) => {
         });
     };
 
-    // processWalletPayment — accept studentRegNo
     const processWalletPayment = async (enteredPin, extraData = {}) => {
         setProcessing(true);
         setError(null);
@@ -252,7 +256,6 @@ export const usePayment = (book, formData, sellerDetails) => {
 
             const sellerRef = doc(db, 'sellers', currentUser.uid);
             await new Promise(resolve => setTimeout(resolve, 1500));
-
             let updatedBalance = null;
 
             await runTransaction(db, async (transaction) => {
@@ -262,40 +265,87 @@ export const usePayment = (book, formData, sellerDetails) => {
                 const sellerData = sellerSnap.data();
                 const storedValue = sellerData.transactionPin || sellerData.transferPin;
 
-                if (storedValue === undefined || storedValue === null) {
-                    throw new Error("PIN_NOT_SET");
-                }
-                if (enteredPin.toString().trim() !== storedValue.toString().trim()) {
-                    throw new Error("Incorrect PIN. Please try again.");
-                }
+                if (storedValue === undefined || storedValue === null) throw new Error("PIN_NOT_SET");
+                if (enteredPin.toString().trim() !== storedValue.toString().trim()) throw new Error("Incorrect PIN. Please try again.");
 
                 const currentBalance = sellerData.accountBalance || 0;
-                if (currentBalance < book.price) {
-                    throw new Error(`Insufficient funds. Balance: ₦${currentBalance.toLocaleString()}`);
-                }
+                if (currentBalance < book.price) throw new Error(`Insufficient funds. Balance: ₦${currentBalance.toLocaleString()}`);
 
                 updatedBalance = currentBalance - book.price;
-                transaction.update(sellerRef, {
-                    accountBalance: updatedBalance,
-                    updatedAt: serverTimestamp()
-                });
+                transaction.update(sellerRef, { accountBalance: updatedBalance, updatedAt: serverTimestamp() });
             });
 
-            const walletResponse = {
-                transaction_id: `WAL-${Date.now()}`,
-                tx_ref: `TXN-WAL-${Date.now()}`,
-                payment_type: 'lan_wallet',
-            };
-            await saveTransaction(walletResponse, 'completed', extraData); // ← pass extraData
+            const orderId = await saveTransaction(null, 'completed', extraData, 'NGN');
+            await triggerEmailNotifications(formData.email, formData.name, book, sellerDetails, orderId);
             setNewBalance(updatedBalance);
             setPaymentSuccess(true);
-
         } catch (err) {
             setError({
                 message: err.message === "PIN_NOT_SET"
                     ? "You haven't set a PIN yet. Please set pin to continue."
                     : err.message
             });
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const processWithdrawal = async (amount, pin, otp = null) => {
+        setProcessing(true);
+        setError(null);
+        const WITHDRAWAL_THRESHOLD = 5000;
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) throw new Error("Authentication required.");
+
+            const sellerRef = doc(db, 'sellers', currentUser.uid);
+            const sellerSnap = await getDoc(sellerRef);
+            const sellerData = sellerSnap.data();
+
+            if (pin.toString().trim() !== sellerData.transactionPin?.toString().trim()) {
+                throw new Error("Incorrect PIN.");
+            }
+
+            if (amount > WITHDRAWAL_THRESHOLD && !otp) {
+                const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                await updateDoc(sellerRef, {
+                    withdrawalOtp: generatedOtp,
+                    otpExpiry: Date.now() + 600000
+                });
+                setTempWithdrawalData({ amount, pin });
+                setWithdrawalStep('OTP_REQUIRED');
+                return { status: "OTP_SENT" };
+            }
+
+            if (otp) {
+                if (otp !== sellerData.withdrawalOtp || Date.now() > sellerData.otpExpiry) {
+                    throw new Error("Invalid or expired OTP.");
+                }
+            }
+
+            await runTransaction(db, async (transaction) => {
+                const freshSnap = await transaction.get(sellerRef);
+                const balance = freshSnap.data().accountBalance || 0;
+                if (balance < amount) throw new Error("Insufficient funds.");
+                transaction.update(sellerRef, {
+                    accountBalance: increment(-amount),
+                    withdrawalOtp: null,
+                    otpExpiry: null
+                });
+                const withdrawalLogRef = doc(collection(db, 'withdrawals'));
+                transaction.set(withdrawalLogRef, {
+                    userId: currentUser.uid,
+                    amount,
+                    status: 'completed',
+                    type: 'withdrawal',
+                    createdAt: serverTimestamp()
+                });
+            });
+
+            setPaymentSuccess(true);
+            setWithdrawalStep('COMPLETED');
+        } catch (err) {
+            setError({ message: err.message });
         } finally {
             setProcessing(false);
         }
@@ -327,13 +377,9 @@ export const usePayment = (book, formData, sellerDetails) => {
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         try {
             const sellerRef = doc(db, 'sellers', currentUser.uid);
-            await updateDoc(sellerRef, {
-                resetOtp: otp,
-                otpExpiry: Date.now() + 600000
-            });
-            console.log(`[SECURITY] OTP: ${otp}`);
+            await updateDoc(sellerRef, { resetOtp: otp, otpExpiry: Date.now() + 600000 });
             return { success: true };
-        } catch (err) {
+        } catch {
             return { success: false };
         }
     };
@@ -343,7 +389,6 @@ export const usePayment = (book, formData, sellerDetails) => {
         const sellerRef = doc(db, 'sellers', currentUser.uid);
         const sellerSnap = await getDoc(sellerRef);
         const data = sellerSnap.data();
-
         if (enteredOtp === data?.resetOtp && Date.now() < data?.otpExpiry) {
             await updateDoc(sellerRef, {
                 transactionPin: newPin.toString().trim(),
@@ -357,7 +402,6 @@ export const usePayment = (book, formData, sellerDetails) => {
         }
     };
 
-
     return {
         processing,
         paymentSuccess,
@@ -367,8 +411,11 @@ export const usePayment = (book, formData, sellerDetails) => {
         newBalance,
         showPin,
         setShowPin,
+        exchangeMatrix,      // 📊 Expose so UI can show live rates
+        ratesLoaded,         // ⏳ Expose so UI can show a loading indicator
         processFlutterwavePayment,
         processWalletPayment,
+        processWithdrawal,
         setupInitialPin,
         requestPinReset,
         verifyOtpAndSetPin

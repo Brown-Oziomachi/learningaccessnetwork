@@ -322,7 +322,7 @@ export default function DepartmentsPage() {
                             const fc = FACULTY_COLORS[dept.faculty] || { bg: CREAM, color: NAVY };
                             return (
                                 <Link key={dept.slug}
-                                    href={`/departments/${dept.slug}`}
+                                    href={`/category/${dept.slug}`}
                                     className="dept-card"
                                     onMouseEnter={() => setHoveredCard(dept.slug)}
                                     onMouseLeave={() => setHoveredCard(null)}

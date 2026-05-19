@@ -68,7 +68,7 @@ export default function AboutClient() {
         {
             icon: BookOpen,
             title: 'Knowledge for All',
-            description: "Geography shouldn't determine destiny. Whether you're in Lagos, Kano, Enugu, or a small town with no bookshop in sight — you deserve the same textbooks, the same notes, the same shot at excellence. We're building the infrastructure to close that gap across Africa."
+            description: "Geography shouldn't determine destiny. Whether you're in Nigeria, Kenya, Ghana, or a small town with no bookshop in sight — you deserve the same textbooks, the same notes, the same shot at excellence. We've built the infrastructure to close that gap across Africa."
         },
         {
             icon: Users,
@@ -106,12 +106,12 @@ export default function AboutClient() {
         {
             year: 'Early 2025',
             title: 'First Launch',
-            body: 'LAN Library went live with 500 curated documents spanning 10 subject categories. We kept it lean and focused — only materials that passed our quality bar made the cut. Two hundred students signed up in the first week without a single paid ad.'
+            body: 'LAN Library went live with 1000 curated documents spanning 10 subject categories. We kept it lean and focused — only materials that passed our quality bar made the cut. Two hundred students signed up in the first month without a single paid ad.'
         },
         {
             year: 'Mid 2025',
             title: 'Sellers Join the Ecosystem',
-            body: 'We opened the platform to student sellers and lecturers — enabling anyone with quality academic materials to earn from them on their own terms. The catalogue crossed 1,000 documents. Our 80% revenue share made LAN the most creator-friendly academic marketplace in Nigeria.'
+            body: 'We opened the platform to student sellers and lecturers — enabling anyone with quality academic materials to earn from them on their own terms. The catalogue crossed 1,000 documents. Our 80% revenue share made LAN the most creator-friendly academic marketplace in Africa.'
         },
         {
             year: 'Late 2025',
@@ -419,7 +419,7 @@ export default function AboutClient() {
                         <div className="mission-img" style={{ position: 'relative' }}>
                             <img src="/student.jpg" alt="Students studying"
                                 style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', borderRadius: 4, display: 'block' }} />
-                            <img src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=500&q=80" alt="Open book"
+                            <img src="/capgra.png" alt="Open book"
                                 style={{ position: 'absolute', bottom: '-2rem', right: '-2rem', width: '55%', aspectRatio: '1', objectFit: 'cover', borderRadius: 4, border: '6px solid #fdfcfa', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} />
                         </div>
 
@@ -445,7 +445,7 @@ export default function AboutClient() {
                                 </p>
                             </div>
                             <p style={{ fontSize: 'clamp(0.92rem, 1.5vw, 1rem)', color: '#374151', lineHeight: 1.85, fontWeight: 300, marginBottom: '1.25rem' }}>
-                                We built LAN because the textbook you need for tomorrow's exam shouldn't cost three weeks of allowance. Because your lecturer's notes shouldn't be locked behind a WhatsApp group you were never added to. Because great students in smaller cities deserve the same resources as students in Abuja or Lagos.
+                                We built LAN because the textbook you need for tomorrow's exam shouldn't cost three weeks of allowance. Because your lecturer's notes shouldn't be locked behind a WhatsApp group you were never added to. Because great students in smaller cities & countries deserve the same resources as students in Nigeria or South Africa.
                             </p>
                             <p style={{ fontSize: 'clamp(0.92rem, 1.5vw, 1rem)', color: '#374151', lineHeight: 1.85, fontWeight: 300, marginBottom: '2.5rem' }}>
                                 LAN is a marketplace and a library in one — built specifically for African academic life. Students browse and buy instantly. Sellers upload their materials and earn 80% of every sale. Every document is manually reviewed before it goes live. Quality is non-negotiable.

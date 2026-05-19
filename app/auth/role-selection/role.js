@@ -492,6 +492,7 @@ router.push(`/auth/create-account${buildQuery({ role: "seller" })}`);
                         type="text"
                         placeholder="Type to search universities…"
                         value={studentUniSearch}
+                        required
                         onChange={e => setStudentUniSearch(e.target.value)}
                         style={{ paddingLeft: "38px" }}
                       />
@@ -609,7 +610,7 @@ router.push(`/auth/create-account${buildQuery({ role: "seller" })}`);
                     ? <><strong style={{ color: NAVY }}>{activeStudentRole?.label}</strong> · {studyLevel}</>
                     : studentSubRole ? "Pick your year of study to continue" : ""}
                 </p>
-                <button className="rs-btn-primary" onClick={handleStudentContinue} disabled={!studentSubRole || !studyLevel}>
+                <button className="rs-btn-primary" onClick={handleStudentContinue} disabled={!studentSubRole || !institution || !fieldOfStudy || !studyLevel}>
                   Continue to Registration <ArrowRight size={14} />
                 </button>
               </div>
@@ -835,7 +836,7 @@ router.push(`/auth/create-account${buildQuery({ role: "seller" })}`);
                 <button
                   className="rs-btn-primary purple"
                   onClick={handleLecturerContinue}
-                  disabled={!lecturerUniSlug || !lecturerDepartment}
+                  disabled={!lecturerUniSlug || !lecturerDepartment || !lecturerTitle}
                 >
                   Continue to Registration <ArrowRight size={14} />
                 </button>
