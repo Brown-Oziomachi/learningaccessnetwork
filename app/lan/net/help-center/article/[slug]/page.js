@@ -176,7 +176,7 @@ export default function HelpArticlePage() {
                         >
                             <ArrowLeft size={15} /> Back to Help Center
                         </Link>
-                        <Link href="/" style={{ textDecoration:"none" }}>
+                        <Link href="/home" style={{ textDecoration:"none" }}>
                             <span className="lan-serif" style={{ fontSize:"18px", fontWeight:900, color:"#fff" }}>[LAN Library]</span>
                         </Link>
                     </div>
@@ -185,7 +185,7 @@ export default function HelpArticlePage() {
                 {/* ══ BREADCRUMB ══ */}
                 <div className="breadcrumb">
                     <div style={{ maxWidth:"1100px", margin:"0 auto", display:"flex", alignItems:"center", gap:"8px" }}>
-                        <a href="/">Home</a>
+                        <a href="/home">Home</a>
                         <span style={{ color:"#ccc" }}>›</span>
                         <a href="/lan/net/help-center">Help Center</a>
                         <span style={{ color:"#ccc" }}>›</span>

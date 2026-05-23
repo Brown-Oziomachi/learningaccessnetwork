@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { DollarSign, TrendingUp, ShoppingBag, Download, Book, Globe, Settings, X, Camera, Save, AlertCircle, ChevronRight, User, Building, Users, ArrowUpRight, ArrowDownLeft, Sparkles, Package, Zap, Eye, EyeOff, RefreshCw } from "lucide-react";
+import { DollarSign, TrendingUp, ShoppingBag, Download, Book, Globe, Settings, X, Camera, Save, AlertCircle, ChevronRight, User, Building, Users, ArrowUpRight, ArrowDownLeft, Sparkles, Package, Zap, Eye, EyeOff, RefreshCw, Printer, Receipt } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, increment, setDoc } from "firebase/firestore";
@@ -12,6 +12,7 @@ import { usePayment } from "@/app/hooks/usePayment";
 import { addStudentRoleToExistingUser } from "@/lib/auth/authHelpers";
 import ExportStudentsModal from "@/components/Exportstudentsmodal";
 import { uploadImageToCloudinary } from "@/lib/uploadImageToCloudinary";
+import PrintLicensingControl from "./print-licence-control/page";
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -898,6 +899,8 @@ export default function SellerAccountClient() {
     const [Processing, setProcessing] = useState(false);
     const [resetPinSuccess, setResetPinSuccess] = useState(false);
     const [showSwitchModal, setShowSwitchModal] = useState(false);
+    const [showPrintLicenseLedger, setShowPrintLicenseLedger] = useState(false);
+    const [activeSection, setActiveSection] = useState(null);
     const router = useRouter();
     const [showPhysicalOrdersModal, setShowPhysicalOrdersModal] = useState(false);
     const [physicalOrders, setPhysicalOrders] = useState([]);
@@ -1499,6 +1502,12 @@ export default function SellerAccountClient() {
                                             setShowPhysicalOrdersModal(true);
                                         },
                                     },
+                                   {
+                                        id: 'print-license-ledger',
+                                        icon: <Receipt size={18} style={{ color: NAVY }} />,   // ← correct JSX element
+                                        label: 'Print License Ledger',
+                                        onClick: () => { setShowProfileModal(false); setShowPrintLicenseLedger(true); }
+                                    },
                                     {
                                         label: "Promotion Analytics",
                                         icon: (
@@ -1767,7 +1776,6 @@ export default function SellerAccountClient() {
                     </div>
                 )}
 
-                {/* Edit Profile Modal */}
                 {/* Edit Profile Modal */}
                 {isEditing && (
                     <div className="modal-overlay mt-25">
@@ -2184,7 +2192,25 @@ export default function SellerAccountClient() {
                     </div>
                 )}
 
+               
                 <ExportStudentsModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} sellerId={user?.uid} sellerBooks={sellerBooks} />
+           
+              {/* Print License Ledger Modal */}
+{showPrintLicenseLedger && (
+  <div className="modal-overlay mt-25">
+    <div className="modal-inner">
+      <div style={{ background: NAVY, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0 }}>
+        <h2 className="lan-serif" style={{ fontSize: '20px', fontWeight: 700, color: '#fff', margin: 0 }}>Print License Ledger</h2>
+        <button onClick={() => setShowPrintLicenseLedger(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}>
+          <X size={22} />
+        </button>
+      </div>
+      <div style={{ padding: '24px', background: BG, minHeight: '400px' }}>
+        <PrintLicensingControl user={user} />
+      </div>
+    </div>
+  </div>
+)}
             </div>
         </>
     );

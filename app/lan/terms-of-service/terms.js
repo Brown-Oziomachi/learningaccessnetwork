@@ -18,6 +18,7 @@ const sections = [
   { id: "intellectual-property", label: "Intellectual Property Rights" },
   { id: "user-content", label: "User-Generated Content" },
   { id: "fees", label: "Fees and Payment" },
+    { id: "local-print", label: "Local Self-Print License" },
   { id: "privacy", label: "Privacy and Data Protection" },
   { id: "disclaimers", label: "Disclaimers and Limitation of Liability" },
   { id: "indemnification", label: "Indemnification" },
@@ -236,6 +237,92 @@ export default function TermsOfServiceClient() {
               <p>Your library or organization may incur fines or fees for late returns, lost materials, or damaged items. These fees are separate from any subscription fees and are determined by your library's policies. You are responsible for paying all such fines and fees.</p>
               <p>We reserve the right to change our fees and pricing at any time. We will provide advance notice of any fee changes, and continued use of paid services after such changes constitutes acceptance of the new fees.</p>
             </section>
+
+            <section id="local-print" className="prose-section">
+              <h2>8a. Local Self-Print License</h2>
+              <hr className="gold-rule" />
+
+              {/* ── Disclosure banner ── */}
+              <div style={{
+                background: "#fffbeb",
+                border: "1px solid #fcd34d",
+                borderLeft: "4px solid #d97706",
+                padding: "20px 24px",
+                marginBottom: "28px",
+              }}>
+                <p style={{
+                  fontSize: "9px",
+                  fontWeight: 700,
+                  letterSpacing: "0.18em",
+                  textTransform: "uppercase",
+                  color: "#92400e",
+                  marginBottom: "10px",
+                  fontFamily: "'Lato', sans-serif",
+                }}>
+                  ⚠️ &nbsp; Important Disclosure — Please Read Before Purchasing a Print License
+                </p>
+                <p style={{
+                  fontSize: "15px",
+                  fontFamily: "'Playfair Display', serif",
+                  fontWeight: 700,
+                  color: "#78350f",
+                  margin: "0 0 10px",
+                  lineHeight: 1.4,
+                }}>
+                  Local Self-Print License
+                </p>
+                <p style={{
+                  fontSize: "14px",
+                  color: "#92400e",
+                  lineHeight: 1.85,
+                  margin: 0,
+                  fontFamily: "'Lato', sans-serif",
+                  fontWeight: 400,
+                }}>
+                  This is <strong>not a delivery order</strong>. You are paying the author for a{" "}
+                  <strong>one-time personal print license</strong> — permission to print one copy
+                  on your own printer for personal study only. Reselling, sharing, or scanning the
+                  printed copy violates LAN's IP policy.
+                </p>
+              </div>
+
+              <p>
+                When you purchase a Local Self-Print License through LAN Library, you acquire a
+                limited, non-exclusive, non-transferable right to produce exactly one (1) physical
+                printed copy of the licensed document solely for your own private, non-commercial
+                study and reference.
+              </p>
+
+              <h3>What Is and Is Not Permitted</h3>
+              <p>
+                <strong style={{ color: "#0d2244" }}>Permitted:</strong> printing one copy on your
+                own printer or at a private print facility for your personal academic use.
+              </p>
+              <p>
+                <strong style={{ color: "#dc2626" }}>Strictly Prohibited:</strong> reproducing
+                additional copies; selling, lending, or gifting the printed copy to any third
+                party; digitally scanning, photographing, or otherwise re-digitising the printed
+                copy; uploading the digital source file to any platform or service; or using the
+                material for commercial or institutional purposes of any kind.
+              </p>
+
+              <h3>Relationship to the Author</h3>
+              <p>
+                The fee you pay constitutes compensation to the original author or rights-holder
+                for the grant of this single-copy print permission. LAN Library acts solely as a
+                payment and licensing intermediary and does not itself hold rights in the
+                underlying intellectual property.
+              </p>
+
+              <h3>Enforcement</h3>
+              <p>
+                Breach of these print-license conditions constitutes infringement of the author's
+                intellectual property rights and a material violation of these Terms. LAN Library
+                reserves the right to suspend or terminate your account and to refer confirmed
+                infringement cases to the relevant rights-holder for independent legal action.
+              </p>
+            </section>
+
 
             <section id="privacy" className="prose-section">
               <h2>9. Privacy and Data Protection</h2>

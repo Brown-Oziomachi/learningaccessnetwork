@@ -628,7 +628,8 @@ export default function PaymentClient() {
                         {book.description && (
                             <div style={{ marginTop: "14px", background: CREAM, border: "0.5px solid rgba(184,150,62,0.15)", padding: "12px 14px" }}>
                                 <p style={{ fontSize: "10px", fontWeight: 700, color: GOLD, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 4px" }}>Description</p>
-                                <p style={{ fontSize: "12px", color: "#666", lineHeight: 1.65, margin: 0 }}>{book.description}</p>
+                                <p style={{
+                                    fontSize: "12px", color: "#666", lineHeight: 1.65, margin: 0, WebkitLineClamp: 5, WebkitBoxOrient: "vertical", }}>{book.description}</p>
                             </div>
                         )}
                     </div>

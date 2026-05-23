@@ -13,12 +13,15 @@ const CREAM = "#f5f0e8";
 const BG    = "#f5f1ea";
 
 const helpCategories = [
-    { title:"Getting Started", icon:"📖", articles:[
-        { title:"Creating an account",       slug:"creating-your-account" },
-        { title:"Signing in to your account",slug:"signing-in" },
-        { title:"Browsing the library",      slug:"browsing-the-library" },
-        { title:"Using the search function", slug:"using-search-function" },
-    ]},
+    {
+        title: "Getting Started", icon: "📖", articles: [
+            { title: "Creating an account", slug: "creating-your-account" },
+            { title: "Signing in to your account", slug: "signing-in" },
+            { title: "Browsing the library", slug: "browsing-the-library" },
+            { title: "Using the search function", slug: "using-search-function" },
+            { title: "How the Bounty Board works", slug: "bounty-board" },  // ← ADD THIS
+        ]
+    },
     { title:"Payments & Subscriptions", icon:"💳", articles:[
         { title:"How to purchase a book",    slug:"how-to-purchase-book" },
         { title:"Accepted payment methods",  slug:"payment-methods" },

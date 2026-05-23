@@ -1,5 +1,6 @@
 // PART 1: Getting Started, Payments & Pricing, Downloads & Access
 export const articlesP1 = {
+
   // ==================== GETTING STARTED ====================
   'creating-your-account': {
     category: 'Getting Started',
@@ -570,6 +571,132 @@ export const articlesP1 = {
   ]
 },
 
+ 'bounty-board': {
+    category: 'Getting Started',
+    title: 'How the Bounty Board Works',
+    readTime: '4 min read',
+    lastUpdated: 'May 2026',
+    tags: ['Bounty Board', 'Requests', 'Earn', 'Authors'],
+    content: [
+      {
+        type: 'intro',
+        text: 'The LAN Library Bounty Board is a community-powered marketplace that connects students who need specific study materials with authors and lecturers who can create them — with automatic, transparent payouts for everyone involved.',
+      },
+      {
+        type: 'heading',
+        text: 'How the Bounty Board Works',
+      },
+      {
+        type: 'paragraph',
+        text: 'The process runs in three stages: a student posts a request and funds it, an author fulfils the request by uploading the asset, and the platform automatically splits and releases the payment.',
+      },
+      {
+        type: 'heading',
+        text: '1. Student Requests — Post a Bounty',
+      },
+      {
+        type: 'paragraph',
+        text: 'Any registered student can post a request for a document, past question paper, lecture note, or any other learning material that is missing from the library.',
+      },
+      {
+        type: 'steps',
+        items: [
+          'Navigate to the Bounty Board from the main menu.',
+          'Click "Post a Request" and describe the material you need (e.g. title, course code, year, school).',
+          'Set a bounty reward — the amount you are willing to pay for the completed material.',
+          'Confirm the bounty; LAN Library immediately places the full reward amount into secure escrow.',
+          'Your request goes live and is visible to all authors on the platform.',
+        ],
+      },
+      {
+        type: 'note',
+        text: 'Escrow means the funds are held safely by LAN Library and cannot be accessed by anyone until the request is fulfilled. Your money is protected.',
+      },
+      {
+        type: 'heading',
+        text: '2. Author Fulfilment — Claim the Bounty',
+      },
+      {
+        type: 'paragraph',
+        text: 'Content creators, lecturers, and subject-matter experts can browse open bounties and earn money by producing the requested materials.',
+      },
+      {
+        type: 'steps',
+        items: [
+          'Browse the Bounty Board and find a request that matches your expertise.',
+          'Click "Claim Bounty" to signal your intent — this does not yet lock you in.',
+          'Create or compile the requested digital asset (PDF, past question set, lecture note, etc.).',
+          'Upload the completed asset directly to the bounty request.',
+          'The student is notified and given a short window to confirm receipt.',
+        ],
+      },
+      {
+        type: 'list',
+        items: [
+          'Authors may claim multiple bounties simultaneously.',
+          'Only one author can fulfil a single bounty request.',
+          'Submitted assets are reviewed against the original request description before payout is released.',
+        ],
+      },
+      {
+        type: 'heading',
+        text: '3. Automated Payout & Split',
+      },
+      {
+        type: 'paragraph',
+        text: 'Once the uploaded asset is confirmed as matching the request, the escrow is released automatically — no manual intervention required.',
+      },
+      {
+        type: 'list',
+        items: [
+          'Author receives 80% of the bounty directly into their LAN wallet.',
+          'LAN Library retains a 20% admin commission fee to cover platform operations.',
+          'The student gains immediate, lifetime access to the fulfilled document.',
+          'Both parties receive an email confirmation of the completed transaction.',
+        ],
+      },
+      {
+        type: 'note',
+        text: 'Example: A student posts a ₦2,000 bounty. The author who fulfils it receives ₦1,600 (80%) and LAN Library retains ₦400 (20%). The full ₦2,000 was held in escrow from the moment the bounty was posted.',
+      },
+      {
+        type: 'heading',
+        text: 'Escrow Protection',
+      },
+      {
+        type: 'paragraph',
+        text: 'Every bounty is backed by real funds locked in escrow the moment the student posts the request. This guarantees:',
+      },
+      {
+        type: 'list',
+        items: [
+          'Authors are always paid when a valid fulfilment is accepted.',
+          'Students are never charged unless their material is delivered.',
+          'Neither party can access the escrowed funds prematurely.',
+          'Disputed fulfilments are reviewed by the LAN Library team before release.',
+        ],
+      },
+      {
+        type: 'heading',
+        text: 'Tips for Getting Your Bounty Fulfilled Faster',
+      },
+      {
+        type: 'list',
+        items: [
+          'Be as specific as possible: include the course code, institution, year, and lecturer name.',
+          'Set a competitive bounty amount — higher rewards attract faster responses.',
+          'Attach a sample page or table of contents if you have one, to guide the author.',
+          'Check the library first — the material may already exist and be available for immediate purchase.',
+        ],
+      },
+    ],
+    relatedArticles: [
+      { title: 'How to Purchase a Book', slug: 'how-to-purchase-book' },
+      { title: 'Becoming a Seller', slug: 'seller-account-overview' },
+      { title: 'Understanding Pricing', slug: 'understanding-pricing' },
+    ],
+  },
+ 
   'payment-methods': {
     category: 'Payments & Pricing',
     title: 'Accepted Payment Methods',

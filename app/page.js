@@ -107,7 +107,7 @@ const GLOBAL_STYLES = `
   /* ── ghost btn ── */
   .btn-ghost {
     display: inline-flex; align-items: center; gap: 8px;
-    padding: 14px 28px; background: transparent; color: #fff;
+    padding: 14px 48px; background: transparent; color: #fff;
     font-family: 'Lato', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
     border: 0.5px solid rgba(255,255,255,0.35); cursor: pointer; text-decoration: none;
     transition: background 0.18s;
@@ -367,7 +367,7 @@ export default function LandingPage() {
           <AnimatePresence mode="wait">
             <motion.div key={heroIdx} initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} transition={{ duration:1 }}
               style={{ position:"absolute", inset:0 }}>
-              <img src={heroImages[heroIdx]} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", opacity:.35 }} />
+              <img src={heroImages[heroIdx]} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", opacity:.49 }} />
             </motion.div>
           </AnimatePresence>
 
@@ -394,9 +394,9 @@ export default function LandingPage() {
 
             <div className="anim-up-4" style={{ display:"flex", flexWrap:"wrap", gap:12 }}>
               <button className="btn-primary" onClick={goSignIn}>
-                Browse Books <ArrowRight size={14} />
+                Create Account <ArrowRight size={14} />
               </button>
-              <a style={{color: GOLD}} href="/docs" className="btn-ghost font-extrabold">
+              <a style={{color: GOLD, background: NAVY}} href="/docs" className="btn-ghost font-extrabold">
                 Documentation
               </a>
             </div>
@@ -451,7 +451,7 @@ export default function LandingPage() {
               <div style={{ position:"relative", zIndex:1, border:`0.5px solid #e5ddd0`, overflow:"hidden" }}>
                 <img src="/studs.png" alt="Students using LAN Library"
                   style={{ width:"100%", aspectRatio:"4/3", objectFit:"cover", display:"block" }}
-                  onError={e => { e.target.src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800"; }}
+                  onError={e => { e.target.src="/stud2.png"; }}
                 />
                 {/* overlay badge */}
                 <div style={{ position:"absolute", bottom:1, left:1, background:NAVY, padding:"12px 18px", display:"flex", flexDirection:"column", gap:3 }}>
@@ -1130,7 +1130,7 @@ export default function LandingPage() {
             }}
             >
 
-            <p>LAN Library is operated by Learning Access Network Ltd., a digital academic resource platform dedicated to connecting African students and educators with quality learning materials. We are headquartered in Abuja, Nigeria, and serve learners across the African continent.</p>
+            <p>LAN Library is operated by Learning Access Network Ltd., a digital academic resource platform dedicated to connecting African students and educators with quality learning materials. We are headquartered in Abuja, Nigeria, and serve learners within the African continent.</p>
                 </div>
          
       </footer>

@@ -23,7 +23,6 @@ import {
   Share2,
   Bookmark,
   MoreVertical,
-  Lock,
   Menu,
   X,
   Eye,
@@ -43,9 +42,9 @@ import {
   TrendingUp,
   Package,
   MapPin,
-  AlertCircle,
   Star,
   Unlock,
+   Printer, Lock, AlertCircle ,
 } from "lucide-react";
 import Link from "next/link";
 import { fetchBookDetails } from "@/utils/bookUtils";
@@ -54,6 +53,7 @@ import FeaturedAdsCarousel from "./FeaturedAdsCarousel";
 import StudyBuddyTracker from "./StudyBuddyTracker";
 import OpenAccessModal from "./Openaccessmodal";
 import GoogleAdComponent from "./GoogleAdComponent";
+import { FrozenPdfGate, SellerProfileLink } from "./book-preview- patches";
 
 /* ── palette — matches the app ── */
 const NAVY = "#0d2244";
@@ -79,7 +79,93 @@ const isSellerBook = (book) =>
     book.sellerName !== "" &&
     book.sellerName !== "LAN Library");
 
-export default function BookPreviewPage() {
+    /* ─── LicenseButton Component ─────────────────────────────────────────────── */
+function LicenseButton({ book, isGloballyFrozen, isPrintLicensingEnabled, router, cleanBookId, style = {} }) {
+  const NAVY = "#0d2244";
+  const GOLD = "#b8963e";
+  const CREAM = "#f5f0e8";
+
+  // Disabled states
+  const isDisabled = isGloballyFrozen || !isPrintLicensingEnabled;
+  const disabledReason = isGloballyFrozen
+    ? "This document is currently frozen."
+    : !isPrintLicensingEnabled
+    ? "Print licensing is not enabled for this book."
+    : null;
+
+  const handleClick = () => {
+    if (isDisabled) {
+      alert(disabledReason);
+      return;
+    }
+    router.push(`/document/request-print-permission?id=${cleanBookId}&title=${encodeURIComponent(book?.title || "")}&pages=${book?.pages || 0}&price=${book?.price || 0}`);
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={isDisabled}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        padding: "14px 16px",
+        border: isDisabled ? "0.5px solid #f0ebe0" : `0.5px solid ${GOLD}`,
+        background: isDisabled ? CREAM : "#fff",
+        cursor: isDisabled ? "not-allowed" : "pointer",
+        transition: "all 0.18s",
+        opacity: isDisabled ? 0.6 : 1,
+        ...style,
+      }}
+      onMouseEnter={(e) => {
+        if (!isDisabled) {
+          e.currentTarget.style.borderColor = NAVY;
+          e.currentTarget.style.background = CREAM;
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = isDisabled ? "#f0ebe0" : GOLD;
+        e.currentTarget.style.background = "#fff";
+      }}
+    >
+      <div style={{
+        width: "36px",
+        height: "36px",
+        border: `0.5px solid #e5ddd0`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: CREAM,
+        flexShrink: 0,
+      }}>
+        {isDisabled ? <Lock size={16} style={{ color: "#aaa" }} /> : <Printer size={16} style={{ color: NAVY }} />}
+      </div>
+      <div style={{ flex: 1, textAlign: "left" }}>
+        <p style={{
+          fontSize: "13px",
+          fontWeight: 700,
+          color: isDisabled ? "#aaa" : NAVY,
+          margin: "0 0 1px",
+          fontFamily: "'Lato',sans-serif",
+        }}>
+          Request Print License
+        </p>
+        <p style={{
+          fontSize: "11px",
+          color: isDisabled ? "#bbb" : "#aaa",
+          margin: 0,
+          fontFamily: "'Lato',sans-serif",
+        }}>
+          {isDisabled ? "Not available" : "Configure & request"}
+        </p>
+      </div>
+      {isDisabled && <AlertCircle size={14} style={{ color: "#d97706", flexShrink: 0 }} />}
+    </button>
+  );
+}
+
+export default function BookPreviewPage({ bookDetails }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawBookId = searchParams.get("id");
@@ -89,7 +175,6 @@ export default function BookPreviewPage() {
       ? `firestore-${rawBookId}`
       : null;
   const cleanBookId = rawBookId?.replace("firestore-", "");
-
   const [book, setBook] = useState(null);
   const [user, setUser] = useState(null);
   const [isPurchased, setIsPurchased] = useState(false);
@@ -121,6 +206,8 @@ export default function BookPreviewPage() {
   const [physicalInventory, setPhysicalInventory] = useState(null);
   const [loadingPhysical, setLoadingPhysical] = useState(true);
   const [feedbackRating, setFeedbackRating] = useState(0);
+  const [isPrintLicensingEnabled, setIsPrintLicensingEnabled] = useState(false);
+  const [isGloballyFrozen, setIsGloballyFrozen] = useState(false);
 
   /* ── NEW: Open Access modal ── */
   const [showOAModal, setShowOAModal] = useState(false);
@@ -156,6 +243,24 @@ export default function BookPreviewPage() {
       return `https://lh3.googleusercontent.com/d/${fileId}=w400`;
     }
     return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+  };
+
+  const handleRequestLicenseClick = () => {
+    // Guard Clause: Prevent execution if bookDetails is missing or loading
+    if (!bookDetails || !bookDetails.id) {
+      console.warn("Cannot redirect: bookDetails is not yet loaded.");
+      return;
+    }
+
+    // Package up the variables into search parameters safely
+    const params = new URLSearchParams();
+    params.set("id", bookDetails.id);
+    params.set("title", bookDetails.title || "Untitled Document");
+    params.set("pages", (bookDetails.pages || 0).toString());
+    params.set("price", (bookDetails.price || 0).toString());
+
+    // Send the user to the dedicated hardcopy licensing config page
+    router.push(`/document/request-print-permission?${params.toString()}`);
   };
 
   /* ── NEW: PDF.js page count effect — only for open-access, non-seller books ── */
@@ -597,27 +702,49 @@ export default function BookPreviewPage() {
     if (user && bookId) checkPurchaseStatus(user.uid);
   }, [user, bookId]);
 
-  useEffect(() => {
-    const fetchBook = async () => {
-      try {
-        setLoading(true);
-        const bookData = await fetchBookDetails(bookId);
-        if (bookData) {
-          setBook({ ...bookData, image: getThumbnailUrl(bookData) });
-          setPreviewContent(
-            bookData.previewText ||
-              bookData.introduction ||
-              bookData.tableOfContents ||
-              bookData.description,
-          );
-        }
-      } catch {
-      } finally {
-        setLoading(false);
+  // AFTER — direct Firestore read for licensing/freeze fields (not routed through bookUtils)
+ useEffect(() => {
+  const fetchBook = async () => {
+    try {
+      setLoading(true);
+      setIsGloballyFrozen(false);
+      setIsPrintLicensingEnabled(false);
+      setIsPurchased(false);
+      setIsSaved(false);
+      setBook(null);
+      setViewCount(0);
+      setPositiveRatingPercent(null);
+      setTotalRatings(0);
+      setBookFeedbackCount(0);
+      setPdfPageCount(null);
+      setCalculatingPages(false);
+
+      const bookData = await fetchBookDetails(bookId);
+      if (bookData) {
+        setBook({ ...bookData, image: getThumbnailUrl(bookData) });
+        setPreviewContent(
+          bookData.previewText ||
+            bookData.introduction ||
+            bookData.tableOfContents ||
+            bookData.description,
+        );
       }
-    };
-    if (bookId) fetchBook();
-  }, [bookId]);
+      const cId = bookId?.replace("firestore-", "");
+      if (cId) {
+        const snap = await getDoc(doc(db, "advertMyBook", cId));
+        if (snap.exists()) {
+          const raw = snap.data();
+          setIsPrintLicensingEnabled(raw.isPrintLicensingEnabled === true);
+          setIsGloballyFrozen(raw.isGloballyFrozen === true);
+        }
+      }
+    } catch {
+    } finally {
+      setLoading(false);
+    }
+  };
+  if (bookId) fetchBook();
+}, [bookId]);
 
   useEffect(() => {
     const fetchAllBooks = async () => {
@@ -632,6 +759,7 @@ export default function BookPreviewPage() {
             query(
               collection(db, "advertMyBook"),
               where("status", "==", "approved"),
+              where("isGloballyFrozen", "==", false),
             ),
           );
           const fb = [];
@@ -654,7 +782,8 @@ export default function BookPreviewPage() {
               previewUrl: data.previewUrl,
               embedUrl: data.embedUrl,
               isFromFirestore: true,
-              tableOfContents: data.tableOfContents || data.tableOfContent || null,
+              tableOfContents:
+                data.tableOfContents || data.tableOfContent || null,
             };
             b.image = getThumbnailUrl(b);
             fb.push(b);
@@ -1730,7 +1859,31 @@ export default function BookPreviewPage() {
 
             {/* Right: CTAs — FIXED to not overflow */}
             <div className="lan-header-actions">
-              {free ? (
+              {isGloballyFrozen ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    background: "rgba(99,102,241,0.15)",
+                    border: "0.5px solid rgba(99,102,241,0.35)",
+                    padding: "5px 10px",
+                    flexShrink: 0,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      color: "#a5b4fc",
+                      fontFamily: "'Lato',sans-serif",
+                      letterSpacing: "0.08em",
+                    }}
+                  >
+                    ❄ FROZEN
+                  </span>
+                </div>
+              ) : free ? (
                 <button
                   className="lan-header-cta"
                   onClick={handleFreeAccess}
@@ -1751,8 +1904,7 @@ export default function BookPreviewPage() {
                     flexShrink: 0,
                   }}
                 >
-                  <Unlock size={12} />
-                  ACCESS FREE
+                  <Unlock size={12} /> ACCESS FREE
                 </button>
               ) : !isPurchased ? (
                 <button
@@ -1893,7 +2045,24 @@ export default function BookPreviewPage() {
                     <X size={20} />
                   </button>
                 </div>
-                {free ? (
+                {isGloballyFrozen ? (
+                  <div
+                    style={{
+                      width: "100%",
+                      background: "rgba(99,102,241,0.15)",
+                      border: "0.5px solid rgba(99,102,241,0.3)",
+                      padding: "11px",
+                      textAlign: "center",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      color: "#a5b4fc",
+                      fontFamily: "'Lato',sans-serif",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    ❄ Resource Frozen by Admin
+                  </div>
+                ) : free ? (
                   <button
                     onClick={() => {
                       setShowNavMenu(false);
@@ -1941,6 +2110,7 @@ export default function BookPreviewPage() {
                   </button>
                 ) : null}
               </div>
+
               <div style={{ padding: "12px" }}>
                 {[
                   {
@@ -1955,7 +2125,6 @@ export default function BookPreviewPage() {
                   { label: "Saved Books", href: "/saved-my-book" },
                   { label: "Help & Support", href: "/lan/net/help-center" },
                   { label: "All Documents", href: "/documents" },
-
                 ].map(({ label, href, onClick }) =>
                   href ? (
                     <Link
@@ -2330,21 +2499,30 @@ export default function BookPreviewPage() {
                 >
                   {[
                     {
-                      icon: free ? (
+                      icon: isGloballyFrozen ? (
+                        <Lock size={18} style={{ color: "#aaa" }} />
+                      ) : free ? (
                         <Unlock size={18} style={{ color: "#16a34a" }} />
                       ) : (
                         <Download size={18} />
                       ),
-                      label: free
-                        ? "Download"
-                        : isPurchased
-                          ? "Open"
-                          : "Purchase",
-                      onClick: free
-                        ? handleFreeAccess
-                        : isPurchased
-                          ? () => router.push("/my-books")
-                          : handlePurchase,
+                      label: isGloballyFrozen
+                        ? "Frozen"
+                        : free
+                          ? "Download"
+                          : isPurchased
+                            ? "Open"
+                            : "Purchase",
+                      onClick: isGloballyFrozen
+                        ? () =>
+                            alert(
+                              "This document is currently frozen by administration.",
+                            )
+                        : free
+                          ? handleFreeAccess
+                          : isPurchased
+                            ? () => router.push("/my-books")
+                            : handlePurchase,
                     },
                     {
                       icon: (
@@ -2370,9 +2548,12 @@ export default function BookPreviewPage() {
                       onClick: () => setShowFeedbackModal(true),
                     },
                     {
-                      icon: <Flag size={18} />,
-                      label: "Report",
-                      onClick: handleReport,
+                      icon: <Sparkles size={18} style={{ color: "#a78bfa" }} />,
+                      label: "Ask AI",
+                      onClick: () =>
+                        router.push(
+                          `/ai-chat?bookId=${bookId}&bookTitle=${encodeURIComponent(book?.title || "")}`,
+                        ),
                     },
                   ].map(({ icon, label, onClick }) => (
                     <button
@@ -2437,14 +2618,6 @@ export default function BookPreviewPage() {
                     <PageCountDisplay fontSize="11px" />
                   </div>
                 </div>
-
-                {/* AI Button */}
-                <AiAskButton
-                  bookTitle={book.title}
-                  pdfUrl={book.pdfUrl || book.embedUrl}
-                  bookId={bookId}
-                  userId={user?.uid}
-                />
 
                 {/* Meta */}
                 <div
@@ -3009,6 +3182,7 @@ export default function BookPreviewPage() {
                       {book.title}
                     </h1>
                     <p
+                      className="underline  "
                       style={{
                         fontSize: "11px",
                         color: "#888",
@@ -3074,21 +3248,30 @@ export default function BookPreviewPage() {
                 >
                   {[
                     {
-                      icon: free ? (
+                      icon: isGloballyFrozen ? (
+                        <Lock size={18} style={{ color: "#aaa" }} />
+                      ) : free ? (
                         <Unlock size={18} style={{ color: "#16a34a" }} />
                       ) : (
                         <Download size={18} />
                       ),
-                      label: free
-                        ? "Download"
-                        : isPurchased
-                          ? "Open"
-                          : "Purchase",
-                      onClick: free
-                        ? handleFreeAccess
-                        : isPurchased
-                          ? () => router.push("/my-books")
-                          : handlePurchase,
+                      label: isGloballyFrozen
+                        ? "Frozen"
+                        : free
+                          ? "Download"
+                          : isPurchased
+                            ? "Open"
+                            : "Purchase",
+                      onClick: isGloballyFrozen
+                        ? () =>
+                            alert(
+                              "This document is currently frozen by administration.",
+                            )
+                        : free
+                          ? handleFreeAccess
+                          : isPurchased
+                            ? () => router.push("/my-books")
+                            : handlePurchase,
                     },
                     {
                       icon: (
@@ -3114,9 +3297,12 @@ export default function BookPreviewPage() {
                       onClick: () => setShowFeedbackModal(true),
                     },
                     {
-                      icon: <Flag size={18} />,
-                      label: "Report",
-                      onClick: handleReport,
+                      icon: <Sparkles size={18} style={{ color: "#a78bfa" }} />,
+                      label: "Ask AI",
+                      onClick: () =>
+                        router.push(
+                          `/ai-chat?bookId=${bookId}&bookTitle=${encodeURIComponent(book?.title || "")}`,
+                        ),
                     },
                   ].map(({ icon, label, onClick }) => (
                     <button
@@ -3142,8 +3328,12 @@ export default function BookPreviewPage() {
                   {[
                     {
                       icon: <Layers size={13} style={{ color: GOLD }} />,
-                      val: free ? "FREE" : `₦${book.price?.toLocaleString()}`,
-                      highlight: free,
+                      val: isGloballyFrozen
+                        ? "❄ FROZEN"
+                        : free
+                          ? "FREE"
+                          : `₦${book.price?.toLocaleString()}`,
+                      highlight: free && !isGloballyFrozen,
                     },
                     {
                       icon: <ShoppingBag size={13} style={{ color: GOLD }} />,
@@ -3204,16 +3394,8 @@ export default function BookPreviewPage() {
                     padding: "12px 16px",
                     borderTop: "0.5px solid #e5ddd0",
                   }}
-                >
-                  <AiAskButton
-                    bookTitle={book.title}
-                    pdfUrl={book.pdfUrl || book.embedUrl}
-                    bookId={bookId}
-                    userId={user?.uid}
-                  />
-                </div>
+                ></div>
               </div>
-
               {/* PDF Viewer */}
               <div
                 style={{
@@ -3354,7 +3536,6 @@ export default function BookPreviewPage() {
                     </button>
                   </div>
                 </div>
-
                 {user && (
                   <StudyBuddyTracker
                     bookId={bookId}
@@ -3364,10 +3545,12 @@ export default function BookPreviewPage() {
                     bookTitle={book?.title || ""}
                   />
                 )}
-
                 <PhysicalStockBadge />
-                <PdfViewer heightClass="400px" fullHeight="900px" />
-
+                {isGloballyFrozen ? (
+                  <FrozenPdfGate />
+                ) : (
+                  <PdfViewer heightClass="400px" fullHeight="900px" />
+                )}
                 <FeaturedAdsCarousel
                   tier="Gold"
                   maxAds={2}
@@ -3390,152 +3573,7 @@ export default function BookPreviewPage() {
                   style={{ marginTop: "1px" }}
                 />
               </div>
-
               {/* Mobile lecturers */}
-              <div
-                className="lg-hide"
-                style={{
-                  background: "#fff",
-                  border: "0.5px solid #e5ddd0",
-                  padding: "20px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "16px",
-                  }}
-                >
-                  <div>
-                    <p
-                      style={{
-                        fontSize: "10px",
-                        fontWeight: 700,
-                        letterSpacing: "0.16em",
-                        textTransform: "uppercase",
-                        color: GOLD,
-                        margin: "0 0 2px",
-                        fontFamily: "'Lato',sans-serif",
-                      }}
-                    >
-                      Educators
-                    </p>
-                    <h3
-                      style={{
-                        fontFamily: "'Playfair Display',serif",
-                        fontSize: "16px",
-                        fontWeight: 700,
-                        color: NAVY,
-                        margin: 0,
-                      }}
-                    >
-                      LAN Lecturers
-                    </h3>
-                  </div>
-                  <button
-                    onClick={() => router.push("/lecturers")}
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      color: NAVY,
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      fontFamily: "'Lato',sans-serif",
-                    }}
-                  >
-                    See all
-                  </button>
-                </div>
-                {lecturers.slice(0, 4).map((lec) => (
-                  <div
-                    key={lec.sellerId}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      marginBottom: "12px",
-                    }}
-                  >
-                    <Link
-                      href={`/seller-profile?sellerId=${lec.sellerId}`}
-                      style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "50%",
-                        background: NAVY,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: GOLD,
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        textDecoration: "none",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {lec.sellerName?.charAt(0)?.toUpperCase() || "?"}
-                    </Link>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p
-                        style={{
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          color: NAVY,
-                          margin: 0,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          fontFamily: "'Lato',sans-serif",
-                        }}
-                      >
-                        {lec.title
-                          ? `${lec.title} ${lec.sellerName}`
-                          : lec.sellerName}
-                      </p>
-                      <p
-                        style={{
-                          fontSize: "10px",
-                          color: "#aaa",
-                          margin: 0,
-                          fontFamily: "'Lato',sans-serif",
-                        }}
-                      >
-                        {lec.uploadedBooks} files
-                      </p>
-                    </div>
-                    <button
-                      onClick={(e) =>
-                        handleFollowLecturer(e, lec.sellerId, lec.sellerName)
-                      }
-                      disabled={followLoadingIds.has(lec.sellerId)}
-                      style={{
-                        fontSize: "9px",
-                        fontWeight: 700,
-                        padding: "4px 10px",
-                        border: `0.5px solid ${followingIds.has(lec.sellerId) ? "#86efac" : GOLD}`,
-                        background: followingIds.has(lec.sellerId)
-                          ? "rgba(22,163,74,0.08)"
-                          : CREAM,
-                        color: followingIds.has(lec.sellerId)
-                          ? "#16a34a"
-                          : NAVY,
-                        cursor: "pointer",
-                        fontFamily: "'Lato',sans-serif",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {followLoadingIds.has(lec.sellerId)
-                        ? "…"
-                        : followingIds.has(lec.sellerId)
-                          ? "✓ Following"
-                          : "+ Follow"}
-                    </button>
-                  </div>
-                ))}
-              </div>
 
               {/* Mobile: You might also like */}
               <div
@@ -4144,16 +4182,20 @@ export default function BookPreviewPage() {
                   By {book.author}
                 </p>
                 <p
-                    style={{
-                        fontSize: "13px",
-                        color: "#555",
-                        lineHeight: 1.75,
-                        fontFamily: "'Lato',sans-serif",
-                        margin: 0,
-                        whiteSpace: "pre-line",
-                    }}
+                  style={{
+                    fontSize: "13px",
+                    color: "#555",
+                    lineHeight: 1.75,
+                    fontFamily: "'Lato',sans-serif",
+                    margin: 0,
+                    whiteSpace: "pre-line",
+                  }}
                 >
-                    {book.tableOfContents || book.tableOfContent || book.summary || book.introduction  || "No summary available for this document."}
+                  {book.tableOfContents ||
+                    book.tableOfContent ||
+                    book.summary ||
+                    book.introduction ||
+                    "No summary available for this document."}
                 </p>
               </div>
             </div>
@@ -4222,12 +4264,13 @@ export default function BookPreviewPage() {
                   },
                   {
                     icon: <Flag size={22} style={{ color: NAVY }} />,
-                    label: "Report",
+                    label: "Report legal issue",
                     onClick: handleReport,
                   },
-                ].map(({ icon, label, onClick }) => (
+                ].map(({ icon, label, onClick, disabled }) => (
                   <button
                     key={label}
+                    disabled={disabled}
                     onClick={onClick}
                     style={{
                       width: "100%",
@@ -4237,7 +4280,8 @@ export default function BookPreviewPage() {
                       padding: "14px 0",
                       border: "none",
                       background: "transparent",
-                      cursor: "pointer",
+                      cursor: disabled ? "not-allowed" : "pointer",
+                      opacity: disabled ? 0.4 : 1,
                       borderBottom: "0.5px solid #f0ebe0",
                       color: NAVY,
                       fontFamily: "'Lato',sans-serif",
@@ -4249,6 +4293,16 @@ export default function BookPreviewPage() {
                     {label}
                   </button>
                 ))}
+
+                <LicenseButton
+                  book={book}
+                  isGloballyFrozen={isGloballyFrozen}
+                  isPrintLicensingEnabled={isPrintLicensingEnabled}
+                  router={router}
+                  cleanBookId={cleanId}
+                  style={{ marginTop: 8, marginBottom: 4 }}
+                />
+
                 <button
                   onClick={() => setShowOptionsModal(false)}
                   style={{

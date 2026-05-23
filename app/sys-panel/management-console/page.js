@@ -22,6 +22,7 @@ import { BookApprovalModal, ReplyModal, TransactionModal, UserModal } from '@/co
 import { db, auth } from '@/lib/firebaseConfig';
 import PromotionsAdminSection from './promotions-admin-section/page';
 import TrafficAnalyticsSection from './trafficAnalyticsSection/page';
+import PrintLicenseLedger from './printLicenseLedger/Page';
 
 /* ── CSS Variables & Global Styles ─────────────────────────────────────── */
 const globalStyles = `
@@ -370,6 +371,7 @@ const NAV_SECTIONS = [
     items: [
       { id: 'withdrawals', icon: Download, label: 'Withdrawals', badgeKey: 'pendingWithdrawals', badgeType: 'warn' },
       { id: 'transactions', icon: DollarSign, label: 'Transactions' },
+      { id: 'print-license-ledger', icon: Receipt, label: 'Print License Ledger' },
       { id: 'settings', icon: Settings, label: 'Fee Settings' },
     ]
   },
@@ -2214,6 +2216,10 @@ export default function ComprehensiveAdminPanel() {
             </div>
           )}
 
+          {activeSection === 'print-license-ledger' && (
+            <PrintLicenseLedger user={user} db={db} />
+          )}
+          
           {activeSection === 'physical-orders' && (
             <div>
               {/* Pre-order warning banner */}

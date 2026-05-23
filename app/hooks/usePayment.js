@@ -154,7 +154,7 @@ export const usePayment = (book, formData, sellerDetails) => {
                 sellerId: distribution.isPlatformBook ? 'platform' : (sellerDetails?.id || null),
                 platformFee: distribution.platformFee,
                 sellerAmount: distribution.sellerAmount,
-                exchangeRateUsed: exchangeMatrix[targetCurrency] || 1.0, // 📊 Log rate used
+                exchangeRateUsed: exchangeMatrix[targetCurrency] || 1.0,
                 createdAt: serverTimestamp(),
             };
 
@@ -180,13 +180,31 @@ export const usePayment = (book, formData, sellerDetails) => {
                 });
             }
 
+            // ── Print license record ──────────────────────────────────────
+            if (extraData?.printLicense) {
+                await addDoc(collection(db, 'print_licenses'), {
+                    bookId: book.id,
+                    bookTitle: book.title,
+                    studentId: currentUser.uid,
+                    studentEmail: formData.email,
+                    studentName: formData.name || null,
+                    sellerId: sellerDetails?.id || null,
+                    sellerName: sellerDetails?.name || null,
+                    totalAmount: book.price,
+                    sellerRoyalty: Math.round(book.price * 0.8),
+                    adminCommission: Math.round(book.price * 0.2),
+                    pages: book.pages || 0,
+                    transactionId: transactionRef.id,
+                    createdAt: serverTimestamp(),
+                });
+            }
+
             await qualifyReferral(currentUser.uid, book.price);
             return transactionRef.id;
         } catch (err) {
             throw err;
         }
     };
-
     const processFlutterwavePayment = (extraData = {}, targetCurrency = 'NGN') => {
         if (!book || !formData.email) {
             setError({ message: "Please fill in your email before paying." });

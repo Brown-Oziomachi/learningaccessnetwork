@@ -19,6 +19,7 @@ import Navbar from "@/components/NavBar";
 import { auth, db } from "@/lib/firebaseConfig";
 import { useAds, injectAds } from "@/lib/useAds";
 import FeaturedAdsCarousel from "@/components/FeaturedAdsCarousel";
+import HomeBountyStrip from "@/components/HomeBountyStrip";
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -36,7 +37,7 @@ const documentTypes = [
     { name: "Summary", slug: "summary", image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=400", description: "Quick study breakdowns" },
     { name: "Syllabus", slug: "syllabus", image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400", description: "Course requirements" },
     { name: "Course Outline", slug: "course-outline", image: "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=400", description: "Topic distributions" },
-    { name: "Assignment", slug: "assignment", image: "https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=400", description: "Practice tasks and projects" },
+    { name: "signment", slug: "assignment", image: "https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=400", description: "Practice tasks and projects" },
     { name: "Project", slug: "project", image: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400", description: "Detailed student projects" },
     { name: "Lab Manual", slug: "lab-manual", image: "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=400", description: "Practical guides and lab reports" },
     { name: "Handwritten Notes", slug: "handwritten-notes", image: "https://images.unsplash.com/photo-1503467913725-8484b65b0715?w=400", description: "Authentic student class notes" },
@@ -46,6 +47,7 @@ const documentTypes = [
 ];
 
 const categories = [
+    { name: "Mathematics", slug: "mathematics", faculty: "Sciences", sub: 11, image: "https://images.unsplash.com/photo-1509228468518-180dd4864904?w=600", description: "Calculus, algebra, statistics, and pure mathematics" },
     { name: "Mass Communication", slug: "mass-communication", faculty: "Arts & Social", sub: 7, image: "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=600", description: "Journalism, broadcasting, public relations and digital media" },
     { name: "Public Administration", slug: "public-administration", faculty: "Arts & Social", sub: 7, image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600", description: "Governance, public policy, local government and civil service" },
     { name: "Medicine & Health Sciences", slug: "medicine-health-sciences", faculty: "Sciences", sub: 14, image: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=600", description: "Anatomy, physiology, clinical studies and medical education resources" },
@@ -56,7 +58,6 @@ const categories = [
     { name: "Biology", slug: "biology", faculty: "Sciences", sub: 9, image: "https://images.unsplash.com/photo-1530026405186-ed1f139313f8?w=600", description: "Ecology, genetics, zoology, botany and life sciences" },
     { name: "Chemistry", slug: "chemistry", faculty: "Sciences", sub: 10, image: "https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?w=600", description: "Organic, inorganic, physical chemistry and laboratory practice" },
     { name: "Physics", slug: "physics", faculty: "Sciences", sub: 8, image: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=600", description: "Mechanics, electromagnetism, quantum physics and modern science" },
-    { name: "Mathematics", slug: "mathematics", faculty: "Sciences", sub: 11, image: "https://images.unsplash.com/photo-1509228468518-180dd4864904?w=600", description: "Calculus, algebra, statistics, and pure mathematics" },
     { name: "Statistics", slug: "statistics", faculty: "Sciences", sub: 7, image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600", description: "Data analysis, probability theory and applied statistics" },
     { name: "Veterinary Medicine", slug: "veterinary-medicine", faculty: "Sciences", sub: 6, image: "https://images.unsplash.com/photo-1596854407944-bf87f6fdd49e?w=600", description: "Animal health, veterinary surgery and clinical sciences" },
     { name: "Law", slug: "law", faculty: "Arts & Social", sub: 12, image: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600", description: "Constitutional law, criminal law, contracts and legal practice" },
@@ -364,7 +365,7 @@ export default function HomeClient() {
                     {/* ── Dark overlay ── */}
                     <div style={{
                         position: "absolute", inset: 0,
-                        background: "linear-gradient(to bottom, rgba(13,34,68,0.82) 0%, rgba(13,34,68,0.75) 60%, rgba(13,34,68,0.95) 100%)",
+                        background: "linear-gradient(to bottom, rgba(11,30,65,0.80) 0%, rgba(10,24,58,0.55) 60%, rgba(10,34,48,0.75) 100%)",
                     }} />
 
                     {/* ── dot-grid pattern ── */}
@@ -403,7 +404,7 @@ export default function HomeClient() {
                                 fontSize: "clamp(42px, 7vw, 78px)", fontWeight: 900,
                                 color: "#fff", lineHeight: 1.02, letterSpacing: "-1.10px", margin: "0 0 24px"
                             }}>
-                                [ LAN LIBRARY ]<br />
+                                [LAN LIBRARY]<br />
                                 <span style={{ color: GOLD, fontStyle: "italic", fontSize: "30px" }}>
                                     | Africa's Academic EdTech Marketplace.
                                 </span>
@@ -434,15 +435,14 @@ export default function HomeClient() {
                                 boxShadow: "0 32px 80px rgba(0,0,0,0.5)",
                                 overflow: "hidden",
                             }}>
-                                {/* ← swap this src for any second image you want beside the text */}
                                 <img
                                     src="/stud.png"
                                     alt="LAN Library students"
                                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                                     onError={e => {
-                                        e.target.src = "/stud.png";
+                                        e.target.src = "/stud2.png";
                                     }}
-                                />
+                                    />
 
                                 {/* gold corner accents */}
                                 <div style={{ position: "absolute", top: 0, left: 0, width: "28px", height: "28px", borderTop: `2px solid ${GOLD}`, borderLeft: `2px solid ${GOLD}` }} />
@@ -558,7 +558,7 @@ export default function HomeClient() {
                                                 flexShrink: 0,
                                                 border: "0.5px solid #e5ddd0",
                                             }}
-                                            onError={e => { e.target.style.display = "none"; }}
+                                            onError={e => { e.target.style.display = "LAN Documents"; }}
                                         />
                                     )}
 
@@ -592,7 +592,7 @@ export default function HomeClient() {
                     </div>
                 )}
 
-
+<HomeBountyStrip />
 
                 {/* ══════════════════════════════════════════════════════════
     UNIVERSITY HUBS
@@ -787,7 +787,7 @@ export default function HomeClient() {
                                                 <div style={{ position: "relative", background: "#ede8df" }}>
                                                     <img src={book.image} alt={book.title}
                                                         style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", transition: "box-shadow 0.2s" }}
-                                                        onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
+                                                        onError={e => { e.target.display = "none"; }}
                                                         className="book-thumb"
                                                     />
                                                     <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontFamily: "'Lato',sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff" }}>
@@ -821,7 +821,7 @@ export default function HomeClient() {
                                                 <div style={{ position: "relative", background: "#ede8df" }}>
                                                     <img src={book.image} alt={book.title}
                                                         style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", transition: "box-shadow 0.2s" }}
-                                                        onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
+                                                        onError={e => { e.target.display = "none"; }}
                                                         className="book-thumb"
                                                     />
                                                     <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontFamily: "'Lato',sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff" }}>
@@ -914,6 +914,7 @@ export default function HomeClient() {
                                                     <img
                                                         src={cat.image}
                                                         alt={cat.name}
+                                                        onError ={e => {e.target.src = "/studs.png"}}
                                                         className="browse-img"
                                                         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                                                     />

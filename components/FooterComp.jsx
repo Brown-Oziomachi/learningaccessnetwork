@@ -196,7 +196,7 @@ export default function Footer() {
                 { label: "Contact Us", href: "/contact/lan/4/enquiry" },
                 { label: "How It Works", href: "/learn/make-money" },
                 { label: "FAQs", href: "/lan/faqs" },
-                { label: "Referral", href: "/referrals" },
+                { label: "Referral", href: "/ref/invite-friends" },
                 { label: "Transfer", href: "/transfer" },
                 { label: "Help Center", href: "/lan/net/help-center" },
               ].map(({ label, href }) => (

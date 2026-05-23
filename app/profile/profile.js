@@ -41,9 +41,8 @@ import {
     Globe,
     ShoppingBag,
     Lock,
-    TrendingUp,
     Sparkles,
-    ChevronRight,
+
 } from "lucide-react";
 
 /* ─── Design Tokens ─────────────────────────────────────── */
@@ -729,11 +728,9 @@ const [resolvedUid, setResolvedUid] = useState(null);
                 if (ud.exists()) {
                     const u = ud.data();
                     setUserData(u);
-                    if (!sellerName || sellerName === "Unknown")
-                        sellerName =
-                            u.displayName ||
-                            `${u.firstName || ""} ${u.surname || ""}`.trim() ||
-                            sellerName;
+                    // Always prefer users collection — it's what edit profile updates
+                    const usersName = `${u.firstName || ""} ${u.surname || ""}`.trim() || u.displayName;
+                    if (usersName) sellerName = usersName;
                     setSellerPhoto(
                         u.photoBase64 || u.photoURL || u.profilePicture || null
                     );

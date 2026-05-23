@@ -1065,7 +1065,7 @@ export default function ShareProfilePage() {
             students discover your materials.
           </p>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/my-account/seller-account")}
             style={{
               display: "inline-flex",
               alignItems: "center",

@@ -192,7 +192,7 @@ export default function CountryClient() {
                     {country && (
                         <div className="lan-selected-box">
                             <div className="lan-selected-dot" />
-                            {country}
+                            {country} 
                         </div>
                     )}
 

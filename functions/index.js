@@ -4,7 +4,7 @@
  * route (powered by Resend) — no Firebase mail extension needed.
  *
  * Deploy:  firebase deploy --only functions
- * Config:  firebase functions:config:set app.site_url="https://lanlibrary.com"
+ * Config:  firebase functions:config:set app.site_url="https://learningaccessnetwork.com"
  */
 
 const functions = require("firebase-functions");
@@ -20,7 +20,7 @@ const db = admin.firestore();
 const SITE_URL = () =>
     functions.config().app?.site_url ||
     process.env.NEXT_PUBLIC_SITE_URL ||
-    "https://lanlibrary.com";
+    "https://learningaccessnetwork.com";
 
 async function callMailAPI(payload) {
     const url = `${SITE_URL()}/api/send-seller-notification`;

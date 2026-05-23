@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
                 if (code === 'auth/user-not-found') setError('No account found with this email address.');
                 else if (code === 'auth/invalid-email') setError('Invalid email address format.');
                 else if (code === 'auth/too-many-requests') setError('Too many attempts. Please try again later.');
-                else setError(`Failed to send reset email: ${result.error?.message || 'Unknown error'}`);
+                else setError(`Failed to send reset email: Check your network connection`);
             }
         } catch { setError('An unexpected error occurred. Please try again.'); }
         finally { setLoading(false); }

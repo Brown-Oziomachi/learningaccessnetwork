@@ -12,7 +12,6 @@ import {
   Book,
   BookOpen,
   ChevronRight,
-  Sparkles,
   HelpCircle,
   Crown,
   FileText,
@@ -22,9 +21,14 @@ import {
   ClipboardList,
   PenTool,
   Folder,
-  Bell,
   Home,
   WifiOff,
+  ShoppingBag,
+  Sparkle,
+  BookOpenIcon,
+  Copy,
+  Globe2,
+  Video,
 } from "lucide-react";
 import Link from "next/link";
 import { signOut } from "firebase/auth";
@@ -38,38 +42,135 @@ import {
   where,
   doc,
   getDoc,
-  onSnapshot,  // ← ADD THIS
+  onSnapshot,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { createPortal } from "react-dom";
 
-/* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
 const GOLD = "#b8963e";
 const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
-const TOPBAR_BG = "#f9f6f0";
 
-/* ─── search tag data ────────────────────────────────────────── */
 const searchTags = [
   { name: "Textbook", description: "Standard educational books", icon: Book },
-  { name: "Lecture Note", description: "Summarized class materials", icon: FileText },
-  { name: "Past Question", description: "Previous exam papers", icon: FileQuestion },
-  { name: "Thesis", description: "Academic research papers", icon: GraduationCap },
+  {
+    name: "Lecture Note",
+    description: "Summarized class materials",
+    icon: FileText,
+  },
+  {
+    name: "Past Question",
+    description: "Previous exam papers",
+    icon: FileQuestion,
+  },
+  {
+    name: "Thesis",
+    description: "Academic research papers",
+    icon: GraduationCap,
+  },
   { name: "Summary", description: "Quick study breakdowns", icon: List },
   { name: "Syllabus", description: "Course requirements", icon: ClipboardList },
-  { name: "Course Outline", description: "Topic distributions", icon: BookOpen },
-  { name: "Assignment", description: "Practice tasks and projects", icon: PenTool },
+  {
+    name: "Course Outline",
+    description: "Topic distributions",
+    icon: BookOpen,
+  },
+  {
+    name: "Assignment",
+    description: "Practice tasks and projects",
+    icon: PenTool,
+  },
   { name: "Project", description: "Detailed student projects", icon: Folder },
 ];
 
-/* ─── category nav items ─────────────────────────────────────── */
 const NAV_CATS = [
   { key: "education", label: "Education" },
   { key: "business", label: "Business" },
   { key: "technology", label: "Technology" },
   { key: "science", label: "Science" },
-  { key: "sexeducation", label: "Sex Education", href: "/category/sex-education" },
+  {
+    key: "sexeducation",
+    label: "Sex Education",
+    href: "/category/sex-education",
+  },
+];
+
+const SAVED_MENU_ITEMS = [
+  {
+    icon: Bookmark,
+    label: "Saved Books",
+    description: "Your saved library collection",
+    href: "/saved-my-book",
+    color: GOLD,
+  },
+  {
+    icon: ShoppingBag,
+    label: "Explore Sellers",
+    description: "Browse document from sellers",
+    href: "/lan-sellers/en/@/lib",
+    color: GOLD,
+  },
+  {
+    icon: Crown,
+    label: "Follow Lecturers",
+    description: "Follow your favourite lecturer",
+    href: "/lecturers",
+    color: GOLD,
+  },
+  {
+    icon: Globe2,
+    label: "Invite Friends",
+    description: "Refer friends & earn 500",
+    href: "/ref/invite-friends",
+    color: GOLD,
+  },
+  {
+    icon: Copy,
+    label: "Copy Profile",
+    description: "Showcase your profile",
+    href: "/my-account/seller-account/share-profile",
+    color: GOLD,
+  },
+  {
+    icon: Sparkle,
+    label: "Ask AI",
+    description: "Get summaries & Book concept",
+    href: "/ai-chat",
+    color: GOLD,
+  },
+ 
+];
+
+const MORE_TOOLS_ITEMS = [
+  {
+    icon: HelpCircle,
+    label: "Help Center",
+    description: "Guides & support articles",
+    href: "/lan/net/help-center",
+    color: GOLD,
+  },
+  {
+    icon: FileText,
+    label: "Bounty Board-ABB",
+    description: "Request missing study materials",
+    href: "/academic/bounty/board",
+    color: GOLD,
+  },
+  {
+    icon: GraduationCap,
+    label: "Open Resources",
+    description: "Free academic materials",
+    href: "/open-access",
+    color: GOLD,
+  },
+   {
+    icon: Video,
+    label: "Watch More Videos",
+    description: "Step-by-Step Tutorials",
+    href: "/learn/make-money",
+    color: GOLD,
+  },
 ];
 
 export default function Navbar() {
@@ -85,49 +186,53 @@ export default function Navbar() {
   const [showSearchTags, setShowSearchTags] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [isOnline, setIsOnline] = useState(
+    typeof window !== "undefined" ? window.navigator.onLine : true,
+  );
+  const [announcement, setAnnouncement] = useState(null);
+  const [showSavedMenu, setShowSavedMenu] = useState(false);
+  const [showMoreTools, setShowMoreTools] = useState(false);
+
+  const savedMenuRef = useRef(null);
+  const savedBtnRef = useRef(null);
+  const savedMenuTimer = useRef(null);
+  const moreToolsRef = useRef(null);
+  const moreToolsTriggerRef = useRef(null);
+  const moreToolsTimer = useRef(null);
   const catButtonRefs = useRef({});
-  const router = useRouter();
   const searchTagsRef = useRef(null);
   const dropdownTimer = useRef(null);
- const [isDesktop, setIsDesktop] = useState(false);
-  const [isOnline, setIsOnline] = useState(
-    typeof window !== "undefined" ? window.navigator.onLine : true
-  );
-    const [announcement, setAnnouncement] = useState(null);
+  const router = useRouter();
 
-    useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+  useEffect(() => {
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
     };
   }, []);
 
   useEffect(() => {
-    const ref = doc(db, 'siteSettings', 'announcement');
+    const ref = doc(db, "siteSettings", "announcement");
     const unsub = onSnapshot(ref, (snap) => {
       if (snap.exists()) {
-        const data = snap.data();
-        if (data.active) setAnnouncement(data);
-        else setAnnouncement(null);
-      } else {
-        setAnnouncement(null);
-      }
+        const d = snap.data();
+        setAnnouncement(d.active ? d : null);
+      } else setAnnouncement(null);
     });
     return () => unsub();
   }, []);
 
-  /* scroll shadow */
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  /* fetch books */
   useEffect(() => {
     const fetchBooks = async () => {
       try {
@@ -156,7 +261,6 @@ export default function Navbar() {
     fetchBooks();
   }, []);
 
-  /* auth */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (cu) => {
       setUser(cu);
@@ -178,15 +282,13 @@ export default function Navbar() {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth > 900);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
-useEffect(() => {
-  const check = () => setIsDesktop(window.innerWidth > 900);
-  check(); // run on mount
-  window.addEventListener("resize", check);
-  return () => window.removeEventListener("resize", check);
-}, []);
-
-  /* click outside search tags */
   useEffect(() => {
     const handler = (e) => {
       if (searchTagsRef.current && !searchTagsRef.current.contains(e.target))
@@ -196,7 +298,20 @@ useEffect(() => {
     return () => document.removeEventListener("mousedown", handler);
   }, [showSearchTags]);
 
-  /* helpers */
+  useEffect(() => {
+    const handler = (e) => {
+      if (
+        savedMenuRef.current &&
+        !savedMenuRef.current.contains(e.target) &&
+        savedBtnRef.current &&
+        !savedBtnRef.current.contains(e.target)
+      )
+        setShowSavedMenu(false);
+    };
+    if (showSavedMenu) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showSavedMenu]);
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -207,61 +322,86 @@ useEffect(() => {
   };
 
   const HandleClick = () => {
-    if (!user) { router.push("/auth/signin"); return; }
+    if (!user) {
+      router.push("/auth/signin");
+      return;
+    }
     router.push(isSeller ? "/upload-document" : "/become-seller");
   };
 
   const handleMyAccountClick = async () => {
-    if (!user) { router.push("/auth/signin"); return; }
+    if (!user) {
+      router.push("/auth/signin");
+      return;
+    }
     try {
       const snap = await getDoc(doc(db, "users", user.uid));
-      if (!snap.exists()) { router.push("/role-selection"); return; }
+      if (!snap.exists()) {
+        router.push("/role-selection");
+        return;
+      }
       const data = snap.data();
-      if (!data.role) { router.push("/role-selection"); return; }
+      if (!data.role) {
+        router.push("/role-selection");
+        return;
+      }
       if (data.role === "student") router.push("/student/dashboard");
-      else if (data.role === "seller" || data.isSeller) router.push("/my-account/seller-account");
+      else if (data.role === "seller" || data.isSeller)
+        router.push("/my-account/seller-account");
       else router.push("/");
     } catch {
       router.push("/");
     }
   };
 
-  /* ─── FIX: getBooksByCategory is defined INSIDE useMemo so it
-         always reads the current allBooks when the memo recalculates ─── */
+  const openSavedMenu = () => {
+    clearTimeout(savedMenuTimer.current);
+    setShowSavedMenu(true);
+  };
+  const closeSavedMenu = () => {
+    savedMenuTimer.current = setTimeout(() => setShowSavedMenu(false), 180);
+  };
+  const openMoreTools = () => {
+    clearTimeout(moreToolsTimer.current);
+    setShowMoreTools(true);
+  };
+  const closeMoreTools = () => {
+    moreToolsTimer.current = setTimeout(() => setShowMoreTools(false), 180);
+  };
+
   const menuCategories = useMemo(() => {
-    const getBooksByCategory = (cat) =>
+    const get = (cat) =>
       allBooks
         .filter((b) => b.category?.toLowerCase().includes(cat.toLowerCase()))
         .slice(0, 6);
-
     return {
       education: {
         title: "Education Documents",
         description: "Academic resources and study guides",
-        books: getBooksByCategory("education"),
+        books: get("education"),
       },
       business: {
         title: "Business Documents",
         description: "Management, finance, entrepreneurship",
-        books: getBooksByCategory("business"),
+        books: get("business"),
       },
       technology: {
         title: "Technology Documents",
         description: "Programming, IT, digital innovation",
-        books: getBooksByCategory("technology"),
+        books: get("technology"),
       },
       science: {
         title: "Science Documents",
         description: "Research, discoveries, exploration",
-        books: getBooksByCategory("science"),
+        books: get("science"),
       },
       sexeducation: {
         title: "Sex Education",
         description: "Sexual health, relationships, wellness",
-        books: getBooksByCategory("sex education"),
+        books: get("sex education"),
       },
     };
-  }, [allBooks]); // ← allBooks is the only dep; memo re-runs whenever books load
+  }, [allBooks]);
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -270,244 +410,161 @@ useEffect(() => {
     }
   };
 
-  /* dropdown hover with delay to avoid flicker */
   const openDropdown = (key) => {
-  clearTimeout(dropdownTimer.current);
-  const btn = catButtonRefs.current[key];
-  if (btn) {
-    const rect = btn.getBoundingClientRect();
-    setDropdownPos({ top: rect.bottom, left: rect.left });
-  }
-  setActiveDropdown(key);
-};
+    clearTimeout(dropdownTimer.current);
+    const btn = catButtonRefs.current[key];
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      setDropdownPos({ top: rect.bottom, left: rect.left });
+    }
+    setActiveDropdown(key);
+  };
   const closeDropdown = () => {
     dropdownTimer.current = setTimeout(() => setActiveDropdown(null), 180);
   };
 
+  /* ── shared inner renderer for Space menu items ── */
+  const spaceItemInner = (item) => {
+    const Icon = item.icon;
+    return (
+      <>
+        <div
+          style={{
+            width: "64px",
+            height: "34px",
+            borderRadius: "9px",
+            flexShrink: 0,
+            border: `0.5px solid ${item.color}30`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: NAVY,
+          }}
+        >
+          <Icon size={15} style={{ color: item.color }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: "13px",
+              fontWeight: 700,
+              color: NAVY,
+              fontFamily: "'Lato',sans-serif",
+              lineHeight: 1.2,
+            }}
+          >
+            {item.label}
+          </div>
+          <div
+            style={{
+              fontSize: "11px",
+              color: "#888",
+              fontFamily: "'Lato',sans-serif",
+              marginTop: "2px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {item.description}
+          </div>
+        </div>
+        <ChevronRight size={13} style={{ color: "#999", flexShrink: 0 }} />
+      </>
+    );
+  };
+
   return (
     <>
-      {/* ── global styles ──────────────────────────────────────── */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
 
-        .lan-nav-link {
-          display: flex; align-items: center; gap: 5px;
-          font-size: 13px; font-family: 'Lato', sans-serif;
-          font-weight: 400; letter-spacing: 0.01em;
-          padding: 8px 12px; border-radius: 6px;
-          color: rgba(245,240,232,0.82);
-          transition: color 0.18s, background 0.18s;
-          text-decoration: none; cursor: pointer;
-          background: none; border: none;
-        }
-        .lan-nav-link:hover { color: ${CREAM}; background: rgba(255,255,255,0.07); }
+        .lan-nav-link { display:flex; align-items:center; gap:5px; font-size:13px; font-family:'Lato',sans-serif; font-weight:400; padding:8px 12px; border-radius:6px; color:rgba(245,240,232,0.82); transition:color 0.18s,background 0.18s; text-decoration:none; cursor:pointer; background:none; border:none; }
+        .lan-nav-link:hover { color:${CREAM}; background:rgba(255,255,255,0.07); }
 
-        .lan-cat-btn {
-          display: flex; align-items: center; gap: 4px;
-          font-size: 12px; font-family: 'Lato', sans-serif;
-          font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-          padding: 10px 14px; color: #555;
-          background: none; border: none; cursor: pointer;
-          transition: color 0.15s, background 0.15s;
-          white-space: nowrap;
-        }
-        .lan-cat-btn:hover, .lan-cat-btn.active { color: ${NAVY}; background: rgba(13,34,68,0.06); }
+        .lan-cat-btn { display:flex; align-items:center; gap:4px; font-size:12px; font-family:'Lato',sans-serif; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; padding:10px 14px; color:#555; background:none; border:none; cursor:pointer; transition:color 0.15s,background 0.15s; white-space:nowrap; }
+        .lan-cat-btn:hover, .lan-cat-btn.active { color:${NAVY}; background:rgba(13,34,68,0.06); }
 
-        /* ─── DESKTOP DROPDOWN FIX: removed top gap that caused mouseLeave ─── */
-        .lan-dropdown-wrapper {
-          position: relative;
-        }
-        .lan-dropdown-wrapper::after {
-          content: '';
-          position: absolute;
-          top: 100%;
-          left: 0;
-          right: 0;
-          height: 8px; /* bridges the 1px gap between button and dropdown */
-          background: transparent;
-        }
-        .lan-dropdown {
-          position: fixed;
-          min-width: 640px; background: #fff;
-          border: 0.5px solid #e8e2d8;
-          box-shadow: 0 20px 60px rgba(13,34,68,0.14);
-          z-index: 9999; padding: 0;
-          animation: dropIn 0.18s cubic-bezier(0.4,0,0.2,1);
-        }
-        @keyframes dropIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+        .lan-dropdown-wrapper { position:relative; }
+        .lan-dropdown-wrapper::after { content:''; position:absolute; top:100%; left:0; right:0; height:8px; background:transparent; }
 
-        .lan-book-card {
-          padding: 10px; border: 0.5px solid #ede8df; border-radius: 6px;
-          transition: border-color 0.15s, box-shadow 0.15s;
-          text-decoration: none; display: block;
-        }
-        .lan-book-card:hover { border-color: ${GOLD}; box-shadow: 0 4px 16px rgba(184,150,62,0.12); }
+        .lan-dropdown { position:fixed; min-width:640px; background:#fff; border:0.5px solid #e8e2d8; box-shadow:0 20px 60px rgba(13,34,68,0.14); z-index:9999; padding:0; animation:dropIn 0.18s cubic-bezier(0.4,0,0.2,1); }
+        @keyframes dropIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
 
-        .lan-sell-btn {
-          font-family: 'Lato', sans-serif; font-weight: 700; font-size: 12px;
-          letter-spacing: 0.06em; text-transform: uppercase;
-          padding: 9px 18px; border-radius: 6px;
-          background: ${GOLD}; color: ${NAVY}; border: none; cursor: pointer;
-          transition: background 0.18s; white-space: nowrap;
-        }
-        .lan-sell-btn:hover:not(:disabled) { background: ${GOLDD}; }
-        .lan-sell-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .lan-saved-dropdown { position:absolute; top:calc(100% + 10px); right:0; background:#fff; border:0.5px solid #e8e2d8; border-radius:14px; box-shadow:0 20px 60px rgba(13,34,68,0.16); z-index:9999; width:260px; padding:8px; animation:dropIn 0.18s cubic-bezier(0.4,0,0.2,1); }
+        .lan-saved-menu-item { display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:10px; text-decoration:none; cursor:pointer; transition:background 0.15s; border:none; background:none; width:100%; text-align:left; }
+        .lan-saved-menu-item:hover { background:#f9f6f0; }
+        .lan-saved-menu-divider { height:0.5px; background:#f0ebe0; margin:4px 8px; }
 
-        .lan-logout-btn {
-          display: flex; align-items: center; gap: 6px;
-          padding: 8px 12px; border-radius: 6px; font-size: 12px;
-          background: rgba(185,28,28,0.12); color: #ef4444;
-          border: 0.5px solid rgba(239,68,68,0.2); cursor: pointer;
-          transition: background 0.15s; font-family: 'Lato', sans-serif;
-        }
-        .lan-logout-btn:hover { background: rgba(185,28,28,0.22); }
+        .lan-saved-trigger { display:flex; align-items:center; gap:5px; font-size:13px; font-family:'Lato',sans-serif; font-weight:400; padding:8px 12px; border-radius:6px; color:rgba(245,240,232,0.82); transition:color 0.18s,background 0.18s; cursor:pointer; background:none; border:none; position:relative; }
+        .lan-saved-trigger:hover, .lan-saved-trigger.open { color:${CREAM}; background:rgba(255,255,255,0.07); }
+        .lan-saved-trigger .chevron { transition:transform 0.2s; }
+        .lan-saved-trigger.open .chevron { transform:rotate(180deg); }
 
-        .lan-search-wrap {
-          position: relative; flex: 1; max-width: 480px;
-        }
-        .lan-search-input {
-          width: 100%; padding: 9px 40px 9px 16px;
-          background: rgba(255,255,255,0.09); border: 0.5px solid rgba(184,150,62,0.3);
-          border-radius: 8px; font-size: 13px; color: ${CREAM};
-          font-family: 'Lato', sans-serif; outline: none;
-          transition: border-color 0.18s, background 0.18s;
-        }
-        .lan-search-input::placeholder { color: rgba(245,240,232,0.38); }
-        .lan-search-input:focus { border-color: ${GOLD}; background: rgba(255,255,255,0.13); }
+        .lan-more-tools-trigger { display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:10px; cursor:pointer; transition:background 0.15s; border:none; background:none; width:100%; text-align:left; }
+        .lan-more-tools-trigger:hover { background:#f9f6f0; }
+        .lan-more-tools-panel { position:absolute; bottom:0; right:calc(100% + 10px); width:240px; background:#fff; border:0.5px solid #e8e2d8; border-radius:14px; box-shadow:0 20px 60px rgba(13,34,68,0.16); z-index:10000; padding:8px; animation:dropIn 0.18s cubic-bezier(0.4,0,0.2,1); }
 
-        .lan-tag-dropdown {
-          position: absolute; top: calc(100% + 8px); left: 0; right: 0;
-          background: #fff; border: 0.5px solid #e8e2d8;
-          box-shadow: 0 16px 48px rgba(13,34,68,0.16);
-          border-radius: 10px; z-index: 999; padding: 12px;
-          animation: dropIn 0.18s cubic-bezier(0.4,0,0.2,1);
-        }
-        .lan-tag-btn {
-          display: flex; align-items: flex-start; gap: 8px; padding: 10px;
-          border-radius: 7px; cursor: pointer; text-align: left; width: 100%;
-          background: none; border: none;
-          transition: background 0.15s;
-        }
-        .lan-tag-btn:hover { background: #f9f6f0; }
+        .lan-book-card { padding:10px; border:0.5px solid #ede8df; border-radius:6px; transition:border-color 0.15s,box-shadow 0.15s; text-decoration:none; display:block; }
+        .lan-book-card:hover { border-color:${GOLD}; box-shadow:0 4px 16px rgba(184,150,62,0.12); }
 
-        .lan-mobile-overlay {
-          position: fixed; inset: 0; background: #fff; z-index: 9999;
-          overflow-y: auto; font-family: 'Lato', sans-serif;
-          animation: slideInLeft 0.25s cubic-bezier(0.4,0,0.2,1);
-        }
-        @keyframes slideInLeft { from { transform: translateX(-100%); opacity: 0.6; } to { transform: translateX(0); opacity: 1; } }
+        .lan-sell-btn { font-family:'Lato',sans-serif; font-weight:700; font-size:12px; letter-spacing:0.06em; text-transform:uppercase; padding:9px 18px; border-radius:6px; background:${GOLD}; color:${NAVY}; border:none; cursor:pointer; transition:background 0.18s; white-space:nowrap; }
+        .lan-sell-btn:hover:not(:disabled) { background:${GOLDD}; }
+        .lan-sell-btn:disabled { opacity:0.6; cursor:not-allowed; }
 
-        .lan-mobile-link {
-          display: flex; align-items: center; gap: 12px;
-          padding: 13px 20px; border-radius: 8px; font-size: 14px;
-          color: ${NAVY}; text-decoration: none; font-weight: 500;
-          transition: background 0.15s; cursor: pointer;
-          background: none; border: none; width: 100%;
-        }
-        .lan-mobile-link:hover { background: #f9f6f0; }
+        .lan-logout-btn { display:flex; align-items:center; gap:6px; padding:8px 12px; border-radius:6px; font-size:12px; background:rgba(185,28,28,0.12); color:#ef4444; border:0.5px solid rgba(239,68,68,0.2); cursor:pointer; transition:background 0.15s; font-family:'Lato',sans-serif; }
+        .lan-logout-btn:hover { background:rgba(185,28,28,0.22); }
 
-        /* ─── MOBILE: book cards in submenu ─── */
-        .lan-mobile-book-card {
-          padding: 12px 16px;
-          border: 0.5px solid #ede8df;
-          border-radius: 8px;
-          background: #fdfaf6;
-          text-decoration: none;
-          display: block;
-          transition: border-color 0.15s, box-shadow 0.15s;
-        }
-        .lan-mobile-book-card:hover {
-          border-color: ${GOLD};
-          box-shadow: 0 4px 16px rgba(184,150,62,0.12);
-        }
+        .lan-search-wrap { position:relative; flex:1; max-width:480px; }
+        .lan-search-input { width:100%; padding:9px 40px 9px 16px; background:rgba(255,255,255,0.09); border:0.5px solid rgba(184,150,62,0.3); border-radius:8px; font-size:13px; color:${CREAM}; font-family:'Lato',sans-serif; outline:none; transition:border-color 0.18s,background 0.18s; }
+        .lan-search-input::placeholder { color:rgba(245,240,232,0.38); }
+        .lan-search-input:focus { border-color:${GOLD}; background:rgba(255,255,255,0.13); }
 
-        .lan-divider-gold {
-          height: 1px; background: linear-gradient(90deg, transparent, ${GOLD}, transparent);
-          opacity: 0.35; margin: 8px 0;
+        .lan-tag-dropdown { position:absolute; top:calc(100% + 8px); left:0; right:0; background:#fff; border:0.5px solid #e8e2d8; box-shadow:0 16px 48px rgba(13,34,68,0.16); border-radius:10px; z-index:999; padding:12px; animation:dropIn 0.18s cubic-bezier(0.4,0,0.2,1); }
+        .lan-tag-btn { display:flex; align-items:flex-start; gap:8px; padding:10px; border-radius:7px; cursor:pointer; text-align:left; width:100%; background:none; border:none; transition:background 0.15s; }
+        .lan-tag-btn:hover { background:#f9f6f0; }
+
+        .lan-mobile-overlay { position:fixed; inset:0; background:#fff; z-index:9999; overflow-y:auto; font-family:'Lato',sans-serif; animation:slideInLeft 0.25s cubic-bezier(0.4,0,0.2,1); }
+        @keyframes slideInLeft { from{transform:translateX(-100%);opacity:0.6} to{transform:translateX(0);opacity:1} }
+
+        .lan-mobile-link { display:flex; align-items:center; gap:12px; padding:13px 20px; border-radius:8px; font-size:14px; color:${NAVY}; text-decoration:none; font-weight:500; transition:background 0.15s; cursor:pointer; background:none; border:none; width:100%; }
+        .lan-mobile-link:hover { background:#f9f6f0; }
+
+        .lan-mobile-book-card { padding:12px 16px; border:0.5px solid #ede8df; border-radius:8px; background:#fdfaf6; text-decoration:none; display:block; transition:border-color 0.15s,box-shadow 0.15s; }
+        .lan-mobile-book-card:hover { border-color:${GOLD}; box-shadow:0 4px 16px rgba(184,150,62,0.12); }
+
+        .lan-sell-btn-wrap { transition:opacity 0.3s ease-in-out,transform 0.3s ease-in-out; }
+        .lan-sell-btn-wrap.offline { opacity:0.7; }
+
+        @keyframes spin { to{transform:rotate(360deg)} }
+        @keyframes fabPop { from{transform:scale(0.7);opacity:0} to{transform:scale(1);opacity:1} }
+
+        @media (max-width:900px) {
+          #hamburger-btn    { display:flex !important; }
+          .lan-search-wrap  { display:none !important; }
+          nav               { display:none !important; }
+          .lan-category-bar { display:none !important; }
         }
-
-        .lan-topbar-ticker {
-          display: flex; align-items: center; gap: 6px;
-          font-size: 12px; font-family: 'Lato', sans-serif;
-          font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-          color: ${NAVY}; padding: 8px 16px; background: ${TOPBAR_BG};
-          justify-content: center; text-decoration: none;
-          border-bottom: 1px solid rgba(13,34,68,0.08);
-          transition: background 0.15s;
-        }
-        .lan-topbar-ticker:hover { background: #f0ebe0; }
-
-        .lan-ai-fab {
-          position: fixed; bottom: 96px; right: 20px; z-index: 9999;
-          display: flex; align-items: center; gap: 7px;
-          background: linear-gradient(135deg, #0ea5e9, #0284c7);
-          color: #fff; font-size: 13px; font-weight: 700;
-          font-family: 'Lato', sans-serif;
-          padding: 11px 18px; border-radius: 999px;
-          box-shadow: 0 6px 24px rgba(14,165,233,0.38);
-          text-decoration: none;
-          transition: transform 0.2s, box-shadow 0.2s;
-          animation: fabPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
-        }
-        .lan-ai-fab:hover { transform: scale(1.06); box-shadow: 0 8px 32px rgba(14,165,233,0.5); }
-        @keyframes fabPop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .lan-sell-btn-wrap { transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; }
-        .lan-sell-btn-wrap.offline { opacity: 0.7; }
-        .lan-sell-btn-wrap.online { opacity: 1; transform: translateY(0); }
-
-       @media (max-width: 900px) {
-      #hamburger-btn { display: flex !important; }
-      .lan-search-wrap { display: none !important; }
-      nav { display: none !important; }
-      .lan-category-bar { display: none !important; }
-    }
       `}</style>
 
-      {/* ══ TOP ANNOUNCEMENT BAR ══ */}
+      {/* ══ ANNOUNCEMENT BANNER ══ */}
       {announcement && (
         <>
           <style>{`
-           @keyframes tickerScroll {
-            0%   { transform: translateX(0%); }
-            100% { transform: translateX(-50%); }
-          }
-          .lan-ticker-track {
-            display: flex;
-            white-space: nowrap;
-            animation: tickerScroll 18s linear infinite;
-            width: max-content;
-          }
-            .lan-ticker-track:hover { animation-play-state: paused; }
-            .lan-ticker-bar {
-              background: ${announcement.bgColor || NAVY};
-              border-bottom: 1px solid rgba(184,150,62,0.22);
-              overflow: hidden;
-              height: 34px;
-              display: flex;
-              align-items: center;
-              position: relative;
-            }
-            .lan-ticker-bar::before, .lan-ticker-bar::after {
-              content: '';
-              position: absolute;
-              top: 0; bottom: 0;
-              width: 60px;
-              z-index: 2;
-              pointer-events: none;
-            }
-            .lan-ticker-bar::before {
-              left: 0;
-              background: linear-gradient(to right, ${announcement.bgColor || NAVY}, transparent);
-            }
-            .lan-ticker-bar::after {
-              right: 0;
-              background: linear-gradient(to left, ${announcement.bgColor || NAVY}, transparent);
-            }
+            @keyframes tickerScroll { 0%{transform:translateX(0%)} 100%{transform:translateX(-50%)} }
+            .lan-ticker-track { display:flex; white-space:nowrap; animation:tickerScroll 18s linear infinite; width:max-content; }
+            .lan-ticker-track:hover { animation-play-state:paused; }
           `}</style>
-
-          <div className="lan-ticker-bar">
+          <div
+            style={{
+              background: announcement.bgColor || NAVY,
+              borderBottom: "1px solid rgba(184,150,62,0.22)",
+              overflow: "hidden",
+              height: "34px",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
             <div
               style={{
                 flexShrink: 0,
@@ -516,7 +573,7 @@ useEffect(() => {
                 gap: "6px",
                 background: GOLD,
                 color: NAVY,
-                fontFamily: "'Lato', sans-serif",
+                fontFamily: "'Lato',sans-serif",
                 fontSize: "9px",
                 fontWeight: 900,
                 letterSpacing: "0.14em",
@@ -544,7 +601,7 @@ useEffect(() => {
                   <span
                     key={i}
                     style={{
-                      fontFamily: "'Lato', sans-serif",
+                      fontFamily: "'Lato',sans-serif",
                       fontSize: "12px",
                       fontWeight: 600,
                       color: announcement.textColor || CREAM,
@@ -563,6 +620,7 @@ useEffect(() => {
                           textDecoration: "underline",
                         }}
                         target="_blank"
+                        rel="noreferrer"
                       >
                         {announcement.linkText || "Learn more →"}
                       </a>
@@ -584,7 +642,7 @@ useEffect(() => {
       <header
         style={{
           background: NAVY,
-          borderBottom: `1px solid rgba(184,150,62,0.18)`,
+          borderBottom: "1px solid rgba(184,150,62,0.18)",
           position: "sticky",
           top: 0,
           zIndex: 500,
@@ -615,14 +673,14 @@ useEffect(() => {
               {showMobileMenu ? <X size={22} /> : <Menu size={22} />}
             </button>
 
-            {/* ── BRAND ── */}
+            {/* brand */}
             <Link
               href="/home"
               style={{ textDecoration: "none", flexShrink: 0 }}
             >
               <div
                 style={{
-                  fontFamily: "'Playfair Display', Georgia, serif",
+                  fontFamily: "'Playfair Display',Georgia,serif",
                   lineHeight: 1.05,
                 }}
               >
@@ -643,7 +701,7 @@ useEffect(() => {
                     color: GOLD,
                     letterSpacing: "0.15em",
                     textTransform: "uppercase",
-                    fontFamily: "'Lato', sans-serif",
+                    fontFamily: "'Lato',sans-serif",
                     marginTop: "1px",
                   }}
                 >
@@ -652,7 +710,7 @@ useEffect(() => {
               </div>
             </Link>
 
-            {/* ── DESKTOP SEARCH ── */}
+            {/* desktop search */}
             <div
               className="lan-search-wrap"
               ref={searchTagsRef}
@@ -683,7 +741,6 @@ useEffect(() => {
               >
                 <Search size={16} />
               </button>
-
               {showSearchTags && (
                 <div className="lan-tag-dropdown">
                   <p
@@ -724,7 +781,7 @@ useEffect(() => {
                               height: "30px",
                               borderRadius: "6px",
                               background: "#f9f6f0",
-                              border: `0.5px solid #ede8df`,
+                              border: "0.5px solid #ede8df",
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
@@ -761,7 +818,7 @@ useEffect(() => {
               )}
             </div>
 
-            {/* ── DESKTOP NAV LINKS ── */}
+            {/* desktop nav */}
             <nav
               style={{
                 display: "flex",
@@ -779,16 +836,209 @@ useEffect(() => {
               <Link href="/lecturers" className="lan-nav-link">
                 <Crown size={15} style={{ color: GOLD }} /> Faculties
               </Link>
-              <Link href="/saved-my-book" className="lan-nav-link">
-                <Bookmark size={15} style={{ color: GOLD }} /> Saved
-              </Link>
 
+              {/* ── YOUR SPACE DROPDOWN ── */}
+              <div
+                style={{ position: "relative" }}
+                onMouseEnter={openSavedMenu}
+                onMouseLeave={closeSavedMenu}
+              >
+                <button
+                  ref={savedBtnRef}
+                  className={`lan-saved-trigger ${showSavedMenu ? "open" : ""}`}
+                  onClick={() => setShowSavedMenu((p) => !p)}
+                  aria-haspopup="true"
+                  aria-expanded={showSavedMenu}
+                >
+                  <Bookmark size={15} style={{ color: GOLD }} />
+                  Space
+                  <ChevronDown size={12} className="chevron" />
+                </button>
+
+                {showSavedMenu && (
+                  <div
+                    className="lan-saved-dropdown"
+                    ref={savedMenuRef}
+                    style={{ background: CREAM, color: NAVY }}
+                  >
+                    {/* header */}
+                    <div
+                      style={{
+                        padding: "10px 12px 8px",
+                        borderBottom: "0.5px solid #f0ebe0",
+                        marginBottom: "6px",
+                        background: NAVY,
+                        borderRadius: "10px 10px 0 0",
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontSize: "10px",
+                          fontWeight: 900,
+                          color: CREAM,
+                          letterSpacing: "0.14em",
+                          textTransform: "uppercase",
+                          fontFamily: "'Lato',sans-serif",
+                          margin: 5,
+                          textAlign: "center",
+                        }}
+                      >
+                        Your Space
+                      </p>
+                    </div>
+
+                    {/* ── SAVED_MENU_ITEMS ── */}
+                    {SAVED_MENU_ITEMS.map((item, idx) => {
+                      const isLast = idx === SAVED_MENU_ITEMS.length - 1;
+                      return (
+                        <React.Fragment key={item.label}>
+                          {item.isDynamic ? (
+                            <button
+                              className="lan-saved-menu-item"
+                              onClick={() => {
+                                setShowSavedMenu(false);
+                                handleMyAccountClick();
+                              }}
+                            >
+                              {spaceItemInner(item)}
+                            </button>
+                          ) : (
+                            <Link
+                              href={item.href}
+                              className="lan-saved-menu-item"
+                              onClick={() => setShowSavedMenu(false)}
+                            >
+                              {spaceItemInner(item)}
+                            </Link>
+                          )}
+                          {/* divider between items (not after last — More Tools row comes next) */}
+                          {!isLast && (
+                            <div className="lan-saved-menu-divider" />
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+
+                    {/* ── MORE TOOLS trigger (after the list, before closing div) ── */}
+                    <div className="lan-saved-menu-divider" />
+                    <div
+                      style={{ position: "relative" }}
+                      ref={moreToolsTriggerRef}
+                      onMouseEnter={openMoreTools}
+                      onMouseLeave={closeMoreTools}
+                    >
+                      <button className="lan-more-tools-trigger">
+                        <div
+                          style={{
+                            width: "64px",
+                            height: "34px",
+                            borderRadius: "9px",
+                            flexShrink: 0,
+                            border: `0.5px solid ${GOLD}30`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: NAVY,
+                          }}
+                        >
+                          <Sparkle size={15} style={{ color: GOLD }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: "13px",
+                              fontWeight: 700,
+                              color: NAVY,
+                              fontFamily: "'Lato',sans-serif",
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            More Tools
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              color: "#888",
+                              fontFamily: "'Lato',sans-serif",
+                              marginTop: "2px",
+                            }}
+                          >
+                            Extra features & resources
+                          </div>
+                        </div>
+                        <ChevronRight
+                          size={13}
+                          style={{ color: GOLD, flexShrink: 0 }}
+                        />
+                      </button>
+
+                      {/* ── SIDE PANEL — appears to the LEFT ── */}
+                      {showMoreTools && (
+                        <div
+                          className="lan-more-tools-panel"
+                          ref={moreToolsRef}
+                          onMouseEnter={openMoreTools}
+                          onMouseLeave={closeMoreTools}
+                        >
+                          <div
+                            style={{
+                              padding: "10px 12px 8px",
+                              borderBottom: "0.5px solid #f0ebe0",
+                              marginBottom: "6px",
+                              background: NAVY,
+                              borderRadius: "10px 10px 0 0",
+                            }}
+                          >
+                            <p
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: 900,
+                                color: CREAM,
+                                letterSpacing: "0.14em",
+                                textTransform: "uppercase",
+                                fontFamily: "'Lato',sans-serif",
+                                margin: 5,
+                                textAlign: "center",
+                              }}
+                            >
+                              More Tools
+                            </p>
+                          </div>
+                          {MORE_TOOLS_ITEMS.map((item, idx) => {
+                            const isLast = idx === MORE_TOOLS_ITEMS.length - 1;
+                            return (
+                              <React.Fragment key={item.label}>
+                                <Link
+                                  href={item.href}
+                                  className="lan-saved-menu-item"
+                                  onClick={() => {
+                                    setShowMoreTools(false);
+                                    setShowSavedMenu(false);
+                                  }}
+                                >
+                                  {spaceItemInner(item)}
+                                </Link>
+                                {!isLast && (
+                                  <div className="lan-saved-menu-divider" />
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    {/* ── END MORE TOOLS ── */}
+                  </div>
+                )}
+              </div>
+              {/* ── END YOUR SPACE ── */}
+
+              {/* sell / upload button */}
               <div
                 className={`lan-sell-btn-wrap ${isOnline ? "online" : "offline"}`}
                 style={{ marginLeft: "6px" }}
               >
                 {!isOnline ? (
-                  /* ── OFFLINE STATE ── */
                   <button
                     disabled
                     className="lan-sell-btn"
@@ -802,8 +1052,7 @@ useEffect(() => {
                       border: "0.5px solid rgba(255,255,255,0.1)",
                     }}
                   >
-                    <WifiOff size={13} style={{ color: "#f59e0b" }} />
-                    Offline
+                    <WifiOff size={13} style={{ color: "#f59e0b" }} /> Offline
                     <span
                       style={{
                         width: "6px",
@@ -816,7 +1065,6 @@ useEffect(() => {
                     />
                   </button>
                 ) : checkingSeller ? (
-                  /* ── CHECKING STATE ── */
                   <button className="lan-sell-btn" disabled>
                     <span
                       style={{
@@ -839,7 +1087,6 @@ useEffect(() => {
                     </span>
                   </button>
                 ) : isSeller ? (
-                  /* ── SELLER: Upload ── */
                   <button className="lan-sell-btn" onClick={HandleClick}>
                     <span
                       style={{
@@ -852,7 +1099,6 @@ useEffect(() => {
                     </span>
                   </button>
                 ) : (
-                  /* ── GUEST: Become a Seller ── */
                   <button className="lan-sell-btn" onClick={HandleClick}>
                     Become a Seller
                   </button>
@@ -875,7 +1121,7 @@ useEffect(() => {
           className="lan-category-bar"
           style={{
             background: CREAM,
-            borderTop: `1px solid rgba(13,34,68,0.1)`,
+            borderTop: "1px solid rgba(13,34,68,0.1)",
             position: "relative",
             zIndex: 600,
             overflow: "visible",
@@ -888,7 +1134,6 @@ useEffect(() => {
               padding: "0 20px",
               display: "flex",
               alignItems: "center",
-              gap: "0",
               overflowX: "auto",
             }}
           >
@@ -904,12 +1149,11 @@ useEffect(() => {
                 color: "#888",
                 textDecoration: "none",
                 whiteSpace: "nowrap",
-                fontFamily: "'Lato', sans-serif",
+                fontFamily: "'Lato',sans-serif",
               }}
             >
               What is LAN?
             </Link>
-
             <div
               style={{
                 width: "1px",
@@ -919,7 +1163,6 @@ useEffect(() => {
               }}
             />
 
-            {/* ─── DESKTOP DROPDOWN: wrapper div handles both button + panel hover ─── */}
             {NAV_CATS.map(({ key, label, href }) => (
               <div
                 key={key}
@@ -956,11 +1199,10 @@ useEffect(() => {
                       onMouseEnter={() => openDropdown(key)}
                       onMouseLeave={closeDropdown}
                     >
-                      {/* dropdown header */}
                       <div
                         style={{
                           padding: "20px 24px 16px",
-                          borderBottom: `1px solid #f0ebe0`,
+                          borderBottom: "1px solid #f0ebe0",
                           background: "#fdfaf6",
                         }}
                       >
@@ -982,7 +1224,7 @@ useEffect(() => {
                           />
                           <h3
                             style={{
-                              fontFamily: "'Playfair Display', serif",
+                              fontFamily: "'Playfair Display',serif",
                               fontSize: "18px",
                               fontWeight: 700,
                               color: NAVY,
@@ -997,13 +1239,12 @@ useEffect(() => {
                             fontSize: "12px",
                             color: "#888",
                             margin: "0 0 0 13px",
-                            fontFamily: "'Lato', sans-serif",
+                            fontFamily: "'Lato',sans-serif",
                           }}
                         >
                           {menuCategories[key]?.description}
                         </p>
                       </div>
-
                       {menuCategories[key]?.books?.length > 0 ? (
                         <>
                           <div style={{ padding: "16px 24px 0" }}>
@@ -1022,7 +1263,7 @@ useEffect(() => {
                             <div
                               style={{
                                 display: "grid",
-                                gridTemplateColumns: "repeat(3, 1fr)",
+                                gridTemplateColumns: "repeat(3,1fr)",
                                 gap: "10px",
                               }}
                             >
@@ -1090,7 +1331,7 @@ useEffect(() => {
                             style={{
                               fontSize: "12px",
                               color: "#aaa",
-                              fontFamily: "'Lato', sans-serif",
+                              fontFamily: "'Lato',sans-serif",
                             }}
                           >
                             No documents yet in this category.
@@ -1122,7 +1363,6 @@ useEffect(() => {
                 flexShrink: 0,
               }}
             />
-
             <Link
               href="/documents"
               style={{
@@ -1134,7 +1374,7 @@ useEffect(() => {
                 color: "#555",
                 textDecoration: "none",
                 whiteSpace: "nowrap",
-                fontFamily: "'Lato', sans-serif",
+                fontFamily: "'Lato',sans-serif",
               }}
             >
               All Documents
@@ -1158,7 +1398,7 @@ useEffect(() => {
             >
               <div
                 style={{
-                  fontFamily: "'Playfair Display', serif",
+                  fontFamily: "'Playfair Display',serif",
                   fontSize: "20px",
                   fontWeight: 900,
                   color: NAVY,
@@ -1167,7 +1407,7 @@ useEffect(() => {
                 [LAN Library]
                 <div
                   style={{
-                    fontFamily: "'Lato', sans-serif",
+                    fontFamily: "'Lato',sans-serif",
                     fontSize: "10px",
                     color: GOLD,
                     fontWeight: 300,
@@ -1204,10 +1444,10 @@ useEffect(() => {
                 style={{
                   width: "100%",
                   padding: "11px 40px 11px 14px",
-                  border: `1px solid rgba(13,34,68,0.15)`,
+                  border: "1px solid rgba(13,34,68,0.15)",
                   borderRadius: "8px",
                   fontSize: "14px",
-                  fontFamily: "'Lato', sans-serif",
+                  fontFamily: "'Lato',sans-serif",
                   outline: "none",
                   color: NAVY,
                   background: "#fdfaf6",
@@ -1231,15 +1471,19 @@ useEffect(() => {
               </button>
             </div>
 
-            {/* ─── MOBILE: main menu vs submenu ─── */}
+            {/* ══════════════ THREE-WAY TERNARY ══════════════
+                null          → main menu
+                'more-tools'  → More Tools submenu       ← FIX
+                anything else → category submenu
+            ═══════════════════════════════════════════════ */}
             {mobileSubmenu === null ? (
               <>
+                {/* sell button */}
                 <div
                   className={`lan-sell-btn-wrap ${isOnline ? "online" : "offline"}`}
                   style={{ marginBottom: "20px" }}
                 >
                   {!isOnline ? (
-                    /* ── OFFLINE ── */
                     <button
                       disabled
                       style={{
@@ -1250,7 +1494,7 @@ useEffect(() => {
                         border: "0.5px solid rgba(13,34,68,0.1)",
                         fontSize: "14px",
                         fontWeight: 700,
-                        fontFamily: "'Lato', sans-serif",
+                        fontFamily: "'Lato',sans-serif",
                         cursor: "not-allowed",
                         display: "flex",
                         alignItems: "center",
@@ -1258,8 +1502,7 @@ useEffect(() => {
                         gap: "8px",
                       }}
                     >
-                      <WifiOff size={16} style={{ color: "#f59e0b" }} />
-                      Offline
+                      <WifiOff size={16} style={{ color: "#f59e0b" }} /> Offline
                       <span
                         style={{
                           width: "7px",
@@ -1272,7 +1515,6 @@ useEffect(() => {
                       />
                     </button>
                   ) : (
-                    /* ── ONLINE ── */
                     <button
                       onClick={HandleClick}
                       disabled={checkingSeller}
@@ -1284,7 +1526,7 @@ useEffect(() => {
                         border: "none",
                         fontSize: "14px",
                         fontWeight: 700,
-                        fontFamily: "'Lato', sans-serif",
+                        fontFamily: "'Lato',sans-serif",
                         cursor: checkingSeller ? "not-allowed" : "pointer",
                         display: "flex",
                         alignItems: "center",
@@ -1308,6 +1550,7 @@ useEffect(() => {
 
                 <div className="lan-divider-gold" />
 
+                {/* quick links */}
                 <div
                   style={{
                     display: "flex",
@@ -1324,10 +1567,7 @@ useEffect(() => {
                       icon: User,
                       label: "My Account",
                     },
-                    { href: "/lecturers", icon: Crown, label: "Faculties" },
-                    { href: "/saved-my-book", icon: Bookmark, label: "Saved" },
                     { href: "/transfer", icon: Bookmark, label: "Transfer" },
-                    { href: "/referrals", icon: Bookmark, label: "Referral" },
                     {
                       href: "/lan/net/help-center",
                       icon: HelpCircle,
@@ -1360,50 +1600,102 @@ useEffect(() => {
 
                 <div className="lan-divider-gold" />
 
+                {/* Your Space */}
                 <p
                   style={{
                     fontSize: "10px",
                     fontWeight: 700,
-                    color: GOLD,
+                    color: NAVY,
                     letterSpacing: "0.14em",
                     textTransform: "uppercase",
                     padding: "12px 0 6px",
-                    fontFamily: "'Lato', sans-serif",
+                    fontFamily: "'Lato',sans-serif",
+                  }}
+                >
+                  Your Space
+                </p>
+                {SAVED_MENU_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  return item.isDynamic ? (
+                    <button
+                      key={item.label}
+                      className="lan-mobile-link"
+                      onClick={() => {
+                        handleMyAccountClick();
+                        setShowMobileMenu(false);
+                      }}
+                    >
+                      <Icon size={17} style={{ color: item.color }} />{" "}
+                      {item.label}
+                    </button>
+                  ) : (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      className="lan-mobile-link"
+                      onClick={() => setShowMobileMenu(false)}
+                    >
+                      <Icon size={17} style={{ color: item.color }} />{" "}
+                      {item.label}
+                    </Link>
+                  );
+                })}
+
+                {/* More Tools entry in mobile Your Space */}
+                <button
+                  className="lan-mobile-link"
+                  onClick={() => setMobileSubmenu("more-tools")}
+                  style={{ justifyContent: "space-between" }}
+                >
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                    }}
+                  >
+                    <Sparkle size={17} style={{ color: GOLD }} /> More Tools
+                  </span>
+                  <ChevronRight size={15} style={{ color: "#ccc" }} />
+                </button>
+
+                <div className="lan-divider-gold" />
+
+                {/* Categories */}
+                <p
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: NAVY,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    padding: "12px 0 6px",
+                    fontFamily: "'Lato',sans-serif",
                   }}
                 >
                   Categories
                 </p>
-
-                {/* ─── each category button opens the submenu ─── */}
-                {NAV_CATS.map(
-                  (
-                    { key, label }, // ← destructure label here
-                  ) => (
-                    <button
-                      key={key}
-                      className="lan-mobile-link"
-                      onClick={() => setMobileSubmenu(key)}
-                      style={{ justifyContent: "space-between" }}
+                {NAV_CATS.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    className="lan-mobile-link"
+                    onClick={() => setMobileSubmenu(key)}
+                    style={{ justifyContent: "space-between" }}
+                  >
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                      }}
                     >
-                      <span
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <BookOpen size={16} style={{ color: GOLD }} />
-                        {menuCategories[key]?.title?.replace(
-                          " Documents",
-                          "",
-                        ) ?? label}{" "}
-                        {/* ← fallback */}
-                      </span>
-                      <ChevronRight size={15} style={{ color: "#ccc" }} />
-                    </button>
-                  ),
-                )}
-
+                      <BookOpen size={16} style={{ color: GOLD }} />
+                      {menuCategories[key]?.title?.replace(" Documents", "") ??
+                        label}
+                    </span>
+                    <ChevronRight size={15} style={{ color: "#ccc" }} />
+                  </button>
+                ))}
                 <Link
                   href="/documents"
                   className="lan-mobile-link"
@@ -1413,7 +1705,6 @@ useEffect(() => {
                 </Link>
 
                 <div className="lan-divider-gold" />
-
                 <button
                   onClick={handleLogout}
                   style={{
@@ -1427,7 +1718,7 @@ useEffect(() => {
                     color: "#ef4444",
                     fontSize: "13px",
                     fontWeight: 700,
-                    fontFamily: "'Lato', sans-serif",
+                    fontFamily: "'Lato',sans-serif",
                     cursor: "pointer",
                     marginTop: "12px",
                     width: "100%",
@@ -1436,9 +1727,8 @@ useEffect(() => {
                   <LogOut size={16} /> Sign Out
                 </button>
               </>
-            ) : (
-              /* ─── MOBILE SUBMENU: shows books for tapped category ─── */
-              // ─── MOBILE SUBMENU ───
+            ) : mobileSubmenu === "more-tools" ? (
+              /* ══ MORE TOOLS SUBMENU ══ */
               <div>
                 <button
                   onClick={() => setMobileSubmenu(null)}
@@ -1451,7 +1741,7 @@ useEffect(() => {
                     border: "none",
                     cursor: "pointer",
                     color: NAVY,
-                    fontFamily: "'Lato', sans-serif",
+                    fontFamily: "'Lato',sans-serif",
                     fontSize: "13px",
                     fontWeight: 700,
                   }}
@@ -1462,11 +1752,94 @@ useEffect(() => {
                   />{" "}
                   Back
                 </button>
-
-                {/* ── Use NAV_CATS label as fallback so heading always shows ── */}
                 <h2
                   style={{
-                    fontFamily: "'Playfair Display', serif",
+                    fontFamily: "'Playfair Display',serif",
+                    fontSize: "22px",
+                    fontWeight: 700,
+                    color: NAVY,
+                    marginBottom: "4px",
+                  }}
+                >
+                  More Tools
+                </h2>
+                <p
+                  style={{
+                    fontSize: "13px",
+                    color: "#888",
+                    marginBottom: "20px",
+                    fontFamily: "'Lato',sans-serif",
+                  }}
+                >
+                  Extra features & resources
+                </p>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "2px",
+                  }}
+                >
+                  {MORE_TOOLS_ITEMS.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.label}
+                        href={item.href}
+                        className="lan-mobile-link"
+                        onClick={() => {
+                          setShowMobileMenu(false);
+                          setMobileSubmenu(null);
+                        }}
+                      >
+                        <Icon size={17} style={{ color: item.color }} />
+                        <span>
+                          <span style={{ display: "block", fontWeight: 700 }}>
+                            {item.label}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              color: "#888",
+                              fontWeight: 400,
+                            }}
+                          >
+                            {item.description}
+                          </span>
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* ══ CATEGORY SUBMENU (unchanged) ══ */
+              <div>
+                <button
+                  onClick={() => setMobileSubmenu(null)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginBottom: "20px",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: NAVY,
+                    fontFamily: "'Lato',sans-serif",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                  }}
+                >
+                  <ChevronRight
+                    size={16}
+                    style={{ transform: "rotate(180deg)" }}
+                  />{" "}
+                  Back
+                </button>
+                <h2
+                  style={{
+                    fontFamily: "'Playfair Display',serif",
                     fontSize: "22px",
                     fontWeight: 700,
                     color: NAVY,
@@ -1481,21 +1854,20 @@ useEffect(() => {
                     fontSize: "13px",
                     color: "#888",
                     marginBottom: "20px",
-                    fontFamily: "'Lato', sans-serif",
+                    fontFamily: "'Lato',sans-serif",
                   }}
                 >
                   {menuCategories[mobileSubmenu]?.description ??
                     "Browse documents in this category"}
                 </p>
 
-                {/* ── Show loading spinner while books are fetching ── */}
                 {allBooks.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "40px 0" }}>
                     <span
                       style={{
                         width: "24px",
                         height: "24px",
-                        border: `2px solid rgba(184,150,62,0.3)`,
+                        border: "2px solid rgba(184,150,62,0.3)",
                         borderTopColor: GOLD,
                         borderRadius: "50%",
                         display: "inline-block",
@@ -1507,7 +1879,7 @@ useEffect(() => {
                         fontSize: "13px",
                         color: "#aaa",
                         marginTop: "12px",
-                        fontFamily: "'Lato', sans-serif",
+                        fontFamily: "'Lato',sans-serif",
                       }}
                     >
                       Loading documents…
@@ -1556,7 +1928,7 @@ useEffect(() => {
                       style={{
                         fontSize: "13px",
                         color: "#aaa",
-                        fontFamily: "'Lato', sans-serif",
+                        fontFamily: "'Lato',sans-serif",
                       }}
                     >
                       No documents yet in this category.
@@ -1590,9 +1962,9 @@ useEffect(() => {
                       fontWeight: 700,
                       color: GOLD,
                       textDecoration: "none",
-                      fontFamily: "'Lato', sans-serif",
+                      fontFamily: "'Lato',sans-serif",
                       fontSize: "13px",
-                      borderTop: `1px solid #ede8df`,
+                      borderTop: "1px solid #ede8df",
                     }}
                   >
                     View all{" "}
@@ -1606,11 +1978,6 @@ useEffect(() => {
           </div>
         </div>
       )}
-
-      {/* ── Floating AI button ── */}
-      <Link href="/ai-chat" className="lan-ai-fab">
-        <Sparkles size={15} /> Ask AI
-      </Link>
     </>
   );
 }

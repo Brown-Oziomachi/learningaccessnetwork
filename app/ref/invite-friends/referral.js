@@ -656,7 +656,7 @@ export default function ReferralClient() {
                             {/* Referral code card */}
                             <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: 'clamp(16px,4vw,24px)' }}>
                                 <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: GOLD, marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Share</p>
-                                <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(15px,3vw,18px)', fontWeight: 700, color: NAVY, margin: '0 0 14px' }}>Your Referral Link</h3>
+                                <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(15px,3vw,18px)', fontWeight: 700, color: NAVY, margin: '0 0 14px' }}>Your Referral Code</h3>
 
                                 <div style={{ background: CREAM, border: '0.5px solid #e5ddd0', padding: '10px 12px', marginBottom: '10px' }}>
                                     <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#aaa', margin: '0 0 3px', fontFamily: "'Lato',sans-serif" }}>Your code</p>

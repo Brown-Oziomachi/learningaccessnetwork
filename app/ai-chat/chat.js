@@ -2,12 +2,14 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-    Sparkles, Loader2, X, Send, ChevronRight,
+     Loader2, X, Send, ChevronRight,
     BookMarked, Star, ArrowLeft, Copy, Check,
     PlusCircle, MessageSquare, Menu, ShoppingCart,
     Trash2, Search, Library, ChevronDown, Zap,
     Crown, CreditCard, Lock, GraduationCap, FileText,
     TrendingUp,
+    Link,
+    ArrowRight,
 } from "lucide-react";
 import {
     collection, addDoc, serverTimestamp, query,
@@ -452,16 +454,30 @@ function BookPickerScreen({ onSelectBook }) {
 
     return (
         <div className="lan-root" style={{ display: "flex", flexDirection: "column", height: "100dvh", overflow: "hidden" }}>
-            <div className="cream-bg" style={{ padding: "40px 28px 32px", textAlign: "center", flexShrink: 0 }}>
-                <h1 className="lan-serif" style={{ fontSize: "clamp(24px,5vw,42px)", fontWeight: 700, color: NAVY, marginBottom: 10 }}>
+            <div style={{height: "5px", opacity: 70}}>
+                <img src="/studs.png" style={{ opacity: 2 }}
+                    onError={e => {
+                        e.target.src = "/stud2.png"
+                    }}
+                />
+            </div>
+            <div className="cream-bg" style={{ padding: "40px 28px 32px", textAlign: "right", flexShrink: 0 }}>
+                <h1 className="lan-serif" style={{ fontSize: "clamp(24px,5vw,42px)", fontWeight: 700, color: CREAM, marginBottom: 10 }}>
                     Which book do you need help with?
                 </h1>
+                <p style={{ fontSize: 14, color: "#888",  margin: "0 auto", lineHeight: 1.75, fontWeight: 300 }}>
+                    Pick a book from the LAN library and ask anything — summaries, key concepts, explanations and more.
+                </p>
                 <div className="gold-line" style={{ maxWidth: 260, margin: "0 auto 12px" }}>
                     <div style={{ width: 7, height: 7, background: GOLD, transform: "rotate(45deg)", flexShrink: 0 }} />
                 </div>
-                <p style={{ fontSize: 14, color: "#888", maxWidth: 460, margin: "0 auto", lineHeight: 1.75, fontWeight: 300 }}>
-                    Pick a book from the LAN library and ask anything — summaries, key concepts, explanations and more.
-                </p>
+                <div style={{marginBottom: "0 auto"}}>
+                <a href="/upload-document"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 2, padding: "10px 30px", background: GOLD, color: NAVY, fontSize: "15px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato',sans-serif", whiteSpace: "nowrap" }}>
+                    Add Book <ArrowRight size={12} />
+                </a>
+
+                </div>
             </div>
             <div style={{ background: "#fff", borderTop: `0.5px solid #e5ddd0`, borderBottom: `0.5px solid #e5ddd0`, padding: "14px 28px", flexShrink: 0 }}>
                 <div style={{ maxWidth: 600, margin: "0 auto", position: "relative" }}>

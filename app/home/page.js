@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import HomeClient from "./home";
 
 export const metadata = {
-    title: "Welcome to LAN Library | African EdTech marketplace. ",
+    title: "Welcome to LAN Library | The Global Student Library. ",
     description: "Become part of Africa's largest digital academic library, where education resources is documented for students to have access to all knowledge through network system. Have access to all university library from your country."
 }
 export default function HomePage () {

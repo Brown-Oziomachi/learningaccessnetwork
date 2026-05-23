@@ -1,25 +1,4 @@
 // app/api/send-seller-notification/route.js
-// ─────────────────────────────────────────────────────────────────
-// Unified outbound email endpoint powered by Resend.
-// Called by:
-//   • Firebase Cloud Functions (all 5 triggers)
-//   • /api/webhooks/flutterwave   (book purchase → seller alert)
-//   • /api/resend-receipt         (manual buyer resend)
-//
-// Body shape:
-// {
-//   type: "sale_alert" | "book_approved" | "seller_welcome" |
-//         "low_balance" | "payout_success" | "abandoned_cart" |
-//         "order_receipt" | "ad_boost",
-//
-//   // recipient
-//   to:          string,          // required
-//   userId?:     string,          // for opt-out check
-//
-//   // per-type payload (see each builder below)
-//   ...rest
-// }
-// ─────────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
@@ -37,7 +16,7 @@ import {
 } from "@/lib/emailTemplates";   // ← copy emailTemplates.js → lib/emailTemplates.js
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = "LAN Library <noreply@lanlibrary.com>";
+const FROM = "LAN Library <noreply@learningaccessnetwork.com>";
 
 /* ── email category used for opt-out checks ── */
 const CATEGORY_MAP = {
@@ -60,7 +39,7 @@ const SUBJECTS = {
     order_receipt: (d) => `Your Receipt — "${d.bookTitle}"`,
     sale_alert: (d) => `🎉 New Sale — "${d.bookTitle}" — ₦${Number(d.netEarning).toLocaleString()} earned`,
     ad_boost: (d) => `✅ Your Ad Boost is Active — ${d.tier} · ${d.durationDays} days`,
-    abandoned_cart: "📚 You left something behind in your LAN Library cart",
+    abandoned_cart: "📚 You left something behind in your LAN Library saved book",
 };
 
 /* ─────────────────────────────────────────────────────────────────

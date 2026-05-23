@@ -1,55 +1,6 @@
 // PART 2: Account Management, Security & Privacy, Technical Support
 export const articlesP2 = {
   // ==================== DOWNLOADS & ACCESS (continued) ====================
-  'accessing-my-books': {
-    category: 'Downloads & Access',
-    title: 'Accessing My Books',
-    readTime: '3 min read',
-    lastUpdated: 'December 15, 2025',
-    tags: ['My Books', 'Library', 'Access'],
-    content: [
-      {
-        type: 'intro',
-        text: 'Your personal library contains all books you\'ve purchased and uploaded. Learn how to access and manage your collection.'
-      },
-      {
-        type: 'heading',
-        text: 'Finding Your Library'
-      },
-      {
-        type: 'steps',
-        items: [
-          'Sign in to your Learning Access Network account',
-          'Click "My Books" in the top navigation menu',
-          'You\'ll see your complete collection',
-          'Books display with covers, titles, and authors'
-        ]
-      },
-      {
-        type: 'heading',
-        text: 'Managing Your Collection'
-      },
-      {
-        type: 'list',
-        items: [
-          'Download any book to your device',
-          'View book details and descriptions',
-          'Sort by title, author, or date',
-          'Search within your library',
-          'Upload personal PDFs for storage'
-        ]
-      },
-      {
-        type: 'note',
-        text: 'Your library syncs across all devices. Books you purchase on mobile will appear on desktop and vice versa.'
-      }
-    ],
-    relatedArticles: [
-      { title: 'Downloading Your PDFs', slug: 'downloading-pdfs' },
-      { title: 'Multiple Device Access', slug: 'multiple-device-access' },
-      { title: 'Troubleshooting Downloads', slug: 'troubleshooting-downloads' }
-    ]
-  },
 
   'multiple-device-access': {
     category: 'Downloads & Access',
@@ -1009,7 +960,7 @@ export const articlesP2 = {
       },
       {
         type: 'note',
-        text: 'Questions about these terms? Contact legal@learningaccess.net'
+        text: 'Questions about these terms? Contact legal@learningaccessnetwork.com'
       }
     ],
     relatedArticles: [
@@ -1654,5 +1605,5 @@ export const articlesP2 = {
       { title: 'Can\'t Access My Books', slug: 'cant-access-books' },
       { title: 'PDF Won\'t Open', slug: 'pdf-wont-open' }
     ]
-  }
+  },
 };
