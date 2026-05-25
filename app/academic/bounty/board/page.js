@@ -1,13 +1,13 @@
 // app/bounty/page.jsx
 import { Suspense } from "react";
-import AcademicBountyBoardClient from "./board";
+import PublishFlowWithBountyClient from "./board";
 
 export const metadata = {
     title: "Academic Bounty Board | LAN Library — Campus Economy Hub",
     description: "Can't find a file? Post a paid academic request and let top campus sellers from across Africa create it for you. Browse open bounties, submit proposals, and earn rewards.",
 };
 
-export default function AcademicBountyBoardPage() {
+export default function PublishFlowWithBountyPage() {
     return (
         <Suspense
             fallback={
@@ -31,7 +31,7 @@ export default function AcademicBountyBoardPage() {
                 </div>
             }
         >
-            <AcademicBountyBoardClient/>
+            <PublishFlowWithBountyClient />
         </Suspense>
     );
 }

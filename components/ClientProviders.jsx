@@ -3,8 +3,13 @@
 import { useState, useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { Toaster, toast } from "react-hot-toast";
+import dynamic from "next/dynamic";
 import { SessionTimeoutProvider } from "./SessionTimeoutProvider";
 import { auth } from "@/lib/firebaseConfig";
+// import BountyPopup from "./BountyPopup";
+
+// ← Dynamic import prevents SSR crash + white page
+const BountyPopup = dynamic(() => import("./BountyPopup"), { ssr: false });
 
 export default function ClientProviders({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
@@ -18,7 +23,6 @@ export default function ClientProviders({ children }) {
     return () => unsub();
   }, []);
 
-  // Don't render children until Firebase has resolved auth state
   if (!ready) return null;
 
   return (
@@ -47,6 +51,8 @@ export default function ClientProviders({ children }) {
       >
         {children}
       </SessionTimeoutProvider>
+
+      <BountyPopup />
     </>
   );
 }

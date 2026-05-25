@@ -127,7 +127,7 @@ const SAVED_MENU_ITEMS = [
   },
   {
     icon: Copy,
-    label: "Copy Profile",
+    label: "Your Public Link",
     description: "Showcase your profile",
     href: "/my-account/seller-account/share-profile",
     color: GOLD,

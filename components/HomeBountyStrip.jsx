@@ -1,14 +1,4 @@
 "use client";
-/**
- * HomeBountyStrip.jsx
- *
- * A compact horizontal strip shown on the home page that surfaces the latest
- * open bounties. Each card is clickable and routes to /bounty-board?highlight=<id>
- *
- * Usage (in your home page JSX):
- *   import HomeBountyStrip from "@/components/HomeBountyStrip";
- *   <HomeBountyStrip />
- */
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -53,11 +43,14 @@ export default function HomeBountyStrip() {
     const unsub = subscribeToLatestOpenBounties((list) => {
       setBounties(list);
       setLoading(false);
-    }, 6);
+    }, 4);
     return () => unsub();
   }, []);
 
   if (loading || bounties.length === 0) return null;
+
+  const mobileCards = bounties.slice(0, 2);
+  const desktopOnlyCards = bounties.slice(2, 4);
 
   return (
     <>
@@ -67,6 +60,10 @@ export default function HomeBountyStrip() {
         .hbs-card:hover { border-color: ${GOLD} !important; transform: translateY(-4px); box-shadow: 0 12px 32px rgba(13,34,68,.12); }
         .hbs-see-all { transition: color .15s; }
         .hbs-see-all:hover { color: ${GOLDD} !important; }
+        .hbs-grid { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+        @media (min-width: 768px) { .hbs-grid { grid-template-columns: repeat(4, 1fr); } }
+        .hbs-desktop-only { display: none !important; }
+        @media (min-width: 768px) { .hbs-desktop-only { display: block !important; } }
       `}</style>
 
       <section
@@ -136,7 +133,7 @@ export default function HomeBountyStrip() {
               </p>
             </div>
             <Link
-              href="/bounty-board"
+              href="/academic/bounty/board"
               className="hbs-see-all"
               style={{
                 fontSize: 11,
@@ -156,167 +153,180 @@ export default function HomeBountyStrip() {
           </div>
 
           {/* Cards grid */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-              gap: 16,
-            }}
-          >
-            {bounties.map((b) => (
+          <div className="hbs-grid">
+            {/* Always visible: first 2 */}
+            {mobileCards.map((b) => (
               <Link
                 key={b.id}
                 href={`/academic/bounty/board?highlight=${b.id}`}
                 style={{ textDecoration: "none" }}
               >
-                <div
-                  className="hbs-card"
-                  style={{
-                    background: "#fff",
-                    border: ".5px solid #e5ddd0",
-                    padding: "20px",
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 14,
-                    cursor: "pointer",
-                  }}
-                >
-                  {/* Top row: university badge + reward */}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                    }}
-                  >
-                    <div style={{ background: NAVY, padding: "3px 10px" }}>
-                      <span
-                        style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          letterSpacing: ".12em",
-                          textTransform: "uppercase",
-                          color: GOLD,
-                          fontFamily: "'Lato',sans-serif",
-                        }}
-                      >
-                        {b.university}
-                      </span>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div
-                        style={{
-                          fontSize: 8,
-                          fontWeight: 700,
-                          letterSpacing: ".12em",
-                          textTransform: "uppercase",
-                          color: "#bbb",
-                          fontFamily: "'Lato',sans-serif",
-                        }}
-                      >
-                        Reward
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: "'Playfair Display',serif",
-                          fontSize: 20,
-                          fontWeight: 700,
-                          color: NAVY,
-                          lineHeight: 1.1,
-                        }}
-                      >
-                        {b.rewardFmt}
-                      </div>
-                    </div>
-                  </div>
+                <BountyCard b={b} />
+              </Link>
+            ))}
 
-                  {/* Title */}
-                  <h3
-                    style={{
-                      fontFamily: "'Playfair Display',serif",
-                      fontSize: 14,
-                      fontWeight: 700,
-                      color: NAVY,
-                      lineHeight: 1.4,
-                      margin: 0,
-                      flex: 1,
-                      display: "-webkit-box",
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {b.title}
-                  </h3>
-
-                  {/* Footer */}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: "#888",
-                        fontFamily: "'Lato',sans-serif",
-                      }}
-                    >
-                      {b.department}
-                    </span>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        fontSize: 9,
-                        fontWeight: 700,
-                        color: "#dc2626",
-                        background: "rgba(220,38,38,.07)",
-                        border: ".5px solid rgba(220,38,38,.2)",
-                        padding: "3px 9px",
-                        letterSpacing: ".06em",
-                        fontFamily: "'Lato',sans-serif",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 5,
-                          height: 5,
-                          borderRadius: "50%",
-                          background: "#dc2626",
-                        }}
-                      />
-                      {b.deadlineLabel || "Open"}
-                    </span>
-                  </div>
-
-                  {/* CTA row */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "flex-end",
-                      gap: 4,
-                      color: GOLD,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: ".08em",
-                      textTransform: "uppercase",
-                      fontFamily: "'Lato',sans-serif",
-                    }}
-                  >
-                    Fulfil this request <ArrowIcon />
-                  </div>
-                </div>
+            {/* Desktop only: cards 3 & 4 */}
+            {desktopOnlyCards.map((b) => (
+              <Link
+                key={b.id}
+                href={`/academic/bounty/board?highlight=${b.id}`}
+                style={{ textDecoration: "none" }}
+                className="hbs-desktop-only"
+              >
+                <BountyCard b={b} />
               </Link>
             ))}
           </div>
         </div>
       </section>
     </>
+  );
+}
+
+function BountyCard({ b }) {
+  return (
+    <div
+      className="hbs-card"
+      style={{
+        background: "#fff",
+        border: ".5px solid #e5ddd0",
+        padding: "20px",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+        cursor: "pointer",
+      }}
+    >
+      {/* Top row: university badge + reward */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+        }}
+      >
+        <div style={{ background: NAVY, padding: "3px 10px" }}>
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: ".12em",
+              textTransform: "uppercase",
+              color: GOLD,
+              fontFamily: "'Lato',sans-serif",
+            }}
+          >
+            {b.university}
+          </span>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div
+            style={{
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: ".12em",
+              textTransform: "uppercase",
+              color: "#bbb",
+              fontFamily: "'Lato',sans-serif",
+            }}
+          >
+            Reward
+          </div>
+          <div
+            style={{
+              fontFamily: "'Playfair Display',serif",
+              fontSize: 20,
+              fontWeight: 700,
+              color: NAVY,
+              lineHeight: 1.1,
+            }}
+          >
+            {b.rewardFmt}
+          </div>
+        </div>
+      </div>
+
+      {/* Title */}
+      <h3
+        style={{
+          fontFamily: "'Playfair Display',serif",
+          fontSize: 14,
+          fontWeight: 700,
+          color: NAVY,
+          lineHeight: 1.4,
+          margin: 0,
+          flex: 1,
+          display: "-webkit-box",
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}
+      >
+        {b.title}
+      </h3>
+
+      {/* Footer */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <span
+          style={{
+            fontSize: 10,
+            color: "#888",
+            fontFamily: "'Lato',sans-serif",
+          }}
+        >
+          {b.department}
+        </span>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 9,
+            fontWeight: 700,
+            color: "#dc2626",
+            background: "rgba(220,38,38,.07)",
+            border: ".5px solid rgba(220,38,38,.2)",
+            padding: "3px 9px",
+            letterSpacing: ".06em",
+            fontFamily: "'Lato',sans-serif",
+          }}
+        >
+          <span
+            style={{
+              width: 5,
+              height: 5,
+              borderRadius: "50%",
+              background: "#dc2626",
+            }}
+          />
+          {b.deadlineLabel || "Open"}
+        </span>
+      </div>
+
+      {/* CTA row */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          gap: 4,
+          color: GOLD,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: ".08em",
+          textTransform: "uppercase",
+          fontFamily: "'Lato',sans-serif",
+        }}
+      >
+        Fulfil this request <ArrowIcon />
+      </div>
+    </div>
   );
 }

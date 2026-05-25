@@ -240,7 +240,7 @@ export const usePayment = (book, formData, sellerDetails) => {
             customizations: {
                 title: "LAN Library",
                 description: `Purchase: ${book.title}`,
-                logo: "/lan-logo.png",
+                logo: "/lanlog.png",
             },
             callback: async (response) => {
                 if (response.status === "successful" || response.status === "completed") {
@@ -429,8 +429,8 @@ export const usePayment = (book, formData, sellerDetails) => {
         newBalance,
         showPin,
         setShowPin,
-        exchangeMatrix,      // 📊 Expose so UI can show live rates
-        ratesLoaded,         // ⏳ Expose so UI can show a loading indicator
+        exchangeMatrix,      
+        ratesLoaded,        
         processFlutterwavePayment,
         processWalletPayment,
         processWithdrawal,

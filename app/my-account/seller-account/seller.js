@@ -1173,7 +1173,7 @@ export default function SellerAccountClient() {
     };
 
     const handleButton = () => router.push("/lan/net/help-center");
-    const referral = () => router.push("/referrals");
+    const referral = () => router.push("/ref/invite-friends");
 
     /* ── Loading state ── */
     if (loading) return (
@@ -1448,7 +1448,40 @@ export default function SellerAccountClient() {
                                 </div>
                             )}
                         </div>
+                    {/* Security Notice */}
+                        <div style={{
+                        background: CREAM,
+                        border: `0.5px solid rgba(184,150,62,0.25)`,
+                        borderLeft: `3px solid ${GOLD}`,
+                        padding: "14px 16px",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "10px",
+                        }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={GOLD}
+                            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: "1px" }}>
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <div>
+                            <p style={{
+                            fontSize: "10px", fontWeight: 700, letterSpacing: "0.12em",
+                            textTransform: "uppercase", color: NAVY, margin: "0 0 3px",
+                            fontFamily: "'Lato',sans-serif",
+                            }}>Security Reminder</p>
+                            <p style={{
+                            fontSize: "11px", color: "#666", margin: 0,
+                            fontFamily: "'Lato',sans-serif", lineHeight: 1.65,
+                            }}>
+                            Keep your login credentials secure.{" "}
+                            <strong style={{ color: NAVY }}>We will never ask for your password</strong>{" "}
+                            via email or phone.
+                            </p>
+                        </div>
+                        </div>
                     </div>
+                    
                 </div>
 
                 {/* ── Bottom Nav (mobile) ── */}

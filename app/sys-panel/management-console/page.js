@@ -373,6 +373,7 @@ const NAV_SECTIONS = [
       { id: 'transactions', icon: DollarSign, label: 'Transactions' },
       { id: 'print-license-ledger', icon: Receipt, label: 'Print License Ledger' },
       { id: 'settings', icon: Settings, label: 'Fee Settings' },
+      { id: 'bounty-escrow', icon: Lock, label: 'Bounty Escrow', badgeKey: 'pendingBountyEscrow', badgeType: 'warn' },
     ]
   },
   {
@@ -768,6 +769,327 @@ function AdminNotificationBell({ setActiveSection }) {
     </div>
   );
 }
+
+function BountyEscrowSection({ user }) {
+  const [bounties, setBounties] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [releasing, setReleasing] = useState(null);
+  const [refunding, setRefunding] = useState(null);
+
+  useEffect(() => { loadBounties(); }, []);
+
+  const loadBounties = async () => {
+    setLoading(true);
+    try {
+      const q = query(collection(db, "bounties"), orderBy("createdAt", "desc"));
+      const snap = await getDocs(q);
+      setBounties(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  };
+
+  const releaseEscrow = async (bounty) => {
+    if (!bounty.claimedBy) { alert("No author has claimed this bounty yet."); return; }
+    if (!confirm(`Release ₦${Number(bounty.reward).toLocaleString()} escrow?\n\n• Author gets ₦${Math.round(bounty.reward * 0.8).toLocaleString()} (80%)\n• Platform keeps ₦${Math.round(bounty.reward * 0.2).toLocaleString()} (20%)`)) return;
+    setReleasing(bounty.id);
+    try {
+      await runTransaction(db, async (txn) => {
+        const authorRef = doc(db, "sellers", bounty.claimedBy);
+        const platformRef = doc(db, "sellers", "LAN_LIBRARY_PLATFORM");
+        const authorSnap = await txn.get(authorRef);
+        const platformSnap = await txn.get(platformRef);
+
+        const payout = Math.round(bounty.reward * 0.8);
+        const fee = Math.round(bounty.reward * 0.2);
+
+        // Credit author
+        if (authorSnap.exists()) {
+          txn.update(authorRef, {
+            accountBalance: (authorSnap.data().accountBalance || 0) + payout,
+            totalEarnings: (authorSnap.data().totalEarnings || 0) + payout,
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        // Credit platform
+        if (platformSnap.exists()) {
+          txn.update(platformRef, {
+            accountBalance: (platformSnap.data().accountBalance || 0) + fee,
+            totalFeesCollected: (platformSnap.data().totalFeesCollected || 0) + fee,
+            updatedAt: serverTimestamp(),
+          });
+        } else {
+          txn.set(platformRef, {
+            accountBalance: fee, totalFeesCollected: fee,
+            createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+          });
+        }
+
+        // Platform fee ledger
+        txn.set(doc(collection(db, "platformFees")), {
+          source: "bounty_escrow",
+          bountyId: bounty.id,
+          bountyTitle: bounty.title,
+          sellerId: bounty.claimedBy,
+          sellerName: bounty.claimedByName || "",
+          postedBy: bounty.postedBy || "",
+          salePrice: bounty.reward,
+          fee,
+          sellerPayout: payout,
+          disbursedToFlutterwave: false,
+          createdAt: serverTimestamp(),
+          recordedBy: user?.email || "admin",
+        });
+
+        // Mark bounty fulfilled
+        txn.update(doc(db, "bounties", bounty.id), {
+          status: "fulfilled",
+          escrowStatus: "released",
+          escrowReleasedAt: serverTimestamp(),
+          escrowReleasedBy: user?.email || "admin",
+          authorPayout: payout,
+          platformFee: fee,
+        });
+
+        // Notify author
+        txn.set(doc(collection(db, "notifications")), {
+          userId: bounty.claimedBy,
+          type: "bounty_paid",
+          title: `Bounty Paid — ${bounty.title}`,
+          message: `₦${payout.toLocaleString()} credited to your wallet for fulfilling the bounty.`,
+          createdAt: serverTimestamp(), read: false,
+        });
+
+        // Notify student
+        if (bounty.postedById) {
+          txn.set(doc(collection(db, "notifications")), {
+            userId: bounty.postedById,
+            type: "bounty_fulfilled",
+            title: `Your bounty has been fulfilled!`,
+            message: `"${bounty.title}" — the document is now available.`,
+            createdAt: serverTimestamp(), read: false,
+          });
+        }
+      });
+
+      await loadBounties();
+      alert("✅ Escrow released. Author credited.");
+    } catch (e) { alert("Failed: " + e.message); }
+    finally { setReleasing(null); }
+  };
+
+  const refundEscrow = async (bounty) => {
+    const reason = prompt("Refund reason (shown to student):");
+    if (!reason?.trim()) return;
+    if (!confirm(`Refund ₦${Number(bounty.reward).toLocaleString()} to ${bounty.postedBy}?`)) return;
+    setRefunding(bounty.id);
+    try {
+      // In a real system you'd reverse the Flutterwave charge via API
+      // For wallet payments, credit back the student's wallet
+      await updateDoc(doc(db, "bounties", bounty.id), {
+        status: "refunded",
+        escrowStatus: "refunded",
+        escrowRefundedAt: serverTimestamp(),
+        escrowRefundedBy: user?.email || "admin",
+        refundReason: reason,
+      });
+      if (bounty.paymentMethod === "wallet" && bounty.postedById) {
+        const walletRef = doc(db, "sellers", bounty.postedById);
+        const walletSnap = await getDoc(walletRef);
+        if (walletSnap.exists()) {
+          await updateDoc(walletRef, {
+            accountBalance: (walletSnap.data().accountBalance || 0) + bounty.reward,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
+      await addDoc(collection(db, "notifications"), {
+        userId: bounty.postedById,
+        type: "bounty_refunded",
+        title: "Bounty Refunded",
+        message: `₦${Number(bounty.reward).toLocaleString()} has been refunded. Reason: ${reason}`,
+        createdAt: serverTimestamp(), read: false,
+      });
+      await loadBounties();
+      alert("✅ Bounty refunded.");
+    } catch (e) { alert("Failed: " + e.message); }
+    finally { setRefunding(null); }
+  };
+
+  const filtered = bounties.filter(b => {
+    if (filter !== "all" && b.escrowStatus !== filter && b.status !== filter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return b.title?.toLowerCase().includes(q) || b.postedBy?.toLowerCase().includes(q) ||
+             b.paymentRef?.toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  const totalLocked    = bounties.filter(b => !b.escrowStatus || b.escrowStatus === "locked").reduce((s, b) => s + (b.reward || 0), 0);
+  const totalReleased  = bounties.filter(b => b.escrowStatus === "released").reduce((s, b) => s + (b.reward || 0), 0);
+  const totalRefunded  = bounties.filter(b => b.escrowStatus === "refunded").reduce((s, b) => s + (b.reward || 0), 0);
+  const totalFees      = bounties.filter(b => b.escrowStatus === "released").reduce((s, b) => s + (b.platformFee || Math.round(b.reward * 0.2)), 0);
+
+  const statusColor = (b) => {
+    if (b.escrowStatus === "released" || b.status === "fulfilled") return "#34d399";
+    if (b.escrowStatus === "refunded") return "#f87171";
+    if (b.status === "pending_approval") return "#fbbf24";
+    if (b.status === "claimed") return "#60a5fa";
+    return "#94a3b8";
+  };
+
+  const statusLabel = (b) => {
+    if (b.escrowStatus === "released") return "Released";
+    if (b.escrowStatus === "refunded") return "Refunded";
+    if (b.status === "fulfilled") return "Fulfilled";
+    if (b.status === "pending_approval") return "Pending Approval";
+    if (b.status === "claimed") return "Claimed — Awaiting Upload";
+    return "Locked (Open)";
+  };
+
+  return (
+    <div>
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Locked in Escrow",   value: `₦${totalLocked.toLocaleString()}`,   color: "#fbbf24", sub: `${bounties.filter(b => !b.escrowStatus || b.escrowStatus === "locked").length} bounties` },
+          { label: "Released to Authors", value: `₦${totalReleased.toLocaleString()}`, color: "#34d399", sub: `${bounties.filter(b => b.escrowStatus === "released").length} paid out` },
+          { label: "Platform Fees (20%)", value: `₦${totalFees.toLocaleString()}`,     color: "#60a5fa", sub: "From released bounties" },
+          { label: "Refunded",            value: `₦${totalRefunded.toLocaleString()}`, color: "#f87171", sub: `${bounties.filter(b => b.escrowStatus === "refunded").length} refunds` },
+        ].map(({ label, value, color, sub }) => (
+          <div key={label} className="card-sm">
+            <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{label}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color }}>{value}</div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>{sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {[["all","All"],["open","Open / Locked"],["claimed","Claimed"],["pending_approval","Pending Approval"],["released","Released"],["refunded","Refunded"]].map(([key, label]) => (
+          <button key={key} onClick={() => setFilter(key)}
+            className={`btn ${filter === key ? "btn-primary" : "btn-ghost"}`}>
+            {label}
+            <span style={{ marginLeft: 4, opacity: 0.6 }}>
+              ({key === "all" ? bounties.length : bounties.filter(b => b.escrowStatus === key || b.status === key).length})
+            </span>
+          </button>
+        ))}
+        <input className="input-dark" placeholder="Search by title, poster or payment ref…"
+          value={search} onChange={e => setSearch(e.target.value)}
+          style={{ flex: 1, minWidth: 220 }} />
+        <button onClick={loadBounties} className="btn btn-ghost"><RefreshCw size={13} />Refresh</button>
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: 48 }}>
+          <div style={{ width: 32, height: 32, border: "2px solid rgba(59,130,246,0.3)", borderTopColor: "#3b82f6", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        </div>
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                {["Bounty", "Posted By", "Reward", "80% → Author", "20% → Platform", "Payment Ref", "Method", "Status", "Actions"].map(h => (
+                  <th key={h}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr><td colSpan={9} style={{ textAlign: "center", padding: 40, color: "var(--text-muted)" }}>No bounties found</td></tr>
+              ) : filtered.map(b => (
+                <tr key={b.id}>
+                  <td>
+                    <div style={{ fontWeight: 700, color: "var(--text-primary)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</div>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+                      {b.university} {b.department ? `· ${b.department}` : ""}
+                    </div>
+                    {b.claimedByName && (
+                      <div style={{ fontSize: 10, color: "#60a5fa", marginTop: 2 }}>Author: {b.claimedByName}</div>
+                    )}
+                  </td>
+                  <td>
+                    <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>{b.postedBy || "Unknown"}</div>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{b.contactEmail}</div>
+                  </td>
+                  <td style={{ color: "#fbbf24", fontWeight: 700 }}>₦{Number(b.reward).toLocaleString()}</td>
+                  <td style={{ color: "#34d399", fontWeight: 700 }}>₦{Math.round(b.reward * 0.8).toLocaleString()}</td>
+                  <td style={{ color: "#60a5fa", fontWeight: 700 }}>₦{Math.round(b.reward * 0.2).toLocaleString()}</td>
+                  <td>
+                    <span style={{ fontFamily: "monospace", fontSize: 10, color: "var(--text-muted)", background: "var(--surface)", padding: "2px 6px", borderRadius: 4 }}>
+                      {b.paymentRef ? b.paymentRef.slice(0, 24) + "…" : "—"}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`pill ${b.paymentMethod === "flutterwave" ? "pill-info" : "pill-success"}`}>
+                      {b.paymentMethod === "flutterwave" ? "💳 Card" : "💰 Wallet"}
+                    </span>
+                  </td>
+                  <td>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: statusColor(b) }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusColor(b), flexShrink: 0 }} />
+                      {statusLabel(b)}
+                    </span>
+                    {b.escrowReleasedAt && (
+                      <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+                        {b.escrowReleasedAt?.toDate?.().toLocaleDateString("en-NG")}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    {(b.status === "pending_approval" || b.status === "claimed") && b.escrowStatus !== "released" && b.escrowStatus !== "refunded" && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <button
+                          onClick={() => releaseEscrow(b)}
+                          disabled={releasing === b.id}
+                          className="btn btn-success"
+                          style={{ padding: "5px 10px", fontSize: 11, whiteSpace: "nowrap" }}>
+                          {releasing === b.id ? "…" : "✅ Release Escrow"}
+                        </button>
+                        <button
+                          onClick={() => refundEscrow(b)}
+                          disabled={refunding === b.id}
+                          className="btn btn-danger"
+                          style={{ padding: "5px 10px", fontSize: 11, whiteSpace: "nowrap" }}>
+                          {refunding === b.id ? "…" : "↩ Refund"}
+                        </button>
+                      </div>
+                    )}
+                    {b.escrowStatus === "released" && (
+                      <span style={{ fontSize: 11, color: "#34d399" }}>✅ Paid out</span>
+                    )}
+                    {b.escrowStatus === "refunded" && (
+                      <span style={{ fontSize: 11, color: "#f87171" }}>↩ Refunded{b.refundReason ? ` — ${b.refundReason}` : ""}</span>
+                    )}
+                    {(!b.escrowStatus || b.escrowStatus === "locked") && b.status === "open" && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <span style={{ fontSize: 10, color: "var(--text-muted)" }}>Awaiting claim</span>
+                        <button
+                          onClick={() => refundEscrow(b)}
+                          disabled={refunding === b.id}
+                          className="btn btn-danger"
+                          style={{ padding: "4px 8px", fontSize: 10 }}>
+                          ↩ Refund
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 /* ── Main Component ─────────────────────────────────────────────────────── */
 export default function ComprehensiveAdminPanel() {
@@ -1200,6 +1522,7 @@ export default function ComprehensiveAdminPanel() {
     openContactMessages: contactMessages?.filter(m => m.status === 'open').length || 0,
     pendingFaculty: users?.filter(u => u.lecturerVerificationStatus === 'pending').length || 0,
     pendingPromotions: promotions?.filter(p => p.status === 'pending').length || 0,
+    pendingBountyEscrow: 0, 
   };
 
   if (checkingAdmin) return (
@@ -1515,6 +1838,18 @@ export default function ComprehensiveAdminPanel() {
             </div>
           )}
 
+          {activeSection === "bounty-escrow" && (
+            <div>
+              <div className="section-header">
+                <div>
+                  <div className="section-title"><Lock size={18} />Bounty Escrow Ledger</div>
+                  <div className="section-sub">Track all locked, released, and refunded bounty funds</div>
+                </div>
+              </div>
+              <BountyEscrowSection user={user} />
+            </div>
+          )}
+          
           {/* ── USERS ─────────────────────────────────────────────────── */}
           {activeSection === 'users' && (
             <div>

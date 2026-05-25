@@ -165,7 +165,7 @@ function LicenseButton({ book, isGloballyFrozen, isPrintLicensingEnabled, router
   );
 }
 
-export default function BookPreviewPage({ bookDetails }) {
+export default async function BookPreviewPage({ bookDetails }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawBookId = searchParams.get("id");
@@ -208,7 +208,8 @@ export default function BookPreviewPage({ bookDetails }) {
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [isPrintLicensingEnabled, setIsPrintLicensingEnabled] = useState(false);
   const [isGloballyFrozen, setIsGloballyFrozen] = useState(false);
-
+  const [userBountyRole, setUserBountyRole] = useState(null);
+  
   /* ── NEW: Open Access modal ── */
   const [showOAModal, setShowOAModal] = useState(false);
 
@@ -399,6 +400,36 @@ export default function BookPreviewPage({ bookDetails }) {
     }
   }, [book]);
 
+  useEffect(() => {
+  if (!book?.bountyId || !user?.uid) {
+    setUserBountyRole(null);
+    return;
+  }
+ 
+  const checkBountyRole = async () => {
+    try {
+      const bountyRef = doc(db, "bounties", book.bountyId);
+      const bountySnap = await getDoc(bountyRef);
+      
+      if (bountySnap.exists()) {
+        const bountyData = bountySnap.data();
+        
+        if (bountyData.postedByUid === user.uid) {
+          setUserBountyRole("requester");
+        } else if (bountyData.fulfilledByUid === user.uid) {
+          setUserBountyRole("fulfiller");
+        } else {
+          setUserBountyRole(null);
+        }
+      }
+    } catch (err) {
+      console.error("Error checking bounty role:", err);
+    }
+  };
+  
+  checkBountyRole();
+  }, [book?.bountyId, user?.uid]);
+  
   useEffect(() => {
     if (!bookId) return;
     const trackView = async () => {
@@ -746,6 +777,26 @@ export default function BookPreviewPage({ bookDetails }) {
   if (bookId) fetchBook();
 }, [bookId]);
 
+  
+const cId = bookId?.replace("firestore-", "");
+if (cId) {
+  const snap = await getDoc(doc(db, "advertMyBook", cId));
+  if (snap.exists()) {
+    const raw = snap.data();
+    setIsPrintLicensingEnabled(raw.isPrintLicensingEnabled === true);
+    setIsGloballyFrozen(raw.isGloballyFrozen === true);
+    
+    if (raw.isBountyFulfillment && raw.bountyId) {
+      setBook(prevBook => ({
+        ...prevBook,
+        isBountyFulfillment: true,
+        bountyId: raw.bountyId,
+      }));
+    }
+  }
+}
+ 
+  
   useEffect(() => {
     const fetchAllBooks = async () => {
       try {
@@ -799,30 +850,45 @@ export default function BookPreviewPage({ bookDetails }) {
     fetchAllBooks();
   }, []);
 
-  const checkPurchaseStatus = async (userId) => {
-    try {
-      const ud = await getDoc(doc(db, "users", userId));
-      if (ud.exists()) {
-        const pb = ud.data().purchasedBooks || {};
-        const cId = bookId?.replace("firestore-", "");
-        let purchased = pb[bookId] || pb[cId] || pb[`firestore-${cId}`];
-        if (!purchased)
-          purchased = Object.keys(pb).some((key) => {
-            const ck = key.replace("firestore-", "");
-            return key === bookId || key === cId || ck === bookId || ck === cId;
-          });
-        setIsPurchased(!!purchased);
-        if (purchased && searchParams.get("purchased") === "true") {
-          showToastMessage("Purchase successful! You now have full access.");
-          const url = new URL(window.location);
-          url.searchParams.delete("purchased");
-          window.history.replaceState({}, "", url);
+ const checkPurchaseStatus = async (userId) => {
+  try {
+    const ud = await getDoc(doc(db, "users", userId));
+    if (ud.exists()) {
+      const pb = ud.data().purchasedBooks || {};
+      const cId = bookId?.replace("firestore-", "");
+      
+      let purchased = pb[bookId] || pb[cId] || pb[`firestore-${cId}`];
+      if (!purchased)
+        purchased = Object.keys(pb).some((key) => {
+          const ck = key.replace("firestore-", "");
+          return key === bookId || key === cId || ck === bookId || ck === cId;
+        });
+      
+      if (purchased && book?.isBountyFulfillment) {
+        const bountyRef = doc(db, "bounties", book.bountyId);
+        const bountySnap = await getDoc(bountyRef);
+        
+        if (bountySnap.exists()) {
+          const bountyData = bountySnap.data();
+          if (bountyData.postedByUid !== userId) {
+            setIsPurchased(false);
+            return;
+          }
         }
-      } else setIsPurchased(false);
-    } catch {
-      setIsPurchased(false);
-    }
-  };
+      }
+      
+      setIsPurchased(!!purchased);
+      if (purchased && searchParams.get("purchased") === "true") {
+        showToastMessage("Purchase successful! You now have full access.");
+        const url = new URL(window.location);
+        url.searchParams.delete("purchased");
+        window.history.replaceState({}, "", url);
+      }
+    } else setIsPurchased(false);
+  } catch {
+    setIsPurchased(false);
+  }
+};
 
   const checkSavedStatus = async (userId) => {
     try {
@@ -1009,6 +1075,62 @@ export default function BookPreviewPage({ bookDetails }) {
         </div>
       );
 
+    {book?.isBountyFulfillment && book?.bountyId && (
+  <div
+    style={{
+      margin: "0 16px 0",
+      padding: "14px 16px",
+      background: "rgba(184,150,62,0.08)",
+      border: `0.5px solid ${GOLD}`,
+      display: "flex",
+      gap: "12px",
+      alignItems: "center",
+    }}
+  >
+    <div
+      style={{
+        width: "36px",
+        height: "36px",
+        background: NAVY,
+        border: `1px solid ${GOLD}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ fontSize: "18px" }}>🎯</span>
+    </div>
+    <div>
+      <p
+        style={{
+          fontSize: "11px",
+          fontWeight: 700,
+          color: GOLD,
+          margin: "0 0 2px",
+          fontFamily: "'Lato',sans-serif",
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+        }}
+      >
+        Bounty Fulfilled
+      </p>
+      <p
+        style={{
+          fontSize: "12px",
+          color: NAVY,
+          margin: 0,
+          fontFamily: "'Lato',sans-serif",
+          fontWeight: 600,
+        }}
+      >
+        This document was created to fulfill a student's paid request
+      </p>
+    </div>
+  </div>
+    )
+    }
+    
     if (!physicalInventory)
       return (
         <div
@@ -1608,6 +1730,41 @@ export default function BookPreviewPage({ bookDetails }) {
     );
   };
 
+{book?.isBountyFulfillment && userBountyRole === "requester" && !isPurchased && (
+  <button
+    onClick={handlePurchase}
+    style={{ /* button styles */ }}
+  >
+    BUY THIS FULFILLMENT — ₦{book.price?.toLocaleString()}
+  </button>
+)}
+ 
+{book?.isBountyFulfillment && userBountyRole === "fulfiller" && isPurchased && (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      background: "rgba(34,197,94,0.12)",
+      border: `0.5px solid rgba(34,197,94,0.3)`,
+      padding: "8px 12px",
+    }}
+  >
+    <span style={{ color: "#16a34a", fontSize: "14px" }}>✓</span>
+    <span
+      style={{
+        fontSize: "11px",
+        color: "#16a34a",
+        fontWeight: 700,
+        fontFamily: "'Lato',sans-serif",
+      }}
+    >
+      SOLD — Your payout has been released
+    </span>
+  </div>
+  )
+  }
+  
   /* ── Loading ── */
   if (loading)
     return (

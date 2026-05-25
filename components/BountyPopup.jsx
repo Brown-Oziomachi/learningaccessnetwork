@@ -238,7 +238,7 @@ export default function BountyPopup() {
             {bounties.map((b, i) => (
               <Link
                 key={b.id}
-                href={`/bounty-board?highlight=${b.id}`}
+                href={`/academic/bounty/board?highlight=${b.id}`}
                 style={{ textDecoration: "none", display: "block" }}
                 onClick={close}
               >
@@ -357,7 +357,7 @@ export default function BountyPopup() {
           {/* Footer CTA */}
           <div style={{ borderTop: ".5px solid #f0ebe0" }}>
             <Link
-              href="/bounty-board"
+              href="/academic/bounty/board"
               onClick={close}
               style={{
                 display: "flex",

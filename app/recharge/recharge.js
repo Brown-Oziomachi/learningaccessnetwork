@@ -950,7 +950,7 @@ useEffect(() => {
                                 <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#fffbeb", border: `0.5px solid #fbbf24`, padding: "8px 12px", marginTop: "8px" }}>
                                   <AlertCircle size={12} style={{ color: "#d97706", flexShrink: 0 }} />
                                   <p style={{ fontSize: "11px", color: "#92400e", margin: 0 }}>
-                                    This looks like a {NETWORKS.find((n) => n.id === detectNetwork(phone))?.name} number.{" "}
+                                    This looks like {NETWORKS.find((n) => n.id === detectNetwork(phone))?.name} number.{" "}
                                     <button onClick={() => { setSelectedNetwork(detectNetwork(phone)); setSelectedPlan(null); setAirtimePlans([]); }}
                                       style={{ background: "none", border: "none", cursor: "pointer", color: "#92400e", fontWeight: 700, fontSize: "11px", textDecoration: "underline", padding: 0 }}>
                                       Switch now
