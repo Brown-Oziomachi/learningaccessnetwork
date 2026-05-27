@@ -13,6 +13,7 @@ import {
 } from "@/lib/bountyService";
 import { createPortal } from "react-dom";
 import { UNIVERSITIES_BY_COUNTRY, UNIVERSITY_COUNTRIES } from "@/lib/africanUniversities";
+import BountyCard from "@/components/BountyCard";
 
 /* ─── Departments (used in CreateModal) ────────────────────── */
 const DEPARTMENTS_BY_FACULTY = {
@@ -462,118 +463,6 @@ function BidButton({ bounty, user }) {
   );
 }
 
-/* ─── BountyCard ────────────────────────────────────────────── */
-function BountyCard({ bounty, highlighted, user, index = 0 }) {
-  const [hovered, setHovered] = useState(false);
-  const ref = useRef(null);
-  const tier = getTier(bounty.reward || 0);
-  const dlInfo = getDeadlineInfo(bounty.deadline);
-  const slotsPct = Math.min(100, ((bounty.proposals || 0) / (bounty.maxProposals || 10)) * 100);
-  const isFilled = bounty.status === "fulfilled";
-  const isUnderReview = bounty.status === "pending_approval";
-  {
-    isUnderReview && (
-      <div
-        style={{
-          position: "absolute",
-          top: 12,
-          right: 12,
-          background: "#f59e0b",
-          color: "#fff",
-          fontSize: 8,
-          fontWeight: 900,
-          padding: "3px 8px",
-          letterSpacing: "0.14em",
-          fontFamily: "'Lato',sans-serif",
-          textTransform: "uppercase"
-        }}
-      >
-        ⏳ UNDER REVIEW
-      </div>
-    )
-  }
-  const isHot = (bounty.reward || 0) >= 10000 || (bounty.proposals || 0) >= 5;
-
-  useEffect(() => {
-    if (highlighted && ref.current) ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [highlighted]);
-
-  return (
-    <div ref={ref} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      style={{ background: highlighted ? `linear-gradient(135deg,rgba(184,150,62,.04),#fff)` : "#fff", border: `0.5px solid ${highlighted ? GOLD : hovered ? GOLD : "#e5ddd0"}`, marginBottom: 14, transform: hovered ? "translateY(-3px)" : "none", boxShadow: highlighted ? `0 0 0 3px rgba(184,150,62,.2),0 16px 40px rgba(13,34,68,.12)` : hovered ? "0 12px 32px rgba(13,34,68,.09)" : "none", transition: "all .22s cubic-bezier(.4,0,.2,1)", animation: `fadeUp .4s cubic-bezier(.4,0,.2,1) ${index * 0.07}s both`, position: "relative", overflow: "hidden" }}>
-
-      {/* Tier accent */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,${tier.color},transparent)` }} />
-      {isHot && !isFilled && <div style={{ position: "absolute", top: 12, right: 12, background: "#ef4444", color: "#fff", fontSize: 8, fontWeight: 900, padding: "3px 8px", letterSpacing: "0.14em", fontFamily: "'Lato',sans-serif", textTransform: "uppercase" }}>🔥 HOT</div>}
-
-      <div style={{ padding: "18px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
-        {/* Top section — badges + title + meta + slots */}
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-            <TierBadge reward={bounty.reward} />
-            {bounty.university && <span style={{ background: NAVY, padding: "3px 10px" }}><span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: GOLD, fontFamily: "'Lato',sans-serif" }}>{bounty.university}</span></span>}
-            {bounty.department && <span style={{ fontSize: 9, color: "#aaa", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif" }}>{bounty.department}</span>}
-          </div>
-          <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: hovered && !isFilled ? GOLD : NAVY, lineHeight: 1.38, marginBottom: 10, transition: "color .15s", paddingRight: isHot ? 50 : 0 }}>
-            {bounty.title}
-          </h3>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 10, color: "#aaa", fontFamily: "'Lato',sans-serif", fontWeight: 600, alignItems: "center", marginBottom: 10 }}>
-            {bounty.postedBy && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Avatar name={bounty.postedBy} size={16} /><span style={{ color: NAVY }}>{bounty.postedBy}</span></span>}
-            <span>·</span>
-            <span style={{ color: GOLD }}>{bounty.proposals || 0} proposal{(bounty.proposals || 0) !== 1 ? "s" : ""}</span>
-            {bounty.createdAt?.toDate && <><span>·</span><span>{timeAgo(bounty.createdAt.toDate())}</span></>}
-          </div>
-          {!isFilled && (
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                <span style={{ fontSize: 9, color: "#bbb", fontFamily: "'Lato',sans-serif", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Proposal slots</span>
-                <span style={{ fontSize: 9, fontWeight: 700, color: slotsPct > 80 ? "#ef4444" : GOLD, fontFamily: "'Lato',sans-serif" }}>{Math.max(0, (bounty.maxProposals || 10) - (bounty.proposals || 0))} remaining</span>
-              </div>
-              <div style={{ height: 3, background: "#f0ebe0" }}>
-                <div style={{ height: "100%", width: `${slotsPct}%`, background: slotsPct > 80 ? "#ef4444" : GOLD, transition: "width .5s" }} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer row — reward left, status + button right */}
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 10, paddingTop: 10, borderTop: "0.5px solid #f0ebe0" }}>
-          <div>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#aaa", fontFamily: "'Lato',sans-serif", marginBottom: 2 }}>Bounty Reward</div>
-            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: "clamp(17px, 4vw, 22px)", fontWeight: 700, color: NAVY, lineHeight: 1, display: "flex", alignItems: "baseline", gap: 2 }}>
-              <span style={{ fontSize: 12, color: GOLD, fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>₦</span>
-              {bounty.rewardFmt?.replace("₦", "") ?? Number(bounty.reward).toLocaleString("en-NG")}
-            </div>
-            <div style={{ fontSize: 9, color: "#aaa", fontFamily: "'Lato',sans-serif", marginTop: 2 }}>
-              earns ₦{Math.round((bounty.reward || 0) * 0.8).toLocaleString("en-NG")}
-            </div>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-            {!isFilled && (
-              <div style={{ fontSize: 9, fontWeight: 700, fontFamily: "'Lato',sans-serif", color: bounty.status === "pending_approval" ? "#b45309" : dlInfo.color }}>
-                {bounty.status === "pending_approval" ? "⏳ Under Review" : dlInfo.label}
-              </div>
-            )}
-            {isFilled && (
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(22,163,74,.07)", border: "0.5px solid rgba(22,163,74,.22)", color: "#16a34a", fontSize: 9, fontWeight: 700, padding: "4px 10px", fontFamily: "'Lato',sans-serif" }}>
-                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#16a34a" }} />
-                Fulfilled
-              </div>
-            )}
-            <BidButton bounty={bounty} user={user} />
-          </div>
-        </div>
-      </div>
-      {(bounty.tags || []).length > 0 && (
-        <div style={{ borderTop: "0.5px solid #f0ebe0", padding: "10px 24px", display: "flex", gap: 6, flexWrap: "wrap", background: "#faf8f5" }}>
-          {bounty.tags.map(tag => (
-            <span key={tag} style={{ display: "inline-block", background: CREAM, border: "0.5px solid rgba(184,150,62,.3)", color: GOLD, fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "3px 9px", fontFamily: "'Lato',sans-serif" }}>{tag}</span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ─── CREATE MODAL ──────────────────────────────────────────── */
 function CreateModal({ onClose, user, userProfile }) {
@@ -923,6 +812,7 @@ export default function AcademicBountyBoardClient() {
   const searchParams = useSearchParams();
   const highlightId = searchParams?.get("highlight") || null;
   const router = useRouter();
+  
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (cu) => {
@@ -953,8 +843,9 @@ export default function AcademicBountyBoardClient() {
     return list;
   }, [bounties, filter, search, sort]);
 
-  const totalRewards = bounties.filter(b => b.status === "open").reduce((s, b) => s + (b.reward || 0), 0);
-  const activeCt = bounties.filter(b => b.status === "open").length;
+const totalRewards = bounties
+  .filter(b => b.status !== "fulfilled")
+  .reduce((s, b) => s + (b.reward || 0), 0);  const activeCt = bounties.filter(b => b.status === "open").length;
   const totalProps = bounties.reduce((s, b) => s + (b.proposals || 0), 0);
   const fulfilledCt = bounties.filter(b => b.status === "fulfilled").length;
 
@@ -1170,7 +1061,7 @@ export default function AcademicBountyBoardClient() {
                 </div>
               ) : <div className="bounty-grid">
                 {filtered.map((bounty, i) => (
-                  <BountyCard key={bounty.id} bounty={bounty} highlighted={bounty.id === highlightId} user={user} index={i} />
+                  <BountyCard key={bounty.id} bounty={bounty} user={user} highlighted={bounty.id === highlightId} />
                 ))}
               </div>
           }

@@ -13,6 +13,8 @@ import { addStudentRoleToExistingUser } from "@/lib/auth/authHelpers";
 import ExportStudentsModal from "@/components/Exportstudentsmodal";
 import { uploadImageToCloudinary } from "@/lib/uploadImageToCloudinary";
 import PrintLicensingControl from "./print-licence-control/page";
+import BountyApprovalModal from "@/components/BountyApprovalModal";
+import BountyDashboardCard from "./Bounty-cashboard-card/page";
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -901,6 +903,11 @@ export default function SellerAccountClient() {
     const [showSwitchModal, setShowSwitchModal] = useState(false);
     const [showPrintLicenseLedger, setShowPrintLicenseLedger] = useState(false);
     const [activeSection, setActiveSection] = useState(null);
+    const [myClaimedBounties, setMyClaimedBounties] = useState([]);
+    const [pendingBounties, setPendingBounties] = useState([]);
+    const [approvalBounty, setApprovalBounty] = useState(null); 
+    const [showBountyDashboardModal, setShowBountyDashboardModal] = useState(false);
+    const [showBountySubmissionsModal, setShowBountySubmissionsModal] = useState(false);
     const router = useRouter();
     const [showPhysicalOrdersModal, setShowPhysicalOrdersModal] = useState(false);
     const [physicalOrders, setPhysicalOrders] = useState([]);
@@ -935,6 +942,7 @@ export default function SellerAccountClient() {
     }, [router]);
 
     const fetchUserData = async (uid) => {
+        
         try {
             setLoading(true);
             const userDoc = await getDoc(doc(db, "users", uid));
@@ -978,7 +986,18 @@ export default function SellerAccountClient() {
                     department: userData.department || "",        // ✅ already has fallback
                     institution: userData.institution || userData.selectedUniversity || "",
                 });
+
+                
                 await fetchSellerTransactions(uid);
+                
+                try {
+                  const bq = query(
+                    collection(db, 'bounties'),
+                    where('claimedBy', '==', uid)
+                  );
+                  const bs = await getDocs(bq);
+                  setMyClaimedBounties(bs.docs.map(d => ({ id: d.id, ...d.data() })));
+                } catch {}
             }
         } catch (error) { console.error("Error fetching user data:", error); }
         finally { setLoading(false); }
@@ -989,6 +1008,7 @@ export default function SellerAccountClient() {
         return flags[country] || "🌍";
     }
 
+    
     const fetchPhysicalOrders = async () => {
         if (!user?.uid) return;
         setPhysicalOrdersLoading(true);
@@ -1009,65 +1029,196 @@ export default function SellerAccountClient() {
         } finally {
             setPhysicalOrdersLoading(false);
         }
-    };
+    }
 
-    const fetchSellerTransactions = async (uid) => {
-        try {
-            let allTransactions = [];
-            const transactionsQuery = query(collection(db, "transactions"), where("sellerId", "==", uid));
-            const transactionsSnapshot = await getDocs(transactionsQuery);
-            const txnsFromCollection = await Promise.all(transactionsSnapshot.docs.map(async (docSnap) => {
-                const data = docSnap.data();
-                let buyerCountry = null;
-                const buyerId = data.buyerId || data.userId || data.buyerUid || data.uid || null;
-                if (buyerId) { try { const bd = await getDoc(doc(db, "users", buyerId)); if (bd.exists()) buyerCountry = bd.data().country || null; } catch { } }
-                return { id: docSnap.id, ...data, bookTitle: data.bookTitle || data.title, buyerCountry, createdAtDate: data.createdAt?.toDate?.() || (data.purchaseDate ? new Date(data.purchaseDate) : new Date()) };
-            }));
-            allTransactions = [...txnsFromCollection];
-            const withdrawalsQuery = query(collection(db, "withdrawals"), where("sellerId", "==", uid));
-            const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
-            const withdrawalsList = withdrawalsSnapshot.docs.map(d => ({ id: d.id, ...d.data(), requestedAtDate: d.data().requestedAt?.toDate?.() || new Date() }));
-            withdrawalsList.sort((a, b) => b.requestedAtDate - a.requestedAtDate);
-            setWithdrawals(withdrawalsList);
-            const transfersQuery = query(collection(db, 'transfers'), where('senderId', '==', uid));
-            const transfersSnap = await getDocs(transfersQuery);
-            const transfersList = transfersSnap.docs.map(d => { const data = d.data(); return { id: d.id, ...data, bookTitle: `Transfer to ${data.recipientName || 'Unknown'}`, buyerName: data.recipientName || 'Unknown', amount: data.amount, sellerAmount: -data.amount, createdAtDate: data.createdAt?.toDate?.() || new Date(), type: 'transfer_out' }; });
-            const incomingQuery = query(collection(db, 'transfers'), where('recipientId', '==', uid));
-            const incomingSnap = await getDocs(incomingQuery);
-            const incomingList = await Promise.all(incomingSnap.docs.map(async d => {
-                const data = d.data(); let buyerCountry = null;
-                if (data.senderId) { try { const sd = await getDoc(doc(db, "users", data.senderId)); if (sd.exists()) buyerCountry = sd.data().country || null; } catch { } }
-                return { id: `incoming-${d.id}`, ...data, bookTitle: `Transfer from ${data.senderName || 'Unknown'}`, buyerName: data.senderName || 'Unknown', amount: data.amount, sellerAmount: data.amount, buyerCountry, createdAtDate: data.createdAt?.toDate?.() || new Date(), type: 'transfer_in' };
-            }));
+    
+    
+   const fetchSellerTransactions = async (uid) => {
+  try {
+    let allTransactions = [];
+ 
+    /* ── 1. Standard sales from `transactions` collection ── */
+    const transactionsQuery = query(
+      collection(db, "transactions"),
+      where("sellerId", "==", uid)
+    );
+    const transactionsSnapshot = await getDocs(transactionsQuery);
+    const txnsFromCollection = await Promise.all(
+      transactionsSnapshot.docs.map(async (docSnap) => {
+        const data = docSnap.data();
+        let buyerCountry = null;
+        const buyerId =
+          data.buyerId || data.userId || data.buyerUid || data.uid || null;
+        // Don't look up the seller themselves as a buyer
+        if (buyerId && buyerId !== uid) {
+          try {
+            const bd = await getDoc(doc(db, "users", buyerId));
+            if (bd.exists()) buyerCountry = bd.data().country || null;
+          } catch {}
+        }
+        return {
+          id: docSnap.id,
+          ...data,
+          bookTitle: data.bookTitle || data.title,
+          buyerCountry,
+          createdAtDate:
+            data.createdAt?.toDate?.() ||
+            (data.purchaseDate ? new Date(data.purchaseDate) : new Date()),
+        };
+      })
+    );
+    allTransactions = [...txnsFromCollection];
+ 
+    /* ── 2. Withdrawals ── */
+    const withdrawalsQuery = query(
+      collection(db, "withdrawals"),
+      where("sellerId", "==", uid)
+    );
+    const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
+    const withdrawalsList = withdrawalsSnapshot.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+      requestedAtDate: d.data().requestedAt?.toDate?.() || new Date(),
+    }));
+    withdrawalsList.sort((a, b) => b.requestedAtDate - a.requestedAtDate);
+    setWithdrawals(withdrawalsList);
+ 
+    /* ── 3. Outgoing transfers ── */
+    const transfersQuery = query(
+      collection(db, "transfers"),
+      where("senderId", "==", uid)
+    );
+    const transfersSnap = await getDocs(transfersQuery);
+    const transfersList = transfersSnap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        bookTitle: `Transfer to ${data.recipientName || "Unknown"}`,
+        buyerName: data.recipientName || "Unknown",
+        amount: data.amount,
+        sellerAmount: -data.amount,
+        createdAtDate: data.createdAt?.toDate?.() || new Date(),
+        type: "transfer_out",
+      };
+    });
+ 
+    /* ── 4. Incoming transfers ── */
+    const incomingQuery = query(
+      collection(db, "transfers"),
+      where("recipientId", "==", uid)
+    );
+    const incomingSnap = await getDocs(incomingQuery);
+    const incomingList = await Promise.all(
+      incomingSnap.docs.map(async (d) => {
+        const data = d.data();
+        let buyerCountry = null;
+        if (data.senderId) {
+          try {
+            const sd = await getDoc(doc(db, "users", data.senderId));
+            if (sd.exists()) buyerCountry = sd.data().country || null;
+          } catch {}
+        }
+        return {
+          id: `incoming-${d.id}`,
+          ...data,
+          bookTitle: `Transfer from ${data.senderName || "Unknown"}`,
+          buyerName: data.senderName || "Unknown",
+          amount: data.amount,
+          sellerAmount: data.amount,
+          buyerCountry,
+          createdAtDate: data.createdAt?.toDate?.() || new Date(),
+          type: "transfer_in",
+        };
+      })
+    );
+ 
+    /* ── 5. Physical sales ── */
+    const physicalSalesQuery = query(
+      collection(db, "physicalSales"),
+      where("sellerId", "==", uid)
+    );
+    const physicalSalesSnap = await getDocs(physicalSalesQuery);
+    const physicalSalesList = physicalSalesSnap.docs.map((d) => {
+      const data = d.data();
+      return {
+        ...data,
+        bookTitle: `📦 ${data.bookTitle} (Registry Pickup)`,
+        buyerName: data.studentName || data.buyerName || "Student",
+        amount: data.salePrice || data.price || 0,
+        sellerAmount: data.sellerPayout || 0,
+        platformFee: data.platformFee || 0,
+        createdAtDate: data.soldAt?.toDate?.() || new Date(),
+        type: "physical_sale",
+      };
+    });
 
-            const physicalSalesQuery = query(
-                collection(db, "physicalSales"),
-                where("sellerId", "==", uid)
-            );
-            const physicalSalesSnap = await getDocs(physicalSalesQuery);
-            const physicalSalesList = physicalSalesSnap.docs.map(d => {
-                const data = d.data();
-                const fullPrice = data.salePrice || data.price || 0;
-                const payout = data.sellerPayout || 0;
-                const fee = data.platformFee || 0;
+    try {
+      const bountyFulfilledSnap = await getDocs(
+        query(
+          collection(db, "bounties"),
+          where("fulfilledByUid", "==", uid),
+          where("status", "==", "fulfilled")
+        )
+      );
+      const bountyPayoutsList = bountyFulfilledSnap.docs.map((d) => {
+        const data = d.data();
+        const escrow = data.escrowAmount || data.reward || 0;
+        return {
+          id: `bounty-payout-${d.id}`,
+          bookTitle: `🎯 Bounty Reward — ${data.title || "Bounty"}`,
+          buyerName: data.postedBy || "Student",
+          amount: escrow,
+          sellerAmount: data.authorPayout || Math.round(escrow * 0.8),
+          platformFee: data.platformFee || Math.round(escrow * 0.2),
+          createdAtDate:
+            data.approvedAt?.toDate?.() ||
+            data.fulfilledAt?.toDate?.() ||
+            new Date(),
+          type: "bounty_payout",
+        };
+      });
+      allTransactions = [...allTransactions, ...bountyPayoutsList];
+    } catch (e) {
+      console.warn("Bounty payouts fetch failed:", e);
+    }
+ 
+    /* ── 7. ★ Bounty postings — escrow locks ── */
+    try {
+      const bountyPostedSnap = await getDocs(
+        query(collection(db, "bounties"), where("postedByUid", "==", uid))
+      );
+      const bountyPostedList = bountyPostedSnap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: `bounty-posted-${d.id}`,
+          bookTitle: `📌 Bounty Request — ${data.title || "Bounty"}`,
+          buyerName: "Locked in Escrow",
+          amount: data.reward || data.escrowAmount || 0,
+          sellerAmount: -(data.reward || data.escrowAmount || 0),
+          createdAtDate: data.createdAt?.toDate?.() || new Date(),
+          type: "bounty_posted",
+        };
+      });
+      allTransactions = [...allTransactions, ...bountyPostedList];
+    } catch (e) {
+      console.warn("Bounty posted fetch failed:", e);
+    }
+ 
+    allTransactions = [
+      ...allTransactions,
+      ...transfersList,
+      ...incomingList,
+      ...physicalSalesList,
+    ];
+    allTransactions.sort((a, b) => b.createdAtDate - a.createdAtDate);
+    setTransactions(allTransactions);
+  } catch (error) {
+    console.error("Error fetching seller transactions:", error);
+  }
+};
 
-                return {
-                    ...data,
-                    bookTitle: `📦 ${data.bookTitle} (Registry Pickup)`,
-                    buyerName: data.studentName || data.buyerName || "Student",
-                    amount: fullPrice,
-                    sellerAmount: payout,
-                    platformFee: fee,
-                    createdAtDate: data.soldAt?.toDate?.() || new Date(),
-                    type: "physical_sale",
-                };
-            });
-            allTransactions = [...allTransactions, ...transfersList, ...incomingList, ...physicalSalesList];
-            allTransactions.sort((a, b) => b.createdAtDate - a.createdAtDate);
-            setTransactions(allTransactions);
-        } catch (error) { console.error("Error fetching seller transactions:", error); }
-    };
-
+    
     const handleSaveBank = async () => {
         if (!bankFormData.accountName || !bankFormData.accountNumber || !bankFormData.bankName) { alert("Please fill in all required fields"); return; }
         try {
@@ -1313,43 +1464,223 @@ export default function SellerAccountClient() {
                             <VTUQuickAccess />
 
                             {/* Recent Transactions */}
-                            <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '24px' }}>
-                                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '20px' }}>
+                            <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "24px" }}>
+                                {/* header row */}
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "flex-end",
+                                        justifyContent: "space-between",
+                                        marginBottom: "20px",
+                                    }}
+                                >
                                     <div>
-                                        <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: GOLD, marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Activity</p>
-                                        <h3 className="lan-serif" style={{ fontSize: '20px', fontWeight: 700, color: NAVY, margin: 0 }}>Recent Transactions</h3>
+                                        <p
+                                            style={{
+                                                fontSize: "10px",
+                                                fontWeight: 700,
+                                                letterSpacing: "0.2em",
+                                                textTransform: "uppercase",
+                                                color: GOLD,
+                                                marginBottom: "4px",
+                                                fontFamily: "'Lato',sans-serif",
+                                            }}
+                                        >
+                                            Activity
+                                        </p>
+                                        <h3
+                                            className="lan-serif"
+                                            style={{ fontSize: "20px", fontWeight: 700, color: NAVY, margin: 0 }}
+                                        >
+                                            Recent Transactions
+                                        </h3>
                                     </div>
-                                    <button onClick={() => setShowTransactionHistory(true)} style={{ fontSize: '11px', fontWeight: 700, color: NAVY, background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontFamily: "'Lato',sans-serif", letterSpacing: '0.04em' }}>
+                                    <button
+                                        onClick={() => setShowTransactionHistory(true)}
+                                        style={{
+                                            fontSize: "11px",
+                                            fontWeight: 700,
+                                            color: NAVY,
+                                            background: "transparent",
+                                            border: "none",
+                                            cursor: "pointer",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "4px",
+                                            fontFamily: "'Lato',sans-serif",
+                                            letterSpacing: "0.04em",
+                                        }}
+                                    >
                                         View all <ChevronRight size={13} />
                                     </button>
                                 </div>
+
+                                {/* empty state */}
                                 {transactions.length === 0 ? (
-                                    <div style={{ textAlign: 'center', padding: '40px 0', borderTop: '0.5px solid #f0ebe0' }}>
-                                        <ShoppingBag size={36} style={{ color: '#ddd', margin: '0 auto 10px' }} />
-                                        <p style={{ fontSize: '13px', color: '#aaa', fontFamily: "'Lato',sans-serif" }}>No transactions yet</p>
+                                    <div
+                                        style={{
+                                            textAlign: "center",
+                                            padding: "40px 0",
+                                            borderTop: "0.5px solid #f0ebe0",
+                                        }}
+                                    >
+                                        <ShoppingBag size={36} style={{ color: "#ddd", margin: "0 auto 10px" }} />
+                                        <p style={{ fontSize: "13px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>
+                                            No transactions yet
+                                        </p>
                                     </div>
                                 ) : (
-                                    transactions.slice(0, 5).map(txn => (
-                                        <div key={txn.id} className="txn-row">
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                <div style={{ width: '38px', height: '38px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}>
-                                                    {txn.type === 'transfer_out' ? <ArrowUpRight size={16} style={{ color: '#ef4444' }} /> : txn.type === 'physical_sale' ? <Package size={16} style={{ color: GOLD }} /> : <ShoppingBag size={16} style={{ color: NAVY }} />}
+                                    /* ── transaction rows ── */
+                                    transactions.slice(0, 5).map((txn) => {
+                                        const isOut =
+                                            txn.type === "transfer_out" || txn.type === "bounty_posted";
+                                        const isBountyPayout = txn.type === "bounty_payout";
+
+                                        const amountDisplay = isOut
+                                            ? `-₦${Number(txn.amount).toLocaleString()}`
+                                            : `+₦${Number(
+                                                txn.sellerAmount || txn.amount * 0.8
+                                            ).toLocaleString()}`;
+
+                                        const statusLabel = isBountyPayout
+                                            ? "🎯 Bounty Bonus"
+                                            : txn.type === "bounty_posted"
+                                                ? "📌 Escrow Locked"
+                                                : txn.type === "transfer_out"
+                                                    ? "Sent"
+                                                    : txn.type === "transfer_in"
+                                                        ? "Received"
+                                                        : txn.type === "physical_sale"
+                                                            ? "📦 Physical Sale"
+                                                            : "Success";
+
+                                        const icon =
+                                            txn.type === "transfer_out" ? (
+                                                <ArrowUpRight size={16} style={{ color: "#ef4444" }} />
+                                            ) : txn.type === "transfer_in" ? (
+                                                <ArrowDownLeft size={16} style={{ color: "#16a34a" }} />
+                                            ) : txn.type === "physical_sale" ? (
+                                                <Package size={16} style={{ color: GOLD }} />
+                                            ) : isBountyPayout ? (
+                                                <svg
+                                                    width="16"
+                                                    height="16"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="#16a34a"
+                                                    strokeWidth="2"
+                                                >
+                                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                                                </svg>
+                                            ) : txn.type === "bounty_posted" ? (
+                                                <svg
+                                                    width="16"
+                                                    height="16"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke={GOLD}
+                                                    strokeWidth="2"
+                                                >
+                                                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                                </svg>
+                                            ) : (
+                                                <ShoppingBag size={16} style={{ color: NAVY }} />
+                                            );
+
+                                        return (
+                                            <div key={txn.id} className="txn-row">
+                                                {/* ── left: icon + title + date ── */}
+                                                <div
+                                                    style={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "12px",
+                                                        flex: 1,
+                                                        minWidth: 0,
+                                                    }}
+                                                >
+                                                    {/* icon box */}
+                                                    <div
+                                                        style={{
+                                                            width: "38px",
+                                                            height: "38px",
+                                                            border: "0.5px solid #e5ddd0",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            background: CREAM,
+                                                            flexShrink: 0,
+                                                        }}
+                                                    >
+                                                        {icon}
+                                                    </div>
+
+                                                    {/* title + date */}
+                                                    <div style={{ minWidth: 0 }}>
+                                                        <p
+                                                            style={{
+                                                                fontSize: "12px",
+                                                                fontWeight: 700,
+                                                                color: NAVY,
+                                                                margin: "0 0 2px",
+                                                                fontFamily: "'Lato',sans-serif",
+                                                                overflow: "hidden",
+                                                                textOverflow: "ellipsis",
+                                                                whiteSpace: "nowrap",
+                                                            }}
+                                                        >
+                                                            {txn.bookTitle || "Transaction"}
+                                                        </p>
+                                                        <p
+                                                            style={{
+                                                                fontSize: "10px",
+                                                                color: "#aaa",
+                                                                margin: 0,
+                                                                fontFamily: "'Lato',sans-serif",
+                                                            }}
+                                                        >
+                                                            {txn.createdAtDate?.toLocaleDateString?.() || ""}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>{txn.bookTitle}</p>
-                                                    <p style={{ fontSize: '10px', color: '#aaa', margin: 0, fontFamily: "'Lato',sans-serif" }}>{txn.createdAtDate?.toLocaleDateString()}</p>
+
+                                                {/* ── right: amount + status badge ── */}
+                                                <div
+                                                    style={{
+                                                        textAlign: "right",
+                                                        flexShrink: 0,
+                                                        marginLeft: "12px",
+                                                    }}
+                                                >
+                                                    <p
+                                                        style={{
+                                                            fontSize: "13px",
+                                                            fontWeight: 700,
+                                                            color: isOut ? "#ef4444" : "#16a34a",
+                                                            margin: "0 0 2px",
+                                                            fontFamily: "'Lato',sans-serif",
+                                                        }}
+                                                    >
+                                                        {amountDisplay}
+                                                    </p>
+                                                    <p
+                                                        style={{
+                                                            fontSize: "10px",
+                                                            color: "#aaa",
+                                                            margin: 0,
+                                                            fontFamily: "'Lato',sans-serif",
+                                                        }}
+                                                    >
+                                                        {statusLabel}
+                                                    </p>
                                                 </div>
                                             </div>
-                                            <div style={{ textAlign: 'right' }}>
-                                                <p style={{ fontSize: '13px', fontWeight: 700, color: txn.type === 'transfer_out' ? '#ef4444' : '#16a34a', margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>
-                                                    {txn.type === 'transfer_out' ? `-₦${txn.amount?.toLocaleString()}` : `+₦${(txn.sellerAmount || (txn.amount * 0.80)).toLocaleString()}`}
-                                                </p>
-                                                <p style={{ fontSize: '10px', color: '#aaa', margin: 0, fontFamily: "'Lato',sans-serif" }}>{txn.type === 'transfer_out' ? 'Sent' : 'Success'}</p>
-                                            </div>
-                                        </div>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </div>
+                            );
                         </div>
 
                         {/* RIGHT */}
@@ -1534,6 +1865,18 @@ export default function SellerAccountClient() {
                                             fetchPhysicalOrders();
                                             setShowPhysicalOrdersModal(true);
                                         },
+                                    },
+                                    {
+                                        label: "My Bounties",
+                                        icon: (
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2">
+                                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                                            </svg>
+                                        ),
+                                        onClick: () => {
+                                            setShowProfileModal(false);
+                                            setShowBountyDashboardModal(true);
+                                        }
                                     },
                                    {
                                         id: 'print-license-ledger',
@@ -2112,7 +2455,62 @@ export default function SellerAccountClient() {
                     </div>
                 )}
 
-
+                {showBountySubmissionsModal && (
+                    <div className="modal-overlay mt-25">
+                        <div className="modal-inner">
+                            <div style={{ background: NAVY, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0 }}>
+                                <div>
+                                    <p style={{ color: GOLD, fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Bounties</p>
+                                    <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: '20px', fontWeight: 700, color: '#fff', margin: 0 }}>My Bounty Submissions</h2>
+                                </div>
+                                <button onClick={() => setShowBountySubmissionsModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}>
+                                    <X size={22} />
+                                </button>
+                            </div>
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: BG }}>
+                                {myClaimedBounties.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                                        <Receipt size={40} style={{ color: '#ddd', margin: '0 auto 12px' }} />
+                                        <p style={{ fontSize: '14px', fontWeight: 700, color: NAVY, fontFamily: "'Playfair Display',serif", marginBottom: '6px' }}>No bounty submissions yet</p>
+                                        <p style={{ fontSize: '12px', color: '#aaa', fontFamily: "'Lato',sans-serif" }}>Bounties you claim will appear here.</p>
+                                    </div>
+                                ) : (
+                                    myClaimedBounties.map(bounty => (
+                                        <div key={bounty.id} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '16px', marginBottom: '8px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                                <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                                                    {bounty.title || bounty.bookTitle || 'Bounty Submission'}
+                                                </p>
+                                                <span style={{
+                                                    fontSize: '10px', fontWeight: 700, padding: '2px 8px', fontFamily: "'Lato',sans-serif",
+                                                    background: bounty.status === 'fulfilled' ? '#f0fdf4' : bounty.status === 'disputed' ? '#fef2f2' : '#fef9c3',
+                                                    color: bounty.status === 'fulfilled' ? '#16a34a' : bounty.status === 'disputed' ? '#dc2626' : '#a16207',
+                                                }}>
+                                                    {bounty.status === 'fulfilled' ? '✅ Approved' : bounty.status === 'disputed' ? '🚩 Disputed' : '⏳ Pending'}
+                                                </span>
+                                            </div>
+                                            {bounty.reward && (
+                                                <p style={{ fontSize: '12px', color: GOLD, fontWeight: 700, margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>
+                                                    Reward: ₦{Number(bounty.reward).toLocaleString()}
+                                                </p>
+                                            )}
+                                            <p style={{ fontSize: '11px', color: '#aaa', margin: '0 0 10px', fontFamily: "'Lato',sans-serif" }}>
+                                                {bounty.claimedAt?.toDate?.()?.toLocaleDateString() || ''}
+                                            </p>
+                                            <button
+                                                onClick={() => { setShowBountySubmissionsModal(false); setApprovalBounty({ id: bounty.id, data: bounty }); }}
+                                                style={{ background: NAVY, color: '#fff', border: 'none', padding: '8px 14px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}
+                                            >
+                                                View Details →
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+                
                 {/* PIN Modal */}
                 {showPinModal && (
                     <PinModal amount={withdrawAmount} bankDetails={user?.bankDetails} pinValue={pinValue} pinError={pinError}
@@ -2225,7 +2623,25 @@ export default function SellerAccountClient() {
                     </div>
                 )}
 
-               
+               {showBountyDashboardModal && (
+    <div className="modal-overlay mt-25">
+        <div className="modal-inner">
+            <div style={{ background: NAVY, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0 }}>
+                <div>
+                    <p style={{ color: GOLD, fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Bounty Board</p>
+                    <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: '20px', fontWeight: 700, color: '#fff', margin: 0 }}>My Bounties</h2>
+                </div>
+                <button onClick={() => setShowBountyDashboardModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}>
+                    <X size={22} />
+                </button>
+            </div>
+            <div style={{ padding: '16px', background: BG, overflowY: 'auto' }}>
+                <BountyDashboardCard user={user} />
+            </div>
+        </div>
+    </div>
+)}
+
                 <ExportStudentsModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} sellerId={user?.uid} sellerBooks={sellerBooks} />
            
               {/* Print License Ledger Modal */}

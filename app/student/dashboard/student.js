@@ -21,6 +21,7 @@ import NotificationBell from '@/components/NotificationBell';
 import FeaturedAdsCarousel from '@/components/FeaturedAdsCarousel';
 import { increment } from 'firebase/firestore';
 import { useAds } from "@/lib/useAds";  
+import BountyApprovalModal from '@/components/BountyApprovalModal';
 
 /* ─── Design tokens ─── */
 const NAVY  = "#0d2244";
@@ -545,10 +546,11 @@ export default function StudentDashboardClient() {
     const [campusBooks,    setCampusBooks]    = useState([]);
     const [selectedLecturer, setSelectedLecturer] = useState(null);
     const [showAllLecturers, setShowAllLecturers] = useState(false);    
-   const goldAds   = useAds("Gold",   3);
-const silverAds = useAds("Silver", 2);
-const bronzeAds = useAds("Bronze", 2);  // ← ADD THIS
-
+    const [pendingBounties, setPendingBounties]       = useState([]);
+    const [approvalBounty,  setApprovalBounty]        = useState(null); 
+    const goldAds   = useAds("Gold",   3);
+    const silverAds = useAds("Silver", 2);
+    const bronzeAds = useAds("Bronze", 2);  
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (u) => {
             if (u) await fetchAll(u.uid);
@@ -642,6 +644,16 @@ const bronzeAds = useAds("Bronze", 2);  // ← ADD THIS
                 setLecturerBooks(lecBooks.filter(b=>{if(seen2.has(b.firestoreId))return false;seen2.add(b.firestoreId);return true;})
                     .sort((a,b)=>(b.createdAt?.toDate?.()?.getTime()||0)-(a.createdAt?.toDate?.()?.getTime()||0)).slice(0,10));
             }
+
+            try {
+                const bq = query(
+                    collection(db, 'bounties'),
+                    where('postedById',  '==', uid),
+                    where('status',      '==', 'pending_approval')
+                );
+                const bs = await getDocs(bq);
+                setPendingBounties(bs.docs.map(d => ({ id: d.id, ...d.data() })));
+                } catch {}
 
             try {
                 const lecIds=new Set(seenIds);
@@ -1059,6 +1071,33 @@ const bronzeAds = useAds("Bronze", 2);  // ← ADD THIS
             }
         </div>
     );
+
+    {
+        pendingBounties.length > 0 && (
+            <div style={{ marginTop: 24, borderTop: '0.5px solid #f0ebe0', paddingTop: 22 }}>
+                <p className="sl" style={{ marginBottom: 6 }}>Action Required</p>
+                <h3 className="lan-serif" style={{ fontSize: 17, color: NAVY, margin: '0 0 12px' }}>
+                    Bounties Awaiting Your Review
+                </h3>
+                {pendingBounties.map(b => (
+                    <div key={b.id} style={{ background: '#fff', border: `0.5px solid ${GOLD}`, padding: '14px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: '0 0 2px', fontFamily: "'Lato',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.title}</p>
+                            <p style={{ fontSize: 10, color: '#aaa', margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                                Submitted by <strong style={{ color: NAVY }}>{b.claimedByName || 'Author'}</strong> · ₦{Number(b.reward).toLocaleString()} in escrow
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setApprovalBounty({ id: b.id, data: b })}
+                            style={{ padding: '9px 18px', background: GOLD, color: NAVY, border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", letterSpacing: '0.06em', flexShrink: 0 }}
+                        >
+                            Review →
+                        </button>
+                    </div>
+                ))}
+            </div>
+        )
+    }
 
     /* ── AI ── */
     const renderAI = () => (
@@ -1617,6 +1656,19 @@ const bronzeAds = useAds("Bronze", 2);  // ← ADD THIS
                 </button>
             </nav>
         </div>
+
+        {approvalBounty && (
+            <BountyApprovalModal
+                bountyId={approvalBounty.id}
+                bountyData={approvalBounty.data}
+                currentUser={{ uid: user.uid, email: user.email, displayName: user.displayName || `${user.firstName} ${user.surname}` }}
+                onClose={() => setApprovalBounty(null)}
+                onUpdateStatus={(status) => {
+                setPendingBounties(prev => prev.filter(b => b.id !== approvalBounty.id));
+                setApprovalBounty(null);
+                }}
+            />
+            )}
         </>
     );
 }

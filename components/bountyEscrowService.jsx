@@ -1,11 +1,3 @@
-/**
- * bountyEscrowService.js
- * ─────────────────────────────────────────────────────────────────────────────
- * Handles all Firestore operations related to bounty escrow, wallet deduction,
- * and payout splitting. Every mutation that touches money is wrapped in a
- * runTransaction so failures roll back atomically.
- */
-
 import {
   doc,
   collection,
@@ -65,13 +57,15 @@ export async function createBountyWithEscrow({
     throw new Error("Invalid bounty amount");
 
   const userRef = doc(db, "users", userId);
+  const sellerRef = doc(db, "sellers", userId);
   const escrowRef = doc(db, "platform_escrow", "main");
   const newBountyRef = doc(collection(db, "bounties"));
 
   await runTransaction(db, async (tx) => {
     /* ── read phase ── */
-    const [userSnap, escrowSnap] = await Promise.all([
+    const [userSnap, sellerSnap, escrowSnap] = await Promise.all([
       tx.get(userRef),
+      tx.get(sellerRef),
       tx.get(escrowRef),
     ]);
 
@@ -85,7 +79,6 @@ export async function createBountyWithEscrow({
 
     if (walletBalance < bountyAmount) throw new Error("INSUFFICIENT_FUNDS");
 
-    // Resolve the poster's display name from Firestore
     const resolvedName =
       displayName?.trim() ||
       userData.displayName?.trim() ||
@@ -103,13 +96,22 @@ export async function createBountyWithEscrow({
 
     /* ── write phase ── */
 
-    // 1. Deduct bounty amount from student wallet
+    // 1. Deduct from users/walletBalance
     tx.update(userRef, {
       walletBalance: walletBalance - bountyAmount,
       updatedAt: serverTimestamp(),
     });
 
-    // 2. Create the bounty document (status: open)
+    // 2. Also deduct from sellers/accountBalance (keeps dashboard in sync)
+    if (sellerSnap.exists()) {
+      const sellerBal = sellerSnap.data().accountBalance ?? 0;
+      tx.update(sellerRef, {
+        accountBalance: Math.max(0, sellerBal - bountyAmount),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    // 3. Create the bounty document (status: open)
     tx.set(newBountyRef, {
       title: formData.title,
       university: formData.university || "",
@@ -137,13 +139,10 @@ export async function createBountyWithEscrow({
       createdAt: serverTimestamp(),
     });
 
-    // 3. Increment platform escrow balance
+    // 4. Increment platform escrow balance
     tx.set(
       escrowRef,
-      {
-        totalHeld: currentEscrow + bountyAmount,
-        updatedAt: serverTimestamp(),
-      },
+      { totalHeld: currentEscrow + bountyAmount, updatedAt: serverTimestamp() },
       { merge: true },
     );
   });
@@ -163,11 +162,8 @@ export async function claimBounty(bountyId, claimantUid, claimantName) {
     const bountyData = snap.data();
     if (!["open", "claimed"].includes(bountyData.status))
       throw new Error("BOUNTY_NOT_OPEN");
-
-    // If already claimed by someone else, throw error
-    if (bountyData.claimedByUid && bountyData.claimedByUid !== claimantUid) {
+    if (bountyData.claimedByUid && bountyData.claimedByUid !== claimantUid)
       throw new Error("ALREADY_CLAIMED_BY_OTHER");
-    }
 
     tx.update(bountyRef, {
       status: "claimed",
@@ -180,8 +176,7 @@ export async function claimBounty(bountyId, claimantUid, claimantName) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   5.  Fetch all bounties claimed by a specific user (lecturer/author)
-       Used to populate the publishing flow dropdown.
+   5.  Fetch all bounties claimed by a specific user
    ───────────────────────────────────────────────────────────── */
 export async function getClaimedBounties(userId) {
   if (!userId) return [];
@@ -196,13 +191,11 @@ export async function getClaimedBounties(userId) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   6.  Link a newly uploaded book to a bounty (called after book upload)
-       Creates the book with status: "pending" and marks bounty as "pending_approval"
+   6.  Link a newly uploaded book to a bounty
    ───────────────────────────────────────────────────────────── */
 export async function linkBookToBounty(bookData, bountyId, user) {
   if (!bountyId || !user?.uid) throw new Error("bountyId and user required");
 
-  // Resolve display name
   const userSnap = await getDoc(doc(db, "users", user.uid));
   const userData = userSnap.exists() ? userSnap.data() : {};
   const displayName =
@@ -212,17 +205,17 @@ export async function linkBookToBounty(bookData, bountyId, user) {
     user.email?.split("@")[0] ||
     "Author";
 
-  // Create advertMyBook doc — status: "pending" (admin must approve)
   const bookRef = await addDoc(collection(db, "advertMyBook"), {
     ...bookData,
     userId: user.uid,
     sellerId: user.uid,
+    uploadedByUid: user.uid,
     sellerEmail: user.email,
     sellerName: displayName,
-    bookTitle: bookData.title,
+    bookTitle: bookData.bookTitle || bookData.title,
     bountyId,
     isBountyFulfillment: true,
-    status: "pending", // ← admin approves before it goes live
+    status: "pending",
     views: 0,
     purchases: 0,
     isGloballyFrozen: false,
@@ -231,13 +224,12 @@ export async function linkBookToBounty(bookData, bountyId, user) {
     updatedAt: serverTimestamp(),
   });
 
-  // Update bounty — pending_approval + linkedBookId
   await updateDoc(doc(db, "bounties", bountyId), {
+    [`bidderBooks.${user.uid}`]: bookRef.id,
     status: "pending_approval",
-    linkedBookId: bookRef.id,
+    fulfilledAt: serverTimestamp(),
     fulfilledByUid: user.uid,
     fulfilledByName: displayName,
-    fulfilledAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
 
@@ -246,10 +238,11 @@ export async function linkBookToBounty(bookData, bountyId, user) {
 
 /* ─────────────────────────────────────────────────────────────
    7.  ADMIN APPROVES bounty fulfillment
-       - Changes book status from "pending" → "approved"
-       - Changes bounty status from "pending_approval" → "fulfilled"
-       - Releases 80% payout to seller's wallet
-       - Keeps 20% as platform fee
+       ★ Now also:
+         - Updates sellers/accountBalance so the payout appears in
+           the seller dashboard balance card immediately.
+         - Writes a `transactions` doc so the payout row shows in
+           fetchSellerTransactions without any extra queries.
    ───────────────────────────────────────────────────────────── */
 export async function approveBountyFulfillment(bountyId) {
   const bountyRef = doc(db, "bounties", bountyId);
@@ -269,22 +262,25 @@ export async function approveBountyFulfillment(bountyId) {
       ? (escrowSnap.data().totalHeld ?? 0)
       : 0;
 
-    // Get seller (fulfiller) reference
     const sellerUid = bounty.fulfilledByUid;
     if (!sellerUid) throw new Error("NO_FULFILLER_FOUND");
 
-    const sellerRef = doc(db, "users", sellerUid);
-    const sellerSnap = await tx.get(sellerRef);
+    const sellerUserRef = doc(db, "users", sellerUid);
+    const sellerAccRef = doc(db, "sellers", sellerUid);
 
-    // Get book to update its status
-    const bookRef = bounty.linkedBookId
-      ? doc(db, "advertMyBook", bounty.linkedBookId)
-      : null;
-    if (bookRef) {
+    const [sellerUserSnap, sellerAccSnap] = await Promise.all([
+      tx.get(sellerUserRef),
+      tx.get(sellerAccRef),
+    ]);
+
+    // Approve the book
+    const bookId = bounty.linkedBookId || bounty.bidderBooks?.[sellerUid];
+    if (bookId) {
+      const bookRef = doc(db, "advertMyBook", bookId);
       const bookSnap = await tx.get(bookRef);
       if (bookSnap.exists()) {
         tx.update(bookRef, {
-          status: "approved", // ← book is now live for purchase
+          status: "approved",
           updatedAt: serverTimestamp(),
         });
       }
@@ -296,17 +292,16 @@ export async function approveBountyFulfillment(bountyId) {
 
     /* ── write phase ── */
 
-    // 1. Release seller's 80% payout to their wallet
-    if (sellerSnap.exists()) {
-      const currentBalance = sellerSnap.data().walletBalance ?? 0;
-      tx.update(sellerRef, {
-        walletBalance: currentBalance + authorPayout,
+    // 1. Credit users/walletBalance
+    if (sellerUserSnap.exists()) {
+      tx.update(sellerUserRef, {
+        walletBalance:
+          (sellerUserSnap.data().walletBalance ?? 0) + authorPayout,
         totalEarned: increment(authorPayout),
         updatedAt: serverTimestamp(),
       });
     } else {
-      // Create seller record if doesn't exist
-      tx.set(sellerRef, {
+      tx.set(sellerUserRef, {
         userId: sellerUid,
         walletBalance: authorPayout,
         totalEarned: authorPayout,
@@ -315,9 +310,28 @@ export async function approveBountyFulfillment(bountyId) {
       });
     }
 
-    // 2. Mark bounty as fulfilled and unlock escrow
+    // 2. ★ Credit sellers/accountBalance (dashboard balance card)
+    if (sellerAccSnap.exists()) {
+      tx.update(sellerAccRef, {
+        accountBalance:
+          (sellerAccSnap.data().accountBalance ?? 0) + authorPayout,
+        totalEarnings: increment(authorPayout),
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      tx.set(sellerAccRef, {
+        sellerId: sellerUid,
+        accountBalance: authorPayout,
+        totalEarnings: authorPayout,
+        booksSold: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    // 3. Mark bounty fulfilled
     tx.update(bountyRef, {
-      status: "fulfilled", // ← bounty is now fulfilled
+      status: "fulfilled",
       escrowLocked: false,
       authorPayout,
       platformFee,
@@ -325,7 +339,7 @@ export async function approveBountyFulfillment(bountyId) {
       updatedAt: serverTimestamp(),
     });
 
-    // 3. Decrement escrow ledger; accumulate released + fee totals
+    // 4. Update escrow ledger
     tx.set(
       escrowRef,
       {
@@ -337,35 +351,50 @@ export async function approveBountyFulfillment(bountyId) {
       { merge: true },
     );
 
-    // 4. Notify seller
+    // 5. ★ Write a `transactions` doc so fetchSellerTransactions picks it up
+    //    even on accounts that existed before this fix.
+    const txRef = doc(collection(db, "transactions"));
+    tx.set(txRef, {
+      sellerId: sellerUid,
+      type: "bounty_payout",
+      bookTitle: `🎯 Bounty Reward — ${bounty.title || "Bounty"}`,
+      buyerName: bounty.postedBy || "Student",
+      amount: escrowAmount,
+      sellerAmount: authorPayout,
+      sellerPayout: authorPayout,
+      platformFee,
+      salePrice: escrowAmount,
+      bountyId,
+      status: "completed",
+      source: "bounty_escrow",
+      createdAt: serverTimestamp(),
+    });
+
+    // 6. Notify seller (in-app)
     if (sellerUid) {
       const notifRef = doc(collection(db, "notifications"));
       tx.set(notifRef, {
         userId: sellerUid,
         type: "bounty_approved",
         title: "Your Bounty Fulfillment Approved! 🎉",
-        message: `₦${authorPayout.toLocaleString(
-          "en-NG",
-        )} has been credited to your wallet for "${bounty.title}".`,
+        message: `₦${authorPayout.toLocaleString("en-NG")} has been credited to your wallet for "${bounty.title}".`,
         bountyId,
+        link: `/academic/bounty/board?highlight=${bountyId}`,
         read: false,
         createdAt: serverTimestamp(),
       });
     }
 
-    // 5. Notify poster (student)
+    // 7. Notify poster (in-app)
     if (bounty.postedByUid) {
       const notifRef = doc(collection(db, "notifications"));
       tx.set(notifRef, {
         userId: bounty.postedByUid,
         type: "bounty_fulfilled",
         title: "Your Bounty Has Been Fulfilled! 📚",
-        message: `"${bounty.title}" is now available for download. ${
-          bounty.reward
-            ? `You paid ₦${bounty.reward.toLocaleString("en-NG")}.`
-            : ""
-        }`,
+        message: `"${bounty.title}" is now available for download.${bounty.reward ? ` You paid ₦${bounty.reward.toLocaleString("en-NG")}.` : ""}`,
         bountyId,
+        link: `/academic/bounty/board?highlight=${bountyId}`,
         read: false,
         createdAt: serverTimestamp(),
       });
@@ -375,9 +404,6 @@ export async function approveBountyFulfillment(bountyId) {
 
 /* ─────────────────────────────────────────────────────────────
    8.  ADMIN REJECTS bounty fulfillment
-       - Deletes the book or marks it as "rejected"
-       - Returns bounty to "claimed" state for other bidders
-       - Money stays in escrow (no payout)
    ───────────────────────────────────────────────────────────── */
 export async function rejectBountyFulfillment(
   bountyId,
@@ -393,7 +419,6 @@ export async function rejectBountyFulfillment(
     if (bounty.status !== "pending_approval")
       throw new Error("NOT_PENDING_APPROVAL");
 
-    // Mark book as rejected
     if (bounty.linkedBookId) {
       const bookRef = doc(db, "advertMyBook", bounty.linkedBookId);
       const bookSnap = await tx.get(bookRef);
@@ -406,9 +431,8 @@ export async function rejectBountyFulfillment(
       }
     }
 
-    // Reset bounty to claimed state — other bidders can still submit
     tx.update(bountyRef, {
-      status: "claimed", // ← back to claimed, awaiting next submission
+      status: "claimed",
       linkedBookId: null,
       fulfilledByUid: null,
       fulfilledByName: null,
@@ -418,7 +442,6 @@ export async function rejectBountyFulfillment(
       updatedAt: serverTimestamp(),
     });
 
-    // Notify fulfiller (seller) — rejection
     if (bounty.fulfilledByUid) {
       const notifRef = doc(collection(db, "notifications"));
       tx.set(notifRef, {
@@ -435,8 +458,7 @@ export async function rejectBountyFulfillment(
 }
 
 /* ─────────────────────────────────────────────────────────────
-   9.  Refund bounty escrow (if bounty expires or is cancelled)
-       Returns money to student, resets bounty status
+   9.  Refund bounty escrow
    ───────────────────────────────────────────────────────────── */
 export async function refundBountyEscrow(
   bountyId,
@@ -447,38 +469,29 @@ export async function refundBountyEscrow(
   const escrowRef = doc(db, "platform_escrow", "main");
 
   await runTransaction(db, async (tx) => {
-    /* ── read phase ── */
     const bountySnap = await tx.get(bountyRef);
     if (!bountySnap.exists()) throw new Error("BOUNTY_NOT_FOUND");
 
     const bounty = bountySnap.data();
 
-    // Guard: only refund if the bounty is still active and escrow is locked
     const refundableStatuses = ["open", "claimed", "pending_approval"];
-    if (!refundableStatuses.includes(bounty.status)) {
+    if (!refundableStatuses.includes(bounty.status))
       throw new Error(
         `BOUNTY_NOT_REFUNDABLE: current status is "${bounty.status}"`,
       );
-    }
-    if (!bounty.escrowLocked) {
-      throw new Error("ESCROW_ALREADY_RELEASED");
-    }
+    if (!bounty.escrowLocked) throw new Error("ESCROW_ALREADY_RELEASED");
 
     const escrowSnap = await tx.get(escrowRef);
     const currentHeld = escrowSnap.exists()
       ? (escrowSnap.data().totalHeld ?? 0)
       : 0;
 
-    // Get poster's wallet
     const posterUid = bounty.postedByUid;
     const posterRef = posterUid ? doc(db, "users", posterUid) : null;
     const posterSnap = posterRef ? await tx.get(posterRef) : null;
 
     const escrowAmount = bounty.escrowAmount ?? bounty.reward ?? 0;
 
-    /* ── write phase ── */
-
-    // 1. Mark bounty refunded and unlock escrow
     tx.update(bountyRef, {
       status: "refunded",
       escrowLocked: false,
@@ -489,16 +502,13 @@ export async function refundBountyEscrow(
       updatedAt: serverTimestamp(),
     });
 
-    // 2. Return escrowAmount to the poster's walletBalance
     if (posterSnap?.exists()) {
-      const currentBalance = posterSnap.data().walletBalance ?? 0;
       tx.update(posterRef, {
-        walletBalance: currentBalance + escrowAmount,
+        walletBalance: (posterSnap.data().walletBalance ?? 0) + escrowAmount,
         updatedAt: serverTimestamp(),
       });
     }
 
-    // 3. Decrement escrow ledger and track total refunded
     tx.set(
       escrowRef,
       {
@@ -509,23 +519,19 @@ export async function refundBountyEscrow(
       { merge: true },
     );
 
-    // 4. Notify poster (student gets their money back)
     if (posterUid) {
       const notifRef = doc(collection(db, "notifications"));
       tx.set(notifRef, {
         userId: posterUid,
         type: "bounty_refunded",
         title: "Bounty Refunded",
-        message: `₦${escrowAmount.toLocaleString(
-          "en-NG",
-        )} has been returned to your wallet. Reason: ${reason}`,
+        message: `₦${escrowAmount.toLocaleString("en-NG")} has been returned to your wallet. Reason: ${reason}`,
         bountyId,
         read: false,
         createdAt: serverTimestamp(),
       });
     }
 
-    // 5. Notify claimant if someone had claimed it
     const claimantUid = bounty.claimedByUid;
     if (claimantUid) {
       const notifRef = doc(collection(db, "notifications"));

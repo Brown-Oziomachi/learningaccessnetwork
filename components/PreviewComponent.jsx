@@ -165,7 +165,7 @@ function LicenseButton({ book, isGloballyFrozen, isPrintLicensingEnabled, router
   );
 }
 
-export default async function BookPreviewPage({ bookDetails }) {
+export default function BookPreviewPage({ bookDetails }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawBookId = searchParams.get("id");
@@ -776,25 +776,6 @@ export default async function BookPreviewPage({ bookDetails }) {
   };
   if (bookId) fetchBook();
 }, [bookId]);
-
-  
-const cId = bookId?.replace("firestore-", "");
-if (cId) {
-  const snap = await getDoc(doc(db, "advertMyBook", cId));
-  if (snap.exists()) {
-    const raw = snap.data();
-    setIsPrintLicensingEnabled(raw.isPrintLicensingEnabled === true);
-    setIsGloballyFrozen(raw.isGloballyFrozen === true);
-    
-    if (raw.isBountyFulfillment && raw.bountyId) {
-      setBook(prevBook => ({
-        ...prevBook,
-        isBountyFulfillment: true,
-        bountyId: raw.bountyId,
-      }));
-    }
-  }
-}
  
   
   useEffect(() => {
@@ -1729,41 +1710,6 @@ if (cId) {
       </div>
     );
   };
-
-{book?.isBountyFulfillment && userBountyRole === "requester" && !isPurchased && (
-  <button
-    onClick={handlePurchase}
-    style={{ /* button styles */ }}
-  >
-    BUY THIS FULFILLMENT — ₦{book.price?.toLocaleString()}
-  </button>
-)}
- 
-{book?.isBountyFulfillment && userBountyRole === "fulfiller" && isPurchased && (
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-      background: "rgba(34,197,94,0.12)",
-      border: `0.5px solid rgba(34,197,94,0.3)`,
-      padding: "8px 12px",
-    }}
-  >
-    <span style={{ color: "#16a34a", fontSize: "14px" }}>✓</span>
-    <span
-      style={{
-        fontSize: "11px",
-        color: "#16a34a",
-        fontWeight: 700,
-        fontFamily: "'Lato',sans-serif",
-      }}
-    >
-      SOLD — Your payout has been released
-    </span>
-  </div>
-  )
-  }
   
   /* ── Loading ── */
   if (loading)

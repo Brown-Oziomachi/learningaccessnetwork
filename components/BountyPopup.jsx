@@ -85,14 +85,19 @@ export default function BountyPopup() {
 
   /* subscribe to live open bounties */
   useEffect(() => {
-    const unsub = subscribeToLatestOpenBounties((list) => {
-      setBounties(list);
-      // Show popup on first data load if there are bounties and not yet shown
-      if (list.length > 0 && !shown) {
-        setVisible(true);
-        setShown(true);
-      }
-    }, 4);
+const unsub = subscribeToLatestOpenBounties((list) => {
+  const available = list.filter(
+    (b) =>
+      b.status !== "fulfilled" &&
+      b.status !== "disputed" &&
+      (b.proposals || 0) < (b.maxProposals || 10),
+  );
+  setBounties(available);
+  if (available.length > 0 && !shown) {
+    setVisible(true);
+    setShown(true);
+  }
+}, 999); 
     return () => unsub();
   }, [shown]);
 
@@ -234,7 +239,7 @@ export default function BountyPopup() {
           </div>
 
           {/* Bounty cards */}
-          <div style={{ maxHeight: 320, overflowY: "auto" }}>
+          <div style={{ maxHeight: 420, overflowY: "auto" }}>
             {bounties.map((b, i) => (
               <Link
                 key={b.id}

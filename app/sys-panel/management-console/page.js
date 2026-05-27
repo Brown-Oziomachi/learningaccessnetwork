@@ -785,7 +785,9 @@ function BountyEscrowSection({ user }) {
     try {
       const q = query(collection(db, "bounties"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
-      setBounties(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setBounties(data);
+      onBadgeCount?.(data.filter(d => d.status === 'disputed').length);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -924,6 +926,7 @@ function BountyEscrowSection({ user }) {
       const q = search.toLowerCase();
       return b.title?.toLowerCase().includes(q) || b.postedBy?.toLowerCase().includes(q) ||
              b.paymentRef?.toLowerCase().includes(q);
+             
     }
     return true;
   });
@@ -938,6 +941,8 @@ function BountyEscrowSection({ user }) {
     if (b.escrowStatus === "refunded") return "#f87171";
     if (b.status === "pending_approval") return "#fbbf24";
     if (b.status === "claimed") return "#60a5fa";
+    if (b.status === "disputed") return "#f87171";
+
     return "#94a3b8";
   };
 
@@ -970,7 +975,7 @@ function BountyEscrowSection({ user }) {
 
       {/* Filters */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {[["all","All"],["open","Open / Locked"],["claimed","Claimed"],["pending_approval","Pending Approval"],["released","Released"],["refunded","Refunded"]].map(([key, label]) => (
+        {[["all","All"],["open","Open / Locked"],["claimed","Claimed"],["pending_approval","Pending Approval"], ["disputed", "Disputed 🚩"],["released","Released"],["refunded","Refunded"]].map(([key, label]) => (
           <button key={key} onClick={() => setFilter(key)}
             className={`btn ${filter === key ? "btn-primary" : "btn-ghost"}`}>
             {label}
@@ -1133,6 +1138,7 @@ export default function ComprehensiveAdminPanel() {
   const [sellersData, setSellersData] = useState([]);
   const [contactMessages, setContactMessages] = useState([]);
   const [promotions, setPromotions] = useState([]);
+  const [bounties, setBounties] = useState([]);
   const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
 
   useEffect(() => {
@@ -1522,7 +1528,7 @@ export default function ComprehensiveAdminPanel() {
     openContactMessages: contactMessages?.filter(m => m.status === 'open').length || 0,
     pendingFaculty: users?.filter(u => u.lecturerVerificationStatus === 'pending').length || 0,
     pendingPromotions: promotions?.filter(p => p.status === 'pending').length || 0,
-    pendingBountyEscrow: 0, 
+    pendingBountyEscrow: bounties?.filter(b => b.status === 'disputed').length || 0,
   };
 
   if (checkingAdmin) return (
@@ -1846,7 +1852,7 @@ export default function ComprehensiveAdminPanel() {
                   <div className="section-sub">Track all locked, released, and refunded bounty funds</div>
                 </div>
               </div>
-              <BountyEscrowSection user={user} />
+              <BountyEscrowSection user={user} onBadgeCount={(n) => setStats(s => ({ ...s, pendingBountyEscrow: n }))} />
             </div>
           )}
           
