@@ -20,6 +20,7 @@ import { auth, db } from "@/lib/firebaseConfig";
 import { useAds, injectAds } from "@/lib/useAds";
 import FeaturedAdsCarousel from "@/components/FeaturedAdsCarousel";
 import HomeBountyStrip from "@/components/HomeBountyStrip";
+import { useCurrency } from "../context/CurrencyContext";
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -87,8 +88,7 @@ const getThumbnailUrl = (book) => {
         const m = book.pdfUrl.match(/[-\w]{25,}/);
         if (m) return `https://drive.google.com/thumbnail?id=${m[0]}&sz=w400`;
     }
-    return book.image || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-};
+    return book.image || null; };
 
 /* ════════════════════════════════════════════════════════════════
    COMPONENT
@@ -105,6 +105,7 @@ export default function HomeClient() {
     const [bookSalesCount, setBookSalesCount] = useState({});
     const [browseSearch, setBrowseSearch] = useState("");
     const [selectedAds, setSelectedAds] = useState([]);
+  const { fmt } = useCurrency();
 
     const router = useRouter();
     const goldAds = useAds("Gold", 10);
@@ -340,6 +341,11 @@ export default function HomeClient() {
         .anim-up { animation: slideUp 0.6s cubic-bezier(0.4,0,0.2,1) both; }
         .anim-up-2 { animation: slideUp 0.6s 0.12s cubic-bezier(0.4,0,0.2,1) both; }
         .anim-up-3 { animation: slideUp 0.6s 0.24s cubic-bezier(0.4,0,0.2,1) both; }
+
+        @media(max-width:640px){
+        .browse-card-grid { grid-template-columns: 1fr 1fr !important; }
+        .doc-card-grid { grid-template-columns: 1fr 1fr !important; }
+        }
       `}</style>
 
             <div className="lan-root min-h-screen">
@@ -574,7 +580,8 @@ export default function HomeClient() {
                                         )}
                                         {ad.price && (
                                             <p style={{ fontSize: "11px", fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>
-                                                ₦{Number(ad.price).toLocaleString()}
+                                                {fmt(Number(ad.price))}
+                                            
                                             </p>
                                         )}
                                     </div>
@@ -592,7 +599,7 @@ export default function HomeClient() {
                     </div>
                 )}
 
-<HomeBountyStrip />
+            <HomeBountyStrip />
 
                 {/* ══════════════════════════════════════════════════════════
     UNIVERSITY HUBS
@@ -744,14 +751,28 @@ export default function HomeClient() {
 
                                         return (
                                             <Link key={book.id} href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block", background: "#fff" }}>
-                                                <div style={{ position: "relative", background: "#ede8df" }}>
-                                                    <img src={book.image} alt={book.title}
-                                                        style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", transition: "box-shadow 0.2s" }}
-                                                        onError={e => { e.target.style.display = "none"; if (e.target.nextSibling) e.target.nextSibling.style.display = "flex"; }}
-                                                        className="book-thumb"
-                                                    />
-                                                    <div style={{ display: "none", width: "100%", aspectRatio: "3/4", alignItems: "center", justifyContent: "center", background: "#ede8df" }}>
-                                                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+                                                <div style={{ position: "relative" }}>
+                                                    <div style={{ position: "relative", width: "100%", aspectRatio: "3/4", background: NAVY, overflow: "hidden" }}>
+                                                        {/* Title fallback underneath */}
+                                                        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "12px", background: `linear-gradient(135deg, ${NAVY} 0%, #1a3a6e 100%)` }}>
+                                                            <div style={{ width: "36px", height: "36px", border: `1px solid rgba(184,150,62,0.4)`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "10px", flexShrink: 0 }}>
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+                                                            </div>
+                                                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "11px", fontWeight: 700, color: "#fff", textAlign: "center", lineHeight: 1.35, margin: "0 0 6px", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                                                                {book.title}
+                                                            </p>
+                                                            <p style={{ fontSize: "9px", color: "rgba(184,150,62,0.7)", fontFamily: "'Lato',sans-serif", textAlign: "center", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+                                                                {book.author}
+                                                            </p>
+                                                        </div>
+                                                        {/* Actual thumbnail floats on top */}
+                                                        {book.image && (
+                                                            <img src={book.image} alt={book.title}
+                                                                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                                                onError={e => { e.target.style.display = "none"; }}
+                                                                className="book-thumb"
+                                                            />
+                                                        )}
                                                     </div>
                                                     <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontFamily: "'Lato',sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff" }}>
                                                         <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />PDF
@@ -785,13 +806,25 @@ export default function HomeClient() {
                                         return (
                                             <Link key={book.id} href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block", background: "#fff" }}>
                                                 <div style={{ position: "relative", background: "#ede8df" }}>
-                                                    <img src={book.image} alt={book.title}
-                                                        style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", transition: "box-shadow 0.2s" }}
-                                                        onError={e => { e.target.display = "none"; }}
-                                                        className="book-thumb"
-                                                    />
-                                                    <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontFamily: "'Lato',sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff" }}>
-                                                        <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />PDF
+                                                    <div style={{ position: "relative", width: "100%", aspectRatio: "3/4", background: NAVY, overflow: "hidden" }}>
+                                                        {/* Title fallback always visible underneath */}
+                                                        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "12px", background: `linear-gradient(135deg, ${NAVY} 0%, #1a3a6e 100%)` }}>
+                                                            <div style={{ width: "36px", height: "36px", border: `1px solid rgba(184,150,62,0.4)`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "10px", flexShrink: 0 }}>
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+                                                            </div>
+                                                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "11px", fontWeight: 700, color: "#fff", textAlign: "center", lineHeight: 1.35, margin: "0 0 6px", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                                                                {book.title}
+                                                            </p>
+                                                            <p style={{ fontSize: "9px", color: "rgba(184,150,62,0.7)", fontFamily: "'Lato',sans-serif", textAlign: "center", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+                                                                {book.author}
+                                                            </p>
+                                                        </div>
+                                                        {/* Actual thumbnail on top — hides automatically if it fails */}
+                                                        <img src={book.image} alt={book.title}
+                                                            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                                            onError={e => { e.target.style.display = "none"; }}
+                                                            className="book-thumb"
+                                                        />
                                                     </div>
                                                     {owned && <span style={{ position: "absolute", top: "8px", right: "8px", background: "#16a34a", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>OWNED</span>}
                                                 </div>
@@ -901,7 +934,8 @@ export default function HomeClient() {
                                         <p style={{ fontSize: "13px", color: "#bbb" }}>Try a different search term</p>
                                     </div>
                                 ) : (
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "18px" }}>
+                                        <div className="browse-card-grid"
+                                            style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "18px" }}>
                                         {filteredCategories.map((cat, i) => (
 
                                             <a key={i}
@@ -977,7 +1011,8 @@ export default function HomeClient() {
                                         <p style={{ fontSize: "13px", color: "#bbb" }}>Try a different search term</p>
                                     </div>
                                 ) : (
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "14px" }}>
+                                        <div className="doc-card-grid"
+                                            style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "14px" }}>
                                         {filteredDocTypes.map((dt, i) => (
                                             <div key={i} className="doc-card" onClick={() => router.push(`/document-type/${dt.slug}`)}>
                                                 <div style={{ height: "120px", overflow: "hidden", position: "relative" }}>

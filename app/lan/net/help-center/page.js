@@ -19,9 +19,32 @@ const helpCategories = [
             { title: "Signing in to your account", slug: "signing-in" },
             { title: "Browsing the library", slug: "browsing-the-library" },
             { title: "Using the search function", slug: "using-search-function" },
-            { title: "How the Bounty Board works", slug: "bounty-board" },  // ← ADD THIS
         ]
     },
+    {
+    title: "Overview & Getting Started", icon: "🌍", articles: [
+        { title: "What is LAN Library?", slug: "what-is-lan-library" },
+        { title: "Becoming a LAN Seller", slug: "seller-account-overview" },
+    ]
+},
+{
+    title: "Uploading & Content", icon: "📤", articles: [
+        { title: "Uploading Your First Book", slug: "uploading-first-book" },
+        { title: "Responding to Student Reviews", slug: "responding-to-reviews" },
+    ]
+},
+{
+    title: "Physical & Print", icon: "📦", articles: [
+        { title: "Consigning Physical Books to Abuja Registry", slug: "consigning-physical-books" },
+        { title: "Enabling Print Licensing on Your Books", slug: "enabling-print-licensing" },
+    ]
+},
+{
+    title: "Bounty Board", icon: "🎯", articles: [
+        { title: "How to Request Materials (For Buyers)", slug: "bounty-board-for-buyers" },
+        { title: "Earning Money on the Bounty Board (For Sellers)", slug: "bounty-board-for-authors" },
+    ]
+},
     { title:"Payments & Subscriptions", icon:"💳", articles:[
         { title:"How to purchase a book",    slug:"how-to-purchase-book" },
         { title:"Accepted payment methods",  slug:"payment-methods" },
@@ -33,6 +56,16 @@ const helpCategories = [
         { title:"Accessing My Books",        slug:"accessing-my-books" },
         { title:"PDF won't open",            slug:"pdf-wont-open" },
     ]},
+    {
+        title: "Seller Tools", icon: "🛒", articles: [
+            { title: "Physical Repository",           slug: "physical-repository" },
+            { title: "My Physical Orders",            slug: "my-physical-orders" },
+            { title: "Print License Ledger",          slug: "print-license-ledger" },
+            { title: "Promotion Analytics",           slug: "promotion-analytics" },
+            { title: "Impact Analytics",              slug: "impact-analytics" },
+            { title: "How the Bounty Board works",    slug: "bounty-board" },
+        ]
+    },
     { title:"Account Management", icon:"👤", articles:[
         { title:"Updating your profile",     slug:"updating-profile" },
         { title:"Changing your password",    slug:"changing-password" },

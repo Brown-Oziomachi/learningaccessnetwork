@@ -404,7 +404,7 @@ export default function AboutClient() {
                     <div className="stats-grid">
                         <StatCard value={1000} suffix="+" label="Documents Published" triggered={statsTriggered} delay="0.05s" />
                         <StatCard value={500} suffix="+" label="Active Readers" triggered={statsTriggered} delay="0.15s" />
-                        <StatCard value={10} suffix="+" label="Countries Reached" triggered={statsTriggered} delay="0.25s" />
+                        <StatCard value={3} suffix="+" label="Countries Reached" triggered={statsTriggered} delay="0.25s" />
                         <StatCard value={4.8} suffix="/5" label="Avg. User Rating" isDecimal triggered={statsTriggered} delay="0.35s" />
                         <StatCard value={80} suffix="%" label="Seller Revenue Share" triggered={statsTriggered} delay="0.45s" />
                     </div>
@@ -417,9 +417,9 @@ export default function AboutClient() {
                     <div className="mission-grid">
                         {/* Image collage */}
                         <div className="mission-img" style={{ position: 'relative' }}>
-                            <img src="/student.jpg" alt="Students studying"
+                            <img src="/stud2.png" alt="Students studying"
                                 style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', borderRadius: 4, display: 'block' }} />
-                            <img src="/capgra.png" alt="Open book"
+                            <img src="/stud.png" alt="Open book"
                                 style={{ position: 'absolute', bottom: '-2rem', right: '-2rem', width: '55%', aspectRatio: '1', objectFit: 'cover', borderRadius: 4, border: '6px solid #fdfcfa', boxShadow: '0 20px 60px rgba(0,0,0,0.14)' }} />
                         </div>
 
@@ -444,6 +444,12 @@ export default function AboutClient() {
                                     "Every student deserves the material their success depends on — regardless of where they grew up or what their family earns."
                                 </p>
                             </div>
+                            <p style={{ fontSize: 'clamp(0.92rem, 1.5vw, 1rem)', color: '#374151', lineHeight: 1.85, fontWeight: 300, marginBottom: '1.25rem' }}>
+                                LAN pictured a great school of technology where young men and young
+                                women could be taught how to succeed in life by
+                                developing the ability to THINK in practical rather
+                                than in theoretical terms
+                            </p>
                             <p style={{ fontSize: 'clamp(0.92rem, 1.5vw, 1rem)', color: '#374151', lineHeight: 1.85, fontWeight: 300, marginBottom: '1.25rem' }}>
                                 We built LAN because the textbook you need for tomorrow's exam shouldn't cost three weeks of allowance. Because your lecturer's notes shouldn't be locked behind a WhatsApp group you were never added to. Because great students in smaller cities & countries deserve the same resources as students in Nigeria or South Africa.
                             </p>
@@ -642,7 +648,7 @@ export default function AboutClient() {
                                     onMouseLeave={e => e.currentTarget.style.background = '#c8922a'}>
                                     Browse Library <ArrowRight size={15} />
                                 </Link>
-                                <Link href="/referrals"
+                                <Link href="/ref/invite-friends"
                                     style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '15px 30px', border: '1px solid rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.8)', fontWeight: 500, fontSize: 13, borderRadius: 4, transition: 'all 0.2s' }}
                                     onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.7)'; e.currentTarget.style.color = '#fff'; }}
                                     onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}>

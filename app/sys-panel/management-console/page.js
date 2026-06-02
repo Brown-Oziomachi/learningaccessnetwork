@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   collection, query, where, getDocs, getDoc,
   doc, updateDoc, deleteDoc, addDoc,
@@ -350,7 +350,8 @@ const NAV_SECTIONS = [
     label: 'Dashboard',
     items: [
       { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
-      { id: 'traffic', icon: BarChart3, label: 'Page Traffic' }
+      { id: 'traffic', icon: BarChart3, label: 'Page Traffic' },
+      { id: 'users', icon: Users, label: 'LAN Members' },
     ]
   },
   {
@@ -379,7 +380,6 @@ const NAV_SECTIONS = [
   {
     label: 'Users & Support',
     items: [
-      { id: 'users', icon: Users, label: 'All Users' },
       { id: 'faculty-verification', icon: GraduationCap, label: 'Faculty Verify', badgeKey: 'pendingFaculty', badgeType: 'warn' },
       { id: 'support', icon: MessageSquare, label: 'Support', badgeKey: 'openTickets', badgeType: 'danger' },
       { id: 'reports', icon: Flag, label: 'Reports', badgeKey: 'pendingReports', badgeType: 'danger' },
@@ -766,6 +766,273 @@ function AdminNotificationBell({ setActiveSection }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function LANMembersSection({ users, fetchUsers, openModal, updateUserStatus, getStatusPill, formatDate }) {
+  const [memberTab, setMemberTab] = useState('all');
+  const [memberSearch, setMemberSearch] = useState('');
+  const [expandedUser, setExpandedUser] = useState(null);
+
+  const getRoleTag = (u) => {
+    if (u.isAdmin || u.role === 'admin') return 'admin';
+    if (u.isLecturer || u.role === 'lecturer' || u.lecturerVerificationStatus === 'approved') return 'lecturer';
+    if (u.isSeller || u.role === 'seller') return 'seller';
+    return 'student';
+  };
+
+  const counts = {
+    all: users.length,
+    sellers: users.filter(u => getRoleTag(u) === 'seller').length,
+    lecturers: users.filter(u => getRoleTag(u) === 'lecturer').length,
+    students: users.filter(u => getRoleTag(u) === 'student').length,
+  };
+
+  const tabFiltered = users.filter(u => {
+    const role = getRoleTag(u);
+    if (memberTab === 'sellers') return role === 'seller';
+    if (memberTab === 'lecturers') return role === 'lecturer';
+    if (memberTab === 'students') return role === 'student';
+    return true;
+  });
+
+  const searched = tabFiltered.filter(u => {
+    const q = memberSearch.toLowerCase();
+    return !q || [u.displayName, u.email, u.firstName, u.surname, u.institution,
+      u.university, u.country, u.phoneNumber, u.role].some(v => v?.toLowerCase().includes(q));
+  });
+
+  const rolePill = (u) => {
+    const role = getRoleTag(u);
+    const map = {
+      admin:    { cls: 'pill-info',    label: 'Admin' },
+      lecturer: { cls: 'pill-success', label: 'Lecturer' },
+      seller:   { cls: 'pill-warn',    label: 'Seller' },
+      student:  { cls: 'pill-gray',    label: 'Student' },
+    };
+    return map[role] || map.student;
+  };
+
+  const TABS = [
+    { key: 'all',       label: 'All Members', icon: Users },
+    { key: 'sellers',   label: 'Sellers',     icon: BookOpen },
+    { key: 'lecturers', label: 'Lecturers',   icon: GraduationCap },
+    { key: 'students',  label: 'Students',    icon: User },
+  ];
+
+  return (
+    <div>
+      <div className="section-header">
+        <div>
+          <div className="section-title"><Users size={18} />LAN Members</div>
+          <div className="section-sub">{users.length} total accounts across all roles</div>
+        </div>
+        <button onClick={fetchUsers} className="btn btn-ghost"><RefreshCw size={13} />Refresh</button>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+        {[
+          { label: 'All Members', count: counts.all,       color: '#60a5fa' },
+          { label: 'Sellers',     count: counts.sellers,   color: '#fbbf24' },
+          { label: 'Lecturers',   count: counts.lecturers, color: '#34d399' },
+          { label: 'Students',    count: counts.students,  color: '#a78bfa' },
+        ].map(({ label, count, color }) => (
+          <div key={label} className="card-sm">
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color }}>{count}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        {TABS.map(({ key, label, icon: Icon }) => (
+          <button key={key} onClick={() => setMemberTab(key)}
+            className={`btn ${memberTab === key ? 'btn-primary' : 'btn-ghost'}`}>
+            <Icon size={13} />{label}
+            <span style={{ marginLeft: 4, opacity: 0.65 }}>({counts[key] ?? users.length})</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div style={{ marginBottom: 16, display: 'flex', gap: 10 }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input className="input-dark" placeholder="Search by name, email, university, country, phone…"
+            value={memberSearch} onChange={e => setMemberSearch(e.target.value)}
+            style={{ paddingLeft: 36 }} />
+        </div>
+        {memberSearch && (
+          <button className="btn btn-ghost" onClick={() => setMemberSearch('')}><X size={13} />Clear</button>
+        )}
+      </div>
+
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+        Showing {searched.length} of {tabFiltered.length} members
+      </div>
+
+      {/* Table */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              {['Member', 'Email', 'Role', 'Location', 'Institution', 'Phone', 'Status', 'Joined', ''].map(h => (
+                <th key={h}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {searched.length === 0 ? (
+              <tr><td colSpan={9} style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>No members found</td></tr>
+            ) : searched.map(u => {
+              const { cls, label } = rolePill(u);
+              const fullName = u.displayName || [u.firstName, u.surname].filter(Boolean).join(' ') || 'Unknown';
+              const initials = fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+              const isExpanded = expandedUser === u.id;
+
+             return (
+                <React.Fragment key={u.id}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                          background: 'linear-gradient(135deg, var(--accent), #8b5cf6)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 11, fontWeight: 700, color: '#fff',
+                        }}>{initials}</div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>{fullName}</div>
+                          {u.lecturerTitle && <div style={{ fontSize: 10, color: '#fbbf24' }}>{u.lecturerTitle}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ fontSize: 12 }}>{u.email}</td>
+                    <td><span className={`pill ${cls}`}><span className="pill-dot" />{label}</span></td>
+                    <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      {[u.city, u.state, u.country].filter(Boolean).join(', ') || '—'}
+                    </td>
+                    <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      {u.institution || u.university || u.school || '—'}
+                    </td>
+                    <td style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
+                      {u.phoneNumber || u.phone || '—'}
+                    </td>
+                    <td>
+                      <span className={`pill ${getStatusPill(u.accountStatus || 'active')}`}>
+                        <span className="pill-dot" />{u.accountStatus || 'active'}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      {formatDate(u.createdAt)?.split(',')[0] || '—'}
+                    </td>
+                    <td>
+                      <button className="icon-btn" style={{ width: 28, height: 28 }}
+                        onClick={e => { e.stopPropagation(); openModal('user', u); }}>
+                        <Eye size={13} />
+                      </button>
+                    </td>
+
+                  {isExpanded && (
+                    <tr>
+                      <td colSpan={9} style={{ padding: 0, background: 'rgba(59,130,246,0.04)', borderBottom: '2px solid rgba(59,130,246,0.15)' }}>
+                        <div style={{ padding: '16px 24px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+
+                          {/* Personal */}
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>Personal</div>
+                            {[
+                              ['Full Name', fullName],
+                              ['Email', u.email],
+                              ['Phone', u.phoneNumber || u.phone || '—'],
+                              ['Date of Birth', u.dateOfBirth || '—'],
+                              ['Gender', u.gender || '—'],
+                            ].map(([k, v]) => (
+                              <div key={k} style={{ marginBottom: 7 }}>
+                                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{k}</div>
+                                <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{v}</div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Location */}
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>Location</div>
+                            {[
+                              ['Country', u.country || '—'],
+                              ['State', u.state || '—'],
+                              ['City', u.city || '—'],
+                              ['Address', u.address || '—'],
+                            ].map(([k, v]) => (
+                              <div key={k} style={{ marginBottom: 7 }}>
+                                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{k}</div>
+                                <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{v}</div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Academic */}
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>Academic</div>
+                            {[
+                              ['Institution', u.institution || u.university || u.school || '—'],
+                              ['Department', u.department || '—'],
+                              ['Faculty', u.faculty || '—'],
+                              ['Level', u.level || '—'],
+                              ['Matric No.', u.matricNumber || u.studentId || '—'],
+                            ].map(([k, v]) => (
+                              <div key={k} style={{ marginBottom: 7 }}>
+                                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{k}</div>
+                                <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{v}</div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Account & Actions */}
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>Account</div>
+                            {[
+                              ['Role', label],
+                              ['Status', u.accountStatus || 'active'],
+                              ['UID', u.id?.slice(0, 14) + '…'],
+                              ['Verified Email', u.emailVerified ? 'Yes' : 'No'],
+                              ['Joined', formatDate(u.createdAt)?.split(',')[0] || '—'],
+                            ].map(([k, v]) => (
+                              <div key={k} style={{ marginBottom: 7 }}>
+                                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{k}</div>
+                                <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{v}</div>
+                              </div>
+                            ))}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
+                              <button onClick={e => { e.stopPropagation(); openModal('user', u); }}
+                                className="btn btn-ghost" style={{ justifyContent: 'center', fontSize: 11, padding: '6px 10px' }}>
+                                <Eye size={12} /> Full Profile
+                              </button>
+                              {(u.accountStatus === 'active' || !u.accountStatus) ? (
+                                <button onClick={e => { e.stopPropagation(); updateUserStatus(u.id, 'suspended'); }}
+                                  className="btn btn-danger" style={{ justifyContent: 'center', fontSize: 11, padding: '6px 10px' }}>
+                                  <UserX size={12} /> Suspend
+                                </button>
+                              ) : (
+                                <button onClick={e => { e.stopPropagation(); updateUserStatus(u.id, 'active'); }}
+                                  className="btn btn-success" style={{ justifyContent: 'center', fontSize: 11, padding: '6px 10px' }}>
+                                  <Check size={12} /> Reactivate
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -1857,33 +2124,16 @@ export default function ComprehensiveAdminPanel() {
           )}
           
           {/* ── USERS ─────────────────────────────────────────────────── */}
-          {activeSection === 'users' && (
-            <div>
-              <div className="section-header">
-                <div className="section-title"><Users size={18} />Users <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 14 }}>({users.length})</span></div>
-              </div>
-              <div style={{ marginBottom: 14 }}>
-                <input className="input-dark" placeholder="Search by name, email or role…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-              </div>
-              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <table className="data-table">
-                  <thead><tr>{['Name', 'Email', 'Role', 'Status', 'Joined', ''].map(h => <th key={h}>{h}</th>)}</tr></thead>
-                  <tbody>
-                    {users.filter(u => u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || u.role?.toLowerCase().includes(searchTerm.toLowerCase())).map(u => (
-                      <tr key={u.id}>
-                        <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{u.displayName || 'N/A'}</td>
-                        <td>{u.email}</td>
-                        <td><span className={`pill ${u.role === 'admin' ? 'pill-info' : 'pill-gray'}`}>{u.role || 'user'}</span></td>
-                        <td><span className={`pill ${getStatusPill(u.accountStatus || 'active')}`}><span className="pill-dot" />{u.accountStatus || 'active'}</span></td>
-                        <td style={{ fontSize: 11 }}>{formatDate(u.createdAt)?.split(',')[0]}</td>
-                        <td><button onClick={() => openModal('user', u)} className="icon-btn" style={{ width: 28, height: 28 }}><Eye size={13} /></button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+         {activeSection === 'users' && (
+  <LANMembersSection
+    users={users}
+    fetchUsers={fetchUsers}
+    openModal={openModal}
+    updateUserStatus={updateUserStatus}
+    getStatusPill={getStatusPill}
+    formatDate={formatDate}
+  />
+)}
 
           {/* ── SUPPORT ───────────────────────────────────────────────── */}
           {activeSection === 'support' && (

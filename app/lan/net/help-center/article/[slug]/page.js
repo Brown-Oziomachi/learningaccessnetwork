@@ -8,8 +8,12 @@ import { db } from '@/lib/firebaseConfig';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { articlesP1 } from '../../data/articlesData1';
 import { articlesP2 } from '../../data/articlesData2';
+import { sellerFeatureArticles } from '../../data/sellerFeatureArticles';
+import { updatedCoreArticles } from '../../data/updatedCoreArticles';
 
-const articles = { ...articlesP1, ...articlesP2 };
+
+
+const articles = { ...articlesP1, ...articlesP2, ...sellerFeatureArticles,...updatedCoreArticles};
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY  = "#0d2244";

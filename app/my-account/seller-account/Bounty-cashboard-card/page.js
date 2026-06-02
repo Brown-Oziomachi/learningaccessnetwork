@@ -7,6 +7,7 @@ import {
     updateDoc, addDoc, runTransaction, serverTimestamp, orderBy,
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
+import { useCurrency } from "@/app/context/CurrencyContext";
 
 /* ─── Brand tokens ──────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -1141,7 +1142,7 @@ export default function BountyDashboardCard({ user }) {
     // Posted bounties data lives here so it can be refreshed after modal actions
     const [postedBounties, setPostedBounties] = useState([]);
     const [loadingPosted, setLoadingPosted] = useState(false);
-
+    const { fmt } = useCurrency();
     /* ── Refresh stats ── */
     const loadStats = useCallback(async () => {
         if (!user?.uid) return;

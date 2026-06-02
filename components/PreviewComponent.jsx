@@ -54,6 +54,7 @@ import StudyBuddyTracker from "./StudyBuddyTracker";
 import OpenAccessModal from "./Openaccessmodal";
 import GoogleAdComponent from "./GoogleAdComponent";
 import { FrozenPdfGate, SellerProfileLink } from "./book-preview- patches";
+import { useCurrency } from "@/app/context/CurrencyContext";
 
 /* ── palette — matches the app ── */
 const NAVY = "#0d2244";
@@ -177,6 +178,10 @@ export default function BookPreviewPage({ bookDetails }) {
   const cleanBookId = rawBookId?.replace("firestore-", "");
   const [book, setBook] = useState(null);
   const [user, setUser] = useState(null);
+  const [replyText, setReplyText] = useState({});
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [submittingReply, setSubmittingReply] = useState(false);
+  const [feedbacks, setFeedbacks] = useState([]);
   const [isPurchased, setIsPurchased] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showNavMenu, setShowNavMenu] = useState(false);
@@ -209,7 +214,7 @@ export default function BookPreviewPage({ bookDetails }) {
   const [isPrintLicensingEnabled, setIsPrintLicensingEnabled] = useState(false);
   const [isGloballyFrozen, setIsGloballyFrozen] = useState(false);
   const [userBountyRole, setUserBountyRole] = useState(null);
-  
+  const { fmt } = useCurrency();
   /* ── NEW: Open Access modal ── */
   const [showOAModal, setShowOAModal] = useState(false);
 
@@ -314,6 +319,64 @@ export default function BookPreviewPage({ bookDetails }) {
 
     fetchPageCount();
   }, [book]);
+
+  useEffect(() => {
+  if (!bookId) return;
+  const fetchFeedbacks = async () => {
+    try {
+      const variants = [
+        bookId,
+        bookId.replace("firestore-", ""),
+        `firestore-${bookId.replace("firestore-", "")}`,
+      ];
+      let all = [];
+      const seen = new Set();
+      for (const id of variants) {
+        const snap = await getDocs(
+          query(collection(db, "bookFeedbacks"), where("bookId", "==", id))
+        );
+        snap.forEach((d) => {
+          if (!seen.has(d.id)) {
+            seen.add(d.id);
+            all.push({ id: d.id, ...d.data() });
+          }
+        });
+      }
+      all.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setFeedbacks(all);
+    } catch (e) {
+      console.error("fetchFeedbacks error:", e);
+    }
+  };
+  fetchFeedbacks();
+}, [bookId]);
+
+const submitReply = async (feedbackId) => {
+  const text = replyText[feedbackId]?.trim();
+  if (!text || !user) return;
+  try {
+    setSubmittingReply(true);
+    await updateDoc(doc(db, "bookFeedbacks", feedbackId), {
+      sellerReply: text,
+      sellerReplyAt: serverTimestamp(),
+      sellerName: book?.sellerName || user?.displayName || "Seller",
+    });
+    setFeedbacks((prev) =>
+      prev.map((f) =>
+        f.id === feedbackId
+          ? { ...f, sellerReply: text, sellerReplyAt: new Date() }
+          : f
+      )
+    );
+    setReplyingTo(null);
+    setReplyText((prev) => ({ ...prev, [feedbackId]: "" }));
+    showToastMessage("Reply posted!");
+  } catch {
+    showToastMessage("Error posting reply. Try again.");
+  } finally {
+    setSubmittingReply(false);
+  }
+};
 
   /* ── Helper: get the effective page count to display ── */
   const getDisplayPages = () => {
@@ -1359,7 +1422,7 @@ export default function BookPreviewPage({ bookDetails }) {
                 onMouseLeave={(e) => (e.currentTarget.style.background = NAVY)}
               >
                 <ShoppingBag size={13} />
-                Get Physical Copy — ₦{book.price?.toLocaleString()}
+                  Get Physical Copy — {fmt(book.price)}
               </button>
             </div>
           </div>
@@ -1702,7 +1765,7 @@ export default function BookPreviewPage({ bookDetails }) {
                 }
                 onMouseLeave={(e) => (e.currentTarget.style.background = NAVY)}
               >
-                Purchase for ₦{book.price?.toLocaleString()}
+                  Purchase for {fmt(book.price)}
               </button>
             </div>
           </div>
@@ -2027,7 +2090,7 @@ export default function BookPreviewPage({ bookDetails }) {
                     flexShrink: 0,
                   }}
                 >
-                  PURCHASE ₦{book.price?.toLocaleString()}
+                  PURCHASE {fmt(book.price)}
                 </button>
               ) : (
                 <div
@@ -2683,7 +2746,7 @@ export default function BookPreviewPage({ bookDetails }) {
                     {free ? (
                       <span style={{ color: "#86efac" }}>FREE</span>
                     ) : (
-                      <span>₦{book.price?.toLocaleString()}</span>
+                      <span>{fmt(book.price)}</span>
                     )}
                   </div>
                   <div className="stat-pill">
@@ -3435,7 +3498,7 @@ export default function BookPreviewPage({ bookDetails }) {
                         ? "❄ FROZEN"
                         : free
                           ? "FREE"
-                          : `₦${book.price?.toLocaleString()}`,
+                          : fmt(book.price),
                       highlight: free && !isGloballyFrozen,
                     },
                     {
@@ -3676,6 +3739,542 @@ export default function BookPreviewPage({ bookDetails }) {
                   style={{ marginTop: "1px" }}
                 />
               </div>
+
+              {/* ══ REVIEWS SECTION ══════════════════════════════════════════ */}
+              {feedbacks.length > 0 && (
+                <div
+                  style={{
+                    background: "#fff",
+                    border: "0.5px solid #e5ddd0",
+                    overflow: "hidden",
+                  }}
+                >
+                  {/* Header */}
+                  <div
+                    style={{
+                      background: NAVY,
+                      padding: "14px 20px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div>
+                      <p
+                        style={{
+                          fontSize: "9px",
+                          fontWeight: 700,
+                          letterSpacing: "0.18em",
+                          textTransform: "uppercase",
+                          color: GOLD,
+                          margin: "0 0 2px",
+                          fontFamily: "'Lato',sans-serif",
+                        }}
+                      >
+                        Student Feedback
+                      </p>
+                      <h3
+                        style={{
+                          fontFamily: "'Playfair Display',serif",
+                          fontSize: "16px",
+                          fontWeight: 700,
+                          color: "#fff",
+                          margin: 0,
+                        }}
+                      >
+                        Reviews & Ratings
+                      </h3>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      {positiveRatingPercent !== null && (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            background: "rgba(184,150,62,0.15)",
+                            border: "0.5px solid rgba(184,150,62,0.3)",
+                            padding: "5px 12px",
+                          }}
+                        >
+                          <ThumbsUp size={12} style={{ color: GOLD }} />
+                          <span
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: GOLD,
+                              fontFamily: "'Lato',sans-serif",
+                            }}
+                          >
+                            {positiveRatingPercent}%
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              color: "rgba(255,255,255,0.4)",
+                              fontFamily: "'Lato',sans-serif",
+                            }}
+                          >
+                            ({totalRatings})
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Review list */}
+                  <div
+                    style={{
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "12px",
+                    }}
+                  >
+                    {feedbacks.map((fb) => {
+                      const isOwner =
+                        isSeller &&
+                        (book?.userId === user?.uid ||
+                          book?.sellerId === user?.uid);
+                      const stars = fb.rating || 0;
+                      const isReplying = replyingTo === fb.id;
+
+                      return (
+                        <div
+                          key={fb.id}
+                          style={{
+                            border: "0.5px solid #e8e0d4",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {/* Review body */}
+                          <div style={{ padding: "14px 16px" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: "10px",
+                              }}
+                            >
+                              {/* Avatar */}
+                              <div
+                                style={{
+                                  width: "34px",
+                                  height: "34px",
+                                  borderRadius: "50%",
+                                  background: NAVY,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                  border: `1.5px solid ${GOLD}`,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    fontWeight: 700,
+                                    color: GOLD,
+                                    fontFamily: "'Playfair Display',serif",
+                                  }}
+                                >
+                                  {(fb.userName || "?")[0].toUpperCase()}
+                                </span>
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                {/* Name + date row */}
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    flexWrap: "wrap",
+                                    gap: "6px",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  <p
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: 700,
+                                      color: NAVY,
+                                      margin: 0,
+                                      fontFamily: "'Lato',sans-serif",
+                                    }}
+                                  >
+                                    {fb.userName || "Anonymous"}
+                                  </p>
+                                  {fb.createdAt && (
+                                    <span
+                                      style={{
+                                        fontSize: "10px",
+                                        color: "#aaa",
+                                        fontFamily: "'Lato',sans-serif",
+                                      }}
+                                    >
+                                      {new Date(
+                                        fb.createdAt?.seconds
+                                          ? fb.createdAt.seconds * 1000
+                                          : fb.createdAt,
+                                      ).toLocaleDateString("en-GB", {
+                                        day: "2-digit",
+                                        month: "short",
+                                        year: "numeric",
+                                      })}
+                                    </span>
+                                  )}
+                                </div>
+                                {/* Stars */}
+                                {stars > 0 && (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: "2px",
+                                      marginBottom: "6px",
+                                    }}
+                                  >
+                                    {[1, 2, 3, 4, 5].map((n) => (
+                                      <svg
+                                        key={n}
+                                        width={12}
+                                        height={12}
+                                        viewBox="0 0 24 24"
+                                        fill={n <= stars ? GOLD : "none"}
+                                        stroke={n <= stars ? GOLD : "#ddd"}
+                                        strokeWidth={1.8}
+                                      >
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                                      </svg>
+                                    ))}
+                                    <span
+                                      style={{
+                                        fontSize: "10px",
+                                        fontWeight: 700,
+                                        color: GOLD,
+                                        fontFamily: "'Lato',sans-serif",
+                                        marginLeft: "4px",
+                                      }}
+                                    >
+                                      {stars}.0
+                                    </span>
+                                  </div>
+                                )}
+                                {/* Review text */}
+                                <p
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "#444",
+                                    fontFamily: "'Lato',sans-serif",
+                                    lineHeight: 1.65,
+                                    margin: "0 0 8px",
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  "{fb.feedback || "(No details provided)"}"
+                                </p>
+                                {/* Reply button — only shown to the book's seller */}
+                                {isOwner && !fb.sellerReply && (
+                                  <button
+                                    onClick={() =>
+                                      setReplyingTo(isReplying ? null : fb.id)
+                                    }
+                                    style={{
+                                      fontSize: "11px",
+                                      fontWeight: 700,
+                                      color: isReplying ? "#aaa" : GOLD,
+                                      background: "transparent",
+                                      border: `0.5px solid ${isReplying ? "#e5ddd0" : "rgba(184,150,62,0.3)"}`,
+                                      padding: "4px 12px",
+                                      cursor: "pointer",
+                                      fontFamily: "'Lato',sans-serif",
+                                      letterSpacing: "0.04em",
+                                      transition: "all 0.15s",
+                                    }}
+                                  >
+                                    {isReplying ? "✕ Cancel" : "↩ Reply"}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Existing seller reply */}
+                          {fb.sellerReply && (
+                            <div
+                              style={{
+                                background: "rgba(13,34,68,0.04)",
+                                borderTop: "0.5px solid #e8e0d4",
+                                borderLeft: `3px solid ${GOLD}`,
+                                padding: "12px 16px 12px 20px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  marginBottom: "6px",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: "24px",
+                                    height: "24px",
+                                    borderRadius: "50%",
+                                    background: NAVY,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: "9px",
+                                      fontWeight: 700,
+                                      color: GOLD,
+                                      fontFamily: "'Lato',sans-serif",
+                                    }}
+                                  >
+                                    S
+                                  </span>
+                                </div>
+                                <p
+                                  style={{
+                                    fontSize: "11px",
+                                    fontWeight: 700,
+                                    color: NAVY,
+                                    margin: 0,
+                                    fontFamily: "'Lato',sans-serif",
+                                  }}
+                                >
+                                  {fb.sellerName ||
+                                    book?.sellerName ||
+                                    "Seller"}
+                                </p>
+                                <span
+                                  style={{
+                                    fontSize: "9px",
+                                    fontWeight: 700,
+                                    background: "rgba(184,150,62,0.12)",
+                                    border: "0.5px solid rgba(184,150,62,0.25)",
+                                    color: GOLD,
+                                    padding: "2px 7px",
+                                    fontFamily: "'Lato',sans-serif",
+                                    letterSpacing: "0.06em",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  Seller
+                                </span>
+                                {fb.sellerReplyAt && (
+                                  <span
+                                    style={{
+                                      fontSize: "10px",
+                                      color: "#aaa",
+                                      fontFamily: "'Lato',sans-serif",
+                                      marginLeft: "auto",
+                                    }}
+                                  >
+                                    {new Date(
+                                      fb.sellerReplyAt?.seconds
+                                        ? fb.sellerReplyAt.seconds * 1000
+                                        : fb.sellerReplyAt,
+                                    ).toLocaleDateString("en-GB", {
+                                      day: "2-digit",
+                                      month: "short",
+                                    })}
+                                  </span>
+                                )}
+                              </div>
+                              <p
+                                style={{
+                                  fontSize: "12px",
+                                  color: "#555",
+                                  fontFamily: "'Lato',sans-serif",
+                                  lineHeight: 1.65,
+                                  margin: 0,
+                                }}
+                              >
+                                {fb.sellerReply}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Reply input — shown only when replying */}
+                          {isReplying && isOwner && (
+                            <div
+                              style={{
+                                background: CREAM,
+                                borderTop: "0.5px solid #e8e0d4",
+                                borderLeft: `3px solid ${GOLD}`,
+                                padding: "14px 16px",
+                              }}
+                            >
+                              <p
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  color: NAVY,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.1em",
+                                  fontFamily: "'Lato',sans-serif",
+                                  margin: "0 0 8px",
+                                }}
+                              >
+                                Your Reply
+                              </p>
+                              <textarea
+                                autoFocus
+                                value={replyText[fb.id] || ""}
+                                onChange={(e) =>
+                                  setReplyText((prev) => ({
+                                    ...prev,
+                                    [fb.id]: e.target.value,
+                                  }))
+                                }
+                                placeholder="Write a professional, helpful response…"
+                                maxLength={500}
+                                rows={3}
+                                style={{
+                                  width: "100%",
+                                  padding: "10px 12px",
+                                  border: "0.5px solid #e5ddd0",
+                                  background: "#fff",
+                                  fontSize: "12px",
+                                  color: NAVY,
+                                  resize: "none",
+                                  outline: "none",
+                                  fontFamily: "'Lato',sans-serif",
+                                  lineHeight: 1.6,
+                                  boxSizing: "border-box",
+                                  transition: "border-color 0.15s",
+                                }}
+                                onFocus={(e) =>
+                                  (e.currentTarget.style.borderColor = GOLD)
+                                }
+                                onBlur={(e) =>
+                                  (e.currentTarget.style.borderColor =
+                                    "#e5ddd0")
+                                }
+                              />
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  marginTop: "8px",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "10px",
+                                    color: "#aaa",
+                                    fontFamily: "'Lato',sans-serif",
+                                  }}
+                                >
+                                  {(replyText[fb.id] || "").length}/500
+                                </span>
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                  <button
+                                    onClick={() => setReplyingTo(null)}
+                                    style={{
+                                      padding: "7px 16px",
+                                      background: "transparent",
+                                      border: "0.5px solid #e5ddd0",
+                                      color: "#aaa",
+                                      fontSize: "11px",
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                      fontFamily: "'Lato',sans-serif",
+                                    }}
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={() => submitReply(fb.id)}
+                                    disabled={
+                                      submittingReply ||
+                                      !replyText[fb.id]?.trim()
+                                    }
+                                    style={{
+                                      padding: "7px 18px",
+                                      background: NAVY,
+                                      border: "none",
+                                      color: GOLD,
+                                      fontSize: "11px",
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                      fontFamily: "'Lato',sans-serif",
+                                      letterSpacing: "0.04em",
+                                      opacity:
+                                        submittingReply ||
+                                        !replyText[fb.id]?.trim()
+                                          ? 0.5
+                                          : 1,
+                                      transition: "opacity 0.15s",
+                                    }}
+                                  >
+                                    {submittingReply
+                                      ? "Posting…"
+                                      : "Post Reply"}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer link */}
+                  <div
+                    style={{
+                      padding: "14px 20px",
+                      borderTop: "0.5px solid #e5ddd0",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        color: "#aaa",
+                        fontFamily: "'Lato',sans-serif",
+                      }}
+                    >
+                      {feedbacks.length} review
+                      {feedbacks.length !== 1 ? "s" : ""}
+                    </span>
+                    <button
+                      onClick={() =>
+                        router.push(`/book/feedbacks?bookId=${bookId}`)
+                      }
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        color: GOLD,
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        fontFamily: "'Lato',sans-serif",
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      View all reviews →
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Mobile lecturers */}
 
               {/* Mobile: You might also like */}

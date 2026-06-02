@@ -14,51 +14,257 @@ import {
 import { createPortal } from "react-dom";
 import { UNIVERSITIES_BY_COUNTRY, UNIVERSITY_COUNTRIES } from "@/lib/africanUniversities";
 import BountyCard from "@/components/BountyCard";
+import { useCurrency } from "@/app/context/CurrencyContext";
 
 /* ─── Departments (used in CreateModal) ────────────────────── */
-const DEPARTMENTS_BY_FACULTY = {
-  "Sciences": [
-    "Medicine & Health Sciences", "Pharmacy", "Nursing", "Biochemistry",
-    "Microbiology", "Biology", "Chemistry", "Physics", "Mathematics",
-    "Statistics", "Veterinary Medicine", "Dentistry", "Nutrition & Dietetics", "Optometry"
-  ],
-  "Engineering & Technology": [
-    "Computer Science", "Electrical Engineering", "Mechanical Engineering",
-    "Civil Engineering", "Chemical Engineering", "Petroleum Engineering",
-    "Architecture", "Information Technology", "Agricultural Engineering",
-    "Environmental Engineering", "Mining Engineering"
-  ],
-  "Arts & Social Sciences": [
-    "Law", "Economics", "Accounting", "Business Administration",
-    "Political Science", "Sociology", "Psychology", "Mass Communication",
-    "History & International Studies", "Public Administration",
-    "Geography", "Philosophy", "Linguistics"
-  ],
-  "Humanities & Creative Arts": [
-    "Literature", "Fine & Applied Arts", "Music",
-    "Theatre & Performing Arts", "Languages & Linguistics", "Religious Studies"
-  ],
-  "Agriculture & Environment": [
-    "Agriculture", "Forestry & Wildlife", "Fisheries & Aquaculture",
-    "Environmental Sciences", "Food Science & Technology"
-  ],
-  "Education": [
-    "Education", "Guidance & Counselling", "Early Childhood Education",
-    "Special Education", "Physical & Health Education"
-  ],
-  "Professional": [
-    "Finance & Banking", "Insurance", "Estate Management",
-    "Hospitality & Tourism", "Library & Information Science",
-    "Quantity Surveying", "Urban & Regional Planning", "Social Work"
-  ],
-};
-
 /* ─── Brand tokens ──────────────────────────────────────────── */
 const NAVY = "#0d2244";
 const GOLD = "#b8963e";
 const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
 const BG = "#f5f1ea";
+
+/* ─── Departments (unchanged) ───────────────────────────────── */
+const DEPARTMENTS_BY_FACULTY = {
+  "Sciences": [
+    "Medicine & Health Sciences", "Pharmacy", "Nursing", "Biochemistry",
+    "Microbiology", "Biology", "Chemistry", "Physics", "Mathematics",
+    "Statistics", "Veterinary Medicine", "Dentistry", "Nutrition & Dietetics", "Optometry",
+  ],
+  "Engineering & Technology": [
+    "Computer Science", "Electrical Engineering", "Mechanical Engineering",
+    "Civil Engineering", "Chemical Engineering", "Petroleum Engineering",
+    "Architecture", "Information Technology", "Agricultural Engineering",
+    "Environmental Engineering", "Mining Engineering",
+  ],
+  "Arts & Social Sciences": [
+    "Law", "Economics", "Accounting", "Business Administration",
+    "Political Science", "Sociology", "Psychology", "Mass Communication",
+    "History & International Studies", "Public Administration",
+    "Geography", "Philosophy", "Linguistics",
+  ],
+  "Humanities & Creative Arts": [
+    "Literature", "Fine & Applied Arts", "Music",
+    "Theatre & Performing Arts", "Languages & Linguistics", "Religious Studies",
+  ],
+  "Agriculture & Environment": [
+    "Agriculture", "Forestry & Wildlife", "Fisheries & Aquaculture",
+    "Environmental Sciences", "Food Science & Technology",
+  ],
+  "Education": [
+    "Education", "Guidance & Counselling", "Early Childhood Education",
+    "Special Education", "Physical & Health Education",
+  ],
+  "Professional": [
+    "Finance & Banking", "Insurance", "Estate Management",
+    "Hospitality & Tourism", "Library & Information Science",
+    "Quantity Surveying", "Urban & Regional Planning", "Social Work",
+  ],
+};
+
+/* ─────────────────────────────────────────────────────────────
+   COUNTRY → CURRENCY MAP
+   Maps every country name used in africanUniversities to its
+   Flutterwave-supported currency code, symbol, and flag.
+   ───────────────────────────────────────────────────────────── */
+const COUNTRY_CURRENCY_MAP = {
+  // West Africa
+  "Nigeria": { currency: "NGN", symbol: "₦", flag: "🇳🇬" },
+  "Ghana": { currency: "GHS", symbol: "GH₵", flag: "🇬🇭" },
+  "Senegal": { currency: "XOF", symbol: "CFA", flag: "🇸🇳" },
+  "Ivory Coast": { currency: "XOF", symbol: "CFA", flag: "🇨🇮" },
+  "Côte d'Ivoire": { currency: "XOF", symbol: "CFA", flag: "🇨🇮" },
+  "Mali": { currency: "XOF", symbol: "CFA", flag: "🇲🇱" },
+  "Benin": { currency: "XOF", symbol: "CFA", flag: "🇧🇯" },
+  "Burkina Faso": { currency: "XOF", symbol: "CFA", flag: "🇧🇫" },
+  "Niger": { currency: "XOF", symbol: "CFA", flag: "🇳🇪" },
+  "Togo": { currency: "XOF", symbol: "CFA", flag: "🇹🇬" },
+  "Guinea": { currency: "GNF", symbol: "FG", flag: "🇬🇳" },
+  "Guinea-Bissau": { currency: "XOF", symbol: "CFA", flag: "🇬🇼" },
+  "Sierra Leone": { currency: "SLL", symbol: "Le", flag: "🇸🇱" },
+  "Liberia": { currency: "LRD", symbol: "L$", flag: "🇱🇷" },
+  "Gambia": { currency: "GMD", symbol: "D", flag: "🇬🇲" },
+  "Cape Verde": { currency: "CVE", symbol: "Esc", flag: "🇨🇻" },
+  // East Africa
+  "Kenya": { currency: "KES", symbol: "KSh", flag: "🇰🇪" },
+  "Uganda": { currency: "UGX", symbol: "USh", flag: "🇺🇬" },
+  "Tanzania": { currency: "TZS", symbol: "TSh", flag: "🇹🇿" },
+  "Rwanda": { currency: "RWF", symbol: "RF", flag: "🇷🇼" },
+  "Ethiopia": { currency: "ETB", symbol: "Br", flag: "🇪🇹" },
+  "Somalia": { currency: "SOS", symbol: "Sh", flag: "🇸🇴" },
+  "Djibouti": { currency: "DJF", symbol: "Fdj", flag: "🇩🇯" },
+  "Eritrea": { currency: "ERN", symbol: "Nfk", flag: "🇪🇷" },
+  "Sudan": { currency: "SDG", symbol: "ج.س.", flag: "🇸🇩" },
+  "South Sudan": { currency: "SSP", symbol: "£", flag: "🇸🇸" },
+  "Burundi": { currency: "BIF", symbol: "Fr", flag: "🇧🇮" },
+  "Comoros": { currency: "KMF", symbol: "Fr", flag: "🇰🇲" },
+  // Central Africa
+  "Cameroon": { currency: "XAF", symbol: "CFA", flag: "🇨🇲" },
+  "Gabon": { currency: "XAF", symbol: "CFA", flag: "🇬🇦" },
+  "Chad": { currency: "XAF", symbol: "CFA", flag: "🇹🇩" },
+  "Republic of the Congo": { currency: "XAF", symbol: "CFA", flag: "🇨🇬" },
+  "DR Congo": { currency: "CDF", symbol: "FC", flag: "🇨🇩" },
+  "Democratic Republic of Congo": { currency: "CDF", symbol: "FC", flag: "🇨🇩" },
+  "Equatorial Guinea": { currency: "XAF", symbol: "CFA", flag: "🇬🇶" },
+  "Central African Republic": { currency: "XAF", symbol: "CFA", flag: "🇨🇫" },
+  "São Tomé and Príncipe": { currency: "STN", symbol: "Db", flag: "🇸🇹" },
+  // North Africa
+  "Egypt": { currency: "EGP", symbol: "E£", flag: "🇪🇬" },
+  "Morocco": { currency: "MAD", symbol: "DH", flag: "🇲🇦" },
+  "Algeria": { currency: "DZD", symbol: "DA", flag: "🇩🇿" },
+  "Tunisia": { currency: "TND", symbol: "DT", flag: "🇹🇳" },
+  "Libya": { currency: "LYD", symbol: "LD", flag: "🇱🇾" },
+  "Mauritania": { currency: "MRU", symbol: "UM", flag: "🇲🇷" },
+  // Southern Africa
+  "South Africa": { currency: "ZAR", symbol: "R", flag: "🇿🇦" },
+  "Zimbabwe": { currency: "ZWL", symbol: "Z$", flag: "🇿🇼" },
+  "Zambia": { currency: "ZMW", symbol: "ZK", flag: "🇿🇲" },
+  "Malawi": { currency: "MWK", symbol: "MK", flag: "🇲🇼" },
+  "Mozambique": { currency: "MZN", symbol: "MT", flag: "🇲🇿" },
+  "Botswana": { currency: "BWP", symbol: "P", flag: "🇧🇼" },
+  "Namibia": { currency: "NAD", symbol: "N$", flag: "🇳🇦" },
+  "Lesotho": { currency: "LSL", symbol: "L", flag: "🇱🇸" },
+  "Eswatini": { currency: "SZL", symbol: "L", flag: "🇸🇿" },
+  "Madagascar": { currency: "MGA", symbol: "Ar", flag: "🇲🇬" },
+  "Mauritius": { currency: "MUR", symbol: "Rs", flag: "🇲🇺" },
+  "Seychelles": { currency: "SCR", symbol: "Rs", flag: "🇸🇨" },
+  "Angola": { currency: "AOA", symbol: "Kz", flag: "🇦🇴" },
+  // Extra / overlap
+  "Uganda ": { currency: "UGX", symbol: "USh", flag: "🇺🇬" }, // trailing-space guard
+};
+
+/* NGN-based fallback exchange rates */
+const FALLBACK_RATES = {
+  NGN: 1, GHS: 0.010, KES: 0.11, UGX: 2.85, TZS: 2.62,
+  RWF: 1.38, ZMW: 0.028, MWK: 1.77, EGP: 0.051, MAD: 0.105,
+  ZAR: 0.019, XOF: 6.56, XAF: 6.56, ETB: 0.057, DZD: 0.13,
+  TND: 0.031, BWP: 0.014, NAD: 0.019, MZN: 0.064, MUR: 0.046,
+  CDF: 2.85,
+};
+
+/* Format a number in a given currency */
+function fmtCurrency(amount, currency, symbol) {
+  const big = ["UGX", "RWF", "TZS", "XOF", "XAF", "MWK", "BIF", "GNF", "CDF", "SOS", "MGA"].includes(currency);
+  const val = big ? Math.round(amount).toLocaleString() : amount.toFixed(2).replace(/\.00$/, "");
+  return `${symbol}${val}`;
+}
+
+/* Convert local → NGN */
+function toNGN(localAmount, currency, rates) {
+  const rate = rates[currency] ?? FALLBACK_RATES[currency] ?? 1;
+  return rate === 0 ? localAmount : Math.round(localAmount / rate);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CountrySelector  (searchable dropdown)
+   ───────────────────────────────────────────────────────────── */
+function CountrySelector({ selected, onSelect, countries }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const filtered = countries.filter(c =>
+    c.name.toLowerCase().includes(query.toLowerCase()) ||
+    (c.currency || "").toLowerCase().includes(query.toLowerCase())
+  );
+
+  const info = COUNTRY_CURRENCY_MAP[selected] || { currency: "NGN", symbol: "₦", flag: "🌍" };
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      {/* Trigger */}
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
+          border: `1.5px solid ${open ? GOLD : "#e5ddd0"}`, background: open ? CREAM : "#fff",
+          cursor: "pointer", transition: "border-color .18s, background .18s",
+          fontFamily: "'Lato', sans-serif", boxSizing: "border-box"
+        }}>
+        <span style={{ fontSize: 20, lineHeight: 1 }}>{info.flag}</span>
+        <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {selected || "— Select Country —"}
+          </p>
+          {selected && (
+            <p style={{ fontSize: 10, color: "#aaa", margin: 0 }}>{info.currency} · {info.symbol}</p>
+          )}
+        </div>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2.5"
+          style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+          background: "#fff", border: "1px solid #e5ddd0",
+          boxShadow: "0 16px 40px rgba(13,34,68,.14)", zIndex: 300,
+          maxHeight: 300, display: "flex", flexDirection: "column"
+        }}>
+          {/* Search */}
+          <div style={{ padding: "8px 12px", borderBottom: "0.5px solid #f0ebe0", display: "flex", alignItems: "center", gap: 8 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" style={{ flexShrink: 0 }}>
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
+              placeholder="Search country…"
+              style={{
+                border: "none", outline: "none", flex: 1, fontSize: 12,
+                fontFamily: "'Lato',sans-serif", color: NAVY, background: "transparent"
+              }} />
+          </div>
+          {/* List */}
+          <div style={{ overflowY: "auto", flex: 1 }}
+            className="country-scroll">
+            {filtered.length === 0 ? (
+              <p style={{ padding: 14, fontSize: 12, color: "#aaa", textAlign: "center" }}>No results</p>
+            ) : filtered.map(c => {
+              const ci = COUNTRY_CURRENCY_MAP[c.name] || { currency: "", symbol: "", flag: "🌍" };
+              const isActive = c.name === selected;
+              return (
+                <button key={c.name} type="button"
+                  onClick={() => { onSelect(c.name); setOpen(false); setQuery(""); }}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 10,
+                    padding: "9px 14px", border: "none",
+                    borderLeft: isActive ? `3px solid ${GOLD}` : "3px solid transparent",
+                    background: isActive ? CREAM : "transparent",
+                    cursor: "pointer", textAlign: "left", transition: "background .1s"
+                  }}
+                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#fafaf8"; }}
+                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}>
+                  <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0 }}>{ci.flag}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{
+                      fontSize: 12, fontWeight: 700, color: NAVY, margin: 0,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+                    }}>{c.name}</p>
+                    {ci.currency && (
+                      <p style={{ fontSize: 10, color: "#aaa", margin: 0 }}>{ci.currency} · {ci.symbol}</p>
+                    )}
+                  </div>
+                  {isActive && (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ─── Tier helper ───────────────────────────────────────────── */
 const getTier = (r) => {
@@ -111,7 +317,7 @@ function TierBadge({ reward }) {
 }
 
 /* ─── Scrolling ticker ──────────────────────────────────────── */
-function LiveTicker({ bounties }) {
+function LiveTicker({ bounties, fmt }) {
   const items = useMemo(() => [...bounties].sort((a, b) => {
     const ta = a.createdAt?.toDate?.() || 0;
     const tb = b.createdAt?.toDate?.() || 0;
@@ -120,7 +326,7 @@ function LiveTicker({ bounties }) {
   if (!items.length) return null;
   const msgs = [...items, ...items].map((b, i) => (
     <span key={i} style={{ fontSize: 11, color: "rgba(245,240,232,.75)", fontFamily: "'Lato',sans-serif", padding: "0 48px", fontWeight: 500, whiteSpace: "nowrap" }}>
-      💰 <strong style={{ color: GOLD }}>{b.postedBy || "A student"}</strong> posted "{b.title?.slice(0, 38)}{b.title?.length > 38 ? "…" : ""}" — ₦{Number(b.reward).toLocaleString("en-NG")}
+      💰 <strong style={{ color: GOLD }}>{b.postedBy || "A student"}</strong> posted "{b.title?.slice(0, 38)}{b.title?.length > 38 ? "…" : ""}" — {fmt(b.reward)}
     </span>
   ));
   return (
@@ -138,9 +344,27 @@ function LiveTicker({ bounties }) {
 
 /* ─── How It Works ──────────────────────────────────────────── */
 const STEPS = [
-  { n: "01", emoji: "📤", title: "Post a Request", body: "Describe the document you need — past questions, lecture notes. Set a reward and funds go into secure escrow immediately." },
-  { n: "02", emoji: "🎯", title: "Authors Compete", body: "Top campus sellers see your request, claim it, and compete to fulfil it. Only one seller can lock the bounty at a time." },
-  { n: "03", emoji: "💸", title: "Automatic Payout", body: "You approve the submission, escrow releases. Author earns 80%, LAN retains 20%. You gain permanent access." },
+  {
+    n: "01",
+    emoji: "📤",
+    title: "How to Request Materials on the Bounty Board",
+    body: "Need a specific study material that isn't on LAN Library? Post a bounty and a creator will produce it for you — or you'll get your money back.",
+    link: "/lan/net/help-center/article/bounty-board-for-buyers",
+  },
+  {
+    n: "02",
+    emoji: "🎯",
+    title: "Earning Money on the Bounty Board",
+    body: "The Bounty Board lets you earn cash by creating materials students specifically request. Find bounties that match your expertise, complete them, and get paid instantly.",
+    link: "/lan/net/help-center/article/bounty-board-for-authors",
+  },
+  {
+    n: "03",
+    emoji: "💸",
+    title: "How the Bounty Board Works",
+    body: "The LAN Library Bounty Board is a community-powered marketplace that connects students who need specific study materials with authors and lecturers who can create them — with automatic, transparent payouts for everyone involved.",
+    link: "/lan/net/help-center/article/bounty-board",
+  },
 ];
 function HowItWorksPanel() {
   const [open, setOpen] = useState(false);
@@ -152,21 +376,45 @@ function HowItWorksPanel() {
           <span style={{ fontSize: 12, fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em", textTransform: "uppercase" }}>How the Bounty Board Works</span>
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <a href="/lan/net/help-center/article/bounty-board" target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 10, fontWeight: 700, color: GOLD, textDecoration: "underline", fontFamily: "'Lato',sans-serif" }}>Full Guide →</a>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2.5" style={{ transform: open ? "rotate(180deg)" : "none", transition: "0.25s" }}><polyline points="6 9 12 15 18 9" /></svg>
         </span>
       </button>
       {open && (
         <div style={{ borderTop: "0.5px solid #f0ebe0", padding: "24px 20px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 16, marginBottom: 20 }}>
-            {STEPS.map(s => (
-              <div key={s.n} style={{ background: CREAM, border: "0.5px solid rgba(184,150,62,.2)", padding: "20px" }}>
-                <div style={{ fontSize: 32, marginBottom: 10 }}>{s.emoji}</div>
-                <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 11, fontWeight: 900, color: "rgba(13,34,68,.15)", letterSpacing: "0.1em", marginBottom: 6 }}>{s.n}</div>
-                <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 6 }}>{s.title}</h4>
-                <p style={{ fontSize: 12, color: "#666", fontFamily: "'Lato',sans-serif", lineHeight: 1.75, margin: 0 }}>{s.body}</p>
-              </div>
-            ))}
+           {STEPS.map(s => (
+  <div key={s.n} style={{ background: CREAM, border: "0.5px solid rgba(184,150,62,.2)", padding: "20px", display: "flex", flexDirection: "column" }}>
+    <div style={{ fontSize: 32, marginBottom: 10 }}>{s.emoji}</div>
+    <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 11, fontWeight: 900, color: "rgba(13,34,68,.15)", letterSpacing: "0.1em", marginBottom: 6 }}>{s.n}</div>
+    <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 6, lineHeight: 1.3 }}>{s.title}</h4>
+    <p style={{
+      fontSize: 12, color: "#666", fontFamily: "'Lato',sans-serif", lineHeight: 1.75,
+      margin: "0 0 10px",
+      display: "-webkit-box",
+      WebkitLineClamp: 3,
+      WebkitBoxOrient: "vertical",
+      overflow: "hidden",
+    }}>{s.body}</p>
+    
+      <a href={s.link}
+      target="_blank"
+      rel="noreferrer"
+      style={{
+        fontSize: 11, fontWeight: 700, color: GOLD,
+        fontFamily: "'Lato',sans-serif", textDecoration: "none",
+        display: "inline-flex", alignItems: "center", gap: 4,
+        marginTop: "auto",
+      }}
+      onMouseEnter={e => e.currentTarget.style.color = GOLDD}
+      onMouseLeave={e => e.currentTarget.style.color = GOLD}
+    >
+      Read more
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>
+      </svg>
+    </a>
+  </div>
+))}
           </div>
           <div style={{ background: NAVY, padding: "14px 18px", display: "flex", gap: 12, alignItems: "center" }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" style={{ flexShrink: 0 }}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
@@ -181,7 +429,7 @@ function HowItWorksPanel() {
 }
 
 /* ─── BID MODAL ─────────────────────────────────────────────── */
-function BidModal({ bounty, user, onClose }) {
+function BidModal({ bounty, user, onClose, fmt }) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -217,7 +465,7 @@ function BidModal({ bounty, user, onClose }) {
               You've been added to the bidder list for this bounty. Now upload the material to fulfil it and unlock:
             </p>
             <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 28, fontWeight: 700, color: "#16a34a", marginBottom: 24 }}>
-              ₦{payout.toLocaleString("en-NG")}
+              {fmt(payout)}
             </p>
             <div style={{ padding: "12px 16px", background: "rgba(13,34,68,.04)", border: ".5px solid rgba(13,34,68,.12)", marginBottom: 24, textAlign: "left" }}>
               <p style={{ fontSize: 11, color: "#555", fontFamily: "'Lato',sans-serif", margin: 0, lineHeight: 1.7 }}>
@@ -255,13 +503,13 @@ function BidModal({ bounty, user, onClose }) {
                 <div style={{ flex: 1, background: CREAM, border: `1.5px solid ${GOLD}44`, padding: "16px 18px" }}>
                   <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#aaa", fontFamily: "'Lato',sans-serif", marginBottom: 4 }}>Your Payout (80%)</div>
                   <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 32, fontWeight: 700, color: NAVY, lineHeight: 1 }}>
-                    <span style={{ fontSize: 14, color: GOLD, fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>₦</span>{payout.toLocaleString("en-NG")}
+                      {fmt(payout)}
                   </div>
                 </div>
                 <div style={{ flex: 1, background: "rgba(13,34,68,.04)", border: "0.5px solid #e5ddd0", padding: "16px 18px" }}>
                   <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#aaa", fontFamily: "'Lato',sans-serif", marginBottom: 4 }}>Full Bounty</div>
                   <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 32, fontWeight: 700, color: "#ccc", lineHeight: 1 }}>
-                    <span style={{ fontSize: 14, color: "#ddd", fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>₦</span>{Number(bounty.reward).toLocaleString("en-NG")}
+                      {fmt(bounty.reward)}
                   </div>
                 </div>
               </div>
@@ -302,7 +550,7 @@ function BidModal({ bounty, user, onClose }) {
                   ? <><span style={{ width: 14, height: 14, border: "2px solid rgba(13,34,68,.25)", borderTopColor: NAVY, borderRadius: "50%", display: "inline-block", animation: "spin .7s linear infinite" }} />Claiming…</>
                   : <>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2.5"><path d="M22 2L11 13" /><path d="M22 2L15 22 11 13 2 9l20-7z" /></svg>
-                    Claim &amp; Earn ₦{payout.toLocaleString("en-NG")}
+                      Claim &amp; Earn {fmt(payout)}
                   </>
                 }
               </button>
@@ -465,9 +713,31 @@ function BidButton({ bounty, user }) {
 
 
 /* ─── CREATE MODAL ──────────────────────────────────────────── */
-function CreateModal({ onClose, user, userProfile }) {
-  const [form, setForm] = useState({ title: "", university: "", department: "", reward: "", deadline: "", tags: "" });
-  const [contact, setContact] = useState({ name: userProfile?.displayName || user?.displayName || "", email: user?.email || "", phone: userProfile?.phoneNumber || "" });
+export function CreateModal({ onClose, user, userProfile }) {
+  /* ── Build country list from africanUniversities ── */
+  const countryList = UNIVERSITY_COUNTRIES.map(name => ({ name }));
+
+  /* ── Form state ── */
+  const [form, setForm] = useState({
+    title: "", university: "", department: "",
+    reward: "",          // local-currency amount entered by user
+    rewardNGN: "",       // NGN equivalent (computed, stored in Firestore)
+    deadline: "", tags: "",
+    universityCountry: "",
+    description: "",  // ← add this
+
+  });
+  const [contact, setContact] = useState({
+    name: userProfile?.displayName || user?.displayName || "",
+    email: user?.email || "",
+    phone: userProfile?.phoneNumber || "",
+  });
+
+  /* ── Currency / exchange rates ── */
+  const [rates, setRates] = useState(FALLBACK_RATES);
+  const [ratesLoaded, setRatesLoaded] = useState(false);
+
+  /* ── Payment step ── */
   const [payStep, setPayStep] = useState("form");
   const [payMethod, setPayMethod] = useState("flutterwave");
   const [processing, setProcessing] = useState(false);
@@ -478,6 +748,32 @@ function CreateModal({ onClose, user, userProfile }) {
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
 
+  /* ── Derived currency info for selected country ── */
+  const currInfo = COUNTRY_CURRENCY_MAP[form.universityCountry] || { currency: "NGN", symbol: "₦", flag: "🌍" };
+  const isNGN = currInfo.currency === "NGN";
+
+  /* ── Reward conversions ── */
+  const localAmount = Number(form.reward) || 0;
+  const ngnAmount = isNGN
+    ? localAmount
+    : Math.round(localAmount / (rates[currInfo.currency] ?? FALLBACK_RATES[currInfo.currency] ?? 1));
+  const payoutNGN = Math.round(ngnAmount * 0.8);
+
+  /* ── Fetch live exchange rates ── */
+  useEffect(() => {
+    const fetchRates = async () => {
+      try {
+        const res = await fetch("https://open.er-api.com/v6/latest/NGN");
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (data?.rates) setRates({ ...FALLBACK_RATES, ...data.rates, NGN: 1 });
+      } catch { /* use fallback */ }
+      finally { setRatesLoaded(true); }
+    };
+    fetchRates();
+  }, []);
+
+  /* ── Load Flutterwave SDK ── */
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.FlutterwaveCheckout) { setFwLoaded(true); return; }
@@ -486,79 +782,119 @@ function CreateModal({ onClose, user, userProfile }) {
     s.onload = () => setFwLoaded(true); document.body.appendChild(s);
   }, []);
 
+  /* ── Load wallet balance on pay step ── */
   useEffect(() => {
     if (payStep !== "pay" || !user?.uid) return;
-    getDoc(doc(db, "sellers", user.uid)).then(s => { if (s.exists()) setWalletBalance(s.data().accountBalance || 0); }).catch(() => { });
+    getDoc(doc(db, "sellers", user.uid))
+      .then(s => { if (s.exists()) setWalletBalance(s.data().accountBalance || 0); })
+      .catch(() => { });
   }, [payStep, user?.uid]);
 
   const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
   const setC = k => e => setContact(p => ({ ...p, [k]: e.target.value }));
-  const rewardNum = Number(form.reward) || 0;
 
+  /* ── Handle country change (resets university) ── */
+  const handleCountryChange = (countryName) => {
+    setForm(p => ({ ...p, universityCountry: countryName, university: "" }));
+  };
+
+  /* ── Universities for selected country ── */
+  const universityOptions = form.universityCountry
+    ? (UNIVERSITIES_BY_COUNTRY[form.universityCountry] || [])
+    : [];
+
+  /* ── Continue to payment ── */
   const handleContinueToPay = () => {
     if (!user) { setError("Please sign in."); return; }
     if (!form.title) { setError("Please enter a document title."); return; }
-    if (rewardNum < 100) { setError("Minimum bounty reward is ₦100."); return; }
+    if (!form.description || form.description.trim().length < 20) {
+      setError("Please add more detail to your requirements (at least 20 characters).");
+      return;
+    }
+    if (form.description.length > 500) {
+      setError("Requirements must be under 500 characters.");
+      return;
+    }
+    if (localAmount < 1) { setError("Please enter a reward amount."); return; }
+    if (ngnAmount < 100) { setError("Minimum bounty reward is ₦100 equivalent."); return; }
     if (!contact.email || !contact.phone) { setError("Please fill in your email and phone."); return; }
     setError(""); setPayStep("pay");
   };
 
+  /* ── Submit bounty after payment ── */
   const submitBounty = async (txRef) => {
     try {
       const tags = form.tags ? form.tags.split(",").map(t => t.trim()).filter(Boolean) : [];
-      // createBounty auto-resolves name + fires notifications
-      await createBounty({ ...form, tags, paymentRef: txRef, paymentMethod: payMethod, contactEmail: contact.email, contactPhone: contact.phone }, user);
+      await createBounty({
+        ...form,
+        reward: ngnAmount,          // always store NGN
+        rewardLocal: localAmount,         // original local amount
+        rewardCurrency: currInfo.currency,  // original currency
+        tags,
+        paymentRef: txRef, paymentMethod: payMethod,
+        contactEmail: contact.email, contactPhone: contact.phone,
+      }, user);
       onClose();
     } catch (e) {
+      console.error("Full error:", e); // <-- add this
       setError("Failed to post bounty after payment. Contact support with ref: " + txRef);
-    } finally { setProcessing(false); }
+    } finally {
+      setProcessing(false);
+    }
   };
 
+  /* ── Flutterwave payment ── */
   const handleFlutterwavePayment = () => {
-    if (!fwLoaded || !window.FlutterwaveCheckout) { setError("Payment gateway loading. Please wait."); return; }
+    if (!fwLoaded || !window.FlutterwaveCheckout) {
+      setError("Payment gateway loading. Please wait."); return;
+    }
     const txRef = `bounty_${user.uid}_${Date.now()}`;
     window.FlutterwaveCheckout({
       public_key: process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY,
-      tx_ref: txRef, amount: rewardNum, currency: "NGN",
-      payment_options: "card,ussd,banktransfer",
+      tx_ref: txRef,
+      amount: isNGN ? ngnAmount : localAmount,
+      currency: currInfo.currency,
+      payment_options: "card,ussd,banktransfer,mobilemoney",
       customer: { email: contact.email, phone_number: contact.phone, name: contact.name },
-      customizations: { title: "LAN Library — Post a Bounty", description: `Bounty: ${form.title}`, logo: "https://learningaccessnetwork.vercel.app/favicon.ico" },
+      customizations: {
+        title: "LAN Library — Post a Bounty",
+        description: `Bounty: ${form.title}`,
+        logo: "/lanlog.png",
+      },
       callback: async (res) => {
-        if (res.status === "successful" || res.status === "completed") { setProcessing(true); await submitBounty(txRef); }
-        else { setError("Payment was not successful. Please try again."); }
+        if (res.status === "successful" || res.status === "completed") {
+          setProcessing(true); await submitBounty(txRef);
+        } else {
+          setError("Payment was not successful. Please try again.");
+        }
       },
       onclose: () => setProcessing(false),
     });
   };
 
+  /* ── Wallet payment ── */
   const handleWalletPay = async () => {
     if (!pin || pin.length < 4) { setPinError("Enter your 4-digit PIN."); return; }
-
-    // ── Pre-validate outside the transaction ──
     const sellerSnap = await getDoc(doc(db, "sellers", user.uid));
     if (!sellerSnap.exists()) { setPinError("Wallet not active."); return; }
     const sd = sellerSnap.data();
     const storedPin = sd.transactionPin || sd.transferPin;
     if (!storedPin) { setPinError("No PIN set. Go to your seller account to set a PIN first."); return; }
     if (pin !== storedPin.toString()) { setPinError("Incorrect PIN. Please try again."); return; }
-    if ((sd.accountBalance || 0) < rewardNum) {
+    if ((sd.accountBalance || 0) < ngnAmount) {
       setPinError(`Insufficient balance. You have ₦${(sd.accountBalance || 0).toLocaleString("en-NG")}.`);
       return;
     }
-
     setProcessing(true); setPinError("");
-
     try {
-      const { runTransaction: rt, doc: firestoreDoc, serverTimestamp: sts } = await import("firebase/firestore");
-
+      const { runTransaction: rt, doc: fd, serverTimestamp: sts } = await import("firebase/firestore");
       await rt(db, async (txn) => {
-        const ref = firestoreDoc(db, "sellers", user.uid);
+        const ref = fd(db, "sellers", user.uid);
         const fresh = await txn.get(ref);
         const bal = fresh.data()?.accountBalance || 0;
-        if (bal < rewardNum) throw new Error("Insufficient balance.");
-        txn.update(ref, { accountBalance: bal - rewardNum, updatedAt: sts() });
+        if (bal < ngnAmount) throw new Error("Insufficient balance.");
+        txn.update(ref, { accountBalance: bal - ngnAmount, updatedAt: sts() });
       });
-
       await submitBounty(`wallet_${user.uid}_${Date.now()}`);
     } catch (e) {
       setPinError(e.message || "Wallet payment failed.");
@@ -566,183 +902,599 @@ function CreateModal({ onClose, user, userProfile }) {
     }
   };
 
-  const inp = { padding: "10px 14px", border: "0.5px solid #e5ddd0", fontSize: 13, fontFamily: "'Lato',sans-serif", outline: "none", width: "100%", background: BG, color: NAVY, boxSizing: "border-box", transition: "border-color .18s" };
+  /* ── Shared input style ── */
+  const inp = {
+    padding: "10px 14px", border: "0.5px solid #e5ddd0", fontSize: 13,
+    fontFamily: "'Lato',sans-serif", outline: "none", width: "100%",
+    background: BG, color: NAVY, boxSizing: "border-box", transition: "border-color .18s",
+  };
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(7,19,31,.78)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(4px)" }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", border: "0.5px solid #e5ddd0", maxWidth: 540, width: "100%", position: "relative", animation: "fadeUp .32s cubic-bezier(.4,0,.2,1) both", maxHeight: "92vh", overflowY: "auto" }}>
-        {/* Header */}
-        <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,.07) 1px,transparent 1px)", backgroundSize: "20px 20px", padding: "22px 26px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-          <div>
-            <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: GOLD, margin: "0 0 5px", fontFamily: "'Lato',sans-serif" }}>{payStep === "form" ? "New Request" : "Secure Payment"}</p>
-            <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700, color: "#fff", margin: 0 }}>{payStep === "form" ? "Post a Bounty" : "Escrow Payment"}</h3>
+    <>
+      <style>{`
+        .ci:focus { border-color: ${GOLD} !important; outline: none; }
+        .country-scroll::-webkit-scrollbar { width: 4px; }
+        .country-scroll::-webkit-scrollbar-track { background: #f5f1ea; }
+        .country-scroll::-webkit-scrollbar-thumb { background: rgba(184,150,62,.35); border-radius: 2px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+      `}</style>
+
+      <div onClick={onClose}
+        style={{
+          position: "fixed", inset: 0, background: "rgba(7,19,31,.78)", zIndex: 999,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 24, backdropFilter: "blur(4px)"
+        }}>
+        <div onClick={e => e.stopPropagation()}
+          style={{
+            background: "#fff", border: "0.5px solid #e5ddd0", maxWidth: 560, width: "100%",
+            position: "relative", animation: "fadeUp .32s cubic-bezier(.4,0,.2,1) both",
+            maxHeight: "92vh", overflowY: "auto"
+          }}>
+
+          {/* ── Modal header ── */}
+          <div style={{
+            background: NAVY,
+            backgroundImage: "radial-gradient(rgba(184,150,62,.07) 1px,transparent 1px)",
+            backgroundSize: "20px 20px", padding: "22px 26px",
+            display: "flex", alignItems: "flex-start", justifyContent: "space-between"
+          }}>
+            <div>
+              <p style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: "0.18em",
+                textTransform: "uppercase", color: GOLD, margin: "0 0 5px",
+                fontFamily: "'Lato',sans-serif"
+              }}>
+                {payStep === "form" ? "New Request" : "Secure Payment"}
+              </p>
+              <h3 style={{
+                fontFamily: "'Playfair Display',serif", fontSize: 22,
+                fontWeight: 700, color: "#fff", margin: 0
+              }}>
+                {payStep === "form" ? "Post a Bounty" : "Escrow Payment"}
+              </h3>
+            </div>
+            <button onClick={onClose}
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: "rgba(255,255,255,.4)", fontSize: 24, lineHeight: 1
+              }}>×</button>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,.4)", fontSize: 24, lineHeight: 1 }}>×</button>
-        </div>
-        <div style={{ padding: "24px 28px" }}>
-          {error && <div style={{ padding: "12px 14px", background: "rgba(220,38,38,.07)", border: "0.5px solid rgba(220,38,38,.25)", color: "#dc2626", fontSize: 12, fontFamily: "'Lato',sans-serif", marginBottom: 16 }}>{error}</div>}
 
-          {payStep === "form" && (
-            <>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
-                <input className="ci" placeholder="Document title or description (be specific)" style={inp} value={form.title} onChange={set("title")} />
-                <div style={{ display: "flex", gap: 10 }}>
-  <select
-    className="ci"
-    style={{ ...inp, flex: 1 }}          
-    value={form.universityCountry || ""}
-    onChange={e => setForm(p => ({ ...p, universityCountry: e.target.value, university: "" }))}
-  >
-    <option value="">— Country —</option>
-    {UNIVERSITY_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-  </select>
+          <div style={{ padding: "24px 28px" }}>
+            {error && (
+              <div style={{
+                padding: "12px 14px", background: "rgba(220,38,38,.07)",
+                border: "0.5px solid rgba(220,38,38,.25)", color: "#dc2626",
+                fontSize: 12, fontFamily: "'Lato',sans-serif", marginBottom: 16
+              }}>
+                {error}
+              </div>
+            )}
 
-  <select
-    className="ci"
-    style={{ ...inp, flex: 1 }}          
-    value={form.university || ""}
-    onChange={e => setForm(p => ({ ...p, university: e.target.value }))}
-    disabled={!form.universityCountry}
-  >
-    <option value="">— University —</option>
-    {(form.universityCountry ? (UNIVERSITIES_BY_COUNTRY[form.universityCountry] || []) : []).map(u => (
-      <option key={u.name} value={u.name}>{u.name}</option>
-    ))}
-  </select>
+            {/* ════════════ STEP 1: FORM ════════════ */}
+            {payStep === "form" && (
+              <>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
 
-  <select
-    className="ci"
-    style={{ ...inp, flex: 1 }}         
-    value={form.department || ""}
-    onChange={e => setForm(p => ({ ...p, department: e.target.value }))}
-  >
-    <option value="">— Department —</option>
-    {Object.entries(DEPARTMENTS_BY_FACULTY).map(([faculty, depts]) => (
-      <optgroup key={faculty} label={faculty}>
-        {depts.map(d => <option key={d} value={d}>{d}</option>)}
-      </optgroup>
-    ))}
-    <option value="Other">Other</option>
+                  {/* Title */}
+                  <input className="ci" placeholder="Document title or description (be specific)"
+                    style={inp} value={form.title} onChange={set("title")} />
+
+{/* ── Document Type + Auto-template ── */}
+<div>
+  <label style={{ display: "block", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aaa", marginBottom: 6, fontFamily: "'Lato',sans-serif" }}>
+    Document Type
+  </label>
+  <select className="ci" style={inp}
+    onChange={e => {
+      const templates = {
+        "Past Question":   "Course Code:\nYear:\nSemester:\nTopics covered:\nSpecific questions needed:",
+        "Lecture Note":    "Course title:\nLecturer name:\nWeek/Topic:\nFormat preferred (PDF/Word):\nAdditional context:",
+        "Textbook":        "Book title:\nAuthor (if known):\nEdition:\nChapters needed:\nISBN (if known):",
+        "Assignment":      "Course:\nAssignment title:\nDeadline:\nRequirements:\nMark allocation:",
+        "Thesis/Project":  "Topic area:\nResearch questions:\nMethodology preference:\nPage range:\nCitation style:",
+        "Summary/Notes":   "Subject:\nTopic:\nAcademic level:\nKey areas to cover:\nPreferred format:",
+        "Lab Manual":      "Course:\nExperiment title:\nEquipment list needed:\nProcedure detail level:\nSafety requirements:",
+        "Exam Revision":   "Subject:\nExam date:\nTopics to cover:\nDifficulty level:\nPast paper year (if any):",
+      };
+      if (templates[e.target.value]) {
+        setForm(p => ({ ...p, description: templates[e.target.value] }));
+      }
+    }}>
+    <option value="">— Select type to auto-fill template —</option>
+    {Object.keys({
+      "Past Question": 1, "Lecture Note": 1, "Textbook": 1,
+      "Assignment": 1, "Thesis/Project": 1, "Summary/Notes": 1,
+      "Lab Manual": 1, "Exam Revision": 1,
+    }).map(t => <option key={t} value={t}>{t}</option>)}
   </select>
 </div>
 
-                <div style={{ display: "flex", gap: 10 }}>
-                  <div style={{ flex: 1, position: "relative" }}>
-                    <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: GOLD, fontWeight: 700, fontSize: 14, fontFamily: "'Playfair Display',serif", pointerEvents: "none" }}>₦</span>
-                    <input className="ci" type="number" min="100" placeholder="Reward amount" style={{ ...inp, paddingLeft: 28 }} value={form.reward} onChange={set("reward")} />
+{/* ── Description / Requirements ── */}
+<div>
+  <label style={{ display: "block", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aaa", marginBottom: 6, fontFamily: "'Lato',sans-serif" }}>
+    Requirements <span style={{ color: "#ccc", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(select a type above to auto-fill)</span>
+  </label>
+  <textarea className="ci" rows={5}
+    placeholder={"Course Code:\nYear:\nSemester:\nTopics covered:"}
+    style={{ ...inp, resize: "vertical", lineHeight: 1.7 }}
+    value={form.description || ""}
+    onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+    aria-label="Document requirements"
+  />
+  <p style={{ fontSize: 10, color: "#aaa", margin: "4px 0 0", fontFamily: "'Lato',sans-serif" }}>
+    {(form.description || "").length}/500 · Be specific — better descriptions get faster fulfillments
+  </p>
                   </div>
-                  <input className="ci" type="date" style={{ ...inp, flex: 1 }} value={form.deadline} onChange={set("deadline")} />
+                  
+                  {/* ── Country selector (full-width, searchable) ── */}
+                  <div>
+                    <label style={{
+                      display: "block", fontSize: 10, fontWeight: 700,
+                      letterSpacing: "0.1em", textTransform: "uppercase",
+                      color: "#aaa", marginBottom: 6, fontFamily: "'Lato',sans-serif"
+                    }}>
+                      Your Country
+                    </label>
+                    <CountrySelector
+                      selected={form.universityCountry}
+                      onSelect={handleCountryChange}
+                      countries={countryList}
+                    />
+                    {form.universityCountry && !isNGN && ratesLoaded && (
+                      <p style={{
+                        fontSize: 10, color: "#888", fontFamily: "'Lato',sans-serif",
+                        margin: "5px 0 0", display: "flex", alignItems: "center", gap: 5
+                      }}>
+                        <span>{currInfo.flag}</span>
+                        Live rate: <strong style={{ color: NAVY }}>
+                          1 {currInfo.currency} = ₦{(1 / (rates[currInfo.currency] ?? FALLBACK_RATES[currInfo.currency] ?? 1)).toFixed(2)}
+                        </strong>
+                        &nbsp;· open.er-api.com
+                      </p>
+                    )}
+                  </div>
+
+                  {/* ── University (filtered by country) ── */}
+                  <div>
+                    <label style={{
+                      display: "block", fontSize: 10, fontWeight: 700,
+                      letterSpacing: "0.1em", textTransform: "uppercase",
+                      color: "#aaa", marginBottom: 6, fontFamily: "'Lato',sans-serif"
+                    }}>
+                      University {!form.universityCountry && <span style={{ color: "#ccc", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(select a country first)</span>}
+                    </label>
+                    <select className="ci" style={inp} value={form.university}
+                      onChange={set("university")} disabled={!form.universityCountry}>
+                      <option value="">— Select University —</option>
+                      {universityOptions.map(u => (
+                        <option key={u.name || u} value={u.name || u}>
+                          {u.name || u}
+                        </option>
+                      ))}
+                    </select>
+                    {form.universityCountry && universityOptions.length === 0 && (
+                      <p style={{ fontSize: 10, color: "#f59e0b", fontFamily: "'Lato',sans-serif", margin: "4px 0 0" }}>
+                        No universities listed for this country yet — you can still proceed.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* ── Department ── */}
+                  <div>
+                    <label style={{
+                      display: "block", fontSize: 10, fontWeight: 700,
+                      letterSpacing: "0.1em", textTransform: "uppercase",
+                      color: "#aaa", marginBottom: 6, fontFamily: "'Lato',sans-serif"
+                    }}>
+                      Department / Faculty
+                    </label>
+                    <select className="ci" style={inp} value={form.department} onChange={set("department")}>
+                      <option value="">— Select Department —</option>
+                      {Object.entries(DEPARTMENTS_BY_FACULTY).map(([faculty, depts]) => (
+                        <optgroup key={faculty} label={faculty}>
+                          {depts.map(d => <option key={d} value={d}>{d}</option>)}
+                        </optgroup>
+                      ))}
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  {/* ── Reward + deadline ── */}
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <div style={{ flex: 1, position: "relative" }}>
+                      <label style={{
+                        display: "block", fontSize: 10, fontWeight: 700,
+                        letterSpacing: "0.1em", textTransform: "uppercase",
+                        color: "#aaa", marginBottom: 6, fontFamily: "'Lato',sans-serif"
+                      }}>
+                        Reward amount {form.universityCountry ? `(${currInfo.currency})` : ""}
+                      </label>
+                      <div style={{ position: "relative" }}>
+                        <span style={{
+                          position: "absolute", left: 12, top: "50%",
+                          transform: "translateY(-50%)", color: GOLD, fontWeight: 700,
+                          fontSize: 13, fontFamily: "'Lato',sans-serif", pointerEvents: "none",
+                          userSelect: "none"
+                        }}>
+                          {currInfo.symbol}
+                        </span>
+                        <input className="ci" type="number" min="1"
+                          placeholder={isNGN ? "e.g. 5000" : "e.g. 50"}
+                          style={{ ...inp, paddingLeft: currInfo.symbol.length > 2 ? 48 : 28 }}
+                          value={form.reward} onChange={set("reward")} />
+                      </div>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{
+                        display: "block", fontSize: 10, fontWeight: 700,
+                        letterSpacing: "0.1em", textTransform: "uppercase",
+                        color: "#aaa", marginBottom: 6, fontFamily: "'Lato',sans-serif"
+                      }}>
+                        Deadline (optional)
+                      </label>
+                      <input className="ci" type="date" style={inp}
+                        value={form.deadline} onChange={set("deadline")} />
+                    </div>
+                  </div>
+
+                  {/* ── Escrow preview panel ── */}
+                  {localAmount > 0 && (
+                    <div style={{
+                      background: NAVY, padding: "16px 18px",
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      flexWrap: "wrap", gap: 10
+                    }}>
+                      <div>
+                        <div style={{
+                          fontSize: 9, color: "rgba(184,150,62,.65)", fontWeight: 700,
+                          letterSpacing: "0.14em", textTransform: "uppercase",
+                          fontFamily: "'Lato',sans-serif", marginBottom: 3
+                        }}>
+                          Locked in Escrow
+                        </div>
+                        <div style={{
+                          fontFamily: "'Playfair Display',serif", fontSize: 28,
+                          fontWeight: 700, color: "#fff", lineHeight: 1
+                        }}>
+                          {fmtCurrency(localAmount, currInfo.currency, currInfo.symbol)}
+                        </div>
+                        {!isNGN && (
+                          <div style={{
+                            fontSize: 10, color: "rgba(255,255,255,.35)",
+                            fontFamily: "'Lato',sans-serif", marginTop: 3
+                          }}>
+                            ≈ ₦{ngnAmount.toLocaleString("en-NG")} NGN
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{
+                          fontSize: 9, color: "rgba(255,255,255,.3)",
+                          fontFamily: "'Lato',sans-serif", marginBottom: 3
+                        }}>
+                          Author earns (80%)
+                        </div>
+                        <div style={{
+                          fontFamily: "'Playfair Display',serif", fontSize: 20,
+                          fontWeight: 700, color: "#86efac"
+                        }}>
+                          {fmtCurrency(localAmount * 0.8, currInfo.currency, currInfo.symbol)}
+                        </div>
+                        {!isNGN && (
+                          <div style={{
+                            fontSize: 10, color: "rgba(134,239,172,.5)",
+                            fontFamily: "'Lato',sans-serif", marginTop: 2
+                          }}>
+                            ≈ ₦{payoutNGN.toLocaleString("en-NG")} NGN
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tags */}
+                  <input className="ci"
+                    placeholder="Tags, comma-separated (e.g. Past Questions, Maths)"
+                    style={inp} value={form.tags} onChange={set("tags")} />
                 </div>
-                {rewardNum > 0 && (
-                  <div style={{ background: NAVY, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontSize: 9, color: "rgba(184,150,62,.65)", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", marginBottom: 3 }}>Locked in Escrow</div>
-                      <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 26, fontWeight: 700, color: "#fff" }}>₦{rewardNum.toLocaleString("en-NG")}</div>
+
+                {/* Contact details */}
+                <p style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
+                  textTransform: "uppercase", color: "#aaa",
+                  fontFamily: "'Lato',sans-serif", marginBottom: 10
+                }}>
+                  Your Contact Details
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+                  <input className="ci" placeholder="Full Name" style={inp}
+                    value={contact.name} onChange={setC("name")} />
+                  <input className="ci" placeholder="Email address" type="email" style={inp}
+                    value={contact.email} onChange={setC("email")} />
+                  <input className="ci" placeholder="Phone number" type="tel" style={inp}
+                    value={contact.phone} onChange={setC("phone")} />
+                </div>
+
+                {/* Security note */}
+                <div style={{
+                  display: "flex", gap: 10, padding: "12px 14px",
+                  background: "rgba(13,34,68,.04)", border: "0.5px solid rgba(13,34,68,.1)",
+                  marginBottom: 20
+                }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={NAVY}
+                    strokeWidth="2" style={{ flexShrink: 0, marginTop: 1 }}>
+                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <p style={{
+                    fontSize: 11, color: "#555", fontFamily: "'Lato',sans-serif",
+                    margin: 0, lineHeight: 1.65
+                  }}>
+                    Reward held safely in escrow. Charged only when a valid submission is accepted.
+                    Authors receive <strong style={{ color: NAVY }}>80%</strong>, LAN retains 20%.{" "}
+                    <strong>All users will be notified of your bounty.</strong>
+                  </p>
+                </div>
+
+                <button onClick={handleContinueToPay}
+                  style={{
+                    width: "100%", padding: "13px 28px", background: GOLD, color: NAVY,
+                    fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+                    border: "none", cursor: "pointer", fontFamily: "'Lato',sans-serif",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    gap: 8, transition: "background .18s"
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = GOLDD)}
+                  onMouseLeave={e => (e.currentTarget.style.background = GOLD)}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2.5">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="16" />
+                    <line x1="8" y1="12" x2="16" y2="12" />
+                  </svg>
+                  Continue to Payment
+                </button>
+              </>
+            )}
+
+            {/* ════════════ STEP 2: PAYMENT ════════════ */}
+            {payStep === "pay" && (
+              <>
+                {/* Bounty summary card */}
+                <div style={{
+                  background: CREAM, border: "0.5px solid rgba(184,150,62,.3)",
+                  padding: "14px 18px", marginBottom: 20
+                }}>
+                  <div style={{
+                    fontSize: 9, fontWeight: 700, letterSpacing: "0.14em",
+                    textTransform: "uppercase", color: GOLD, margin: "0 0 4px",
+                    fontFamily: "'Lato',sans-serif"
+                  }}>
+                    Bounty Summary
+                  </div>
+                  <p style={{
+                    fontFamily: "'Playfair Display',serif", fontSize: 15,
+                    fontWeight: 700, color: NAVY, margin: "0 0 4px", lineHeight: 1.3
+                  }}>
+                    {form.title}
+                  </p>
+                  {form.university && (
+                    <span style={{
+                      fontSize: 10, background: NAVY, color: GOLD,
+                      padding: "2px 8px", fontWeight: 700, fontFamily: "'Lato',sans-serif"
+                    }}>
+                      {form.university}
+                    </span>
+                  )}
+                </div>
+
+                {/* Escrow amount */}
+                <div style={{
+                  background: NAVY, padding: "16px 20px", marginBottom: 20,
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  flexWrap: "wrap", gap: 10
+                }}>
+                  <div>
+                    <div style={{
+                      fontSize: 9, color: "rgba(184,150,62,.65)", fontWeight: 700,
+                      letterSpacing: "0.14em", textTransform: "uppercase",
+                      fontFamily: "'Lato',sans-serif", marginBottom: 3
+                    }}>
+                      You Pay (Escrow)
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 9, color: "rgba(255,255,255,.3)", fontFamily: "'Lato',sans-serif", marginBottom: 3 }}>Author earns (80%)</div>
-                      <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 700, color: "#86efac" }}>₦{Math.round(rewardNum * 0.8).toLocaleString("en-NG")}</div>
+                    <div style={{
+                      fontFamily: "'Playfair Display',serif", fontSize: 28,
+                      fontWeight: 700, color: "#fff"
+                    }}>
+                      {fmtCurrency(localAmount, currInfo.currency, currInfo.symbol)}
                     </div>
+                    {!isNGN && (
+                      <div style={{
+                        fontSize: 10, color: "rgba(255,255,255,.35)",
+                        fontFamily: "'Lato',sans-serif", marginTop: 3
+                      }}>
+                        ≈ ₦{ngnAmount.toLocaleString("en-NG")} NGN
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{
+                      fontSize: 9, color: "rgba(255,255,255,.3)",
+                      fontFamily: "'Lato',sans-serif", marginBottom: 2
+                    }}>
+                      Author earns
+                    </div>
+                    <div style={{
+                      fontFamily: "'Playfair Display',serif", fontSize: 18,
+                      fontWeight: 700, color: "#86efac"
+                    }}>
+                      {fmtCurrency(localAmount * 0.8, currInfo.currency, currInfo.symbol)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment method tabs */}
+                <p style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
+                  textTransform: "uppercase", color: "#aaa",
+                  fontFamily: "'Lato',sans-serif", marginBottom: 10
+                }}>
+                  Payment Method
+                </p>
+                <div style={{ display: "flex", border: "0.5px solid #e5ddd0", marginBottom: 20 }}>
+                  {[
+                    { key: "flutterwave", label: `💳 Card / Bank (${currInfo.currency})`, desc: "Flutterwave checkout" },
+                    {
+                      key: "wallet", label: "💰 LAN Wallet",
+                      desc: walletBalance !== null ? `Balance: ₦${walletBalance.toLocaleString("en-NG")}` : "Loading…"
+                    },
+                  ].map((opt, i) => (
+                    <button key={opt.key}
+                      onClick={() => { setPayMethod(opt.key); setShowPin(false); setPinError(""); }}
+                      style={{
+                        flex: 1, padding: "13px 10px", border: "none", cursor: "pointer",
+                        background: payMethod === opt.key ? NAVY : "#fff",
+                        color: payMethod === opt.key ? "#fff" : "#666",
+                        transition: "all .18s", display: "flex", flexDirection: "column",
+                        alignItems: "center", gap: 3,
+                        borderRight: i === 0 ? "0.5px solid #e5ddd0" : "none"
+                      }}>
+                      <span style={{ fontSize: 12, fontWeight: 700 }}>{opt.label}</span>
+                      <span style={{ fontSize: 10, opacity: .65 }}>{opt.desc}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Flutterwave pay button */}
+                {payMethod === "flutterwave" && (
+                  <button onClick={handleFlutterwavePayment}
+                    disabled={processing || !fwLoaded}
+                    style={{
+                      width: "100%", padding: "14px",
+                      background: processing || !fwLoaded ? "#ccc" : GOLD,
+                      color: NAVY, border: "none", fontSize: 12, fontWeight: 700,
+                      letterSpacing: "0.09em", textTransform: "uppercase",
+                      cursor: processing || !fwLoaded ? "not-allowed" : "pointer",
+                      fontFamily: "'Lato',sans-serif",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8
+                    }}>
+                    {!fwLoaded ? "Loading payment gateway…"
+                      : processing
+                        ? <><span style={{
+                          width: 13, height: 13, border: "2px solid rgba(13,34,68,.25)",
+                          borderTopColor: NAVY, borderRadius: "50%", display: "inline-block",
+                          animation: "spin .7s linear infinite"
+                        }} /> Processing…</>
+                        : <>🌐 {currInfo.flag} Pay {fmtCurrency(localAmount, currInfo.currency, currInfo.symbol)} via Flutterwave</>
+                    }
+                  </button>
+                )}
+
+                {/* Wallet — show PIN pad */}
+                {payMethod === "wallet" && !showPin && (
+                  <button onClick={() => setShowPin(true)}
+                    style={{
+                      width: "100%", padding: "14px", background: NAVY, color: "#fff",
+                      border: "none", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em",
+                      textTransform: "uppercase", cursor: "pointer",
+                      fontFamily: "'Lato',sans-serif",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8
+                    }}>
+                    💰 Pay with LAN Wallet
+                  </button>
+                )}
+                {payMethod === "wallet" && showPin && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <p style={{
+                      fontSize: 12, color: "#888", fontFamily: "'Lato',sans-serif",
+                      margin: 0, textAlign: "center"
+                    }}>
+                      Enter your 4-digit wallet PIN
+                    </p>
+                    <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 4 }}>
+                      {Array.from({ length: 4 }, (_, i) => (
+                        <div key={i} style={{
+                          width: 48, height: 52,
+                          border: `1.5px solid ${i < pin.length ? NAVY : "#e5ddd0"}`,
+                          background: i < pin.length ? CREAM : "#fff",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 20, color: i < pin.length ? NAVY : "#e5ddd0"
+                        }}>
+                          {i < pin.length ? "●" : "○"}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, marginBottom: 4 }}>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                        <button key={n}
+                          onClick={() => { if (pin.length < 4) { setPin(p => p + String(n)); setPinError(""); } }}
+                          disabled={pin.length >= 4}
+                          style={{
+                            height: 48, border: "0.5px solid #e5ddd0", background: "#fff",
+                            fontSize: 18, fontWeight: 700, color: NAVY, cursor: "pointer"
+                          }}>
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, marginBottom: 8 }}>
+                      <div />
+                      <button onClick={() => { if (pin.length < 4) setPin(p => p + "0"); }}
+                        disabled={pin.length >= 4}
+                        style={{
+                          height: 48, border: "0.5px solid #e5ddd0", background: "#fff",
+                          fontSize: 18, fontWeight: 700, color: NAVY, cursor: "pointer"
+                        }}>
+                        0
+                      </button>
+                      <button onClick={() => setPin(p => p.slice(0, -1))}
+                        style={{
+                          height: 48, border: "0.5px solid #e5ddd0", background: "#fff",
+                          fontSize: 18, color: "#aaa", cursor: "pointer"
+                        }}>
+                        ⌫
+                      </button>
+                    </div>
+                    {pinError && (
+                      <p style={{
+                        fontSize: 11, color: "#dc2626",
+                        fontFamily: "'Lato',sans-serif", margin: 0, textAlign: "center"
+                      }}>
+                        {pinError}
+                      </p>
+                    )}
+                    <button onClick={handleWalletPay}
+                      disabled={pin.length < 4 || processing}
+                      style={{
+                        width: "100%", padding: "14px",
+                        background: pin.length < 4 || processing ? "#ccc" : GOLD,
+                        color: NAVY, border: "none", fontSize: 12, fontWeight: 700,
+                        cursor: pin.length < 4 ? "not-allowed" : "pointer",
+                        fontFamily: "'Lato',sans-serif",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8
+                      }}>
+                      {processing ? "Processing…" : "Confirm Payment"}
+                    </button>
                   </div>
                 )}
-                <input className="ci" placeholder="Tags, comma-separated (e.g. Past Questions, Maths)" style={inp} value={form.tags} onChange={set("tags")} />
-              </div>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aaa", fontFamily: "'Lato',sans-serif", marginBottom: 10 }}>Your Contact Details</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-                <input className="ci" placeholder="Full Name" style={inp} value={contact.name} onChange={setC("name")} />
-                <input className="ci" placeholder="Email address" type="email" style={inp} value={contact.email} onChange={setC("email")} />
-                <input className="ci" placeholder="Phone number" type="tel" style={inp} value={contact.phone} onChange={setC("phone")} />
-              </div>
-              <div style={{ display: "flex", gap: 10, padding: "12px 14px", background: "rgba(13,34,68,.04)", border: "0.5px solid rgba(13,34,68,.1)", marginBottom: 20 }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2" style={{ flexShrink: 0, marginTop: 1 }}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                <p style={{ fontSize: 11, color: "#555", fontFamily: "'Lato',sans-serif", margin: 0, lineHeight: 1.65 }}>
-                  Reward held safely in escrow. Charged only when a valid submission is accepted. Authors receive <strong style={{ color: NAVY }}>80%</strong>, LAN retains 20%. <strong>All users will be notified of your bounty.</strong>
-                </p>
-              </div>
-              <button onClick={handleContinueToPay}
-                style={{ width: "100%", padding: "13px 28px", background: GOLD, color: NAVY, fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", border: "none", cursor: "pointer", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "background .18s" }}
-                onMouseEnter={e => e.currentTarget.style.background = GOLDD}
-                onMouseLeave={e => e.currentTarget.style.background = GOLD}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>
-                Continue to Payment
-              </button>
-            </>
-          )}
 
-          {payStep === "pay" && (
-            <>
-              <div style={{ background: CREAM, border: "0.5px solid rgba(184,150,62,.3)", padding: "14px 18px", marginBottom: 20 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: GOLD, margin: "0 0 4px", fontFamily: "'Lato',sans-serif" }}>Bounty Summary</div>
-                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: NAVY, margin: "0 0 4px", lineHeight: 1.3 }}>{form.title}</p>
-                {form.university && <span style={{ fontSize: 10, background: NAVY, color: GOLD, padding: "2px 8px", fontWeight: 700, fontFamily: "'Lato',sans-serif" }}>{form.university}</span>}
-              </div>
-              <div style={{ background: NAVY, padding: "16px 20px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 9, color: "rgba(184,150,62,.65)", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", marginBottom: 3 }}>You Pay (Escrow)</div>
-                  <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 28, fontWeight: 700, color: "#fff" }}>₦{rewardNum.toLocaleString("en-NG")}</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 9, color: "rgba(255,255,255,.3)", fontFamily: "'Lato',sans-serif", marginBottom: 2 }}>Author earns</div>
-                  <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 16, fontWeight: 700, color: "#86efac" }}>₦{Math.round(rewardNum * 0.8).toLocaleString("en-NG")}</div>
-                </div>
-              </div>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#aaa", fontFamily: "'Lato',sans-serif", marginBottom: 10 }}>Payment Method</p>
-              <div style={{ display: "flex", border: "0.5px solid #e5ddd0", marginBottom: 20 }}>
-                {[{ key: "flutterwave", label: "💳 Card / Bank", desc: "Flutterwave checkout" }, { key: "wallet", label: "💰 LAN Wallet", desc: walletBalance !== null ? `Balance: ₦${walletBalance.toLocaleString("en-NG")}` : "Loading…" }].map((opt, i) => (
-                  <button key={opt.key} onClick={() => { setPayMethod(opt.key); setShowPin(false); setPinError(""); }}
-                    style={{ flex: 1, padding: "13px 10px", border: "none", cursor: "pointer", background: payMethod === opt.key ? NAVY : "#fff", color: payMethod === opt.key ? "#fff" : "#666", transition: "all .18s", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, borderRight: i === 0 ? "0.5px solid #e5ddd0" : "none" }}>
-                    <span style={{ fontSize: 13, fontWeight: 700 }}>{opt.label}</span>
-                    <span style={{ fontSize: 10, opacity: 0.65 }}>{opt.desc}</span>
-                  </button>
-                ))}
-              </div>
-              {payMethod === "flutterwave" && (
-                <button onClick={handleFlutterwavePayment} disabled={processing || !fwLoaded}
-                  style={{ width: "100%", padding: "14px", background: processing || !fwLoaded ? "#ccc" : GOLD, color: NAVY, border: "none", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", cursor: processing || !fwLoaded ? "not-allowed" : "pointer", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  {!fwLoaded ? "Loading payment gateway…" : processing ? <><span style={{ width: 13, height: 13, border: "2px solid rgba(13,34,68,.25)", borderTopColor: NAVY, borderRadius: "50%", display: "inline-block", animation: "spin .7s linear infinite" }} />Processing…</> : <>🌐 Pay ₦{rewardNum.toLocaleString("en-NG")} via Flutterwave</>}
+                <button onClick={() => { setPayStep("form"); setError(""); }}
+                  style={{
+                    width: "100%", marginTop: 10, padding: "10px",
+                    background: "transparent", border: "0.5px solid #e5ddd0",
+                    fontSize: 11, color: "#aaa", cursor: "pointer",
+                    fontFamily: "'Lato',sans-serif"
+                  }}>
+                  ← Edit Bounty Details
                 </button>
-              )}
-              {payMethod === "wallet" && !showPin && (
-                <button onClick={() => setShowPin(true)} style={{ width: "100%", padding: "14px", background: NAVY, color: "#fff", border: "none", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  💰 Pay with LAN Wallet
-                </button>
-              )}
-              {payMethod === "wallet" && showPin && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <p style={{ fontSize: 12, color: "#888", fontFamily: "'Lato',sans-serif", margin: 0, textAlign: "center" }}>Enter your 4-digit wallet PIN</p>
-                  <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 4 }}>
-                    {Array.from({ length: 4 }, (_, i) => (
-                      <div key={i} style={{ width: 48, height: 52, border: `1.5px solid ${i < pin.length ? NAVY : "#e5ddd0"}`, background: i < pin.length ? CREAM : "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, color: i < pin.length ? NAVY : "#e5ddd0" }}>
-                        {i < pin.length ? "●" : "○"}
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, marginBottom: 4 }}>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-                      <button key={n} onClick={() => { if (pin.length < 4) { setPin(p => p + String(n)); setPinError(""); } }} disabled={pin.length >= 4}
-                        style={{ height: 48, border: "0.5px solid #e5ddd0", background: "#fff", fontSize: 18, fontWeight: 700, color: NAVY, cursor: "pointer" }}>{n}</button>
-                    ))}
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, marginBottom: 8 }}>
-                    <div />
-                    <button onClick={() => { if (pin.length < 4) setPin(p => p + "0"); }} disabled={pin.length >= 4} style={{ height: 48, border: "0.5px solid #e5ddd0", background: "#fff", fontSize: 18, fontWeight: 700, color: NAVY, cursor: "pointer" }}>0</button>
-                    <button onClick={() => setPin(p => p.slice(0, -1))} style={{ height: 48, border: "0.5px solid #e5ddd0", background: "#fff", fontSize: 18, color: "#aaa", cursor: "pointer" }}>⌫</button>
-                  </div>
-                  {pinError && <p style={{ fontSize: 11, color: "#dc2626", fontFamily: "'Lato',sans-serif", margin: 0, textAlign: "center" }}>{pinError}</p>}
-                  <button onClick={handleWalletPay} disabled={pin.length < 4 || processing}
-                    style={{ width: "100%", padding: "14px", background: pin.length < 4 || processing ? "#ccc" : GOLD, color: NAVY, border: "none", fontSize: 12, fontWeight: 700, cursor: pin.length < 4 ? "not-allowed" : "pointer", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                    {processing ? "Processing…" : "Confirm Payment"}
-                  </button>
-                </div>
-              )}
-              <button onClick={() => { setPayStep("form"); setError(""); }} style={{ width: "100%", marginTop: 10, padding: "10px", background: "transparent", border: "0.5px solid #e5ddd0", fontSize: 11, color: "#aaa", cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>
-                ← Edit Bounty Details
-              </button>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -812,7 +1564,7 @@ export default function AcademicBountyBoardClient() {
   const searchParams = useSearchParams();
   const highlightId = searchParams?.get("highlight") || null;
   const router = useRouter();
-  
+  const { fmt } = useCurrency();
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (cu) => {
@@ -843,9 +1595,8 @@ export default function AcademicBountyBoardClient() {
     return list;
   }, [bounties, filter, search, sort]);
 
-const totalRewards = bounties
-  .filter(b => b.status !== "fulfilled")
-  .reduce((s, b) => s + (b.reward || 0), 0);  const activeCt = bounties.filter(b => b.status === "open").length;
+const totalRewards = bounties.reduce((s, b) => s + (b.reward || 0), 0);
+  const activeCt = bounties.filter(b => b.status === "open").length;
   const totalProps = bounties.reduce((s, b) => s + (b.proposals || 0), 0);
   const fulfilledCt = bounties.filter(b => b.status === "fulfilled").length;
 
@@ -853,7 +1604,7 @@ const totalRewards = bounties
   if (!user) return <AuthSpinner />;
 
   const statsData = [
-    { n: `₦${totalRewards.toLocaleString("en-NG")}`, l: "Total rewards posted", icon: "💰" },
+    { n: fmt(totalRewards), l: "Total rewards posted", icon: "💰" },
     { n: String(activeCt), l: "Active bounties live", icon: "🔴" },
     { n: String(totalProps), l: "Proposals submitted", icon: "📨" },
     { n: String(fulfilledCt), l: "Bounties fulfilled", icon: "✅" },
@@ -927,10 +1678,14 @@ const totalRewards = bounties
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+  .req-field-error { border-color: #ef4444 !important; }
+.char-ok { color: #16a34a; }
+.char-warn { color: #f59e0b; }
+.char-over { color: #ef4444; }
       `}</style>
 
       <div style={{ fontFamily: "'Lato',sans-serif", background: BG, minHeight: "100vh", paddingBottom: 80 }}>
-        <LiveTicker bounties={bounties} />
+        <LiveTicker bounties={bounties} fmt={fmt} />
 
         {/* HERO */}
         <section style={{ backgroundColor: NAVY, backgroundImage: `radial-gradient(rgba(184,150,62,.07) 1px,transparent 1px),radial-gradient(rgba(255,255,255,.025) 1px,transparent 1px)`, backgroundSize: "28px 28px,14px 14px", backgroundPosition: "0 0,7px 7px", padding: "52px 24px 0", position: "relative", overflow: "hidden" }}>

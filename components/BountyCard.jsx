@@ -9,92 +9,106 @@ import {
 } from "@/lib/bountyService";
 
 /* ─── Brand tokens ──────────────────────────────────────────── */
-const NAVY = "#0d2244";
-const GOLD = "#b8963e";
+const NAVY  = "#0d2244";
+const GOLD  = "#b8963e";
 const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
-const BG = "#f5f1ea";
+const BG    = "#f5f1ea";
+
+/* ─── Currency map (all African currencies LAN supports) ────── */
+const CURRENCY_DISPLAY = {
+  NGN: { symbol: "₦",    flag: "🇳🇬", name: "Nigerian Naira"        },
+  GHS: { symbol: "GH₵",  flag: "🇬🇭", name: "Ghanaian Cedi"         },
+  KES: { symbol: "KSh",  flag: "🇰🇪", name: "Kenyan Shilling"       },
+  UGX: { symbol: "USh",  flag: "🇺🇬", name: "Ugandan Shilling"      },
+  TZS: { symbol: "TSh",  flag: "🇹🇿", name: "Tanzanian Shilling"    },
+  ZAR: { symbol: "R",    flag: "🇿🇦", name: "South African Rand"    },
+  XOF: { symbol: "CFA",  flag: "🌍",  name: "West African CFA"      },
+  XAF: { symbol: "CFA",  flag: "🌍",  name: "Central African CFA"   },
+  EGP: { symbol: "E£",   flag: "🇪🇬", name: "Egyptian Pound"        },
+  MAD: { symbol: "DH",   flag: "🇲🇦", name: "Moroccan Dirham"       },
+  ETB: { symbol: "Br",   flag: "🇪🇹", name: "Ethiopian Birr"        },
+  ZMW: { symbol: "ZK",   flag: "🇿🇲", name: "Zambian Kwacha"        },
+  RWF: { symbol: "RF",   flag: "🇷🇼", name: "Rwandan Franc"         },
+  MWK: { symbol: "MK",   flag: "🇲🇼", name: "Malawian Kwacha"       },
+  BWP: { symbol: "P",    flag: "🇧🇼", name: "Botswana Pula"         },
+  NAD: { symbol: "N$",   flag: "🇳🇦", name: "Namibian Dollar"       },
+  CDF: { symbol: "FC",   flag: "🇨🇩", name: "Congolese Franc"       },
+};
+
+/* NGN-based rates: 1 NGN = X units of currency */
+const NGN_RATES = {
+  NGN: 1,
+  GHS: 0.010,
+  KES: 0.11,
+  UGX: 2.85,
+  TZS: 2.62,
+  RWF: 1.38,
+  ZMW: 0.028,
+  MWK: 1.77,
+  EGP: 0.051,
+  MAD: 0.105,
+  ZAR: 0.019,
+  XOF: 0.656,
+  XAF: 0.656,
+  ETB: 0.057,
+  BWP: 0.014,
+  NAD: 0.019,
+  CDF: 2.85,
+};
+
+function convertFromNGN(ngnAmt, toCurrency) {
+  const rate = NGN_RATES[toCurrency] ?? 1;
+  return ngnAmt * rate;
+}
+
+function fmtAmt(amount, currency) {
+  const big = ["UGX","RWF","TZS","XOF","XAF","MWK","CDF","GNF"].includes(currency);
+  return big
+    ? Math.round(amount).toLocaleString()
+    : Math.round(amount).toLocaleString();
+}
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 function getTier(r) {
-  if (r >= 50000)
-    return {
-      name: "Platinum",
-      color: "#e2e8f0",
-      bg: "rgba(226,232,240,.12)",
-      emoji: "💎",
-    };
-  if (r >= 20000)
-    return {
-      name: "Gold",
-      color: GOLD,
-      bg: "rgba(184,150,62,.12)",
-      emoji: "🥇",
-    };
-  if (r >= 5000)
-    return {
-      name: "Silver",
-      color: "#94a3b8",
-      bg: "rgba(148,163,184,.12)",
-      emoji: "🥈",
-    };
-  return {
-    name: "Bronze",
-    color: "#cd7f32",
-    bg: "rgba(205,127,50,.12)",
-    emoji: "🥉",
-  };
+  if (r >= 50000) return { name: "Platinum", color: "#e2e8f0", bg: "rgba(226,232,240,.12)", emoji: "💎" };
+  if (r >= 20000) return { name: "Gold",     color: GOLD,      bg: "rgba(184,150,62,.12)",  emoji: "🥇" };
+  if (r >= 5000)  return { name: "Silver",   color: "#94a3b8", bg: "rgba(148,163,184,.12)", emoji: "🥈" };
+  return                  { name: "Bronze",  color: "#cd7f32", bg: "rgba(205,127,50,.12)",  emoji: "🥉" };
 }
 
 function getDeadlineInfo(deadline) {
   if (!deadline) return { label: "Open deadline", color: "#94a3b8" };
-  const d = deadline?.toDate ? deadline.toDate() : new Date(deadline);
+  const d    = deadline?.toDate ? deadline.toDate() : new Date(deadline);
   const diff = d - Date.now();
   if (diff <= 0) return { label: "Expired", color: "#ef4444" };
-  const days = Math.floor(diff / 86400000);
+  const days  = Math.floor(diff / 86400000);
   const hours = Math.floor((diff % 86400000) / 3600000);
-  if (days === 0 && hours < 6)
-    return { label: `${hours}h left ⚡`, color: "#ef4444" };
-  if (days === 0) return { label: `${hours}h left`, color: "#f59e0b" };
-  if (days <= 2) return { label: `${days}d ${hours}h left`, color: "#f59e0b" };
-  return { label: `${days}d left`, color: "#16a34a" };
+  if (days === 0 && hours < 6) return { label: `${hours}h left ⚡`, color: "#ef4444" };
+  if (days === 0)              return { label: `${hours}h left`,    color: "#f59e0b" };
+  if (days <= 2)               return { label: `${days}d ${hours}h left`, color: "#f59e0b" };
+  return                              { label: `${days}d left`,     color: "#16a34a" };
 }
 
 function timeAgo(d) {
   const s = (Date.now() - (d instanceof Date ? d : new Date(d))) / 1000;
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 60)    return "just now";
+  if (s < 3600)  return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
 }
 
 function Avatar({ name = "?", size = 24 }) {
-  const initials =
-    name
-      .split(" ")
-      .map((n) => n[0] || "")
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "?";
+  const initials = name.split(" ").map(n => n[0] || "").slice(0, 2).join("").toUpperCase() || "?";
   const hue = [...name].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: `hsl(${hue},42%,22%)`,
-        border: `1.5px solid hsl(${hue},50%,38%)`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: size * 0.33,
-        fontWeight: 900,
-        color: `hsl(${hue},70%,80%)`,
-        fontFamily: "'Lato',sans-serif",
-        flexShrink: 0,
-      }}
-    >
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      background: `hsl(${hue},42%,22%)`, border: `1.5px solid hsl(${hue},50%,38%)`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: size * 0.33, fontWeight: 900, color: `hsl(${hue},70%,80%)`,
+      fontFamily: "'Lato',sans-serif", flexShrink: 0,
+    }}>
       {initials}
     </div>
   );
@@ -103,84 +117,141 @@ function Avatar({ name = "?", size = 24 }) {
 function TierBadge({ reward }) {
   const t = getTier(reward || 0);
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        background: t.bg,
-        border: `0.5px solid ${t.color}44`,
-        padding: "3px 9px",
-        fontSize: 9,
-        fontWeight: 700,
-        color: t.color,
-        fontFamily: "'Lato',sans-serif",
-        letterSpacing: "0.11em",
-        textTransform: "uppercase",
-      }}
-    >
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      background: t.bg, border: `0.5px solid ${t.color}44`,
+      padding: "3px 9px", fontSize: 9, fontWeight: 700, color: t.color,
+      fontFamily: "'Lato',sans-serif", letterSpacing: "0.11em", textTransform: "uppercase",
+    }}>
       {t.emoji} {t.name}
     </span>
   );
 }
 
-/* ☰ Hamburger / list icon */
 function ListIcon({ color = "#999" }) {
   return (
-    <svg
-      width="15"
-      height="12"
-      viewBox="0 0 18 12"
-      fill="none"
-      stroke={color}
-      strokeWidth="2"
-      strokeLinecap="round"
-    >
-      <line x1="0" y1="1" x2="18" y2="1" />
-      <line x1="0" y1="6" x2="18" y2="6" />
+    <svg width="15" height="12" viewBox="0 0 18 12" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
+      <line x1="0" y1="1"  x2="18" y2="1"  />
+      <line x1="0" y1="6"  x2="18" y2="6"  />
       <line x1="0" y1="11" x2="18" y2="11" />
     </svg>
   );
 }
 
 /* ══════════════════════════════════════════════════════════
+   CURRENCY PICKER PANEL
+══════════════════════════════════════════════════════════ */
+function CurrencyPickerPanel({ currentCurrency, onSelect, onClose }) {
+  const currencies = Object.entries(CURRENCY_DISPLAY);
+  return createPortal(
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(7,19,31,.7)",
+      zIndex: 1400, display: "flex", alignItems: "center", justifyContent: "center",
+      padding: 24, backdropFilter: "blur(4px)",
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: "#fff", maxWidth: 420, width: "100%",
+        border: "0.5px solid #e5ddd0",
+        animation: "fadeUp .25s cubic-bezier(.4,0,.2,1) both",
+        maxHeight: "80vh", display: "flex", flexDirection: "column",
+      }}>
+        {/* Header */}
+        <div style={{ background: NAVY, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+          <div>
+            <p style={{ fontSize: 9, color: GOLD, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", margin: "0 0 3px" }}>
+              Display Currency
+            </p>
+            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>
+              Choose Your Currency
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,.4)", fontSize: 22, cursor: "pointer" }}>×</button>
+        </div>
+
+        {/* Info note */}
+        <div style={{ padding: "10px 16px", background: "rgba(184,150,62,.07)", borderBottom: "0.5px solid rgba(184,150,62,.15)", flexShrink: 0 }}>
+          <p style={{ fontSize: 11, color: "#a16207", fontFamily: "'Lato',sans-serif", margin: 0, lineHeight: 1.6 }}>
+            Amounts are approximate conversions from NGN using estimated exchange rates.
+          </p>
+        </div>
+
+        {/* Currency grid */}
+        <div style={{ overflowY: "auto", padding: "10px 12px 16px", flex: 1 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {currencies.map(([code, info]) => {
+              const isActive = code === currentCurrency;
+              return (
+                <button key={code} onClick={() => { onSelect(code); onClose(); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "11px 13px", border: `1.5px solid ${isActive ? GOLD : "#e5ddd0"}`,
+                    background: isActive ? CREAM : "#fff",
+                    cursor: "pointer", textAlign: "left", transition: "all .15s",
+                    fontFamily: "'Lato',sans-serif",
+                  }}
+                  onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.background = "#fdf9f0"; } }}
+                  onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = "#e5ddd0"; e.currentTarget.style.background = "#fff"; } }}>
+                  <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{info.flag}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: isActive ? GOLD : NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                      {info.symbol} {code}
+                    </p>
+                    <p style={{ fontSize: 9, color: "#aaa", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {info.name}
+                    </p>
+                  </div>
+                  {isActive && (
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2.5" style={{ flexShrink: 0, marginLeft: "auto" }}>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
    BID MODAL
 ══════════════════════════════════════════════════════════ */
-function BidModal({ bounty, user, onClose }) {
+function BidModal({ bounty, user, onClose, viewCurrency }) {
   const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const payout = Math.round((bounty.reward || 0) * 0.8);
-  const slotsPct = Math.min(
-    100,
-    ((bounty.proposals || 0) / (bounty.maxProposals || 10)) * 100,
-  );
-  const slotsLeft = Math.max(
-    0,
-    (bounty.maxProposals || 10) - (bounty.proposals || 0),
-  );
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState("");
+
+  /* Always show NGN in the bid modal — that's the real escrow amount */
+  const payoutNGN = Math.round((bounty.reward || 0) * 0.8);
+
+  /* Also show local currency if viewer has one set */
+  const currInfo    = CURRENCY_DISPLAY[viewCurrency] || CURRENCY_DISPLAY.NGN;
+  const isNGNView   = viewCurrency === "NGN";
+  const localPayout = isNGNView ? null : convertFromNGN(payoutNGN, viewCurrency);
+  const localReward = isNGNView ? null : convertFromNGN(bounty.reward || 0, viewCurrency);
+
+  const slotsPct = Math.min(100, ((bounty.proposals || 0) / (bounty.maxProposals || 10)) * 100);
+  const slotsLeft = Math.max(0, (bounty.maxProposals || 10) - (bounty.proposals || 0));
   const dlInfo = getDeadlineInfo(bounty.deadline);
+  const isExpired = dlInfo.label === "Expired";
+
 
   const handleClaim = async () => {
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     try {
       await incrementProposals(bounty.id);
       await claimBountyWithNotification(bounty.id, user.uid, user);
       setSubmitted(true);
     } catch (e) {
-      if (e.message === "ALREADY_BID")
-        setError("You already bid on this bounty.");
-      else if (e.message === "BOUNTY_PENDING_APPROVAL")
-        setError("Someone already submitted — under review.");
-      else if (e.message === "BOUNTY_FULFILLED")
-        setError("This bounty has already been fulfilled.");
-      else if (e.message === "BOUNTY_NOT_FOUND")
-        setError("This bounty no longer exists.");
+      if (e.message === "ALREADY_BID")           setError("You already bid on this bounty.");
+      else if (e.message === "BOUNTY_PENDING_APPROVAL") setError("Someone already submitted — under review.");
+      else if (e.message === "BOUNTY_FULFILLED")  setError("This bounty has already been fulfilled.");
+      else if (e.message === "BOUNTY_NOT_FOUND")  setError("This bounty no longer exists.");
       else setError(`Could not place bid: ${e.message}`);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return createPortal(
@@ -241,11 +312,24 @@ function BidModal({ bounty, user, onClose }) {
                 fontSize: 28,
                 fontWeight: 700,
                 color: "#16a34a",
-                marginBottom: 24,
+                marginBottom: 4,
               }}
             >
-              ₦{payout.toLocaleString("en-NG")}
+              ₦{payoutNGN.toLocaleString("en-NG")}
             </p>
+            {!isNGNView && (
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "#aaa",
+                  fontFamily: "'Lato',sans-serif",
+                  marginBottom: 20,
+                }}
+              >
+                ≈ {currInfo.symbol}
+                {fmtAmt(localPayout, viewCurrency)} {viewCurrency}
+              </p>
+            )}
             <div
               style={{
                 padding: "12px 16px",
@@ -434,8 +518,21 @@ function BidModal({ bounty, user, onClose }) {
                     >
                       ₦
                     </span>
-                    {payout.toLocaleString("en-NG")}
+                    {fmtAmt(payoutNGN, "NGN")}
                   </div>
+                  {!isNGNView && (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "#aaa",
+                        fontFamily: "'Lato',sans-serif",
+                        marginTop: 3,
+                      }}
+                    >
+                      ≈ {currInfo.symbol}
+                      {fmtAmt(localPayout, viewCurrency)} {viewCurrency}
+                    </div>
+                  )}
                 </div>
                 <div
                   style={{
@@ -472,8 +569,21 @@ function BidModal({ bounty, user, onClose }) {
                     >
                       ₦
                     </span>
-                    {Number(bounty.reward).toLocaleString("en-NG")}
+                    {fmtAmt(Number(bounty.reward), "NGN")}
                   </div>
+                  {!isNGNView && (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "#ccc",
+                        fontFamily: "'Lato',sans-serif",
+                        marginTop: 3,
+                      }}
+                    >
+                      ≈ {currInfo.symbol}
+                      {fmtAmt(localReward, viewCurrency)} {viewCurrency}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -670,7 +780,7 @@ function BidModal({ bounty, user, onClose }) {
                       <path d="M22 2L11 13" />
                       <path d="M22 2L15 22 11 13 2 9l20-7z" />
                     </svg>
-                    Claim &amp; Earn ₦{payout.toLocaleString("en-NG")}
+                    Claim &amp; Earn ₦{fmtAmt(payoutNGN, "NGN")}
                   </>
                 )}
               </button>
@@ -687,370 +797,150 @@ function BidModal({ bounty, user, onClose }) {
    BIDDERS PANEL
 ══════════════════════════════════════════════════════════ */
 function BiddersPanel({ bounty, onClose }) {
- const claimedUids =
-   Array.isArray(bounty.claimedBy) && bounty.claimedBy.length > 0
-     ? bounty.claimedBy
-     : Object.keys(bounty.bidderNames || {});
- const bidders = claimedUids.map((uid) => ({
-   uid,
-   name: bounty.bidderNames?.[uid] || "Unknown",
- }));
+  const claimedUids =
+    Array.isArray(bounty.claimedBy) && bounty.claimedBy.length > 0
+      ? bounty.claimedBy
+      : Object.keys(bounty.bidderNames || {});
+  const bidders = claimedUids.map(uid => ({ uid, name: bounty.bidderNames?.[uid] || "Unknown" }));
 
   return createPortal(
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(7,19,31,.6)",
-        zIndex: 1300,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        backdropFilter: "blur(4px)",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#fff",
-          maxWidth: 420,
-          width: "100%",
-          border: "0.5px solid #e5ddd0",
-          animation: "fadeUp .28s both",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            background: NAVY,
-            padding: "18px 20px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(7,19,31,.6)", zIndex: 1300, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(4px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", maxWidth: 420, width: "100%", border: "0.5px solid #e5ddd0", animation: "fadeUp .28s both" }}>
+        <div style={{ background: NAVY, padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <p
-              style={{
-                fontSize: 9,
-                color: GOLD,
-                fontWeight: 700,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                fontFamily: "'Lato',sans-serif",
-                margin: "0 0 3px",
-              }}
-            >
-              Proposals
-            </p>
-            <p
-              style={{
-                fontFamily: "'Playfair Display',serif",
-                fontSize: 16,
-                fontWeight: 700,
-                color: "#fff",
-                margin: 0,
-              }}
-            >
-              Bidders ({bidders.length})
-            </p>
+            <p style={{ fontSize: 9, color: GOLD, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", margin: "0 0 3px" }}>Proposals</p>
+            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>Bidders ({bidders.length})</p>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "rgba(255,255,255,.4)",
-              fontSize: 22,
-              cursor: "pointer",
-            }}
-          >
-            ×
-          </button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,.4)", fontSize: 22, cursor: "pointer" }}>×</button>
         </div>
-
-        {/* List */}
         <div style={{ maxHeight: 380, overflowY: "auto" }}>
           {bidders.length === 0 ? (
-            <div
-              style={{
-                padding: "40px 20px",
-                textAlign: "center",
-                color: "#aaa",
-                fontFamily: "'Lato',sans-serif",
-                fontSize: 13,
-              }}
-            >
-              No bidders yet
-            </div>
+            <div style={{ padding: "40px 20px", textAlign: "center", color: "#aaa", fontFamily: "'Lato',sans-serif", fontSize: 13 }}>No bidders yet</div>
           ) : (
-            // Sort: fulfilled winner first, then everyone else
-            [...bidders]
-              .sort((a, b) => {
-                if (a.uid === bounty.fulfilledByUid) return -1;
-                if (b.uid === bounty.fulfilledByUid) return 1;
-                return 0;
-              })
-              .map((b, i) => {
-                const isFulfiller =
-                  b.uid === bounty.fulfilledByUid &&
-                  bounty.status === "fulfilled";
-                const isDisputed = bounty.disputes?.[b.uid];
-                return (
-                  <div
-                    key={b.uid || i}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      padding: "13px 18px",
-                      borderBottom: "0.5px solid #f0ebe0",
-                      background: isFulfiller ? "rgba(22,163,74,.03)" : "#fff",
-                    }}
-                  >
-                    <Avatar name={b.name || "?"} size={34} />
-                    <div style={{ flex: 1 }}>
-                      <p
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 700,
-                          color: NAVY,
-                          margin: "0 0 2px",
-                          fontFamily: "'Lato',sans-serif",
-                        }}
-                      >
-                        {b.name || "Unknown"}
-                      </p>
-                      <p
-                        style={{
-                          fontSize: 10,
-                          color: "#aaa",
-                          margin: 0,
-                          fontFamily: "'Lato',sans-serif",
-                        }}
-                      >
-                        {isFulfiller
-                          ? `Won ₦${Math.round((bounty.reward || 0) * 0.8).toLocaleString("en-NG")}`
-                          : bounty.status === "fulfilled"
-                            ? "Did not win"
-                            : "Bid placed"}
-                      </p>
-                    </div>
-                    <span
+            [...bidders].sort((a, b) => {
+              if (a.uid === bounty.fulfilledByUid) return -1;
+              if (b.uid === bounty.fulfilledByUid) return 1;
+              return 0;
+            }).map((b, i) => {
+              const isFulfiller = b.uid === bounty.fulfilledByUid && bounty.status === "fulfilled";
+              const isDisputed  = bounty.disputes?.[b.uid];
+              return (
+                <div
+                  key={b.uid || i}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "13px 18px",
+                    borderBottom: "0.5px solid #f0ebe0",
+                    background: isFulfiller ? "rgba(22,163,74,.03)" : "#fff",
+                  }}
+                >
+                  <Avatar name={b.name || "?"} size={34} />
+                  <div style={{ flex: 1 }}>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: NAVY,
+                        margin: "0 0 2px",
+                        fontFamily: "'Lato',sans-serif",
+                      }}
+                    >
+                      {b.name || "Unknown"}
+                    </p>
+                    <p
                       style={{
                         fontSize: 10,
-                        fontWeight: 700,
-                        padding: "4px 10px",
+                        color: "#aaa",
+                        margin: 0,
                         fontFamily: "'Lato',sans-serif",
-                        letterSpacing: "0.06em",
-                        background: isFulfiller
-                          ? "rgba(22,163,74,.1)"
-                          : isDisputed
-                            ? "rgba(220,38,38,.08)"
-                            : "rgba(184,150,62,.1)",
-                        color: isFulfiller
-                          ? "#16a34a"
-                          : isDisputed
-                            ? "#dc2626"
-                            : "#b8963e",
-                        border: `0.5px solid ${
-                          isFulfiller
-                            ? "rgba(22,163,74,.3)"
-                            : isDisputed
-                              ? "rgba(220,38,38,.25)"
-                              : "rgba(184,150,62,.3)"
-                        }`,
                       }}
                     >
                       {isFulfiller
-                        ? "✅ Fulfilled"
-                        : isDisputed
-                          ? "🚩 Disputed"
-                          : bounty.status === "fulfilled"
-                            ? "Not selected"
-                            : "🟡 Claimed"}
-                    </span>
+                        ? `Won ₦${fmtAmt(Math.round((bounty.reward || 0) * 0.8), "NGN")}` : bounty.status === "fulfilled"
+                          ? "Did not win"
+                          : "Bid placed"}
+                    </p>
                   </div>
-                );
-              })
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "4px 10px",
+                      fontFamily: "'Lato',sans-serif",
+                      letterSpacing: "0.06em",
+                      background: isFulfiller
+                        ? "rgba(22,163,74,.1)"
+                        : isDisputed
+                          ? "rgba(220,38,38,.08)"
+                          : "rgba(184,150,62,.1)",
+                      color: isFulfiller
+                        ? "#16a34a"
+                        : isDisputed
+                          ? "#dc2626"
+                          : "#b8963e",
+                      border: `0.5px solid ${isFulfiller ? "rgba(22,163,74,.3)" : isDisputed ? "rgba(220,38,38,.25)" : "rgba(184,150,62,.3)"}`,
+                    }}
+                  >
+                    {isFulfiller
+                      ? "✅ Fulfilled"
+                      : isDisputed
+                        ? "🚩 Disputed"
+                        : bounty.status === "fulfilled"
+                          ? "Not selected"
+                          : "🟡 Claimed"}
+                  </span>
+                </div>
+              );
+            })
           )}
         </div>
-
-        {/* Footer */}
         <div style={{ padding: "12px 18px", borderTop: "0.5px solid #f0ebe0" }}>
-          <button
-            onClick={onClose}
-            style={{
-              width: "100%",
-              padding: "11px",
-              background: NAVY,
-              color: "#fff",
-              border: "none",
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: "'Lato',sans-serif",
-            }}
-          >
-            Close
-          </button>
+          <button onClick={onClose} style={{ width: "100%", padding: "11px", background: NAVY, color: "#fff", border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>Close</button>
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }
 
 /* ══════════════════════════════════════════════════════════
    TRACK PANEL  (owner only)
 ══════════════════════════════════════════════════════════ */
-function TrackPanel({ bounty, onClose }) {
+function TrackPanel({ bounty, onClose, viewCurrency }) {
+  const currInfo = CURRENCY_DISPLAY[viewCurrency] || CURRENCY_DISPLAY.NGN;
+  const isNGN = viewCurrency === "NGN";
+  const fmt = (n) => isNGN ? `₦${Math.round(n).toLocaleString()}` : `${currInfo.symbol}${fmtAmt(convertFromNGN(n, viewCurrency), viewCurrency)}`;
   const dlInfo = getDeadlineInfo(bounty.deadline);
   return createPortal(
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(7,19,31,.6)",
-        zIndex: 1300,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        backdropFilter: "blur(4px)",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#fff",
-          maxWidth: 360,
-          width: "100%",
-          border: "0.5px solid #e5ddd0",
-          animation: "fadeUp .28s both",
-        }}
-      >
-        <div
-          style={{
-            background: NAVY,
-            padding: "18px 20px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(7,19,31,.6)", zIndex: 1300, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(4px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", maxWidth: 360, width: "100%", border: "0.5px solid #e5ddd0", animation: "fadeUp .28s both" }}>
+        <div style={{ background: NAVY, padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <p
-              style={{
-                fontSize: 9,
-                color: GOLD,
-                fontWeight: 700,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                fontFamily: "'Lato',sans-serif",
-                margin: "0 0 3px",
-              }}
-            >
-              Your Bounty
-            </p>
-            <p
-              style={{
-                fontFamily: "'Playfair Display',serif",
-                fontSize: 16,
-                fontWeight: 700,
-                color: "#fff",
-                margin: 0,
-              }}
-            >
-              Track Status
-            </p>
+            <p style={{ fontSize: 9, color: GOLD, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", margin: "0 0 3px" }}>Your Bounty</p>
+            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>Track Status</p>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "rgba(255,255,255,.4)",
-              fontSize: 22,
-              cursor: "pointer",
-            }}
-          >
-            ×
-          </button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,.4)", fontSize: 22, cursor: "pointer" }}>×</button>
         </div>
-        <div
-          style={{
-            padding: 20,
-            display: "flex",
-            flexDirection: "column",
-            gap: 0,
-          }}
-        >
+        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 0 }}>
           {[
-            [
-              "Status",
-              bounty.status === "fulfilled"
-                ? "✅ Fulfilled"
-                : bounty.status === "pending_approval"
-                  ? "⏳ Under Review"
-                  : "🟢 Open",
-            ],
-            ["Time left", dlInfo.label],
-            ["Escrowed", `₦${Number(bounty.reward).toLocaleString("en-NG")}`],
-            ["Proposals", String(bounty.proposals || 0)],
-            [
-              "Author earns (80%)",
-              `₦${Math.round((bounty.reward || 0) * 0.8).toLocaleString("en-NG")}`,
-            ],
+            ["Status",          bounty.status === "fulfilled" ? "✅ Fulfilled" : bounty.status === "pending_approval" ? "⏳ Under Review" : "🟢 Open"],
+            ["Time left",       dlInfo.label],
+            ["Escrowed",        fmt(bounty.reward)],
+            ["Proposals",       String(bounty.proposals || 0)],
+            ["Author earns (80%)", fmt((bounty.reward || 0) * 0.8)],
           ].map(([k, v]) => (
-            <div
-              key={k}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                fontSize: 13,
-                padding: "12px 0",
-                borderBottom: "0.5px solid #f0ebe0",
-              }}
-            >
-              <span style={{ color: "#888", fontFamily: "'Lato',sans-serif" }}>
-                {k}
-              </span>
-              <span
-                style={{
-                  fontWeight: 700,
-                  color: NAVY,
-                  fontFamily: "'Lato',sans-serif",
-                }}
-              >
-                {v}
-              </span>
+            <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "12px 0", borderBottom: "0.5px solid #f0ebe0" }}>
+              <span style={{ color: "#888", fontFamily: "'Lato',sans-serif" }}>{k}</span>
+              <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{v}</span>
             </div>
           ))}
-          <button
-            onClick={onClose}
-            style={{
-              width: "100%",
-              marginTop: 16,
-              padding: "12px",
-              background: NAVY,
-              color: "#fff",
-              border: "none",
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: "'Lato',sans-serif",
-            }}
-          >
-            Close
-          </button>
+          <button onClick={onClose} style={{ width: "100%", marginTop: 16, padding: "12px", background: NAVY, color: "#fff", border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>Close</button>
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }
 
@@ -1058,224 +948,53 @@ function TrackPanel({ bounty, onClose }) {
    EDIT PANEL  (owner only)
 ══════════════════════════════════════════════════════════ */
 function EditPanel({ bounty, onClose }) {
-  const [form, setForm] = useState({
-    title: bounty.title || "",
-    tags: (bounty.tags || []).join(", "),
-  });
+  const [form,   setForm]   = useState({ title: bounty.title || "", tags: (bounty.tags || []).join(", ") });
   const [saving, setSaving] = useState(false);
-  const inp = {
-    padding: "10px 12px",
-    border: "0.5px solid #e5ddd0",
-    fontSize: 13,
-    fontFamily: "'Lato',sans-serif",
-    outline: "none",
-    width: "100%",
-    background: BG,
-    color: NAVY,
-    boxSizing: "border-box",
-  };
+  const inp = { padding: "10px 12px", border: "0.5px solid #e5ddd0", fontSize: 13, fontFamily: "'Lato',sans-serif", outline: "none", width: "100%", background: BG, color: NAVY, boxSizing: "border-box" };
 
   const handleSave = async () => {
     setSaving(true);
     try {
       const { updateDoc, doc: fd } = await import("firebase/firestore");
-      const tags = form.tags
-        ? form.tags
-            .split(",")
-            .map((t) => t.trim())
-            .filter(Boolean)
-        : [];
-      await updateDoc(fd(db, "bounties", bounty.id), {
-        title: form.title,
-        tags,
-      });
+      const tags = form.tags ? form.tags.split(",").map(t => t.trim()).filter(Boolean) : [];
+      await updateDoc(fd(db, "bounties", bounty.id), { title: form.title, tags });
       onClose();
-    } catch (e) {
-      alert("Failed to save: " + e.message);
-    } finally {
-      setSaving(false);
-    }
+    } catch (e) { alert("Failed to save: " + e.message); }
+    finally { setSaving(false); }
   };
 
   return createPortal(
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(7,19,31,.6)",
-        zIndex: 1300,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        backdropFilter: "blur(4px)",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#fff",
-          maxWidth: 440,
-          width: "100%",
-          border: "0.5px solid #e5ddd0",
-          animation: "fadeUp .28s both",
-        }}
-      >
-        <div
-          style={{
-            background: NAVY,
-            padding: "18px 20px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(7,19,31,.6)", zIndex: 1300, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(4px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", maxWidth: 440, width: "100%", border: "0.5px solid #e5ddd0", animation: "fadeUp .28s both" }}>
+        <div style={{ background: NAVY, padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <p
-              style={{
-                fontSize: 9,
-                color: GOLD,
-                fontWeight: 700,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                fontFamily: "'Lato',sans-serif",
-                margin: "0 0 3px",
-              }}
-            >
-              Edit
-            </p>
-            <p
-              style={{
-                fontFamily: "'Playfair Display',serif",
-                fontSize: 16,
-                fontWeight: 700,
-                color: "#fff",
-                margin: 0,
-              }}
-            >
-              Update Bounty
-            </p>
+            <p style={{ fontSize: 9, color: GOLD, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", margin: "0 0 3px" }}>Edit</p>
+            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>Update Bounty</p>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "rgba(255,255,255,.4)",
-              fontSize: 22,
-              cursor: "pointer",
-            }}
-          >
-            ×
-          </button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,.4)", fontSize: 22, cursor: "pointer" }}>×</button>
         </div>
-        <div
-          style={{
-            padding: 20,
-            display: "flex",
-            flexDirection: "column",
-            gap: 14,
-          }}
-        >
-          <div
-            style={{
-              padding: "10px 14px",
-              background: "rgba(184,150,62,.07)",
-              border: "0.5px solid rgba(184,150,62,.25)",
-              fontSize: 12,
-              color: "#a16207",
-              fontFamily: "'Lato',sans-serif",
-              lineHeight: 1.65,
-            }}
-          >
+        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ padding: "10px 14px", background: "rgba(184,150,62,.07)", border: "0.5px solid rgba(184,150,62,.25)", fontSize: 12, color: "#a16207", fontFamily: "'Lato',sans-serif", lineHeight: 1.65 }}>
             Only description and tags can be edited after posting.
           </div>
           <div>
-            <label
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: "#aaa",
-                fontFamily: "'Lato',sans-serif",
-                display: "block",
-                marginBottom: 6,
-              }}
-            >
-              Description
-            </label>
-            <textarea
-              value={form.title}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, title: e.target.value }))
-              }
-              rows={3}
-              style={{ ...inp, resize: "vertical", lineHeight: 1.6 }}
-            />
+            <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aaa", fontFamily: "'Lato',sans-serif", display: "block", marginBottom: 6 }}>Description</label>
+            <textarea value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} rows={3} style={{ ...inp, resize: "vertical", lineHeight: 1.6 }} />
           </div>
           <div>
-            <label
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: "#aaa",
-                fontFamily: "'Lato',sans-serif",
-                display: "block",
-                marginBottom: 6,
-              }}
-            >
-              Tags (comma-separated)
-            </label>
-            <input
-              value={form.tags}
-              onChange={(e) => setForm((p) => ({ ...p, tags: e.target.value }))}
-              style={inp}
-              placeholder="e.g. Past Questions, Maths"
-            />
+            <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aaa", fontFamily: "'Lato',sans-serif", display: "block", marginBottom: 6 }}>Tags (comma-separated)</label>
+            <input value={form.tags} onChange={e => setForm(p => ({ ...p, tags: e.target.value }))} style={inp} placeholder="e.g. Past Questions, Maths" />
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <button
-              onClick={onClose}
-              style={{
-                flex: 1,
-                padding: "12px",
-                background: "#f5f5f5",
-                color: "#666",
-                border: "0.5px solid #e5ddd0",
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-                fontFamily: "'Lato',sans-serif",
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              style={{
-                flex: 1,
-                padding: "12px",
-                background: saving ? "#ccc" : GOLD,
-                color: NAVY,
-                border: "none",
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: saving ? "not-allowed" : "pointer",
-                fontFamily: "'Lato',sans-serif",
-              }}
-            >
+            <button onClick={onClose} style={{ flex: 1, padding: "12px", background: "#f5f5f5", color: "#666", border: "0.5px solid #e5ddd0", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>Cancel</button>
+            <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: "12px", background: saving ? "#ccc" : GOLD, color: NAVY, border: "none", fontSize: 12, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", fontFamily: "'Lato',sans-serif" }}>
               {saving ? "Saving…" : "Save Changes"}
             </button>
           </div>
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }
 
@@ -1283,157 +1002,40 @@ function EditPanel({ bounty, onClose }) {
    SHARE PANEL
 ══════════════════════════════════════════════════════════ */
 function SharePanel({ bounty, onClose }) {
-  const url =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/bounty-board?highlight=${bounty.id}`
-      : "";
+  const url  = typeof window !== "undefined" ? `${window.location.origin}/academic/bounty/board?highlight=${bounty.id}` : "";
   const text = `💰 Bounty: ${bounty.title} — ₦${Number(bounty.reward).toLocaleString("en-NG")} reward on LAN Library`;
   return createPortal(
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(7,19,31,.6)",
-        zIndex: 1300,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        backdropFilter: "blur(4px)",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#fff",
-          maxWidth: 360,
-          width: "100%",
-          border: "0.5px solid #e5ddd0",
-          animation: "fadeUp .28s both",
-        }}
-      >
-        <div
-          style={{
-            background: NAVY,
-            padding: "18px 20px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(7,19,31,.6)", zIndex: 1300, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(4px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", maxWidth: 360, width: "100%", border: "0.5px solid #e5ddd0", animation: "fadeUp .28s both" }}>
+        <div style={{ background: NAVY, padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <p
-              style={{
-                fontSize: 9,
-                color: GOLD,
-                fontWeight: 700,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                fontFamily: "'Lato',sans-serif",
-                margin: "0 0 3px",
-              }}
-            >
-              Spread the word
-            </p>
-            <p
-              style={{
-                fontFamily: "'Playfair Display',serif",
-                fontSize: 16,
-                fontWeight: 700,
-                color: "#fff",
-                margin: 0,
-              }}
-            >
-              Share Bounty
-            </p>
+            <p style={{ fontSize: 9, color: GOLD, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", margin: "0 0 3px" }}>Spread the word</p>
+            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>Share Bounty</p>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "rgba(255,255,255,.4)",
-              fontSize: 22,
-              cursor: "pointer",
-            }}
-          >
-            ×
-          </button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,.4)", fontSize: 22, cursor: "pointer" }}>×</button>
         </div>
-        <div
-          style={{
-            padding: "20px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-          }}
-        >
+        <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 10 }}>
           {[
-            {
-              label: "📱 WhatsApp",
-              href: `https://wa.me/?text=${encodeURIComponent(text + "\n" + url)}`,
-            },
-            {
-              label: "🐦 Twitter / X",
-              href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
-            },
-            {
-              label: "📘 Facebook",
-              href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-            },
-            {
-              label: "💼 LinkedIn",
-              href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
-            },
+            { label: "📱 WhatsApp",  href: `https://wa.me/?text=${encodeURIComponent(text + "\n" + url)}` },
+            { label: "🐦 Twitter / X", href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}` },
+            { label: "📘 Facebook",  href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}` },
+            { label: "💼 LinkedIn",  href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}` },
           ].map(({ label, href }) => (
-            <a
-              key={label}
-              href={href}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: "block",
-                padding: "12px 16px",
-                background: CREAM,
-                border: "0.5px solid rgba(184,150,62,.25)",
-                color: NAVY,
-                fontSize: 13,
-                fontWeight: 700,
-                textDecoration: "none",
-                fontFamily: "'Lato',sans-serif",
-                textAlign: "center",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "#ede8df")
-              }
-              onMouseLeave={(e) => (e.currentTarget.style.background = CREAM)}
-            >
+            <a key={label} href={href} target="_blank" rel="noreferrer"
+              style={{ display: "block", padding: "12px 16px", background: CREAM, border: "0.5px solid rgba(184,150,62,.25)", color: NAVY, fontSize: 13, fontWeight: 700, textDecoration: "none", fontFamily: "'Lato',sans-serif", textAlign: "center" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#ede8df")}
+              onMouseLeave={e => (e.currentTarget.style.background = CREAM)}>
               {label}
             </a>
           ))}
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(url);
-              alert("Link copied!");
-            }}
-            style={{
-              padding: "12px 16px",
-              background: NAVY,
-              color: "#fff",
-              border: "none",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: "'Lato',sans-serif",
-            }}
-          >
+          <button onClick={() => { navigator.clipboard.writeText(url); alert("Link copied!"); }}
+            style={{ padding: "12px 16px", background: NAVY, color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>
             🔗 Copy Link
           </button>
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }
 
@@ -1441,36 +1043,53 @@ function SharePanel({ bounty, onClose }) {
    BOUNTY CARD  — main export
 ══════════════════════════════════════════════════════════════ */
 export default function BountyCard({ bounty, user, highlighted }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [panel, setPanel] = useState(null); // "track"|"edit"|"bidders"|"share"|"bid"
-  const [deleting, setDeleting] = useState(false);
+  const [menuOpen,  setMenuOpen]  = useState(false);
+  const [panel,     setPanel]     = useState(null);
+  const [deleting,  setDeleting]  = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   const menuRef = useRef(null);
+const [descExpanded, setDescExpanded] = useState(false);
 
-  const isOwner = user && bounty.postedByUid === user.uid;
-  const alreadyBid =
-    user &&
-    Array.isArray(bounty.claimedBy) &&
-    bounty.claimedBy.includes(user.uid);
-  const dlInfo = getDeadlineInfo(bounty.deadline);
-  const slotsPct = Math.min(
-    100,
-    ((bounty.proposals || 0) / (bounty.maxProposals || 10)) * 100,
-  );
-  const slotsLeft = Math.max(
-    0,
-    (bounty.maxProposals || 10) - (bounty.proposals || 0),
-  );
-  const payout = Math.round((bounty.reward || 0) * 0.8);
+  /* ── Viewer's display currency — persisted in localStorage ── */
+  const [viewCurrency, setViewCurrency] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("lan_display_currency") || "NGN";
+    }
+    return "NGN";
+  });
 
-  // Slots are full when proposals reach maxProposals (default 10)
+  const handleCurrencyChange = (code) => {
+    setViewCurrency(code);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("lan_display_currency", code);
+    }
+  };
+
+  /* ── Derived display values ── */
+  const currInfo  = CURRENCY_DISPLAY[viewCurrency] || CURRENCY_DISPLAY.NGN;
+  const isNGN     = viewCurrency === "NGN";
+  const rewardNGN = bounty.reward || 0;
+
+  /* Primary display */
+  const displayAmt    = isNGN ? rewardNGN : convertFromNGN(rewardNGN, viewCurrency);
+  const displayPayout = displayAmt * 0.8;
+  const displaySymbol = currInfo.symbol;
+
+  /* Secondary: always show NGN equivalent when not in NGN */
+  const showSecondary = !isNGN;
+
+  /* ── Existing derived values ── */
+  const isOwner   = user && bounty.postedByUid === user.uid;
+  const alreadyBid = user && Array.isArray(bounty.claimedBy) && bounty.claimedBy.includes(user.uid);
+  const dlInfo    = getDeadlineInfo(bounty.deadline);
+  const slotsPct  = Math.min(100, ((bounty.proposals || 0) / (bounty.maxProposals || 10)) * 100);
+  const slotsLeft = Math.max(0, (bounty.maxProposals || 10) - (bounty.proposals || 0));
+  const payoutNGN = Math.round(rewardNGN * 0.8); // always NGN for bid button label
   const allSlotsFilled = slotsLeft === 0;
 
   /* Close menu on outside click */
   useEffect(() => {
-    const h = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target))
-        setMenuOpen(false);
-    };
+    const h = e => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
@@ -1478,79 +1097,39 @@ export default function BountyCard({ bounty, user, highlighted }) {
   const closePanel = () => setPanel(null);
 
   const handleDelete = async () => {
-    if (!confirm("Delete this bounty? Funds in escrow will be refunded."))
-      return;
+    if (!confirm("Delete this bounty? Funds in escrow will be refunded.")) return;
     setDeleting(true);
     try {
       const { deleteDoc, doc: fd } = await import("firebase/firestore");
       await deleteDoc(fd(db, "bounties", bounty.id));
-    } catch (e) {
-      alert("Failed to delete: " + e.message);
-    } finally {
-      setDeleting(false);
-    }
+    } catch (e) { alert("Failed to delete: " + e.message); }
+    finally { setDeleting(false); }
+  };
+
+  /* ─── Currency toggle menu item (shown to everyone) ──────── */
+  const currencyMenuItem = {
+    emoji: currInfo.flag,
+    label: `View in ${viewCurrency === "NGN" ? "my currency" : "NGN (₦)"}`,
+    sub: viewCurrency === "NGN"
+      ? "Switch display currency"
+      : `Currently: ${currInfo.symbol} ${viewCurrency} · tap to change`,
+    action: () => { setShowPicker(true); setMenuOpen(false); },
   };
 
   /* ─── Dropdown menu items ─────────────────────────────────── */
-
-  // OWNER menu
   const ownerItems = [
-    {
-      emoji: "📊",
-      label: "Track Bounty",
-      sub: `${dlInfo.label} · ₦${Number(bounty.reward).toLocaleString("en-NG")} escrowed`,
-      action: () => {
-        setPanel("track");
-        setMenuOpen(false);
-      },
-    },
-    {
-      emoji: "✏️",
-      label: "Edit Bounty",
-      sub: "Description & tags only",
-      action: () => {
-        setPanel("edit");
-        setMenuOpen(false);
-      },
-    },
-    {
-      emoji: "👥",
-      label: "Show Bidders",
-      sub: `${bounty.proposals || 0} proposal${(bounty.proposals || 0) !== 1 ? "s" : ""}`,
-      action: () => {
-        setPanel("bidders");
-        setMenuOpen(false);
-      },
-    },
+    { emoji: "📊", label: "Track Bounty",  sub: `${dlInfo.label} · ₦${fmtAmt(rewardNGN, "NGN")} escrowed`, action: () => { setPanel("track"); setMenuOpen(false); } },
+    { emoji: "✏️", label: "Edit Bounty",   sub: "Description & tags only",                                          action: () => { setPanel("edit");    setMenuOpen(false); } },
+    { emoji: "👥", label: "Show Bidders",  sub: `${bounty.proposals || 0} proposal${(bounty.proposals || 0) !== 1 ? "s" : ""}`, action: () => { setPanel("bidders"); setMenuOpen(false); } },
+    currencyMenuItem,
     { divider: true },
-    {
-      emoji: "🗑️",
-      label: deleting ? "Deleting…" : "Delete Bounty",
-      danger: true,
-      action: handleDelete,
-    },
+    { emoji: "🗑️", label: deleting ? "Deleting…" : "Delete Bounty", danger: true, action: handleDelete },
   ];
 
-  // GUEST menu
   const guestItems = [
-    {
-      emoji: "👥",
-      label: "Show Bidders",
-      sub: `${bounty.proposals || 0} proposal${(bounty.proposals || 0) !== 1 ? "s" : ""}`,
-      action: () => {
-        setPanel("bidders");
-        setMenuOpen(false);
-      },
-    },
-    {
-      emoji: "🔗",
-      label: "Share Bounty",
-      sub: "WhatsApp, Twitter & more",
-      action: () => {
-        setPanel("share");
-        setMenuOpen(false);
-      },
-    },
+    { emoji: "👥", label: "Show Bidders", sub: `${bounty.proposals || 0} proposal${(bounty.proposals || 0) !== 1 ? "s" : ""}`, action: () => { setPanel("bidders"); setMenuOpen(false); } },
+    { emoji: "🔗", label: "Share Bounty", sub: "WhatsApp, Twitter & more",                                                      action: () => { setPanel("share");   setMenuOpen(false); } },
+    currencyMenuItem,
   ];
 
   const menuItems = isOwner ? ownerItems : guestItems;
@@ -1558,77 +1137,24 @@ export default function BountyCard({ bounty, user, highlighted }) {
   /* ─── Status pill ─────────────────────────────────────────── */
   const StatusPill = () => {
     if (bounty.status === "fulfilled")
-      return (
-        <span
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            color: "#16a34a",
-            background: "rgba(22,163,74,.1)",
-            border: "0.5px solid rgba(22,163,74,.3)",
-            padding: "3px 8px",
-            fontFamily: "'Lato',sans-serif",
-            letterSpacing: "0.08em",
-            whiteSpace: "nowrap",
-          }}
-        >
-          ✅ FULFILLED
-        </span>
-      );
-    // Only show "Under Review" badge to the owner or the user who already bid
+      return <span style={{ fontSize: 9, fontWeight: 700, color: "#16a34a", background: "rgba(22,163,74,.1)", border: "0.5px solid rgba(22,163,74,.3)", padding: "3px 8px", fontFamily: "'Lato',sans-serif", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>✅ FULFILLED</span>;
     if (bounty.status === "pending_approval" && (isOwner || alreadyBid))
-      return (
-        <span
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            color: "#b45309",
-            background: "rgba(245,158,11,.08)",
-            border: "0.5px solid rgba(245,158,11,.3)",
-            padding: "3px 8px",
-            fontFamily: "'Lato',sans-serif",
-            letterSpacing: "0.08em",
-            whiteSpace: "nowrap",
-          }}
-        >
-          ⏳ UNDER REVIEW
-        </span>
-      );
+      return <span style={{ fontSize: 9, fontWeight: 700, color: "#b45309", background: "rgba(245,158,11,.08)", border: "0.5px solid rgba(245,158,11,.3)", padding: "3px 8px", fontFamily: "'Lato',sans-serif", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>⏳ UNDER REVIEW</span>;
     return null;
   };
 
   /* ─── Card footer CTA ─────────────────────────────────────── */
   const renderFooter = () => {
-    // 1. Fulfilled with a linked book → view/purchase for everyone
     if (bounty.status === "fulfilled" && bounty.linkedBookId) {
       return (
-        <a
-          href={`/book/preview?id=${bounty.linkedBookId}`}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            padding: "12px 16px",
-            background: GOLD,
-            color: NAVY,
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.09em",
-            textTransform: "uppercase",
-            fontFamily: "'Lato',sans-serif",
-            textDecoration: "none",
-            transition: "background .18s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = GOLDD)}
-          onMouseLeave={(e) => (e.currentTarget.style.background = GOLD)}
-        >
+        <a href={`/book/preview?id=${bounty.linkedBookId}`}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "12px 16px", background: GOLD, color: NAVY, fontSize: 11, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", textDecoration: "none", transition: "background .18s" }}
+          onMouseEnter={e => (e.currentTarget.style.background = GOLDD)}
+          onMouseLeave={e => (e.currentTarget.style.background = GOLD)}>
           📖 View &amp; Purchase
         </a>
       );
     }
-
-    // 2. Owner sees escrow info, never the bid button
     if (isOwner) {
       return (
         <div
@@ -1661,154 +1187,73 @@ export default function BountyCard({ bounty, user, highlighted }) {
           >
             Your bounty ·{" "}
             <strong style={{ color: NAVY }}>
-              ₦{Number(bounty.reward).toLocaleString("en-NG")}
+              `${displaySymbol}${fmtAmt(displayAmt, viewCurrency)}
             </strong>{" "}
-            in escrow
+            in escrow`
           </span>
         </div>
       );
     }
-
-    // 3. All slots filled (10/10) → closed for everyone
     if (allSlotsFilled) {
       return (
-        <div
-          style={{
-            padding: "12px 16px",
-            background: "rgba(13,34,68,.04)",
-            borderTop: "0.5px solid rgba(13,34,68,.1)",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "#888",
-              fontFamily: "'Lato',sans-serif",
-            }}
-          >
-            ✓ All slots filled — No more bids
-          </span>
+        <div style={{ padding: "12px 16px", background: "rgba(13,34,68,.04)", borderTop: "0.5px solid rgba(13,34,68,.1)", display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#888", fontFamily: "'Lato',sans-serif" }}>✓ All slots filled — No more bids</span>
         </div>
       );
     }
-
-    // 4. This user already bid AND their submission is under review
     if (alreadyBid && bounty.status === "pending_approval") {
       return (
-        <div
-          style={{
-            padding: "12px 16px",
-            background: "rgba(245,158,11,.05)",
-            borderTop: "0.5px solid rgba(245,158,11,.2)",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "#b45309",
-              fontFamily: "'Lato',sans-serif",
-            }}
-          >
-            ⏳ Under Review — bidding paused
-          </span>
+        <div style={{ padding: "12px 16px", background: "rgba(245,158,11,.05)", borderTop: "0.5px solid rgba(245,158,11,.2)", display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#b45309", fontFamily: "'Lato',sans-serif" }}>⏳ Under Review — bidding paused</span>
         </div>
       );
     }
-
-    // 5. This user already bid (but not under review) → prompt to upload
     if (alreadyBid) {
       return (
-        <a
-          href="/library/publish"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            padding: "12px 16px",
-            background: "#16a34a",
-            color: "#fff",
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            fontFamily: "'Lato',sans-serif",
-            textDecoration: "none",
-            transition: "background .18s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "#15803d")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "#16a34a")}
-        >
+        <a href="/library/publish"
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "12px 16px", background: "#16a34a", color: "#fff", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", textDecoration: "none", transition: "background .18s" }}
+          onMouseEnter={e => (e.currentTarget.style.background = "#15803d")}
+          onMouseLeave={e => (e.currentTarget.style.background = "#16a34a")}>
           📤 Upload Your Fulfillment
         </a>
       );
     }
+   const isExpired = bounty.deadline && getDeadlineInfo(bounty.deadline).label === "Expired";
 
-    // 6. Everyone else (including non-bidders on pending_approval bounties
-    //    that still have open slots) → show Bid button
-    return (
-      <button
-        onClick={() => setPanel("bid")}
-        style={{
-          width: "100%",
-          padding: "13px 16px",
-          background: NAVY,
-          color: "#fff",
-          border: "none",
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: "0.09em",
-          textTransform: "uppercase",
-          fontFamily: "'Lato',sans-serif",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-          transition: "background .18s",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "#1a3a6e")}
-        onMouseLeave={(e) => (e.currentTarget.style.background = NAVY)}
-      >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#fff"
-          strokeWidth="2.5"
-        >
-          <path d="M22 2L11 13" />
-          <path d="M22 2L15 22 11 13 2 9l20-7z" />
-        </svg>
+if (isExpired) {
+  return (
+    <div style={{ padding: "12px 16px", background: "rgba(13,34,68,.04)", borderTop: "0.5px solid rgba(13,34,68,.1)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, opacity: 0.5 }}>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span style={{ fontSize: 11, fontWeight: 700, color: "#888", fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em" }}>BOUNTY EXPIRED</span>
+    </div>
+  );
+}
+
+return (
+  <button onClick={() => setPanel("bid")}
+    style={{ width: "100%", padding: "13px 16px", background: NAVY, color: "#fff", border: "none", fontSize: 11, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "background .18s" }}
+    onMouseEnter={e => (e.currentTarget.style.background = "#1a3a6e")}
+    onMouseLeave={e => (e.currentTarget.style.background = NAVY)}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><path d="M22 2L11 13" /><path d="M22 2L15 22 11 13 2 9l20-7z" /></svg>
         Bid on Bounty
-        <span
-          style={{
-            marginLeft: 2,
-            background: GOLD,
-            color: NAVY,
-            fontSize: 9,
-            fontWeight: 900,
-            padding: "2px 7px",
-            borderRadius: 99,
-          }}
-        >
-          ₦{payout.toLocaleString("en-NG")}
+        <span style={{ marginLeft: 2, background: GOLD, color: NAVY, fontSize: 9, fontWeight: 900, padding: "2px 7px", borderRadius: 99 }}>
+        {displaySymbol}{fmtAmt(displayPayout, viewCurrency)}
         </span>
       </button>
     );
   };
 
+  /* ════════════════════════════════════════════════════════════
+     RENDER
+  ════════════════════════════════════════════════════════════ */
   return (
     <>
+      {/* ── KEYFRAMES (injected once per card, deduplicated by browser) ── */}
+      <style>{`
+        @keyframes fadeUp { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }
+        @keyframes spin    { to { transform:rotate(360deg) } }
+      `}</style>
+
       {/* ══ CARD ══════════════════════════════════════════════ */}
       <div
         style={{
@@ -1839,7 +1284,7 @@ export default function BountyCard({ bounty, user, highlighted }) {
           }}
         />
 
-        {/* ── HEADER: badges + ☰ menu ── */}
+        {/* ── HEADER ── */}
         <div
           style={{
             padding: "14px 14px 0",
@@ -1849,7 +1294,6 @@ export default function BountyCard({ bounty, user, highlighted }) {
             gap: 8,
           }}
         >
-          {/* Badges */}
           <div
             style={{
               display: "flex",
@@ -1879,7 +1323,7 @@ export default function BountyCard({ bounty, user, highlighted }) {
             <StatusPill />
           </div>
 
-          {/* ☰ Menu button */}
+          {/* ☰ Menu */}
           <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
             <button
               onClick={() => setMenuOpen((o) => !o)}
@@ -1901,7 +1345,6 @@ export default function BountyCard({ bounty, user, highlighted }) {
               <ListIcon color={menuOpen ? NAVY : "#999"} />
             </button>
 
-            {/* Dropdown */}
             {menuOpen && (
               <div
                 style={{
@@ -1916,7 +1359,6 @@ export default function BountyCard({ bounty, user, highlighted }) {
                   animation: "fadeUp .18s both",
                 }}
               >
-                {/* Header label */}
                 <div
                   style={{
                     padding: "8px 14px 6px",
@@ -1936,7 +1378,6 @@ export default function BountyCard({ bounty, user, highlighted }) {
                     {isOwner ? "Owner options" : "Actions"}
                   </span>
                 </div>
-
                 <div style={{ padding: "4px 0" }}>
                   {menuItems.map((item, i) =>
                     item.divider ? (
@@ -2028,7 +1469,6 @@ export default function BountyCard({ bounty, user, highlighted }) {
             gap: 9,
           }}
         >
-          {/* Title */}
           <h3
             style={{
               fontFamily: "'Playfair Display',serif",
@@ -2042,7 +1482,6 @@ export default function BountyCard({ bounty, user, highlighted }) {
             {bounty.title}
           </h3>
 
-          {/* Department */}
           {bounty.department && (
             <p
               style={{
@@ -2056,7 +1495,96 @@ export default function BountyCard({ bounty, user, highlighted }) {
             </p>
           )}
 
-          {/* Poster + meta */}
+          {/* ── ADD THIS ── */}
+          {bounty.description && (
+            <div
+              style={{
+                background: CREAM,
+                border: "0.5px solid rgba(184,150,62,.2)",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "#666",
+                  fontFamily: "'Lato',sans-serif",
+                  lineHeight: 1.65,
+                  margin: 0,
+                  padding: "8px 10px",
+                  display: descExpanded ? "block" : "-webkit-box",
+                  WebkitLineClamp: descExpanded ? "unset" : 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: descExpanded ? "visible" : "hidden",
+                  whiteSpace: descExpanded ? "pre-line" : "normal",
+                }}
+              >
+                {bounty.description}
+              </p>
+              {/* Only show toggle if description is long enough to be clamped */}
+              {bounty.description.length > 120 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDescExpanded((p) => !p);
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "5px 10px",
+                    background: "none",
+                    border: "none",
+                    borderTop: "0.5px solid rgba(184,150,62,.15)",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: GOLD,
+                    cursor: "pointer",
+                    fontFamily: "'Lato',sans-serif",
+                    letterSpacing: "0.06em",
+                    textAlign: "left",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background = "rgba(184,150,62,.06)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = "none")
+                  }
+                >
+                  {descExpanded ? (
+                    <>
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                      >
+                        <polyline points="18 15 12 9 6 15" />
+                      </svg>
+                      Show less
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                      >
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                      Show full requirements
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
+
           <div
             style={{
               display: "flex",
@@ -2107,7 +1635,7 @@ export default function BountyCard({ bounty, user, highlighted }) {
             )}
           </div>
 
-          {/* Proposal slots bar */}
+          {/* Slots bar */}
           <div>
             <div
               style={{
@@ -2151,7 +1679,7 @@ export default function BountyCard({ bounty, user, highlighted }) {
             </div>
           </div>
 
-          {/* Reward row */}
+          {/* ── REWARD ROW ── */}
           <div
             style={{
               display: "flex",
@@ -2160,19 +1688,66 @@ export default function BountyCard({ bounty, user, highlighted }) {
             }}
           >
             <div>
+              {/* Label row with currency pill */}
               <div
                 style={{
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  color: "#ccc",
-                  fontFamily: "'Lato',sans-serif",
-                  marginBottom: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginBottom: 3,
                 }}
               >
-                Bounty Reward
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "#ccc",
+                    fontFamily: "'Lato',sans-serif",
+                  }}
+                >
+                  Bounty Reward
+                </span>
+                {/* Currency pill — always visible */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowPicker(true);
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 3,
+                    fontSize: 8,
+                    fontWeight: 700,
+                    letterSpacing: "0.06em",
+                    background: isNGN
+                      ? "rgba(13,34,68,.07)"
+                      : "rgba(184,150,62,.15)",
+                    border: `0.5px solid ${isNGN ? "rgba(13,34,68,.15)" : "rgba(184,150,62,.4)"}`,
+                    color: isNGN ? "#888" : GOLD,
+                    padding: "2px 7px",
+                    cursor: "pointer",
+                    fontFamily: "'Lato',sans-serif",
+                    transition: "all .15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = GOLD;
+                    e.currentTarget.style.color = GOLD;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = isNGN
+                      ? "rgba(13,34,68,.15)"
+                      : "rgba(184,150,62,.4)";
+                    e.currentTarget.style.color = isNGN ? "#888" : GOLD;
+                  }}
+                >
+                  {currInfo.flag} {viewCurrency}
+                </button>
               </div>
+
+              {/* Big amount */}
               <div
                 style={{
                   fontFamily: "'Playfair Display',serif",
@@ -2182,8 +1757,25 @@ export default function BountyCard({ bounty, user, highlighted }) {
                   lineHeight: 1,
                 }}
               >
-                ₦{Number(bounty.reward).toLocaleString("en-NG")}
+                {displaySymbol}
+                {fmtAmt(displayAmt, viewCurrency)}
               </div>
+
+              {/* ≈ NGN secondary line */}
+              {showSecondary && (
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "#bbb",
+                    fontFamily: "'Lato',sans-serif",
+                    marginTop: 2,
+                  }}
+                >
+                  ≈ ₦{rewardNGN.toLocaleString("en-NG")} NGN
+                </div>
+              )}
+
+              {/* Earns line */}
               <div
                 style={{
                   fontSize: 11,
@@ -2192,9 +1784,17 @@ export default function BountyCard({ bounty, user, highlighted }) {
                   marginTop: 2,
                 }}
               >
-                earns ₦{payout.toLocaleString("en-NG")}
+                earns {displaySymbol}
+                {fmtAmt(displayPayout, viewCurrency)}
+                {showSecondary && (
+                  <span style={{ color: "#ccc" }}>
+                    {" "}
+                    (≈ ₦{payoutNGN.toLocaleString("en-NG")})
+                  </span>
+                )}
               </div>
             </div>
+
             {bounty.deadline && (
               <span
                 style={{
@@ -2246,7 +1846,19 @@ export default function BountyCard({ bounty, user, highlighted }) {
       )}
       {panel === "share" && <SharePanel bounty={bounty} onClose={closePanel} />}
       {panel === "bid" && user && typeof document !== "undefined" && (
-        <BidModal bounty={bounty} user={user} onClose={closePanel} />
+        <BidModal
+          bounty={bounty}
+          user={user}
+          onClose={closePanel}
+          viewCurrency={viewCurrency}
+        />
+      )}
+      {showPicker && typeof document !== "undefined" && (
+        <CurrencyPickerPanel
+          currentCurrency={viewCurrency}
+          onSelect={handleCurrencyChange}
+          onClose={() => setShowPicker(false)}
+        />
       )}
     </>
   );

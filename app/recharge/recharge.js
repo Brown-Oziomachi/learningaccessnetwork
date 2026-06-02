@@ -15,6 +15,7 @@ import {
 import { auth, db } from "@/lib/firebaseConfig";
 import { useSearchParams } from "next/navigation";
 import Script from "next/script";
+import { useCurrency } from "../context/CurrencyContext";
 
 /* ─── colour tokens (matching transfer page) ──────────────────── */
 const NAVY  = "#0d2244";
@@ -287,7 +288,7 @@ function NetworkBtn({ network, selected, onClick }) {
 }
 
 /* ─── Success Screen (transfer page aesthetic) ─────────────────── */
-function SuccessScreen({ type, network, phone, amount, plan, txRef, paymentMethod, onReset }) {
+function SuccessScreen({ type, network, phone, amount, plan, txRef, paymentMethod, onReset, fmt }) {
   const net = NETWORKS.find((n) => n.id === network);
   const typeLabel = type === "airtime" ? "Airtime" : type === "data" ? "Data Bundle" : type === "electricity" ? "Electricity" : "TV/Cable";
 
@@ -332,7 +333,7 @@ function SuccessScreen({ type, network, phone, amount, plan, txRef, paymentMetho
         )}
         <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0 0", alignItems: "center" }}>
           <span style={{ fontSize: "12px", color: "#aaa" }}>Amount</span>
-          <span style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", fontWeight: 700, color: NAVY }}>₦{Number(amount || 0).toLocaleString()}</span>
+          <span style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", fontWeight: 700, color: NAVY }}>{fmt(Number(amount || 0))}</span>
         </div>
         {txRef && (
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", paddingTop: "8px", borderTop: "0.5px solid rgba(184,150,62,0.12)", marginTop: "8px" }}>
@@ -351,6 +352,7 @@ function SuccessScreen({ type, network, phone, amount, plan, txRef, paymentMetho
 
 /* ─── MAIN RECHARGE CLIENT ─────────────────────────────────────── */
 export default function RechargeClient() {
+      const { fmt } = useCurrency();
   const searchParams = useSearchParams();
   const [seller, setSeller]   = useState(null);
   const [loading, setLoading] = useState(true);
@@ -575,7 +577,8 @@ useEffect(() => {
     setProcessing(true); setError("");
     const amt = finalAmount; const net = selectedNetwork;
     try {
-      if (amt > walletBalance) throw new Error(`Insufficient balance. You need ₦${(amt || 0).toLocaleString()}.`);
+      if (amt > walletBalance) throw new Error(`Insufficient balance. You need ${fmt(amt || 0)}.`);
+
       const { ref, data: flwData } = await callFlutterwaveVTU();
       const sellerRef = doc(db, "sellers", seller.uid);
       const rechargeRef = doc(collection(db, "recharges"));
@@ -719,7 +722,7 @@ useEffect(() => {
   );
 
   /* ─── helper: plan select button ─────────────────────── */
-  const PlanBtn = ({ label: lbl, sub, price, selected, onClick }) => (
+  const PlanBtn = ({ label: lbl, sub, price, selected, onClick, fmt }) => (
     <button onClick={onClick} style={{
       padding: "10px 12px", border: `0.5px solid ${selected ? NAVY : "#e5ddd0"}`,
       background: selected ? NAVY : CREAM, color: selected ? "#fff" : NAVY,
@@ -728,7 +731,7 @@ useEffect(() => {
     }}>
       <p style={{ fontWeight: 700, margin: "0 0 2px", fontSize: "12px" }}>{lbl}</p>
       {sub && <p style={{ margin: "0 0 4px", fontSize: "10px", opacity: 0.6 }}>{sub}</p>}
-      {price !== undefined && <p style={{ fontWeight: 700, margin: 0, fontSize: "12px", color: selected ? GOLDD : GOLD }}>₦{price.toLocaleString()}</p>}
+      {price !== undefined && <p style={{ fontWeight: 700, margin: 0, fontSize: "12px", color: selected ? GOLDD : GOLD }}>{fmt(price)}</p>}
     </button>
   );
 
@@ -769,7 +772,7 @@ useEffect(() => {
               </p>
               {/* stat strip */}
               <div style={{ borderTop: "0.5px solid rgba(184,150,62,0.2)", marginTop: "28px", display: "flex", flexWrap: "wrap" }}>
-                {[["4", "Networks"], ["Instant", "Delivery"], ["TV+Elec", "Bills Too"], ["₦50", "Min Top-Up"]].map(([val, lbl]) => (
+                {[["4", "Networks"], ["Instant", "Delivery"], ["TV+Elec", "Bills Too"], [fmt(50), "Min Top-Up"]].map(([val, lbl]) => (
                   <div key={lbl} style={{ flex: "1 1 100px", padding: "18px 16px", borderRight: "0.5px solid rgba(184,150,62,0.12)" }}>
                     <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: "#fff" }}>{val}</div>
                     <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", marginTop: "3px" }}>{lbl}</div>
@@ -801,7 +804,7 @@ useEffect(() => {
                     <div style={{ borderTop: "0.5px solid rgba(184,150,62,0.15)", paddingTop: "12px" }}>
                       <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", marginBottom: "3px" }}>Available Balance</p>
                       <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "28px", fontWeight: 700, color: "#fff", margin: 0 }}>
-                        ₦{(seller?.accountBalance || 0).toLocaleString()}
+                        {fmt(seller?.accountBalance || 0)}
                       </p>
                     </div>
                   </div>
@@ -844,7 +847,7 @@ useEffect(() => {
                               </p>
                             </div>
                             <p style={{ fontSize: "11px", fontWeight: 700, color: "#dc2626", flexShrink: 0 }}>
-                              -₦{(r.amount || 0).toLocaleString()}
+                              -{fmt(r.amount || 0)}
                             </p>
                           </div>
                         );
@@ -977,7 +980,7 @@ useEffect(() => {
                                         fontFamily: "'Lato', sans-serif", transition: "all 0.15s", borderRadius: 0,
                                       }}
                                     >
-                                      ₦{amt.toLocaleString()}
+                                      {fmt(amt)}
                                     </button>
                                   ))}
                                 </div>
@@ -1026,6 +1029,7 @@ useEffect(() => {
                                         price={plan.price}
                                         selected={selectedPlan?.id === plan.id}
                                         onClick={() => setSelectedPlan(plan)}
+                                        fmt={fmt}   // ← ADD THIS
                                       />
                                     ))}
                                   </div>
@@ -1121,12 +1125,12 @@ onClick={() => {
                             </div>
 
                             <div style={{ marginBottom: "18px" }}>
-                              <label style={label}>Amount (₦)</label>
+                            <label style={label}>Amount ({fmt(1).replace(/[\d,\.]+/, "").trim() || "₦"})</label>
                               <div style={{ position: "relative" }}>
                                 <span style={{ position: "absolute", left: "13px", top: "50%", transform: "translateY(-50%)", color: "#aaa", fontWeight: 700, fontSize: "14px" }}>₦</span>
                                 <input
                                   type="number"
-                                  placeholder="Min ₦500"
+                                  placeholder={`Min ${fmt(500)}`}                                 
                                   value={elecAmount}
                                   onFocus={() => setFocusElecAmt(true)}
                                   onBlur={() => setFocusElecAmt(false)}
@@ -1215,6 +1219,7 @@ onClick={() => {
                                         price={plan.price}
                                         selected={selectedTvPlan?.id === plan.id}
                                         onClick={() => setSelectedTvPlan(plan)}
+                                        fmt={fmt}   // ← ADD THIS
                                       />
                                     ))}
                                   </div>
@@ -1234,7 +1239,7 @@ onClick={() => {
                               </p>
                             </div>
                             <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", fontWeight: 700, color: NAVY, margin: 0 }}>
-                              ₦{finalAmount.toLocaleString()}
+                              {fmt(finalAmount)}
                             </p>
                           </div>
                         )}
@@ -1345,7 +1350,7 @@ onClick={() => {
                         {/* Total */}
                         <div style={{ borderTop: `0.5px solid rgba(184,150,62,0.2)`, paddingTop: "14px", marginTop: "6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <span style={{ fontSize: "12px", fontWeight: 700, color: NAVY }}>Total</span>
-                          <span style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: NAVY }}>₦{finalAmount.toLocaleString()}</span>
+                          <span style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: NAVY }}>{fmt(finalAmount)}</span>
                         </div>
 
                         {/* Wallet status */}
@@ -1353,7 +1358,7 @@ onClick={() => {
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                             <Wallet size={13} style={{ color: hasEnoughBalance ? "#16a34a" : "#d97706" }} />
                             <span style={{ fontSize: "11px", fontWeight: 700, color: hasEnoughBalance ? "#14532d" : "#92400e" }}>
-                              Wallet: ₦{walletBalance.toLocaleString()}
+                              Wallet: {fmt(walletBalance)}
                             </span>
                           </div>
                           <span style={{ fontSize: "10px", fontWeight: 700, color: hasEnoughBalance ? "#16a34a" : "#d97706", letterSpacing: "0.05em", textTransform: "uppercase" }}>
@@ -1380,14 +1385,14 @@ onClick={() => {
                         <div>
                           <div style={{ background: CREAM, border: `0.5px solid rgba(184,150,62,0.25)`, padding: "10px 14px", marginBottom: "10px" }}>
                             <p style={{ fontSize: "11px", color: "#8a6d1e", textAlign: "center", margin: 0, lineHeight: 1.6 }}>
-                              Your wallet balance (₦{walletBalance.toLocaleString()}) is insufficient.
-                              Pay ₦{finalAmount.toLocaleString()} directly with your card.
+                                Your wallet balance ({fmt(walletBalance)}) is insufficient.
+                                Pay {fmt(finalAmount)} directly with your card.
                             </p>
                           </div>
                           <button onClick={payWithCard} disabled={processing} style={goldBtn(processing)}>
                             {processing
                               ? <><div style={{ width: "14px", height: "14px", border: "2px solid rgba(13,34,68,0.3)", borderTopColor: NAVY, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> Processing…</>
-                              : <><CreditCard size={14} /> Pay ₦{finalAmount.toLocaleString()} with Card</>
+                              : <><CreditCard size={14} /> Pay {fmt(finalAmount)} with Card</>
                             }
                           </button>
                         </div>
@@ -1397,16 +1402,12 @@ onClick={() => {
 
                   {/* STEP 3 — Success */}
                   {step === 3 && (
-                    <SuccessScreen
-                      type={tab}
-                      network={selectedNetwork}
-                      phone={phone}
-                      amount={finalAmount}
-                      plan={tab === "tv" ? selectedTvPlan : tab === "electricity" ? selectedElecPlan : selectedPlan}
-                      txRef={txRef}
-                      paymentMethod={paymentMethod}
-                      onReset={resetForm}
-                    />
+                   <SuccessScreen
+                    type={tab} network={selectedNetwork} phone={phone} amount={finalAmount}
+                    plan={tab === "data" ? selectedPlan : tab === "tv" ? selectedTvPlan : tab === "electricity" ? selectedElecPlan : null}
+                    txRef={txRef} paymentMethod={paymentMethod} onReset={resetForm}
+                    fmt={fmt}
+                  />
                   )}
 
                 </div>

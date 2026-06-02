@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebaseConfig';
 import { generateShortCode } from '@/lib/auth/authHelpers'; 
+import { useCurrency } from '@/app/context/CurrencyContext';
 
 const NAVY  = "#0d2244";
 const GOLD  = "#b8963e";
@@ -113,6 +114,7 @@ function ReferralCard({ step, title, desc, badge }) {
 
 export default function ReferralClient() {
     const { currentUser } = useAuth();
+    const { fmt } = useCurrency();
     const [user, setUser]               = useState(null);
     const [copied, setCopied]           = useState(false);
     const [showBalance, setShowBalance] = useState(true);
@@ -309,13 +311,13 @@ export default function ReferralClient() {
     const steps = [
         { step: 1, title: 'Share Your Link', desc: 'Copy your unique referral link and share via WhatsApp, email or social media.', badge: 'Start here' },
         { step: 2, title: 'Friend Signs Up', desc: 'Your friend creates an account, verifies their email & makes a ₦1,000+ purchase.', badge: 'Qualifying action' },
-        { step: 3, title: 'Claim to Wallet', desc: 'You earn ₦500 and your friend gets ₦100 bonus. Claim instantly to your seller wallet.', badge: '₦500 per referral' },
+        { step: 3, title: 'Claim to Wallet', desc: 'You earn ₦500 and your friend gets ₦100 bonus. Claim instantly to your seller wallet.', badge: `${fmt(500)} per referral` },
     ];
 
     const requirements = [
         'Friend must sign up using your referral link',
         'Friend must verify their email address',
-        'Friend must make first purchase of ₦1,000+ within 30 days',
+        `Friend must make first purchase of ${fmt(1000)}+ within 30 days`,
         'Rewards credited within 24 hours after qualification',
         'Claim anytime — funds go directly into your seller wallet',
     ];
@@ -463,7 +465,7 @@ export default function ReferralClient() {
                             letterSpacing: '-0.5px', margin: '0 0 12px',
                         }}>
                             Hi, {displayName} 👋<br />
-                            <span style={{ color: GOLDD }}>Invite friends</span> &amp; earn ₦500
+                            <span style={{ color: GOLDD }}>Invite friends</span> &amp; earn {fmt(500)}
                         </h1>
 
                         <p style={{
@@ -472,7 +474,7 @@ export default function ReferralClient() {
                             maxWidth: '540px', lineHeight: 1.75,
                             fontWeight: 300, margin: '0 0 24px',
                         }}>
-                            Share your unique link — each friend who signs up and makes a qualifying purchase earns you ₦500 straight to your wallet.
+                            Share your unique link — each friend who signs up and makes a qualifying purchase earns you {fmt(500)} straight to your wallet.
                         </p>
 
                         {/* Referral Link Bar */}
@@ -523,7 +525,7 @@ export default function ReferralClient() {
                             <CheckCircle2 size={18} style={{ color: '#16a34a', flexShrink: 0, marginTop: '1px' }} />
                             <div>
                                 <p style={{ fontWeight: 700, color: '#15803d', margin: '0 0 2px', fontSize: '13px', fontFamily: "'Lato',sans-serif" }}>Reward Claimed! 🎉</p>
-                                <p style={{ fontSize: '12px', color: '#166534', margin: 0, fontFamily: "'Lato',sans-serif" }}>₦{claimSuccessAmount.toLocaleString()} has been added to your seller wallet.</p>
+                                <p style={{ fontSize: '12px', color: '#166534', margin: 0, fontFamily: "'Lato',sans-serif" }}>{fmt(claimSuccessAmount)} has been added to your seller wallet.</p>
                             </div>
                         </div>
                     )}
@@ -542,10 +544,10 @@ export default function ReferralClient() {
 
                             {/* Stats */}
                             <div className="ref-stats-grid">
-                                <StatCard icon={<TrendingUp size={16} style={{ color: GOLD }} />} label="Total Earnings" value={showBalance ? `₦${referralStats.totalEarnings.toLocaleString()}` : '₦****'} highlight />
+                                <StatCard icon={<TrendingUp size={16} style={{ color: GOLD }} />} label="Total Earnings" value={showBalance ? fmt(referralStats.totalEarnings) : '₦****'} highlight />
                                 <StatCard icon={<Users size={16} style={{ color: GOLD }} />} label="Total Referrals" value={referralStats.totalReferrals} />
                                 <StatCard icon={<CheckCircle2 size={16} style={{ color: GOLD }} />} label="Successful" value={referralStats.successfulReferrals} />
-                                <StatCard icon={<Wallet size={16} style={{ color: GOLD }} />} label="Claimed" value={`₦${referralStats.claimedEarnings.toLocaleString()}`} />
+                                <StatCard icon={<Wallet size={16} style={{ color: GOLD }} />} label="Claimed" value={showBalance ? fmt(referralStats.claimedEarnings) : '₦****'} />
                             </div>
 
                             {/* Claim card */}
@@ -564,7 +566,7 @@ export default function ReferralClient() {
                                     <div style={{ minWidth: 0 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                             <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(26px,6vw,48px)', fontWeight: 700, color: '#fff', margin: 0, lineHeight: 1 }}>
-                                                {showBalance ? `₦${referralStats.unclaimedEarnings.toLocaleString()}` : '₦****'}
+                                                {showBalance ? fmt(referralStats.pendingEarnings) : '₦****'}
                                             </p>
                                             <button onClick={() => setShowBalance(!showBalance)}
                                                 style={{ width: '32px', height: '32px', flexShrink: 0, border: '0.5px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)' }}>
@@ -573,7 +575,7 @@ export default function ReferralClient() {
                                         </div>
                                         <p style={{ fontSize: '11px', color: 'rgba(184,150,62,0.7)', marginTop: '5px', fontFamily: "'Lato',sans-serif" }}>Unclaimed rewards ready to transfer</p>
                                         {referralStats.claimedEarnings > 0 && (
-                                            <p style={{ fontSize: '11px', color: '#86efac', marginTop: '3px', fontFamily: "'Lato',sans-serif" }}>✅ ₦{referralStats.claimedEarnings.toLocaleString()} already added to wallet</p>
+                                            <p style={{ fontSize: '11px', color: '#86efac', marginTop: '3px', fontFamily: "'Lato',sans-serif" }}>✅{fmt(referralStats.claimedEarnings)} already added to wallet</p>
                                         )}
                                     </div>
 
@@ -613,7 +615,7 @@ export default function ReferralClient() {
                                     {claiming
                                         ? <><Loader2 size={15} style={{ animation: 'spin 0.8s linear infinite' }} />Claiming…</>
                                         : referralStats.unclaimedEarnings > 0
-                                        ? <><Wallet size={15} />Claim ₦{referralStats.unclaimedEarnings.toLocaleString()} to Wallet</>
+                                        ? <><Wallet size={15} />Claim ₦{fmt(referralStats.unclaimedEarnings)} to Wallet</>
                                         : <><Wallet size={15} />{referralStats.totalEarnings > 0 ? 'All rewards claimed' : 'No rewards yet'}</>
                                     }
                                 </button>
@@ -700,12 +702,12 @@ export default function ReferralClient() {
                                     <Sparkles size={10} style={{ color: GOLD }} />
                                     <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: GOLD, fontFamily: "'Lato',sans-serif" }}>Earnings Potential</span>
                                 </div>
-                                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(20px,4vw,28px)', fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>Up to ₦5,000,000</p>
+                                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 'clamp(20px,4vw,28px)', fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>Up to {fmt(5000000)}</p>
                                 <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '16px', fontFamily: "'Lato',sans-serif", lineHeight: 1.6 }}>No cap on earnings. Refer as many friends as you like.</p>
                                 {[
-                                    ['10 referrals', '₦5,000'],
-                                    ['50 referrals', '₦25,000'],
-                                    ['100 referrals', '₦50,000'],
+                                    ['10 referrals', fmt(5000)],
+                                    ['50 referrals', fmt(25000)],
+                                    ['100 referrals', fmt(50000)],
                                 ].map(([k, v]) => (
                                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.06)', gap: '8px' }}>
                                         <span style={{ color: 'rgba(255,255,255,0.5)', fontFamily: "'Lato',sans-serif" }}>{k}</span>
@@ -728,16 +730,16 @@ export default function ReferralClient() {
                                 {[
                                     ['Total referrals',   referralStats.totalReferrals],
                                     ['Successful',        referralStats.successfulReferrals],
-                                    ['Claimed to wallet', `₦${referralStats.claimedEarnings.toLocaleString()}`],
-                                    ['Pending',           `₦${referralStats.pendingEarnings.toLocaleString()}`],
-                                    ['Total earned',      `₦${referralStats.totalEarnings.toLocaleString()}`],
+                                    ['Claimed to wallet', fmt(referralStats.claimedEarnings)],
+                                    ['Pending',           fmt(referralStats.pendingEarnings)],
+                                    ['Total earned',      fmt(referralStats.totalEarnings)],
                                 ].map(([k, v], i, arr) => (
                                     <div key={k} style={{
                                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                                         fontSize: '12px', padding: '8px 0', gap: '8px',
                                         borderBottom: i < arr.length - 1 ? '0.5px solid #f0ebe0' : 'none',
                                         borderTop: i === arr.length - 1 ? '0.5px solid #e5ddd0' : 'none',
-                                        marginTop: i === arr.length - 1 ? '4px' : 0,
+                                        marginBottom: i === arr.length - 1 ? '4px' : 0,
                                         paddingTop: i === arr.length - 1 ? '12px' : '8px',
                                     }}>
                                         <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{k}</span>

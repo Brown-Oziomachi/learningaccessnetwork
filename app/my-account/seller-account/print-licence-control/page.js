@@ -27,6 +27,7 @@ import {
   FileText,
   AlertCircle,
 } from "lucide-react";
+import { useCurrency } from "@/app/context/CurrencyContext";
 
 /* ── HARDCODED COLORS (fix visibility) ─────────────────────────────────── */
 const COLORS = {
@@ -107,6 +108,7 @@ export default function PrintLicensingControl({ user }) {
   const [loading, setLoading] = useState(true);
   const [togglingId, setTogglingId] = useState(null);
   const [toast, setToast] = useState(null);
+  const { fmt } = useCurrency();
   const [stats, setStats] = useState({
     enabled: 0,
     disabled: 0,
@@ -338,7 +340,7 @@ export default function PrintLicensingControl({ user }) {
           },
           {
             label: "Royalties Earned",
-            value: `₦${stats.revenue.toLocaleString()}`,
+            value: fmt(stats.revenue),
             color: COLORS.gold,
             icon: <Zap size={16} />,
           },
@@ -571,7 +573,7 @@ export default function PrintLicensingControl({ user }) {
                         fontWeight: 700,
                       }}
                     >
-                      ₦{Number(book.price || 0).toLocaleString()}
+                      {fmt(Number(book.price || 0))}
                     </td>
                     <td style={{ padding: "14px 16px" }}>
                       <span

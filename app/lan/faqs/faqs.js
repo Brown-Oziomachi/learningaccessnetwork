@@ -173,14 +173,14 @@ export default function FAQClient() {
                             </p>
 
                             <div className="anim-up-3" style={{ display:"flex", flexWrap:"wrap", gap:"12px" }}>
-                                <Link href="/referrals"
+                                <Link href="/ref/invite-friends"
                                     style={{ display:"inline-flex", alignItems:"center", gap:"8px", padding:"13px 28px", background: GOLD, color: NAVY, fontSize:"13px", fontWeight:700, fontFamily:"'Lato',sans-serif", letterSpacing:"0.06em", textDecoration:"none", transition:"background 0.18s" }}
                                     onMouseEnter={e => e.currentTarget.style.background=GOLDD}
                                     onMouseLeave={e => e.currentTarget.style.background=GOLD}
                                 >
                                     Get your link
                                 </Link>
-                                <Link href="/documents"
+                                <Link href="/"
                                     style={{ display:"inline-flex", alignItems:"center", gap:"8px", padding:"13px 28px", border:"0.5px solid rgba(255,255,255,0.2)", color:"rgba(245,240,232,0.85)", fontSize:"13px", fontWeight:700, fontFamily:"'Lato',sans-serif", letterSpacing:"0.06em", textDecoration:"none", transition:"background 0.18s" }}
                                     onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.07)"}
                                     onMouseLeave={e => e.currentTarget.style.background="transparent"}

@@ -8,6 +8,7 @@ import {
     FileText, AlertCircle, Sparkles, ChevronRight, Library,
 } from "lucide-react";
 import Link from "next/link";
+import { useCurrency } from '@/app/context/CurrencyContext';
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -54,7 +55,7 @@ export default function MySubmissions() {
     const [loading, setLoading] = useState(true);
     const [showBanner, setShowBanner] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
-
+    const { fmt } = useCurrency();
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         if (params.get("status") === "submitted") {
@@ -320,7 +321,7 @@ export default function MySubmissions() {
                                                         </span>
                                                         {book.price && (
                                                             <span style={{ fontSize: "12px", fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>
-                                                                ₦{Number(book.price).toLocaleString()}
+                                                                {fmt(Number(book.price))}
                                                             </span>
                                                         )}
                                                         {book.category && (
@@ -423,7 +424,7 @@ export default function MySubmissions() {
                                                     </p>
                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                                                         <span style={{ fontSize: "12px", fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>
-                                                            ₦{Number(book.price || 0).toLocaleString()}
+                                                            {fmt(Number(book.price || 0))}
                                                         </span>
                                                         {book.courseCode && (
                                                             <span style={{ fontSize: "9px", fontWeight: 700, background: CREAM, border: "0.5px solid #e5ddd0", color: GOLD, padding: "2px 6px", fontFamily: "'Lato',sans-serif" }}>

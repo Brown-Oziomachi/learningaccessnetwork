@@ -15,6 +15,7 @@ import { uploadImageToCloudinary } from "@/lib/uploadImageToCloudinary";
 import PrintLicensingControl from "./print-licence-control/page";
 import BountyApprovalModal from "@/components/BountyApprovalModal";
 import BountyDashboardCard from "./Bounty-cashboard-card/page";
+import { createPortal } from "react-dom";
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -23,195 +24,223 @@ const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
 const BG = "#f5f1ea";
 
+const CURRENCY_DISPLAY = {
+    NGN: { symbol: "₦", flag: "🇳🇬", name: "Nigerian Naira" },
+    GHS: { symbol: "GH₵", flag: "🇬🇭", name: "Ghanaian Cedi" },
+    KES: { symbol: "KSh", flag: "🇰🇪", name: "Kenyan Shilling" },
+    UGX: { symbol: "USh", flag: "🇺🇬", name: "Ugandan Shilling" },
+    TZS: { symbol: "TSh", flag: "🇹🇿", name: "Tanzanian Shilling" },
+    ZAR: { symbol: "R", flag: "🇿🇦", name: "South African Rand" },
+    XOF: { symbol: "CFA", flag: "🌍", name: "West African CFA" },
+    XAF: { symbol: "CFA", flag: "🌍", name: "Central African CFA" },
+    EGP: { symbol: "E£", flag: "🇪🇬", name: "Egyptian Pound" },
+    MAD: { symbol: "DH", flag: "🇲🇦", name: "Moroccan Dirham" },
+    ETB: { symbol: "Br", flag: "🇪🇹", name: "Ethiopian Birr" },
+    ZMW: { symbol: "ZK", flag: "🇿🇲", name: "Zambian Kwacha" },
+    RWF: { symbol: "RF", flag: "🇷🇼", name: "Rwandan Franc" },
+    MWK: { symbol: "MK", flag: "🇲🇼", name: "Malawian Kwacha" },
+    BWP: { symbol: "P", flag: "🇧🇼", name: "Botswana Pula" },
+    NAD: { symbol: "N$", flag: "🇳🇦", name: "Namibian Dollar" },
+    CDF: { symbol: "FC", flag: "🇨🇩", name: "Congolese Franc" },
+};
+
+const NGN_RATES = {
+    NGN: 1, GHS: 0.010, KES: 0.11, UGX: 2.85, TZS: 2.62, RWF: 1.38, ZMW: 0.028,
+    MWK: 1.77, EGP: 0.051, MAD: 0.105, ZAR: 0.019, XOF: 0.656, XAF: 0.656,
+    ETB: 0.057, BWP: 0.014, NAD: 0.019, CDF: 2.85,
+};
+
+function convertFromNGN(ngnAmt, toCurrency) { return ngnAmt * (NGN_RATES[toCurrency] ?? 1); }
+function fmtAmt(amount, currency) { return Math.round(amount).toLocaleString(); }
+function displayCurrency(ngnAmt, currency, currInfo) {
+    if (currency === "NGN") return `₦${Math.round(ngnAmt).toLocaleString()}`;
+    const converted = convertFromNGN(ngnAmt, currency);
+    return `${currInfo.symbol}${fmtAmt(converted, currency)}`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CURRENCY PICKER MODAL
+══════════════════════════════════════════════════════════════ */
+function CurrencyPickerModal({ currentCurrency, onSelect, onClose }) {
+    const currencies = Object.entries(CURRENCY_DISPLAY);
+    if (typeof document === "undefined") return null;
+    return createPortal(
+        <div onClick={onClose} style={{
+            position: "fixed", inset: 0, background: "rgba(7,19,31,.7)",
+            zIndex: 1400, display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 24, backdropFilter: "blur(4px)",
+        }}>
+            <div onClick={e => e.stopPropagation()} style={{
+                background: "#fff", maxWidth: 440, width: "100%",
+                border: "0.5px solid #e5ddd0",
+                maxHeight: "82vh", display: "flex", flexDirection: "column",
+                animation: "fadeUp .25s cubic-bezier(.4,0,.2,1) both",
+            }}>
+                <div style={{ background: NAVY, padding: "18px 22px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+                    <div>
+                        <p style={{ fontSize: 9, color: GOLD, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", margin: "0 0 4px" }}>Display Currency</p>
+                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 700, color: "#fff", margin: 0 }}>Choose Your Currency</p>
+                    </div>
+                    <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,.45)", fontSize: 24, cursor: "pointer", lineHeight: 1 }}>×</button>
+                </div>
+                <div style={{ padding: "10px 18px", background: "rgba(184,150,62,.07)", borderBottom: "0.5px solid rgba(184,150,62,.15)", flexShrink: 0 }}>
+                    <p style={{ fontSize: 11, color: "#a16207", fontFamily: "'Lato',sans-serif", margin: 0, lineHeight: 1.6 }}>
+                        All amounts are approximate conversions from NGN. Payouts are always processed in NGN.
+                    </p>
+                </div>
+                <div style={{ overflowY: "auto", padding: "12px 14px 18px", flex: 1 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        {currencies.map(([code, info]) => {
+                            const isActive = code === currentCurrency;
+                            return (
+                                <button key={code} onClick={() => { onSelect(code); onClose(); }}
+                                    style={{
+                                        display: "flex", alignItems: "center", gap: 10, padding: "11px 13px",
+                                        border: `1.5px solid ${isActive ? GOLD : "#e5ddd0"}`,
+                                        background: isActive ? CREAM : "#fff", cursor: "pointer", textAlign: "left",
+                                        transition: "all .15s", fontFamily: "'Lato',sans-serif",
+                                    }}>
+                                    <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{info.flag}</span>
+                                    <div style={{ minWidth: 0 }}>
+                                        <p style={{ fontSize: 12, fontWeight: 700, color: isActive ? GOLD : NAVY, margin: 0 }}>{info.symbol} {code}</p>
+                                        <p style={{ fontSize: 9, color: "#aaa", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{info.name}</p>
+                                    </div>
+                                    {isActive && (
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2.5" style={{ marginLeft: "auto", flexShrink: 0 }}>
+                                            <polyline points="20 6 9 17 4 12" />
+                                        </svg>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+}
+
 const FACULTY_TITLES = ["Dr.", "Prof.", "Mr.", "Mrs.", "Ms.", "Engr.", "Pharm.", "Barr.", "Lecturer"];
 
 const nigerianBanks = [
-    { name: "Access Bank", code: "044" },
-    { name: "Citibank", code: "023" },
-    { name: "Ecobank Nigeria", code: "050" },
-    { name: "Fidelity Bank", code: "070" },
-    { name: "First Bank of Nigeria", code: "011" },
-    { name: "First City Monument Bank (FCMB)", code: "214" },
-    { name: "Globus Bank", code: "00103" },
-    { name: "Guaranty Trust Bank (GTBank)", code: "058" },
-    { name: "Heritage Bank", code: "030" },
-    { name: "Keystone Bank", code: "082" },
-    { name: "Kuda Bank", code: "50211" },
-    { name: "Opay", code: "999992" },
-    { name: "Palmpay", code: "999991" },
-    { name: "Parallex Bank", code: "526" },
-    { name: "Polaris Bank", code: "076" },
-    { name: "Providus Bank", code: "101" },
-    { name: "Stanbic IBTC Bank", code: "221" },
-    { name: "Standard Chartered Bank", code: "068" },
-    { name: "Sterling Bank", code: "232" },
-    { name: "SunTrust Bank", code: "100" },
-    { name: "Union Bank of Nigeria", code: "032" },
-    { name: "United Bank for Africa (UBA)", code: "033" },
-    { name: "Unity Bank", code: "215" },
-    { name: "Wema Bank", code: "035" },
+    { name: "Access Bank", code: "044" }, { name: "Citibank", code: "023" },
+    { name: "Ecobank Nigeria", code: "050" }, { name: "Fidelity Bank", code: "070" },
+    { name: "First Bank of Nigeria", code: "011" }, { name: "First City Monument Bank (FCMB)", code: "214" },
+    { name: "Globus Bank", code: "00103" }, { name: "Guaranty Trust Bank (GTBank)", code: "058" },
+    { name: "Heritage Bank", code: "030" }, { name: "Keystone Bank", code: "082" },
+    { name: "Kuda Bank", code: "50211" }, { name: "Opay", code: "999992" },
+    { name: "Palmpay", code: "999991" }, { name: "Parallex Bank", code: "526" },
+    { name: "Polaris Bank", code: "076" }, { name: "Providus Bank", code: "101" },
+    { name: "Stanbic IBTC Bank", code: "221" }, { name: "Standard Chartered Bank", code: "068" },
+    { name: "Sterling Bank", code: "232" }, { name: "SunTrust Bank", code: "100" },
+    { name: "Union Bank of Nigeria", code: "032" }, { name: "United Bank for Africa (UBA)", code: "033" },
+    { name: "Unity Bank", code: "215" }, { name: "Wema Bank", code: "035" },
     { name: "Zenith Bank", code: "057" },
 ];
 
 /* ─── VerifiedFacultyBadge ───────────────────────────────────── */
 function VerifiedFacultyBadge({ user, seller }) {
-    const isVerified =
-        (user?.role === "lecturer" || user?.isLecturer === true) &&
-        user?.isVerified === true &&
+    const isFaculty = user?.role === "lecturer" || user?.isLecturer === true ||
+        user?.lecturerVerificationStatus === "pending" ||
+        user?.lecturerVerificationStatus === "approved";
+    if (!isFaculty) return null;
+
+    const isVerified = user?.isVerified === true &&
         user?.lecturerVerificationStatus !== "pending" &&
         user?.lecturerVerificationStatus !== "rejected";
 
-    if (!isVerified) return null;
-
-    return (
-        <span
-            title={`Verified Faculty — ${user?.department || seller?.title || "Academic Staff"}`}
-            aria-label="Verified Faculty"
+    const badgeColor = isVerified ? "#1d9bf0" : "#f59e0b"; // blue = verified, amber = pending
+    const tooltip = isVerified
+        ? `Verified Faculty — ${user?.department || seller?.title || "Academic Staff"}`
+        : "Faculty verification pending";
+     return (
+        <span title={tooltip}
+            aria-label={isVerified ? "Verified Faculty" : "Pending Faculty Verification"}
             style={{
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
                 width: "16px", height: "16px", borderRadius: "50%",
-                background: "#1d9bf0", flexShrink: 0, verticalAlign: "middle",
+                background: badgeColor, flexShrink: 0, verticalAlign: "middle",
                 marginLeft: "4px", cursor: "default",
-            }}
-        >
-            <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                <path d="M2 5.2L4 7.2L8 3" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+                boxShadow: isVerified ? "0 0 0 1.5px rgba(29,155,240,0.25)" : "none",
+                transition: "background 0.2s",
+            }}>
+            {isVerified ? (
+                <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                    <path d="M2 5.2L4 7.2L8 3" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            ) : (
+                <svg width="7" height="7" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                    <circle cx="5" cy="5" r="3.5" stroke="#fff" strokeWidth="2" />
+                </svg>
+            )}
         </span>
     );
 }
 
 function VerificationTimeline({ user, seller }) {
-    const NAVY = "#0d2244";
-    const GOLD = "#b8963e";
-    const CREAM = "#f5f0e8";
-
-    // Only render for faculty/lecturer roles
     const isFaculty =
-        user?.isLecturer === true ||
-        user?.role === "faculty" ||
-        user?.role === "lecturer" ||
+        user?.isLecturer === true || user?.role === "faculty" || user?.role === "lecturer" ||
         ["Dr.", "Prof.", "Mr.", "Mrs.", "Ms.", "Engr.", "Pharm.", "Barr.", "Lecturer"].includes(seller?.title);
-
     if (!isFaculty) return null;
 
-    // ── Determine current step index from Firestore fields ──
-    // Step 0: KYC Submitted   → user has basic profile filled
-    // Step 1: Faculty ID Verified → admin approved (lecturerVerificationStatus === 'approved' or 'verified')
-    // Step 2: Payout Active   → fully_verified + has bank details
     const isIdVerified =
         user?.lecturerVerificationStatus === "approved" ||
         user?.lecturerVerificationStatus === "verified" ||
         user?.isVerified === true;
-
     const isPayoutActive =
         isIdVerified &&
         (user?.bankDetails?.accountNumber || seller?.bankDetails?.accountNumber) &&
         user?.lecturerVerificationStatus !== "pending" &&
         user?.lecturerVerificationStatus !== "rejected";
-
     const currentStepIndex =
-        user?.verificationStatus === "fully_verified" || isPayoutActive ? 2
-            : isIdVerified ? 1
-                : 0;
+        user?.verificationStatus === "fully_verified" || isPayoutActive ? 2 : isIdVerified ? 1 : 0;
 
     const steps = [
         {
-            id: "kyc",
-            label: "KYC Submitted",
-            sublabel: "Profile & basic details",
-            icon: (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                </svg>
-            ),
+            id: "kyc", label: "KYC Submitted", sublabel: "Profile & basic details",
+            icon: (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>),
         },
         {
-            id: "id_verified",
-            label: "Faculty ID Verified",
-            sublabel: "University ID approved",
-            icon: (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="5" width="20" height="14" rx="2" />
-                    <path d="M2 10h20" />
-                </svg>
-            ),
+            id: "id_verified", label: "Faculty ID Verified", sublabel: "University ID approved",
+            icon: (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>),
         },
         {
-            id: "payout",
-            label: "Payout Active",
-            sublabel: "Ready to receive earnings",
-            icon: (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                </svg>
-            ),
+            id: "payout", label: "Payout Active", sublabel: "Ready to receive earnings",
+            icon: (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>),
         },
     ];
 
-    // ── If fully verified, show compact badge instead ──
     if (currentStepIndex === 2) {
         return (
             <div style={{
                 background: "linear-gradient(135deg, #0d2244 0%, #1a3a6e 100%)",
-                border: `1.5px solid ${GOLD}`,
-                padding: "14px 20px",
-                marginBottom: "20px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: "10px",
+                border: `1.5px solid ${GOLD}`, padding: "14px 20px", marginBottom: "20px",
+                display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px",
             }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    {/* Gold shield checkmark */}
-                    <div style={{
-                        width: "40px", height: "40px",
-                        background: GOLD,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0,
-                    }}>
+                    <div style={{ width: "40px", height: "40px", background: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                            <path d="M9 12l2 2 4-4" />
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" />
                         </svg>
                     </div>
                     <div>
-                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "15px", fontWeight: 700, color: "#fff", margin: "0 0 2px" }}>
-                            Fully Verified Faculty
-                        </p>
-                        <p style={{ fontSize: "11px", color: "rgba(184,150,62,0.8)", fontFamily: "'Lato',sans-serif", margin: 0 }}>
-                            All 3 verification steps complete · Payouts enabled
-                        </p>
+                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "15px", fontWeight: 700, color: "#fff", margin: "0 0 2px" }}>Fully Verified Faculty</p>
+                        <p style={{ fontSize: "11px", color: "rgba(184,150,62,0.8)", fontFamily: "'Lato',sans-serif", margin: 0 }}>All 3 verification steps complete · Payouts enabled</p>
                     </div>
                 </div>
-                <div style={{
-                    display: "inline-flex", alignItems: "center", gap: "6px",
-                    background: "rgba(184,150,62,0.15)", border: `0.5px solid rgba(184,150,62,0.4)`,
-                    padding: "5px 12px",
-                }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(184,150,62,0.15)", border: `0.5px solid rgba(184,150,62,0.4)`, padding: "5px 12px" }}>
                     <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e" }} />
-                    <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: GOLD, fontFamily: "'Lato',sans-serif" }}>
-                        Active
-                    </span>
+                    <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: GOLD, fontFamily: "'Lato',sans-serif" }}>Active</span>
                 </div>
             </div>
         );
     }
 
-    // ── Rejected state ──
     if (user?.lecturerVerificationStatus === "rejected") {
         return (
-            <div style={{
-                background: "#fff",
-                border: "0.5px solid #fecaca",
-                padding: "16px 20px",
-                marginBottom: "20px",
-            }}>
-                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "14px", fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>
-                    Verification Status
-                </p>
+            <div style={{ background: "#fff", border: "0.5px solid #fecaca", padding: "16px 20px", marginBottom: "20px" }}>
+                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "14px", fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>Verification Status</p>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "#fef2f2", padding: "12px 14px" }}>
                     <div style={{ width: "32px", height: "32px", background: "#fee2e2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -229,200 +258,70 @@ function VerificationTimeline({ user, seller }) {
         );
     }
 
-    // ── Full timeline (steps 0 or 1 in progress) ──
     const progressPercent = (currentStepIndex / (steps.length - 1)) * 100;
 
     return (
-        <div style={{
-            background: "#fff",
-            border: "0.5px solid #e5ddd0",
-            padding: "20px 24px",
-            marginBottom: "20px",
-            position: "relative",
-            overflow: "hidden",
-        }}>
-            {/* Subtle dot-grid background */}
-            <div style={{
-                position: "absolute", inset: 0,
-                backgroundImage: "radial-gradient(rgba(13,34,68,0.04) 1px,transparent 1px)",
-                backgroundSize: "18px 18px",
-                pointerEvents: "none",
-            }} />
-
-            {/* Header */}
+        <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "20px 24px", marginBottom: "20px", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(13,34,68,0.04) 1px,transparent 1px)", backgroundSize: "18px 18px", pointerEvents: "none" }} />
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px", position: "relative" }}>
                 <div>
-                    <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: GOLD, margin: "0 0 4px", fontFamily: "'Lato',sans-serif" }}>
-                        Faculty Onboarding
-                    </p>
-                    <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: "16px", fontWeight: 700, color: NAVY, margin: 0 }}>
-                        Verification Status
-                    </h3>
+                    <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: GOLD, margin: "0 0 4px", fontFamily: "'Lato',sans-serif" }}>Faculty Onboarding</p>
+                    <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: "16px", fontWeight: 700, color: NAVY, margin: 0 }}>Verification Status</h3>
                 </div>
-                {/* Step counter */}
-                <div style={{
-                    background: NAVY,
-                    padding: "5px 12px",
-                    display: "flex", alignItems: "center", gap: "5px",
-                }}>
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif" }}>
-                        {currentStepIndex + 1}
-                    </span>
+                <div style={{ background: NAVY, padding: "5px 12px", display: "flex", alignItems: "center", gap: "5px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif" }}>{currentStepIndex + 1}</span>
                     <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", fontFamily: "'Lato',sans-serif" }}>/ {steps.length}</span>
                 </div>
             </div>
-
-            {/* ── Progress bar track ── */}
             <div style={{ position: "relative", marginBottom: "24px" }}>
-                {/* Track background */}
-                <div style={{
-                    height: "3px",
-                    background: "#e5ddd0",
-                    position: "absolute",
-                    top: "18px",
-                    left: "18px",
-                    right: "18px",
-                    zIndex: 0,
-                }} />
-                {/* Filled track */}
-                <div style={{
-                    height: "3px",
-                    background: `linear-gradient(90deg, ${GOLD}, rgba(184,150,62,0.6))`,
-                    position: "absolute",
-                    top: "18px",
-                    left: "18px",
-                    width: `calc(${progressPercent}% * (100% - 36px) / 100)`,
-                    zIndex: 1,
-                    transition: "width 0.6s cubic-bezier(0.4,0,0.2,1)",
-                }} />
-
-                {/* Step circles */}
+                <div style={{ height: "3px", background: "#e5ddd0", position: "absolute", top: "18px", left: "18px", right: "18px", zIndex: 0 }} />
+                <div style={{ height: "3px", background: `linear-gradient(90deg, ${GOLD}, rgba(184,150,62,0.6))`, position: "absolute", top: "18px", left: "18px", width: `calc(${progressPercent}% * (100% - 36px) / 100)`, zIndex: 1, transition: "width 0.6s cubic-bezier(0.4,0,0.2,1)" }} />
                 <div style={{ display: "flex", justifyContent: "space-between", position: "relative", zIndex: 2 }}>
                     {steps.map((step, idx) => {
                         const isCompleted = idx < currentStepIndex;
                         const isCurrent = idx === currentStepIndex;
                         const isUpcoming = idx > currentStepIndex;
-
                         return (
-                            <div key={step.id} style={{
-                                display: "flex", flexDirection: "column", alignItems: "center", gap: "8px",
-                                flex: 1,
-                            }}>
-                                {/* Circle */}
+                            <div key={step.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", flex: 1 }}>
                                 <div style={{
-                                    width: "36px", height: "36px",
-                                    borderRadius: "50%",
+                                    width: "36px", height: "36px", borderRadius: "50%",
                                     background: isCompleted ? GOLD : isCurrent ? NAVY : "#f0ebe0",
-                                    border: isCompleted
-                                        ? `2px solid ${GOLD}`
-                                        : isCurrent
-                                            ? `2px solid ${GOLD}`
-                                            : "2px solid #e5ddd0",
-                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                    flexShrink: 0,
-                                    position: "relative",
-                                    transition: "all 0.3s",
-                                    // Pulsing ring for current step
-                                    boxShadow: isCurrent
-                                        ? `0 0 0 4px rgba(184,150,62,0.2), 0 0 0 8px rgba(184,150,62,0.08)`
-                                        : "none",
+                                    border: isCompleted ? `2px solid ${GOLD}` : isCurrent ? `2px solid ${GOLD}` : "2px solid #e5ddd0",
+                                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative", transition: "all 0.3s",
+                                    boxShadow: isCurrent ? `0 0 0 4px rgba(184,150,62,0.2), 0 0 0 8px rgba(184,150,62,0.08)` : "none",
                                     animation: isCurrent ? "verif-pulse 2s ease-in-out infinite" : "none",
                                 }}>
-                                    {isCompleted ? (
-                                        // Checkmark
-                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M20 6L9 17l-5-5" />
-                                        </svg>
-                                    ) : (
-                                        // Step icon
-                                        <span style={{ color: isCurrent ? "#fff" : "#bbb" }}>
-                                            {step.icon}
-                                        </span>
-                                    )}
+                                    {isCompleted ? (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>) : (<span style={{ color: isCurrent ? "#fff" : "#bbb" }}>{step.icon}</span>)}
                                 </div>
-
-                                {/* Label */}
                                 <div style={{ textAlign: "center", maxWidth: "90px" }}>
-                                    <p style={{
-                                        fontSize: "11px",
-                                        fontWeight: isCompleted || isCurrent ? 700 : 400,
-                                        color: isCompleted ? GOLD : isCurrent ? NAVY : "#bbb",
-                                        margin: "0 0 2px",
-                                        fontFamily: "'Lato',sans-serif",
-                                        lineHeight: 1.3,
-                                    }}>
-                                        {step.label}
-                                    </p>
-                                    <p style={{
-                                        fontSize: "9px",
-                                        color: isUpcoming ? "#ccc" : "#aaa",
-                                        margin: 0,
-                                        fontFamily: "'Lato',sans-serif",
-                                        lineHeight: 1.4,
-                                        display: "-webkit-box",
-                                        WebkitLineClamp: 2,
-                                        WebkitBoxOrient: "vertical",
-                                        overflow: "hidden",
-                                    }}>
-                                        {step.sublabel}
-                                    </p>
+                                    <p style={{ fontSize: "11px", fontWeight: isCompleted || isCurrent ? 700 : 400, color: isCompleted ? GOLD : isCurrent ? NAVY : "#bbb", margin: "0 0 2px", fontFamily: "'Lato',sans-serif", lineHeight: 1.3 }}>{step.label}</p>
+                                    <p style={{ fontSize: "9px", color: isUpcoming ? "#ccc" : "#aaa", margin: 0, fontFamily: "'Lato',sans-serif", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{step.sublabel}</p>
                                 </div>
                             </div>
                         );
                     })}
                 </div>
             </div>
-
-            {/* ── Current step info banner ── */}
-            <div style={{
-                background: CREAM,
-                border: `0.5px solid rgba(184,150,62,0.25)`,
-                borderLeft: `3px solid ${GOLD}`,
-                padding: "12px 14px",
-                display: "flex", alignItems: "flex-start", gap: "10px",
-            }}>
-                {/* Animated dot */}
-                <div style={{
-                    width: "8px", height: "8px", borderRadius: "50%",
-                    background: currentStepIndex === 0 ? "#f59e0b" : GOLD,
-                    flexShrink: 0, marginTop: "3px",
-                    animation: "verif-blink 1.8s ease-in-out infinite",
-                }} />
+            <div style={{ background: CREAM, border: `0.5px solid rgba(184,150,62,0.25)`, borderLeft: `3px solid ${GOLD}`, padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: currentStepIndex === 0 ? "#f59e0b" : GOLD, flexShrink: 0, marginTop: "3px", animation: "verif-blink 1.8s ease-in-out infinite" }} />
                 <div>
-                    <p style={{
-                        fontSize: "12px", fontWeight: 700, color: NAVY,
-                        margin: "0 0 3px", fontFamily: "'Lato',sans-serif",
-                    }}>
+                    <p style={{ fontSize: "12px", fontWeight: 700, color: NAVY, margin: "0 0 3px", fontFamily: "'Lato',sans-serif" }}>
                         {currentStepIndex === 0 && "Awaiting admin review of your documents"}
                         {currentStepIndex === 1 && "Faculty ID verified — add your bank details to activate payouts"}
                     </p>
-                    <p style={{
-                        fontSize: "11px", color: "#888", margin: 0,
-                        fontFamily: "'Lato',sans-serif", lineHeight: 1.6,
-                    }}>
-                        {currentStepIndex === 0 &&
-                            "Your credentials are under review. This usually takes 24–48 hours. You'll receive a notification once approved."}
-                        {currentStepIndex === 1 &&
-                            "Go to Profile → Bank Details and add your account number to complete the final step and start receiving payments."}
+                    <p style={{ fontSize: "11px", color: "#888", margin: 0, fontFamily: "'Lato',sans-serif", lineHeight: 1.6 }}>
+                        {currentStepIndex === 0 && "Your credentials are under review. This usually takes 24–48 hours."}
+                        {currentStepIndex === 1 && "Go to Profile → Bank Details and add your account number to complete the final step."}
                     </p>
                 </div>
             </div>
-
-            {/* Keyframe animations injected inline */}
             <style>{`
-                @keyframes verif-pulse {
-                    0%, 100% { box-shadow: 0 0 0 4px rgba(184,150,62,0.2), 0 0 0 8px rgba(184,150,62,0.08); }
-                    50%       { box-shadow: 0 0 0 6px rgba(184,150,62,0.3), 0 0 0 12px rgba(184,150,62,0.05); }
-                }
-                @keyframes verif-blink {
-                    0%, 100% { opacity: 1; }
-                    50%       { opacity: 0.4; }
-                }
+                @keyframes verif-pulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(184,150,62,0.2), 0 0 0 8px rgba(184,150,62,0.08); } 50% { box-shadow: 0 0 0 6px rgba(184,150,62,0.3), 0 0 0 12px rgba(184,150,62,0.05); } }
+                @keyframes verif-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
             `}</style>
         </div>
     );
 }
-
 
 /* ─── PinModal ───────────────────────────────────────────────── */
 function PinModal({ amount, bankDetails, pinError, onDigit, onDelete, onConfirm, onClose, pinValue }) {
@@ -430,15 +329,13 @@ function PinModal({ amount, bankDetails, pinError, onDigit, onDelete, onConfirm,
     const maskedAccount = bankDetails?.accountNumber ? `***${bankDetails.accountNumber.slice(-4)}` : "your account";
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-            <div style={{ background: '#fff', width: '100%', maxWidth: '360px', borderRadius: '0', overflow: 'hidden', boxShadow: '0 32px 64px rgba(13,34,68,0.3)' }} className="mt-30">
+            <div style={{ background: '#fff', width: '100%', maxWidth: '360px', overflow: 'hidden', boxShadow: '0 32px 64px rgba(13,34,68,0.3)' }}>
                 <div style={{ background: NAVY, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
                         <p style={{ color: GOLD, fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Confirm withdrawal</p>
-                        <p style={{ color: '#fff', fontSize: '16px', fontWeight: 700, fontFamily: "'Playfair Display',serif" }}>Enter your PIN</p>
+                        <p style={{ color: '#fff', fontSize: '16px', fontWeight: 700, fontFamily: "'Playfair Display',serif", margin: 0 }}>Enter your PIN</p>
                     </div>
-                    <button onClick={onClose} style={{ width: '34px', height: '34px', border: '0.5px solid rgba(255,255,255,0.2)', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
-                        <X size={15} />
-                    </button>
+                    <button onClick={onClose} style={{ width: '34px', height: '34px', border: '0.5px solid rgba(255,255,255,0.2)', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}><X size={15} /></button>
                 </div>
                 <div style={{ padding: '24px' }}>
                     <p style={{ fontSize: '13px', color: '#888', textAlign: 'center', marginBottom: '20px', lineHeight: 1.6 }}>
@@ -454,7 +351,7 @@ function PinModal({ amount, bankDetails, pinError, onDigit, onDelete, onConfirm,
                     {pinError && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2', border: '0.5px solid #fecaca', padding: '10px 12px', marginBottom: '14px' }}>
                             <AlertCircle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
-                            <p style={{ fontSize: '12px', color: '#dc2626' }}>{pinError}</p>
+                            <p style={{ fontSize: '12px', color: '#dc2626', margin: 0 }}>{pinError}</p>
                         </div>
                     )}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '8px' }}>
@@ -496,7 +393,7 @@ function SuccessModal({ amount, reference, onClose }) {
                         </svg>
                     </div>
                     <p style={{ color: '#fff', fontSize: '18px', fontWeight: 700, fontFamily: "'Playfair Display',serif", marginBottom: '6px' }}>Request Submitted!</p>
-                    <p style={{ color: GOLD, fontSize: '12px', fontFamily: "'Lato',sans-serif" }}>Your withdrawal is pending approval</p>
+                    <p style={{ color: GOLD, fontSize: '12px', fontFamily: "'Lato',sans-serif", margin: 0 }}>Your withdrawal is pending approval</p>
                 </div>
                 <div style={{ padding: '24px' }}>
                     {[['Amount', `₦${Number(amount).toLocaleString()}`], ['Reference', reference], ['Status', '⏳ Pending']].map(([k, v]) => (
@@ -505,9 +402,7 @@ function SuccessModal({ amount, reference, onClose }) {
                             <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", maxWidth: '190px', textAlign: 'right', wordBreak: 'break-all' }}>{v}</span>
                         </div>
                     ))}
-                    <p style={{ fontSize: '11px', color: '#888', textAlign: 'center', marginTop: '8px', lineHeight: 1.7 }}>
-                        You'll receive a notification once processed (24–48 hrs)
-                    </p>
+                    <p style={{ fontSize: '11px', color: '#888', textAlign: 'center', marginTop: '8px', lineHeight: 1.7 }}>You'll receive a notification once processed (24–48 hrs)</p>
                     <button onClick={onClose}
                         style={{ width: '100%', background: NAVY, color: '#fff', padding: '14px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginTop: '16px', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em' }}
                         onMouseEnter={e => e.currentTarget.style.background = '#1a3a6e'}
@@ -524,37 +419,20 @@ function VTUQuickAccess() {
     const router = useRouter();
     const services = [
         {
-            id: "airtime", label: "Airtime", description: "Instant top-up", tab: "airtime", icon: (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} style={{ width: '22px', height: '22px' }}>
-                    <rect x="5" y="2" width="14" height="20" rx="2" /><circle cx="12" cy="17" r="1" fill="currentColor" />
-                </svg>
-            )
+            id: "airtime", label: "Airtime", description: "Instant top-up", tab: "airtime",
+            icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} style={{ width: '22px', height: '22px' }}><rect x="5" y="2" width="14" height="20" rx="2" /><circle cx="12" cy="17" r="1" fill="currentColor" /></svg>)
         },
         {
-            id: "data", label: "Data", description: "All networks", tab: "data", icon: (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} style={{ width: '22px', height: '22px' }}>
-                    <path d="M1.5 8.5C5 5 9.5 3 12 3s7 2 10.5 5.5" strokeLinecap="round" />
-                    <path d="M5 12c1.9-1.9 4.3-3 7-3s5.1 1.1 7 3" strokeLinecap="round" />
-                    <path d="M8.5 15.5c.9-.9 2.1-1.5 3.5-1.5s2.6.6 3.5 1.5" strokeLinecap="round" />
-                    <circle cx="12" cy="19" r="1.5" fill="currentColor" />
-                </svg>
-            )
+            id: "data", label: "Data", description: "All networks", tab: "data",
+            icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} style={{ width: '22px', height: '22px' }}><path d="M1.5 8.5C5 5 9.5 3 12 3s7 2 10.5 5.5" strokeLinecap="round" /><path d="M5 12c1.9-1.9 4.3-3 7-3s5.1 1.1 7 3" strokeLinecap="round" /><path d="M8.5 15.5c.9-.9 2.1-1.5 3.5-1.5s2.6.6 3.5 1.5" strokeLinecap="round" /><circle cx="12" cy="19" r="1.5" fill="currentColor" /></svg>)
         },
         {
-            id: "electricity", label: "Electricity", description: "Pay bills", tab: "electricity", icon: (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} style={{ width: '22px', height: '22px' }}>
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-            )
+            id: "electricity", label: "Electricity", description: "Pay bills", tab: "electricity",
+            icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} style={{ width: '22px', height: '22px' }}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" strokeLinecap="round" strokeLinejoin="round" /></svg>)
         },
         {
-            id: "tv", label: "TV/Cable", description: "DStv, GOtv & more", tab: "tv", icon: (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} style={{ width: '22px', height: '22px' }}>
-                    <rect x="2" y="7" width="20" height="13" rx="2" />
-                    <path d="M8 7L12 3l4 4" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M9 12h6M9 15h4" strokeLinecap="round" />
-                </svg>
-            )
+            id: "tv", label: "TV/Cable", description: "DStv, GOtv & more", tab: "tv",
+            icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} style={{ width: '22px', height: '22px' }}><rect x="2" y="7" width="20" height="13" rx="2" /><path d="M8 7L12 3l4 4" strokeLinecap="round" strokeLinejoin="round" /><path d="M9 12h6M9 15h4" strokeLinecap="round" /></svg>)
         },
     ];
     return (
@@ -573,11 +451,8 @@ function VTUQuickAccess() {
                     <button key={s.id} onClick={() => router.push(`/recharge?tab=${s.tab}`)}
                         style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '14px 8px', border: '0.5px solid #e5ddd0', background: CREAM, cursor: 'pointer', transition: 'all 0.2s' }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.background = '#fff'; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5ddd0'; e.currentTarget.style.background = CREAM; }}
-                    >
-                        <div style={{ width: '40px', height: '40px', background: '#fff', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: NAVY }}>
-                            {s.icon}
-                        </div>
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5ddd0'; e.currentTarget.style.background = CREAM; }}>
+                        <div style={{ width: '40px', height: '40px', background: '#fff', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: NAVY }}>{s.icon}</div>
                         <div style={{ textAlign: 'center' }}>
                             <p style={{ fontSize: '11px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", margin: 0 }}>{s.label}</p>
                             <p style={{ fontSize: '9px', color: '#aaa', fontFamily: "'Lato',sans-serif", margin: '2px 0 0' }}>{s.description}</p>
@@ -586,278 +461,92 @@ function VTUQuickAccess() {
                 ))}
             </div>
             <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '8px', background: CREAM, border: '0.5px solid rgba(184,150,62,0.2)', padding: '10px 14px' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a', animation: 'pulse 2s infinite', flexShrink: 0 }} />
-                <p style={{ fontSize: '11px', color: NAVY, fontWeight: 600, fontFamily: "'Lato',sans-serif" }}>Payments deducted instantly from your LAN wallet</p>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a', flexShrink: 0 }} />
+                <p style={{ fontSize: '11px', color: NAVY, fontWeight: 600, fontFamily: "'Lato',sans-serif", margin: 0 }}>Payments deducted instantly from your LAN wallet</p>
             </div>
         </div>
     );
 }
 
-/* ─── AccountSwitchSheet — redesigned (NAVY / GOLD / CREAM) ──────────────── */
+/* ─── AccountSwitchSheet ──────────────────────────────────────── */
 function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
     const [showEnrollConfirm, setShowEnrollConfirm] = useState(false);
     const [enrolling, setEnrolling] = useState(false);
     const [enrollError, setEnrollError] = useState("");
 
-    const NAVY = "#0d2244";
-    const GOLD = "#b8963e";
-    const CREAM = "#f5f0e8";
-
     const handleEnrollAsStudent = async () => {
         try {
-            setEnrolling(true);
-            setEnrollError("");
-
+            setEnrolling(true); setEnrollError("");
             const currentUser = auth.currentUser;
-            if (!currentUser) {
-                router.push("/auth/role-selection");
-                return;
-            }
-
+            if (!currentUser) { router.push("/auth/role-selection"); return; }
             const result = await addStudentRoleToExistingUser(currentUser.uid);
-
-            if (result.success) {
-                setShowEnrollConfirm(false);
-                onClose();
-                router.push("/student/dashboard");
-            } else {
-                setEnrollError("Something went wrong. Please try again.");
-            }
-        } catch {
-            setEnrollError("Something went wrong. Please try again.");
-        } finally {
-            setEnrolling(false);
-        }
+            if (result.success) { setShowEnrollConfirm(false); onClose(); router.push("/student/dashboard"); }
+            else setEnrollError("Something went wrong. Please try again.");
+        } catch { setEnrollError("Something went wrong. Please try again."); }
+        finally { setEnrolling(false); }
     };
 
-    const handleClose = () => {
-        setShowEnrollConfirm(false);
-        setEnrollError("");
-        onClose();
-    };
+    const handleClose = () => { setShowEnrollConfirm(false); setEnrollError(""); onClose(); };
 
     return (
         <>
-            {/* BACKDROP */}
-            <div
-                className={`fixed inset-0 z-[80] transition-all duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-                    }`}
-                style={{ background: "rgba(13,34,68,0.55)" }}
-                onClick={handleClose}
-            />
-
-            {/* SHEET */}
-            <div
-                className={`fixed bottom-0 left-0 right-0 z-[90] transition-transform duration-300 ease-out ${isOpen ? "translate-y-0" : "translate-y-full"
-                    }`}
-            >
-                <div
-                    className="max-w-lg mx-auto rounded-t-3xl shadow-2xl"
-                    style={{ background: CREAM }}
-                >
-                    {/* HANDLE */}
-                    <div className="flex justify-center pt-3 pb-1">
-                        <div className="w-10 h-1 rounded-full bg-gray-300" />
-                    </div>
-
-                    {/* HEADER */}
+            <div className={`fixed inset-0 z-[80] transition-all duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                style={{ background: "rgba(13,34,68,0.55)" }} onClick={handleClose} />
+            <div className={`fixed bottom-0 left-0 right-0 z-[90] transition-transform duration-300 ease-out ${isOpen ? "translate-y-0" : "translate-y-full"}`}>
+                <div className="max-w-lg mx-auto rounded-t-3xl shadow-2xl" style={{ background: CREAM }}>
+                    <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-gray-300" /></div>
                     <div className="px-6 pt-3 pb-4 border-b border-black/5">
-                        <p
-                            className="text-lg font-bold tracking-tight"
-                            style={{ color: NAVY }}
-                        >
-                            Switch Account
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                            Choose which account to view
-                        </p>
+                        <p className="text-lg font-bold tracking-tight" style={{ color: NAVY }}>Switch Account</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Choose which account to view</p>
                     </div>
-
-                    {/* CONTENT */}
                     <div className="p-4 space-y-3 pb-10">
-
-                        {/* ─── STUDENT CARD ─── */}
-                        <button
-                            onClick={() => {
-                                if (isStudent) {
-                                    router.push("/student/dashboard");
-                                    onClose();
-                                }
-                            }}
-                            disabled={!isStudent}
-                            className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all ${isStudent
-                                    ? "border-white bg-white hover:shadow-md active:scale-[0.98]"
-                                    : "border-gray-200 opacity-60 cursor-not-allowed"
-                                }`}
-                        >
-                            <div
-                                className="w-12 h-12 rounded-xl flex items-center justify-center text-white flex-shrink-0"
-                                style={{
-                                    background: isStudent
-                                        ? "linear-gradient(135deg,#10b981,#0d9488)"
-                                        : "#9ca3af",
-                                }}
-                            >
-                                🎓
-                            </div>
-
+                        <button onClick={() => { if (isStudent) { router.push("/student/dashboard"); onClose(); } }} disabled={!isStudent}
+                            className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all ${isStudent ? "border-white bg-white hover:shadow-md active:scale-[0.98]" : "border-gray-200 opacity-60 cursor-not-allowed"}`}>
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white flex-shrink-0"
+                                style={{ background: isStudent ? "linear-gradient(135deg,#10b981,#0d9488)" : "#9ca3af" }}>🎓</div>
                             <div className="flex-1 text-left">
-                                <p
-                                    className="font-bold text-sm"
-                                    style={{ color: NAVY }}
-                                >
-                                    Student Account
-                                </p>
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                    Access courses, assignments & library
-                                </p>
+                                <p className="font-bold text-sm" style={{ color: NAVY }}>Student Account</p>
+                                <p className="text-xs text-gray-400 mt-0.5">Access courses, assignments & library</p>
                             </div>
-
                             <span className="text-gray-300 text-sm">›</span>
                         </button>
-
-                        {/* ENROLL BUTTON */}
                         {!isStudent && (
-                            <button
-                                onClick={() => {
-                                    setEnrollError("");
-                                    setShowEnrollConfirm(true);
-                                }}
+                            <button onClick={() => { setEnrollError(""); setShowEnrollConfirm(true); }}
                                 className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border-2 border-dashed transition-all active:scale-[0.98]"
-                                style={{
-                                    borderColor: GOLD,
-                                    background: "rgba(184,150,62,0.08)",
-                                }}
-                            >
-                                <span
-                                    className="text-sm font-semibold"
-                                    style={{ color: NAVY }}
-                                >
-                                    Enrol as a Student
-                                </span>
+                                style={{ borderColor: GOLD, background: "rgba(184,150,62,0.08)" }}>
+                                <span className="text-sm font-semibold" style={{ color: NAVY }}>Enrol as a Student</span>
                             </button>
                         )}
-
-                        {/* SELLER CARD */}
-                        <button
-                            onClick={onClose}
-                            className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 bg-white transition-all active:scale-[0.98]"
-                            style={{ borderColor: "rgba(13,34,68,0.1)" }}
-                        >
-                            <div
-                                className="w-12 h-12 rounded-xl flex items-center justify-center text-white flex-shrink-0"
-                                style={{ background: NAVY }}
-                            >
-                                🛒
-                            </div>
-
+                        <button onClick={onClose} className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 bg-white transition-all active:scale-[0.98]" style={{ borderColor: "rgba(13,34,68,0.1)" }}>
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white flex-shrink-0" style={{ background: NAVY }}>🛒</div>
                             <div className="flex-1 text-left">
-                                <p
-                                    className="font-bold text-sm"
-                                    style={{ color: NAVY }}
-                                >
-                                    Seller Account
-                                </p>
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                    Manage earnings, documents & withdrawals
-                                </p>
+                                <p className="font-bold text-sm" style={{ color: NAVY }}>Seller Account</p>
+                                <p className="text-xs text-gray-400 mt-0.5">Manage earnings, documents & withdrawals</p>
                             </div>
-
-                            <span
-                                className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                                style={{
-                                    background: GOLD,
-                                    color: "#fff",
-                                }}
-                            >
-                                Active
-                            </span>
+                            <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: GOLD, color: "#fff" }}>Active</span>
                         </button>
                     </div>
                 </div>
             </div>
-
-            {/* ─── ENROLL CONFIRM ─── */}
-            <div
-                className={`fixed inset-0 z-[100] flex items-end justify-center transition-all duration-300 ${showEnrollConfirm
-                        ? "opacity-100 pointer-events-auto"
-                        : "opacity-0 pointer-events-none"
-                    }`}
-            >
-                <div
-                    className="absolute inset-0"
-                    style={{ background: "rgba(0,0,0,0.45)" }}
-                    onClick={() => {
-                        setShowEnrollConfirm(false);
-                        setEnrollError("");
-                    }}
-                />
-
-                <div
-                    className={`relative w-full max-w-lg rounded-t-3xl shadow-2xl transition-transform duration-300 ${showEnrollConfirm ? "translate-y-0" : "translate-y-full"
-                        }`}
-                    style={{ background: CREAM }}
-                >
-                    <div className="flex justify-center pt-3 pb-1">
-                        <div className="w-10 h-1 rounded-full bg-gray-300" />
-                    </div>
-
+            <div className={`fixed inset-0 z-[100] flex items-end justify-center transition-all duration-300 ${showEnrollConfirm ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}>
+                <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => { setShowEnrollConfirm(false); setEnrollError(""); }} />
+                <div className={`relative w-full max-w-lg rounded-t-3xl shadow-2xl transition-transform duration-300 ${showEnrollConfirm ? "translate-y-0" : "translate-y-full"}`} style={{ background: CREAM }}>
+                    <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-gray-300" /></div>
                     <div className="px-6 pt-4 pb-5 text-center">
-                        <div
-                            className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center text-white"
-                            style={{
-                                background:
-                                    "linear-gradient(135deg,#10b981,#0d9488)",
-                            }}
-                        >
-                            🎓
-                        </div>
-
-                        <p
-                            className="text-lg font-bold"
-                            style={{ color: NAVY }}
-                        >
-                            Enrol as a Student?
-                        </p>
-
-                        <p className="text-sm text-gray-500 mt-1 leading-relaxed">
-                            You’ll get student access linked to your seller account.
-                        </p>
+                        <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg,#10b981,#0d9488)" }}>🎓</div>
+                        <p className="text-lg font-bold" style={{ color: NAVY }}>Enrol as a Student?</p>
+                        <p className="text-sm text-gray-500 mt-1 leading-relaxed">You'll get student access linked to your seller account.</p>
                     </div>
-
-                    {enrollError && (
-                        <div className="mx-5 mb-3 p-3 rounded-xl bg-red-50 border border-red-200">
-                            <p className="text-xs text-red-600">
-                                {enrollError}
-                            </p>
-                        </div>
-                    )}
-
+                    {enrollError && (<div className="mx-5 mb-3 p-3 rounded-xl bg-red-50 border border-red-200"><p className="text-xs text-red-600">{enrollError}</p></div>)}
                     <div className="px-5 pb-8 space-y-2.5">
-                        <button
-                            onClick={handleEnrollAsStudent}
-                            disabled={enrolling}
+                        <button onClick={handleEnrollAsStudent} disabled={enrolling}
                             className="w-full py-3 rounded-2xl text-white font-semibold flex items-center justify-center gap-2"
-                            style={{
-                                background: enrolling ? "#999" : NAVY,
-                            }}
-                        >
+                            style={{ background: enrolling ? "#999" : NAVY }}>
                             {enrolling ? "Enrolling..." : "Yes, Enrol Me"}
                         </button>
-
-                        <button
-                            onClick={() => {
-                                setShowEnrollConfirm(false);
-                                setEnrollError("");
-                            }}
+                        <button onClick={() => { setShowEnrollConfirm(false); setEnrollError(""); }}
                             className="w-full py-3 rounded-2xl font-semibold"
-                            style={{
-                                border: "1px solid rgba(13,34,68,0.2)",
-                                color: NAVY,
-                            }}
-                        >
-                            Cancel
-                        </button>
+                            style={{ border: "1px solid rgba(13,34,68,0.2)", color: NAVY }}>Cancel</button>
                     </div>
                 </div>
             </div>
@@ -866,7 +555,304 @@ function AccountSwitchSheet({ isOpen, onClose, isStudent, router }) {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   MAIN COMPONENT — all state, logic & data fetching preserved
+   TIER DATA
+════════════════════════════════════════════════════════════════ */
+const SELLER_TIERS = [
+    {
+        id: "bronze", label: "Bronze", emoji: "🥉", min: 0, max: 4999,
+        color: "#cd7f32", bg: "rgba(205,127,50,0.08)", border: "rgba(205,127,50,0.3)",
+        perks: ["Up to 20 documents", "Standard search placement", "Basic analytics", "Community support", "Seller badge"],
+    },
+    {
+        id: "silver", label: "Silver", emoji: "🥈", min: 5000, max: 19999,
+        color: "#9ca3af", bg: "rgba(156,163,175,0.08)", border: "rgba(156,163,175,0.3)",
+        perks: ["Up to 100 documents", "Boosted search ranking", "Trend analytics", "Bounty Board access", "Priority review queue", "Department feed features"],
+    },
+    {
+        id: "gold", label: "Gold", emoji: "🥇", min: 20000, max: 49999,
+        color: "#b8963e", bg: "rgba(184,150,62,0.08)", border: "rgba(184,150,62,0.35)",
+        perks: ["Unlimited uploads", "Premium search placement", "Advanced revenue analytics", "High-value bounties (₦5k+)", "Same-day withdrawal processing", "Dedicated support line", "Homepage featured slots", "Referral bonus upgrades"],
+        highlight: true,
+    },
+    {
+        id: "platinum", label: "Platinum", emoji: "💎", min: 50000, max: Infinity,
+        color: "#a855f7", bg: "rgba(168,85,247,0.08)", border: "rgba(168,85,247,0.3)",
+        perks: ["Unlimited uploads, zero queue", "Top-of-search permanently", "Personal account manager", "Instant withdrawal, no limits", "Exclusive platinum bounties (₦50k+)", "Co-branded seller page", "Early access to new features", "LAN Creators Programme invite"],
+    },
+];
+
+const FACULTY_TIERS = [
+    {
+        id: "associate", label: "Associate Faculty", emoji: "🥉", min: 0, max: 9999,
+        color: "#cd7f32", bg: "rgba(205,127,50,0.06)", border: "rgba(205,127,50,0.25)",
+        perks: ["Verified Faculty badge", "Upload up to 30 documents", "Standard search placement", "Basic analytics dashboard", "Community forum access", "Email support"],
+    },
+    {
+        id: "senior", label: "Senior Faculty", emoji: "🥈", min: 10000, max: 49999,
+        color: "#9ca3af", bg: "rgba(156,163,175,0.06)", border: "rgba(156,163,175,0.25)",
+        perks: ["All Associate benefits", "Upload up to 150 documents", "Boosted search placement", "Bounty Board access (up to ₦20k)", "Priority review (12hr)", "Sales trend analytics"],
+    },
+    {
+        id: "distinguished", label: "Distinguished Faculty", emoji: "🏆", min: 50000, max: 149999,
+        color: "#0d9488", bg: "rgba(13,148,136,0.06)", border: "rgba(13,148,136,0.35)",
+        perks: ["All Senior benefits", "Unlimited uploads", "Top-tier search placement", "High-value bounties (up to ₦200k)", "Homepage featured faculty slot", "Personal analytics suite", "Same-day payouts", "Dedicated support line"],
+        highlight: true,
+    },
+    {
+        id: "emeritus", label: "Emeritus Faculty", emoji: "⭐", min: 150000, max: Infinity,
+        color: "#b8963e", bg: "rgba(184,150,62,0.08)", border: "rgba(184,150,62,0.35)",
+        perks: ["Everything in Distinguished", "Permanent top-of-search", "Named account manager", "Instant withdrawals, no limit", "Exclusive ₦500k+ bounties", "Co-branded faculty page", "LAN Academic Advisory Board invite", "Annual faculty summit access"],
+        dark: true,
+    },
+];
+
+function getTier(tiers, totalEarnings) { return tiers.find(t => totalEarnings >= t.min && totalEarnings <= t.max) || tiers[0]; }
+function getNextTier(tiers, current) { const idx = tiers.findIndex(t => t.id === current.id); return idx < tiers.length - 1 ? tiers[idx + 1] : null; }
+
+/* ════════════════════════════════════════════════════════════════
+   TIER MODAL — shown when user clicks "View Tier Details"
+════════════════════════════════════════════════════════════════ */
+function TierModal({ onClose, totalEarnings, isFaculty, fmt }) {
+    const tiers = isFaculty ? FACULTY_TIERS : SELLER_TIERS;
+    const current = getTier(tiers, totalEarnings);
+    const [selectedTier, setSelectedTier] = useState(current.id);
+    const viewing = tiers.find(t => t.id === selectedTier) || current;
+    const next = getNextTier(tiers, current);
+    const progressToNext = next ? Math.min(((totalEarnings - current.min) / (next.min - current.min)) * 100, 100) : 100;
+    const amountToNext = next ? Math.max(next.min - totalEarnings, 0) : 0;
+
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+        <div onClick={onClose} style={{
+            position: "fixed", inset: 0, background: "rgba(7,19,31,.75)",
+            zIndex: 1300, display: "flex", alignItems: "flex-end", justifyContent: "center",
+            padding: "0", backdropFilter: "blur(4px)",
+        }}>
+            <div onClick={e => e.stopPropagation()} style={{
+                background: "#fff", width: "100%", maxWidth: 560,
+                maxHeight: "92vh", display: "flex", flexDirection: "column",
+                animation: "slideUpModal .3s cubic-bezier(.4,0,.2,1) both",
+                borderRadius: "16px 16px 0 0", overflow: "hidden",
+            }}>
+                {/* Handle */}
+                <div style={{ display: "flex", justifyContent: "center", paddingTop: 12, paddingBottom: 4, flexShrink: 0 }}>
+                    <div style={{ width: 40, height: 4, borderRadius: 999, background: "#e5ddd0" }} />
+                </div>
+
+                {/* Header */}
+                <div style={{ background: NAVY, padding: "16px 20px 20px", flexShrink: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                        <div>
+                            <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: GOLD, margin: "0 0 4px", fontFamily: "'Lato',sans-serif" }}>
+                                {isFaculty ? "Faculty Rank" : "Seller Tier"}
+                            </p>
+                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: "#fff", margin: 0 }}>
+                                All {isFaculty ? "Faculty Ranks" : "Seller Tiers"}
+                            </p>
+                        </div>
+                        <button onClick={onClose} style={{ width: 32, height: 32, border: "0.5px solid rgba(255,255,255,0.2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "rgba(255,255,255,0.6)", borderRadius: 4, flexShrink: 0 }}>
+                            <X size={16} />
+                        </button>
+                    </div>
+
+                    {/* Tier selector pills */}
+                    <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }} className="sbar-none">
+                        {tiers.map(t => {
+                            const isActive = t.id === selectedTier;
+                            const isCurrent = t.id === current.id;
+                            return (
+                                <button key={t.id} onClick={() => setSelectedTier(t.id)}
+                                    style={{
+                                        display: "flex", alignItems: "center", gap: 6,
+                                        padding: "6px 12px", flexShrink: 0,
+                                        border: `1.5px solid ${isActive ? t.color : "rgba(255,255,255,0.15)"}`,
+                                        background: isActive ? `${t.bg}` : "rgba(255,255,255,0.07)",
+                                        cursor: "pointer", transition: "all .15s", borderRadius: 4,
+                                        fontFamily: "'Lato',sans-serif",
+                                    }}>
+                                    <span style={{ fontSize: 16, lineHeight: 1 }}>{t.emoji}</span>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: isActive ? t.color : "rgba(255,255,255,0.6)", whiteSpace: "nowrap" }}>
+                                        {t.label}
+                                    </span>
+                                    {isCurrent && (
+                                        <span style={{ fontSize: 8, fontWeight: 700, background: GOLD, color: NAVY, padding: "1px 5px", borderRadius: 99, letterSpacing: "0.08em" }}>YOU</span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Body — scrollable */}
+                <div style={{ overflowY: "auto", flex: 1, padding: "20px" }}>
+                    {/* Current progress (only shown when viewing user's current tier) */}
+                    {viewing.id === current.id && (
+                        <div style={{ background: CREAM, border: `0.5px solid rgba(184,150,62,0.2)`, padding: "16px", marginBottom: 20 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                                <p style={{ fontSize: 11, color: "#888", fontFamily: "'Lato',sans-serif", margin: 0 }}>
+                                    {next ? <>Progress to <strong style={{ color: next.color }}>{next.label}</strong></> : "Maximum tier reached 🎉"}
+                                </p>
+                                {next && <p style={{ fontSize: 11, fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", margin: 0 }}>{fmt ? fmt(amountToNext) : `₦${amountToNext.toLocaleString()}`} to go</p>}
+                            </div>
+                            {next && (
+                                <>
+                                    <div style={{ height: 6, background: "#e5ddd0", overflow: "hidden", marginBottom: 4 }}>
+                                        <div style={{ height: "100%", width: `${progressToNext}%`, background: `linear-gradient(90deg, ${current.color}, ${next.color})`, transition: "width 0.8s" }} />
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ fontSize: 9, color: "#aaa", fontFamily: "'Lato',sans-serif" }}>{fmt ? fmt(current.min) : `₦${current.min.toLocaleString()}`}</span>
+                                        <span style={{ fontSize: 9, color: "#aaa", fontFamily: "'Lato',sans-serif" }}>{fmt ? fmt(next.min) : `₦${next.min.toLocaleString()}`}</span>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Viewing tier header */}
+                    <div style={{
+                        background: viewing.dark ? NAVY : viewing.bg, border: `1.5px solid ${viewing.border}`,
+                        padding: "20px", marginBottom: 20, display: "flex", alignItems: "center", gap: 16,
+                    }}>
+                        <div style={{
+                            width: 56, height: 56, fontSize: 30,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            background: viewing.dark ? "rgba(184,150,62,0.15)" : "rgba(255,255,255,0.7)",
+                            border: `1.5px solid ${viewing.border}`, flexShrink: 0,
+                        }}>{viewing.emoji}</div>
+                        <div>
+                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700, color: viewing.dark ? "#fff" : viewing.color, margin: "0 0 4px" }}>{viewing.label}</p>
+                            <p style={{ fontSize: 11, color: viewing.dark ? "rgba(184,150,62,0.7)" : "#aaa", fontFamily: "'Lato',sans-serif", margin: 0 }}>
+                                {viewing.max === Infinity
+                                    ? `${fmt ? fmt(viewing.min) : `₦${viewing.min.toLocaleString()}`}+`
+                                    : `${fmt ? fmt(viewing.min) : `₦${viewing.min.toLocaleString()}`} – ${fmt ? fmt(viewing.max) : `₦${viewing.max.toLocaleString()}`}`}
+                                jsx
+                            </p>
+                        </div>
+                        {viewing.id === current.id && (
+                            <div style={{ marginLeft: "auto", background: "#16a34a", padding: "4px 10px", flexShrink: 0 }}>
+                                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", letterSpacing: "0.1em", fontFamily: "'Lato',sans-serif" }}>CURRENT</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Perks */}
+                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "0 0 14px", fontFamily: "'Lato',sans-serif" }}>
+                        {viewing.label} Benefits
+                    </p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
+                        {viewing.perks.map((perk, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", background: "#fff", border: `0.5px solid ${viewing.border}` }}>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={viewing.color} strokeWidth="2.5" style={{ flexShrink: 0, marginTop: 2 }}>
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                                <span style={{ fontSize: 12, color: "#555", fontFamily: "'Lato',sans-serif", lineHeight: 1.5 }}>{perk}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* All tiers comparison row */}
+                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "#aaa", margin: "0 0 12px", fontFamily: "'Lato',sans-serif" }}>All Tiers</p>
+                    <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8 }} className="sbar-none">
+                        {tiers.map(t => {
+                            const isViewing = t.id === viewing.id;
+                            const isCurrent2 = t.id === current.id;
+                            const isPast = totalEarnings >= t.min;
+                            return (
+                                <button key={t.id} onClick={() => setSelectedTier(t.id)}
+                                    style={{
+                                        flex: "1", minWidth: 72, padding: "10px 8px",
+                                        border: `1.5px solid ${isViewing ? t.color : isPast ? "rgba(184,150,62,0.2)" : "#e5ddd0"}`,
+                                        background: isViewing ? t.bg : isPast ? "rgba(184,150,62,0.04)" : "#fafafa",
+                                        textAlign: "center", cursor: "pointer", flexShrink: 0, transition: "all .15s",
+                                    }}>
+                                    <p style={{ fontSize: 22, margin: "0 0 4px" }}>{t.emoji}</p>
+                                    <p style={{ fontSize: 9, fontWeight: 700, color: isViewing ? t.color : isPast ? "#aaa" : "#ccc", margin: 0, fontFamily: "'Lato',sans-serif", lineHeight: 1.3 }}>{t.label}</p>
+                                    {isCurrent2 && <div style={{ width: 6, height: 6, borderRadius: "50%", background: t.color, margin: "5px auto 0" }} />}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+            <style>{`@keyframes slideUpModal { from { opacity:0; transform:translateY(40px); } to { opacity:1; transform:translateY(0); } }`}</style>
+        </div>,
+        document.body
+    );
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TIER SUMMARY CARD — compact card on dashboard with button to open modal
+════════════════════════════════════════════════════════════════ */
+function TierSummaryCard({ totalEarnings, isFaculty, onViewDetails, fmt }) {
+    const tiers = isFaculty ? FACULTY_TIERS : SELLER_TIERS;
+    const current = getTier(tiers, totalEarnings);
+    const next = getNextTier(tiers, current);
+    const progressToNext = next ? Math.min(((totalEarnings - current.min) / (next.min - current.min)) * 100, 100) : 100;
+    const amountToNext = next ? Math.max(next.min - totalEarnings, 0) : 0;
+
+    return (
+        <div style={{
+            background: current.dark ? NAVY : "#fff",
+            border: `1.5px solid ${current.border}`,
+            padding: "16px 20px",
+            display: "flex", flexDirection: "column", gap: 12,
+        }}>
+            {/* Top row */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{
+                    width: 44, height: 44, fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center",
+                    background: current.dark ? "rgba(184,150,62,0.15)" : current.bg,
+                    border: `1.5px solid ${current.border}`, flexShrink: 0,
+                }}>{current.emoji}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: current.dark ? "rgba(184,150,62,0.7)" : "#aaa", margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>
+                        {isFaculty ? "Faculty Rank" : "Seller Tier"}
+                    </p>
+                    <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 700, color: current.dark ? "#fff" : current.color, margin: 0 }}>
+                        {current.label}
+                    </p>
+                </div>
+                <button onClick={onViewDetails}
+                    style={{
+                        display: "flex", alignItems: "center", gap: 5, padding: "7px 12px",
+                        background: current.dark ? "rgba(184,150,62,0.15)" : NAVY,
+                        border: `0.5px solid ${current.dark ? "rgba(184,150,62,0.3)" : "transparent"}`,
+                        color: current.dark ? GOLD : "#fff", fontSize: 10, fontWeight: 700,
+                        cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em",
+                        textTransform: "uppercase", flexShrink: 0, whiteSpace: "nowrap",
+                    }}>
+                    View Tiers <ChevronRight size={12} />
+                </button>
+            </div>
+
+            {/* Progress bar */}
+            {next ? (
+                <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                        <p style={{ fontSize: 10, color: current.dark ? "rgba(255,255,255,0.5)" : "#aaa", fontFamily: "'Lato',sans-serif", margin: 0 }}>
+                            To <strong style={{ color: next.color }}>{next.label}</strong>
+                        </p>
+                        <p style={{ fontSize: 10, fontWeight: 700, color: current.dark ? GOLD : NAVY, fontFamily: "'Lato',sans-serif", margin: 0 }}>{fmt ? fmt(amountToNext) : `₦${amountToNext.toLocaleString()}`} to go</p>
+                    </div>
+                    <div style={{ height: 5, background: current.dark ? "rgba(255,255,255,0.1)" : "#f0ebe0", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${progressToNext}%`, background: `linear-gradient(90deg, ${current.color}, ${next.color})`, transition: "width 0.8s" }} />
+                    </div>
+                </div>
+            ) : (
+                <p style={{ fontSize: 11, fontWeight: 700, color: current.dark ? GOLD : current.color, fontFamily: "'Lato',sans-serif", margin: 0 }}>
+                    🎉 Highest tier achieved
+                </p>
+            )}
+        </div>
+    );
+}
+
+/* ─── PinModal ───────────────────────────────────────────────── */
+/* (already defined above) */
+
+/* ════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
 ════════════════════════════════════════════════════════════════ */
 export default function SellerAccountClient() {
     const [user, setUser] = useState(null);
@@ -905,7 +891,7 @@ export default function SellerAccountClient() {
     const [activeSection, setActiveSection] = useState(null);
     const [myClaimedBounties, setMyClaimedBounties] = useState([]);
     const [pendingBounties, setPendingBounties] = useState([]);
-    const [approvalBounty, setApprovalBounty] = useState(null); 
+    const [approvalBounty, setApprovalBounty] = useState(null);
     const [showBountyDashboardModal, setShowBountyDashboardModal] = useState(false);
     const [showBountySubmissionsModal, setShowBountySubmissionsModal] = useState(false);
     const router = useRouter();
@@ -918,21 +904,41 @@ export default function SellerAccountClient() {
     const [showBankModal, setShowBankModal] = useState(false);
     const [bankFormData, setBankFormData] = useState({ accountName: "", accountNumber: "", bankName: "", bankCode: "" });
     const [savingBank, setSavingBank] = useState(false);
+
+    // ── NEW: tier modal state ──
+    const [showSellerTierModal, setShowSellerTierModal] = useState(false);
+    const [showFacultyTierModal, setShowFacultyTierModal] = useState(false);
+
     const [formData, setFormData] = useState({
-        firstName: "",
-        surname: "",
-        dateOfBirth: "",
-        phone: "",
-        phoneNumber: "",
-        address: "",
-        country: "",
-        department: "",
-        institution: "",
+        firstName: "", surname: "", dateOfBirth: "", phone: "", phoneNumber: "",
+        address: "", country: "", department: "", institution: "",
     });
     const { processing: pinProcessing, requestPinReset, verifyOtpAndSetPin } = usePayment(null, formData, null);
     const isPendingLecturer = user?.lecturerVerificationStatus === 'pending';
 
-    /* ── All original useEffects & handlers — completely unchanged ── */
+    const [currency, setCurrency] = useState(() => {
+        if (typeof window !== "undefined") return localStorage.getItem("lan_display_currency") || "NGN";
+        return "NGN";
+    });
+    const [showCurrPicker, setShowCurrPicker] = useState(false);
+    const currInfo = CURRENCY_DISPLAY[currency] || CURRENCY_DISPLAY.NGN;
+    const isNGN = currency === "NGN";
+    const fmt = (ngnAmt) => displayCurrency(ngnAmt, currency, currInfo);
+
+    const handleCurrencyChange = (code) => {
+        setCurrency(code);
+        if (typeof window !== "undefined") localStorage.setItem("lan_display_currency", code);
+    };
+
+    // ── Determine user type flags ──
+    const isFacultyUser =
+        user?.isLecturer === true || user?.role === "faculty" || user?.role === "lecturer" ||
+        FACULTY_TITLES.includes(seller?.title) || FACULTY_TITLES.includes(user?.lecturerTitle) ||
+        user?.lecturerVerificationStatus === 'pending' || user?.lecturerVerificationStatus === 'approved' ||
+        user?.lecturerVerificationStatus === 'rejected';
+
+    const isSellerUser = user?.isSeller === true;
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) { await fetchUserData(currentUser.uid); }
@@ -942,21 +948,14 @@ export default function SellerAccountClient() {
     }, [router]);
 
     const fetchUserData = async (uid) => {
-        
         try {
             setLoading(true);
             const userDoc = await getDoc(doc(db, "users", uid));
             if (userDoc.exists()) {
                 const userData = userDoc.data();
                 if (userData.isDeactivated === true) { await auth.signOut(); router.push("/auth/signin?reason=deactivated"); return; }
-                // Lecturer pending — allow them to see the page but in pending state
-                const isPendingLecturer = userData.lecturerVerificationStatus === 'pending' ||
-                    userData.lecturerVerificationStatus === 'rejected';
-
-                if (!userData.isSeller && !isPendingLecturer) {
-                    router.push('/my-account');
-                    return;
-                }
+                const isPendingLecturer = userData.lecturerVerificationStatus === 'pending' || userData.lecturerVerificationStatus === 'rejected';
+                if (!userData.isSeller && !isPendingLecturer) { router.push('/my-account'); return; }
                 if (userData.isSeller && window.location.pathname === '/my-account') { router.push('/my-account/seller-account'); return; }
                 const sellerDoc = await getDoc(doc(db, "sellers", uid));
                 let bankDetails = null;
@@ -976,28 +975,18 @@ export default function SellerAccountClient() {
                 }
                 setUser({ uid, ...userData, bankDetails });
                 setFormData({
-                    firstName: userData.firstName || "",
-                    surname: userData.surname || "",
-                    dateOfBirth: userData.dateOfBirth || "",
-                    phone: userData.phone || userData.phoneNumber || "",
-                    phoneNumber: userData.phoneNumber || userData.phone || "",
-                    address: userData.address || "",
-                    country: userData.country || "",
-                    department: userData.department || "",        // ✅ already has fallback
+                    firstName: userData.firstName || "", surname: userData.surname || "",
+                    dateOfBirth: userData.dateOfBirth || "", phone: userData.phone || userData.phoneNumber || "",
+                    phoneNumber: userData.phoneNumber || userData.phone || "", address: userData.address || "",
+                    country: userData.country || "", department: userData.department || "",
                     institution: userData.institution || userData.selectedUniversity || "",
                 });
-
-                
                 await fetchSellerTransactions(uid);
-                
                 try {
-                  const bq = query(
-                    collection(db, 'bounties'),
-                    where('claimedBy', '==', uid)
-                  );
-                  const bs = await getDocs(bq);
-                  setMyClaimedBounties(bs.docs.map(d => ({ id: d.id, ...d.data() })));
-                } catch {}
+                    const bq = query(collection(db, 'bounties'), where('claimedBy', '==', uid));
+                    const bs = await getDocs(bq);
+                    setMyClaimedBounties(bs.docs.map(d => ({ id: d.id, ...d.data() })));
+                } catch { }
             }
         } catch (error) { console.error("Error fetching user data:", error); }
         finally { setLoading(false); }
@@ -1008,217 +997,68 @@ export default function SellerAccountClient() {
         return flags[country] || "🌍";
     }
 
-    
     const fetchPhysicalOrders = async () => {
         if (!user?.uid) return;
         setPhysicalOrdersLoading(true);
         try {
-            const snap = await getDocs(
-                query(collection(db, "physicalOrders"), where("userId", "==", user.uid))
-            );
-            const orders = snap.docs
-                .map(d => ({
-                    id: d.id,
-                    ...d.data(),
-                    createdAtDate: d.data().createdAt?.toDate?.() || new Date(),
-                }))
-                .sort((a, b) => b.createdAtDate - a.createdAtDate);
+            const snap = await getDocs(query(collection(db, "physicalOrders"), where("userId", "==", user.uid)));
+            const orders = snap.docs.map(d => ({ id: d.id, ...d.data(), createdAtDate: d.data().createdAt?.toDate?.() || new Date() })).sort((a, b) => b.createdAtDate - a.createdAtDate);
             setPhysicalOrders(orders);
-        } catch (err) {
-            console.error("Failed to fetch physical orders:", err.message);
-        } finally {
-            setPhysicalOrdersLoading(false);
-        }
-    }
+        } catch (err) { console.error("Failed to fetch physical orders:", err.message); }
+        finally { setPhysicalOrdersLoading(false); }
+    };
 
-    
-    
-   const fetchSellerTransactions = async (uid) => {
-  try {
-    let allTransactions = [];
- 
-    /* ── 1. Standard sales from `transactions` collection ── */
-    const transactionsQuery = query(
-      collection(db, "transactions"),
-      where("sellerId", "==", uid)
-    );
-    const transactionsSnapshot = await getDocs(transactionsQuery);
-    const txnsFromCollection = await Promise.all(
-      transactionsSnapshot.docs.map(async (docSnap) => {
-        const data = docSnap.data();
-        let buyerCountry = null;
-        const buyerId =
-          data.buyerId || data.userId || data.buyerUid || data.uid || null;
-        // Don't look up the seller themselves as a buyer
-        if (buyerId && buyerId !== uid) {
-          try {
-            const bd = await getDoc(doc(db, "users", buyerId));
-            if (bd.exists()) buyerCountry = bd.data().country || null;
-          } catch {}
-        }
-        return {
-          id: docSnap.id,
-          ...data,
-          bookTitle: data.bookTitle || data.title,
-          buyerCountry,
-          createdAtDate:
-            data.createdAt?.toDate?.() ||
-            (data.purchaseDate ? new Date(data.purchaseDate) : new Date()),
-        };
-      })
-    );
-    allTransactions = [...txnsFromCollection];
- 
-    /* ── 2. Withdrawals ── */
-    const withdrawalsQuery = query(
-      collection(db, "withdrawals"),
-      where("sellerId", "==", uid)
-    );
-    const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
-    const withdrawalsList = withdrawalsSnapshot.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-      requestedAtDate: d.data().requestedAt?.toDate?.() || new Date(),
-    }));
-    withdrawalsList.sort((a, b) => b.requestedAtDate - a.requestedAtDate);
-    setWithdrawals(withdrawalsList);
- 
-    /* ── 3. Outgoing transfers ── */
-    const transfersQuery = query(
-      collection(db, "transfers"),
-      where("senderId", "==", uid)
-    );
-    const transfersSnap = await getDocs(transfersQuery);
-    const transfersList = transfersSnap.docs.map((d) => {
-      const data = d.data();
-      return {
-        id: d.id,
-        ...data,
-        bookTitle: `Transfer to ${data.recipientName || "Unknown"}`,
-        buyerName: data.recipientName || "Unknown",
-        amount: data.amount,
-        sellerAmount: -data.amount,
-        createdAtDate: data.createdAt?.toDate?.() || new Date(),
-        type: "transfer_out",
-      };
-    });
- 
-    /* ── 4. Incoming transfers ── */
-    const incomingQuery = query(
-      collection(db, "transfers"),
-      where("recipientId", "==", uid)
-    );
-    const incomingSnap = await getDocs(incomingQuery);
-    const incomingList = await Promise.all(
-      incomingSnap.docs.map(async (d) => {
-        const data = d.data();
-        let buyerCountry = null;
-        if (data.senderId) {
-          try {
-            const sd = await getDoc(doc(db, "users", data.senderId));
-            if (sd.exists()) buyerCountry = sd.data().country || null;
-          } catch {}
-        }
-        return {
-          id: `incoming-${d.id}`,
-          ...data,
-          bookTitle: `Transfer from ${data.senderName || "Unknown"}`,
-          buyerName: data.senderName || "Unknown",
-          amount: data.amount,
-          sellerAmount: data.amount,
-          buyerCountry,
-          createdAtDate: data.createdAt?.toDate?.() || new Date(),
-          type: "transfer_in",
-        };
-      })
-    );
- 
-    /* ── 5. Physical sales ── */
-    const physicalSalesQuery = query(
-      collection(db, "physicalSales"),
-      where("sellerId", "==", uid)
-    );
-    const physicalSalesSnap = await getDocs(physicalSalesQuery);
-    const physicalSalesList = physicalSalesSnap.docs.map((d) => {
-      const data = d.data();
-      return {
-        ...data,
-        bookTitle: `📦 ${data.bookTitle} (Registry Pickup)`,
-        buyerName: data.studentName || data.buyerName || "Student",
-        amount: data.salePrice || data.price || 0,
-        sellerAmount: data.sellerPayout || 0,
-        platformFee: data.platformFee || 0,
-        createdAtDate: data.soldAt?.toDate?.() || new Date(),
-        type: "physical_sale",
-      };
-    });
+    const fetchSellerTransactions = async (uid) => {
+        try {
+            let allTransactions = [];
+            const transactionsQuery = query(collection(db, "transactions"), where("sellerId", "==", uid));
+            const transactionsSnapshot = await getDocs(transactionsQuery);
+            const txnsFromCollection = await Promise.all(
+                transactionsSnapshot.docs.map(async (docSnap) => {
+                    const data = docSnap.data();
+                    let buyerCountry = null;
+                    const buyerId = data.buyerId || data.userId || data.buyerUid || data.uid || null;
+                    if (buyerId && buyerId !== uid) {
+                        try { const bd = await getDoc(doc(db, "users", buyerId)); if (bd.exists()) buyerCountry = bd.data().country || null; } catch { }
+                    }
+                    return { id: docSnap.id, ...data, bookTitle: data.bookTitle || data.title, buyerCountry, createdAtDate: data.createdAt?.toDate?.() || (data.purchaseDate ? new Date(data.purchaseDate) : new Date()) };
+                })
+            );
+            allTransactions = [...txnsFromCollection];
+            const withdrawalsQuery = query(collection(db, "withdrawals"), where("sellerId", "==", uid));
+            const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
+            const withdrawalsList = withdrawalsSnapshot.docs.map(d => ({ id: d.id, ...d.data(), requestedAtDate: d.data().requestedAt?.toDate?.() || new Date() }));
+            withdrawalsList.sort((a, b) => b.requestedAtDate - a.requestedAtDate);
+            setWithdrawals(withdrawalsList);
+            const transfersQuery = query(collection(db, "transfers"), where("senderId", "==", uid));
+            const transfersSnap = await getDocs(transfersQuery);
+            const transfersList = transfersSnap.docs.map(d => { const data = d.data(); return { id: d.id, ...data, bookTitle: `Transfer to ${data.recipientName || "Unknown"}`, buyerName: data.recipientName || "Unknown", amount: data.amount, sellerAmount: -data.amount, createdAtDate: data.createdAt?.toDate?.() || new Date(), type: "transfer_out" }; });
+            const incomingQuery = query(collection(db, "transfers"), where("recipientId", "==", uid));
+            const incomingSnap = await getDocs(incomingQuery);
+            const incomingList = await Promise.all(incomingSnap.docs.map(async (d) => {
+                const data = d.data(); let buyerCountry = null;
+                if (data.senderId) { try { const sd = await getDoc(doc(db, "users", data.senderId)); if (sd.exists()) buyerCountry = sd.data().country || null; } catch { } }
+                return { id: `incoming-${d.id}`, ...data, bookTitle: `Transfer from ${data.senderName || "Unknown"}`, buyerName: data.senderName || "Unknown", amount: data.amount, sellerAmount: data.amount, buyerCountry, createdAtDate: data.createdAt?.toDate?.() || new Date(), type: "transfer_in" };
+            }));
+            const physicalSalesQuery = query(collection(db, "physicalSales"), where("sellerId", "==", uid));
+            const physicalSalesSnap = await getDocs(physicalSalesQuery);
+            const physicalSalesList = physicalSalesSnap.docs.map(d => { const data = d.data(); return { ...data, bookTitle: `📦 ${data.bookTitle} (Registry Pickup)`, buyerName: data.studentName || data.buyerName || "Student", amount: data.salePrice || data.price || 0, sellerAmount: data.sellerPayout || 0, platformFee: data.platformFee || 0, createdAtDate: data.soldAt?.toDate?.() || new Date(), type: "physical_sale" }; });
+            try {
+                const bountyFulfilledSnap = await getDocs(query(collection(db, "bounties"), where("fulfilledByUid", "==", uid), where("status", "==", "fulfilled")));
+                const bountyPayoutsList = bountyFulfilledSnap.docs.map(d => { const data = d.data(); const escrow = data.escrowAmount || data.reward || 0; return { id: `bounty-payout-${d.id}`, bookTitle: `🎯 Bounty Reward — ${data.title || "Bounty"}`, buyerName: data.postedBy || "Student", amount: escrow, sellerAmount: data.authorPayout || Math.round(escrow * 0.8), platformFee: data.platformFee || Math.round(escrow * 0.2), createdAtDate: data.approvedAt?.toDate?.() || data.fulfilledAt?.toDate?.() || new Date(), type: "bounty_payout" }; });
+                allTransactions = [...allTransactions, ...bountyPayoutsList];
+            } catch (e) { console.warn("Bounty payouts fetch failed:", e); }
+            try {
+                const bountyPostedSnap = await getDocs(query(collection(db, "bounties"), where("postedByUid", "==", uid)));
+                const bountyPostedList = bountyPostedSnap.docs.map(d => { const data = d.data(); return { id: `bounty-posted-${d.id}`, bookTitle: `📌 Bounty Request — ${data.title || "Bounty"}`, buyerName: "Locked in Escrow", amount: data.reward || data.escrowAmount || 0, sellerAmount: -(data.reward || data.escrowAmount || 0), createdAtDate: data.createdAt?.toDate?.() || new Date(), type: "bounty_posted" }; });
+                allTransactions = [...allTransactions, ...bountyPostedList];
+            } catch (e) { console.warn("Bounty posted fetch failed:", e); }
+            allTransactions = [...allTransactions, ...transfersList, ...incomingList, ...physicalSalesList];
+            allTransactions.sort((a, b) => b.createdAtDate - a.createdAtDate);
+            setTransactions(allTransactions);
+        } catch (error) { console.error("Error fetching seller transactions:", error); }
+    };
 
-    try {
-      const bountyFulfilledSnap = await getDocs(
-        query(
-          collection(db, "bounties"),
-          where("fulfilledByUid", "==", uid),
-          where("status", "==", "fulfilled")
-        )
-      );
-      const bountyPayoutsList = bountyFulfilledSnap.docs.map((d) => {
-        const data = d.data();
-        const escrow = data.escrowAmount || data.reward || 0;
-        return {
-          id: `bounty-payout-${d.id}`,
-          bookTitle: `🎯 Bounty Reward — ${data.title || "Bounty"}`,
-          buyerName: data.postedBy || "Student",
-          amount: escrow,
-          sellerAmount: data.authorPayout || Math.round(escrow * 0.8),
-          platformFee: data.platformFee || Math.round(escrow * 0.2),
-          createdAtDate:
-            data.approvedAt?.toDate?.() ||
-            data.fulfilledAt?.toDate?.() ||
-            new Date(),
-          type: "bounty_payout",
-        };
-      });
-      allTransactions = [...allTransactions, ...bountyPayoutsList];
-    } catch (e) {
-      console.warn("Bounty payouts fetch failed:", e);
-    }
- 
-    /* ── 7. ★ Bounty postings — escrow locks ── */
-    try {
-      const bountyPostedSnap = await getDocs(
-        query(collection(db, "bounties"), where("postedByUid", "==", uid))
-      );
-      const bountyPostedList = bountyPostedSnap.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: `bounty-posted-${d.id}`,
-          bookTitle: `📌 Bounty Request — ${data.title || "Bounty"}`,
-          buyerName: "Locked in Escrow",
-          amount: data.reward || data.escrowAmount || 0,
-          sellerAmount: -(data.reward || data.escrowAmount || 0),
-          createdAtDate: data.createdAt?.toDate?.() || new Date(),
-          type: "bounty_posted",
-        };
-      });
-      allTransactions = [...allTransactions, ...bountyPostedList];
-    } catch (e) {
-      console.warn("Bounty posted fetch failed:", e);
-    }
- 
-    allTransactions = [
-      ...allTransactions,
-      ...transfersList,
-      ...incomingList,
-      ...physicalSalesList,
-    ];
-    allTransactions.sort((a, b) => b.createdAtDate - a.createdAtDate);
-    setTransactions(allTransactions);
-  } catch (error) {
-    console.error("Error fetching seller transactions:", error);
-  }
-};
-
-    
     const handleSaveBank = async () => {
         if (!bankFormData.accountName || !bankFormData.accountNumber || !bankFormData.bankName) { alert("Please fill in all required fields"); return; }
         try {
@@ -1237,52 +1077,28 @@ export default function SellerAccountClient() {
     };
 
     const handleImageUpload = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
+        const file = e.target.files[0]; if (!file) return;
         setUploading(true);
-        uploadImageToCloudinary(file, 'profiles')
-            .then(async (url) => {
-                await updateDoc(doc(db, 'users', user.uid), {
-                    photoURL: url,
-                    photoBase64: url  // keep photoBase64 in sync since seller page uses this field
-                });
-                setUser(prev => ({ ...prev, photoURL: url, photoBase64: url }));
-            })
-            .catch(err => alert('Failed to update image: ' + err.message))
-            .finally(() => setUploading(false));
+        uploadImageToCloudinary(file, 'profiles').then(async (url) => {
+            await updateDoc(doc(db, 'users', user.uid), { photoURL: url, photoBase64: url });
+            setUser(prev => ({ ...prev, photoURL: url, photoBase64: url }));
+        }).catch(err => alert('Failed to update image: ' + err.message)).finally(() => setUploading(false));
     };
 
     const handleSave = async () => {
         try {
-            // Build update object, replacing any undefined with "" so Firestore doesn't reject it
             const updatePayload = {
-                firstName: formData.firstName || "",
-                surname: formData.surname || "",
-                dateOfBirth: formData.dateOfBirth || "",
-                phone: formData.phone || "",
-                phoneNumber: formData.phone || "",
-                address: formData.address || "",
-                country: formData.country || "",
-                department: formData.department || "",
-                institution: formData.institution || "",
-                selectedUniversity: formData.institution || "",
-                displayName: `${formData.firstName} ${formData.surname}`,
-                updatedAt: serverTimestamp(),
+                firstName: formData.firstName || "", surname: formData.surname || "",
+                dateOfBirth: formData.dateOfBirth || "", phone: formData.phone || "",
+                phoneNumber: formData.phone || "", address: formData.address || "",
+                country: formData.country || "", department: formData.department || "",
+                institution: formData.institution || "", selectedUniversity: formData.institution || "",
+                displayName: `${formData.firstName} ${formData.surname}`, updatedAt: serverTimestamp(),
             };
-
             await updateDoc(doc(db, "users", user.uid), updatePayload);
-
-            setUser(prev => ({
-                ...prev,
-                ...updatePayload,
-                updatedAt: new Date(),
-            }));
-            setIsEditing(false);
-            alert("Profile updated successfully!");
-        } catch (error) {
-            alert("Failed to save profile: " + error.message);
-        }
+            setUser(prev => ({ ...prev, ...updatePayload, updatedAt: new Date() }));
+            setIsEditing(false); alert("Profile updated successfully!");
+        } catch (error) { alert("Failed to save profile: " + error.message); }
     };
 
     const handlePinConfirm = async () => {
@@ -1326,7 +1142,6 @@ export default function SellerAccountClient() {
     const handleButton = () => router.push("/lan/net/help-center");
     const referral = () => router.push("/ref/invite-friends");
 
-    /* ── Loading state ── */
     if (loading) return (
         <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG }}>
             <div style={{ textAlign: 'center' }}>
@@ -1337,416 +1152,331 @@ export default function SellerAccountClient() {
         </div>
     );
 
-    /* ══════════════════════════════════════════════════════════════
-       RENDER
-    ══════════════════════════════════════════════════════════════ */
     return (
         <>
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
-                .lan-root { font-family:'Lato',sans-serif; background:${BG}; }
+                * { box-sizing: border-box; }
+                .lan-root { font-family:'Lato',sans-serif; background:${BG}; min-height:100vh; }
                 .lan-serif { font-family:'Playfair Display',Georgia,serif; }
-                .action-row { display:flex; align-items:center; gap:12px; padding:14px 16px; border:0.5px solid #e5ddd0; background:#fff; text-decoration:none; transition:border-color 0.18s,background 0.18s; cursor:pointer; }
+                .action-row { display:flex; align-items:center; gap:12px; padding:12px 14px; border:0.5px solid #e5ddd0; background:#fff; text-decoration:none; transition:border-color 0.18s,background 0.18s; cursor:pointer; width:100%; }
                 .action-row:hover { border-color:${GOLD}; background:${CREAM}; }
-                .txn-row { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border:0.5px solid #f0ebe0; background:#fff; margin-bottom:6px; transition:background 0.15s; }
+                .txn-row { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border:0.5px solid #f0ebe0; background:#fff; margin-bottom:6px; transition:background 0.15s; gap:8px; }
                 .txn-row:hover { background:${CREAM}; }
                 .sbar-none { scrollbar-width:none; -ms-overflow-style:none; }
                 .sbar-none::-webkit-scrollbar { display:none; }
-                .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:50; display:flex; align-items:center; justify-content:flex-start; flex-direction:column; overflow-y:auto; }
-                .modal-inner { background:#fff; width:100%; min-height:100vh; max-width:640px; margin:0 auto; }
-                @media(min-width:640px){ .modal-inner { min-height:auto; margin:40px auto; } }
+                .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:50; display:flex; align-items:flex-start; justify-content:center; overflow-y:auto; overflow-x:hidden; }
+                .modal-inner { background:#fff; width:100%; max-width:640px; min-height:100vh; margin:0 auto; display:flex; flex-direction:column; }
+                @media(min-width:640px){ .modal-inner { min-height:auto; margin:40px auto; border-radius:4px; } }
                 .gold-pill { display:inline-flex; align-items:center; gap:6px; background:rgba(184,150,62,0.12); border:0.5px solid rgba(184,150,62,0.3); padding:5px 12px; border-radius:999px; }
                 @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
                 .anim-up { animation:slideUp 0.45s cubic-bezier(0.4,0,0.2,1) both; }
-                @keyframes pulse2 { 0%,100%{opacity:1} 50%{opacity:0.4} }
                 .pulse-dot { animation:pulse2 2s infinite; }
+                @keyframes pulse2 { 0%,100%{opacity:1} 50%{opacity:0.4} }
+                .lg-grid { display:grid; grid-template-columns:1fr; gap:20px; }
+                .lg-hide { display:flex; }
+                .help-btn { display:none !important; }
+                .curr-label { display:none !important; }
+                @media(min-width:400px) {
+                    .curr-label { display:inline !important; }
+                    .help-btn { display:inline-block !important; }
+                }
+                @media(min-width:1024px) {
+                    .lg-grid { grid-template-columns: 2fr 1fr !important; }
+                    .lg-hide { display:none !important; }
+                }
             `}</style>
 
-            <div className="lan-root" style={{ minHeight: '100vh' }}>
+            <div className="lan-root">
                 <Navbar />
 
-                <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 16px' }}>
+                <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 16px 100px' }}>
 
                     <VerificationTimeline user={user} seller={seller} />
 
-
                     {/* ── Top Header Bar ── */}
-                    <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '16px 24px', marginBottom: '24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                        <button onClick={() => setShowProfileModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
-                            <img src={user?.photoURL || user?.photoBase64 || "/lan-logo.png"} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}` }} alt="Profile" />
-                            <div style={{ textAlign: 'left' }}>
-                                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '16px', fontWeight: 700, color: NAVY, margin: 0, display: 'flex', alignItems: 'center' }}>
-                                    {seller?.title ? `${seller.title} ` : ""}{user?.firstName} {user?.surname}
+                    <div style={{
+                        background: '#fff', border: '0.5px solid #e5ddd0',
+                        padding: '10px 14px', marginBottom: '20px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+                        overflow: 'hidden',
+                    }}>
+                        {/* Profile — left side */}
+                        <button onClick={() => setShowProfileModal(true)} style={{
+                            display: 'flex', alignItems: 'center', gap: '10px',
+                            background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+                            minWidth: 0, flex: 1, overflow: 'hidden',
+                        }}>
+                            <img
+                                src={user?.photoURL || user?.photoBase64 || "/lan-logo.png"}
+                                style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}`, flexShrink: 0 }}
+                                alt="Profile"
+                            />
+                            <div style={{ textAlign: 'left', minWidth: 0, overflow: 'hidden' }}>
+                                <p style={{
+                                    fontFamily: "'Playfair Display',serif", fontSize: '14px', fontWeight: 700, color: NAVY, margin: 0,
+                                    display: 'flex', alignItems: 'center', overflow: 'hidden',
+                                    textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                }}>
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {seller?.title ? `${seller.title} ` : ""}{user?.firstName} {user?.surname}
+                                    </span>
                                     <VerifiedFacultyBadge user={user} seller={seller} />
                                 </p>
-                                <div className="gold-pill" style={{ marginTop: '4px' }}>
+                                <div className="gold-pill" style={{ marginTop: '3px' }}>
                                     <div className="pulse-dot" style={{
-                                        width: '6px', height: '6px', borderRadius: '50%',
+                                        width: '5px', height: '5px', borderRadius: '50%',
                                         background: user?.lecturerVerificationStatus === 'pending' ? '#f59e0b'
                                             : user?.lecturerVerificationStatus === 'rejected' ? '#ef4444'
-                                                : '#16a34a'
-                                    }} />                                    <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: GOLD, fontFamily: "'Lato',sans-serif" }}>
-                                        {user?.lecturerVerificationStatus === 'pending' ? 'Pending Verification'
-                                            : user?.lecturerVerificationStatus === 'rejected' ? 'Verification Rejected'
-                                                : user?.isLecturer || FACULTY_TITLES.includes(seller?.title) ? 'Verified Faculty'
-                                                    : 'Verified Seller'}
+                                                : '#16a34a',
+                                        flexShrink: 0,
+                                    }} />
+                                    <span style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: GOLD, fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap' }}>
+                                        {user?.lecturerVerificationStatus === 'pending' ? 'Pending'
+                                            : user?.lecturerVerificationStatus === 'rejected' ? 'Rejected'
+                                                : isFacultyUser ? 'Verified Faculty'
+                                                    : seller?.isVerifiedSeller ? 'Verified Seller'
+                                                        : 'Seller'}
                                     </span>
                                 </div>
                             </div>
                         </button>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+
+                        {/* Right actions */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                             <NotificationBell userId={user?.uid} />
-                            <a href="/support" style={{ background: GOLD, color: NAVY, fontSize: '11px', fontWeight: 700, padding: '9px 18px', textDecoration: 'none', letterSpacing: '0.06em', fontFamily: "'Lato',sans-serif" }}>GET HELP</a>
-                            <button onClick={() => setShowSwitchModal(true)} style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px' }}>
-                                {[0, 1, 2].map(i => <span key={i} style={{ width: '18px', height: '2px', background: NAVY, display: 'block' }} />)}
+                            <a href="/lan/net/help-center" className="help-btn"
+                                style={{ background: GOLD, color: NAVY, fontSize: '10px', fontWeight: 700, padding: '7px 12px', textDecoration: 'none', letterSpacing: '0.06em', fontFamily: "'Lato',sans-serif" }}>
+                                HELP
+                            </a>
+                            <button onClick={() => setShowCurrPicker(true)} style={{
+                                display: "flex", alignItems: "center", gap: 4,
+                                background: isNGN ? "#fff" : CREAM,
+                                border: `1.5px solid ${isNGN ? "#e5ddd0" : GOLD}`,
+                                padding: "6px 8px", fontSize: 9, fontWeight: 700,
+                                color: isNGN ? "#888" : NAVY, cursor: "pointer",
+                                fontFamily: "'Lato',sans-serif", flexShrink: 0,
+                            }}>
+                                <span style={{ fontSize: 14 }}>{currInfo.flag}</span>
+                                <span className="curr-label">{currInfo.symbol}</span>
+                            </button>
+                            <button onClick={() => setShowSwitchModal(true)} style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px', flexShrink: 0 }}>
+                                {[0, 1, 2].map(i => <span key={i} style={{ width: '16px', height: '2px', background: NAVY, display: 'block' }} />)}
                             </button>
                         </div>
                     </div>
 
                     {/* ── 2-col layout ── */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }} className="lg-grid">
-                        <style>{`@media(min-width:1024px){.lg-grid{grid-template-columns:2fr 1fr !important;}}`}</style>
+                    <div className="lg-grid">
 
-                        {/* LEFT */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* LEFT COLUMN */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
 
                             {/* Balance Card */}
-                            <div className="anim-up" style={{ background: NAVY, backgroundImage: 'radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)', backgroundSize: '24px 24px', padding: '28px', position: 'relative', overflow: 'hidden' }}>
-                                {/* subtle corner diamond */}
+                            <div className="anim-up" style={{
+                                background: NAVY,
+                                backgroundImage: 'radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)',
+                                backgroundSize: '24px 24px', padding: '24px', position: 'relative', overflow: 'hidden',
+                            }}>
                                 <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '120px', height: '120px', border: `0.5px solid rgba(184,150,62,0.15)`, transform: 'rotate(45deg)' }} />
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                                    <div>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px', gap: 8 }}>
+                                    <div style={{ minWidth: 0 }}>
                                         <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: GOLD, marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Available Balance</p>
-                                        <p className="lan-serif" style={{ fontSize: 'clamp(32px,6vw,52px)', fontWeight: 700, color: '#fff', margin: 0, lineHeight: 1 }}>
-                                            ₦{accountBalance.toLocaleString()}
+                                        <p className="lan-serif" style={{ fontSize: 'clamp(28px,5vw,48px)', fontWeight: 700, color: '#fff', margin: 0, lineHeight: 1, wordBreak: 'break-word' }}>
+                                            {fmt(accountBalance)}
                                         </p>
-                                        <p style={{ fontSize: '12px', color: 'rgba(184,150,62,0.7)', marginTop: '6px', fontFamily: "'Lato',sans-serif" }}>Total earnings: ₦{totalEarnings.toLocaleString()}</p>
+                                        <p style={{ fontSize: '11px', color: 'rgba(184,150,62,0.7)', marginTop: '6px', fontFamily: "'Lato',sans-serif" }}>Total earnings: {fmt(totalEarnings)}</p>
                                     </div>
                                     <button onClick={() => setShowTransactionHistory(true)}
-                                        style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: GOLDD, background: 'transparent', border: 'none', cursor: 'pointer', letterSpacing: '0.06em', fontFamily: "'Lato',sans-serif", textTransform: 'uppercase' }}>
+                                        style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: GOLDD, background: 'transparent', border: 'none', cursor: 'pointer', letterSpacing: '0.06em', fontFamily: "'Lato',sans-serif", textTransform: 'uppercase', flexShrink: 0 }}>
                                         History <ChevronRight size={13} />
                                     </button>
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                     <button onClick={() => setShowWithdrawModal(true)} disabled={accountBalance < 1000 || isPendingLecturer}
-                                        style={{ flex: '1', minWidth: '120px', background: GOLD, color: NAVY, padding: '12px 20px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: accountBalance >= 1000 ? 'pointer' : 'not-allowed', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em', opacity: accountBalance < 1000 ? 0.5 : 1, transition: 'background 0.18s' }}
+                                        style={{ flex: '1', minWidth: '110px', background: GOLD, color: NAVY, padding: '12px 16px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: accountBalance >= 1000 ? 'pointer' : 'not-allowed', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em', opacity: accountBalance < 1000 ? 0.5 : 1, transition: 'background 0.18s' }}
                                         onMouseEnter={e => { if (accountBalance >= 1000) e.currentTarget.style.background = GOLDD; }}
                                         onMouseLeave={e => e.currentTarget.style.background = GOLD}
                                     >Withdraw</button>
-                                    <a href="/transfer" style={{ flex: '1', minWidth: '120px', background: 'rgba(255,255,255,0.1)', color: '#fff', padding: '12px 20px', border: '0.5px solid rgba(255,255,255,0.2)', fontSize: '13px', fontWeight: 700, textDecoration: 'none', textAlign: 'center', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em', display: 'inline-block', transition: 'background 0.18s' }}
+                                    <a href="/transfer" style={{ flex: '1', minWidth: '110px', background: 'rgba(255,255,255,0.1)', color: '#fff', padding: '12px 16px', border: '0.5px solid rgba(255,255,255,0.2)', fontSize: '13px', fontWeight: 700, textDecoration: 'none', textAlign: 'center', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em', display: 'inline-block', transition: 'background 0.18s' }}
                                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
                                         onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
                                     >Transfer</a>
                                 </div>
+                                {isPendingLecturer && (
+                                    <p style={{ fontSize: '11px', color: 'rgba(184,150,62,0.6)', marginTop: '8px', fontFamily: "'Lato',sans-serif" }}>
+                                        Withdrawals available after verification
+                                    </p>
+                                )}
                             </div>
-
-                            {isPendingLecturer && (
-                                <p style={{ fontSize: '11px', color: 'rgba(184,150,62,0.6)', marginTop: '8px', fontFamily: "'Lato',sans-serif" }}>
-                                    Withdrawals available after verification
-                                </p>
-                            )}
 
                             {/* Stats Row */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 {[
-                                    { icon: <TrendingUp size={18} style={{ color: GOLD }} />, label: 'Total Earnings', val: `₦${totalEarnings.toLocaleString()}` },
+                                    { icon: <TrendingUp size={18} style={{ color: GOLD }} />, label: 'Total Earnings', val: fmt(totalEarnings) },
                                     { icon: <ShoppingBag size={18} style={{ color: GOLD }} />, label: 'Documents Sold', val: booksSold },
                                 ].map(({ icon, label, val }, i) => (
-                                    <div key={i} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '20px' }}>
-                                        <div style={{ width: '40px', height: '40px', border: `0.5px solid #e5ddd0`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>{icon}</div>
+                                    <div key={i} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '16px', minWidth: 0 }}>
+                                        <div style={{ width: '38px', height: '38px', border: `0.5px solid #e5ddd0`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>{icon}</div>
                                         <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#aaa', margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>{label}</p>
-                                        <p className="lan-serif" style={{ fontSize: '24px', fontWeight: 700, color: NAVY, margin: 0 }}>{val}</p>
+                                        <p className="lan-serif" style={{ fontSize: 'clamp(20px,4vw,26px)', fontWeight: 700, color: NAVY, margin: 0 }}>{val}</p>
                                     </div>
                                 ))}
                             </div>
+
+                            {/* ─── TIER SUMMARY CARDS — conditional on role ─── */}
+                            {/* Seller tier: only for sellers who are NOT purely faculty */}
+                            {isSellerUser && !isFacultyUser && (
+                                <TierSummaryCard
+                                    totalEarnings={totalEarnings}
+                                    isFaculty={false}
+                                    onViewDetails={() => setShowSellerTierModal(true)}
+                                    fmt={fmt}
+                                />
+                            )}
+
+                            {/* Show Faculty Rank ONLY for faculty users */}
+                            {isFacultyUser && (
+                                <TierSummaryCard
+                                    totalEarnings={totalEarnings}
+                                    isFaculty={true}
+                                    onViewDetails={() => setShowFacultyTierModal(true)}
+                                    fmt={fmt}
+                                />
+                            )}
 
                             {/* VTU */}
                             <VTUQuickAccess />
 
                             {/* Recent Transactions */}
-                            <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "24px" }}>
-                                {/* header row */}
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "flex-end",
-                                        justifyContent: "space-between",
-                                        marginBottom: "20px",
-                                    }}
-                                >
-                                    <div>
-                                        <p
-                                            style={{
-                                                fontSize: "10px",
-                                                fontWeight: 700,
-                                                letterSpacing: "0.2em",
-                                                textTransform: "uppercase",
-                                                color: GOLD,
-                                                marginBottom: "4px",
-                                                fontFamily: "'Lato',sans-serif",
-                                            }}
-                                        >
-                                            Activity
-                                        </p>
-                                        <h3
-                                            className="lan-serif"
-                                            style={{ fontSize: "20px", fontWeight: 700, color: NAVY, margin: 0 }}
-                                        >
-                                            Recent Transactions
-                                        </h3>
+                            <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "20px", minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "16px", gap: 8 }}>
+                                    <div style={{ minWidth: 0 }}>
+                                        <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, marginBottom: "4px", fontFamily: "'Lato',sans-serif" }}>Activity</p>
+                                        <h3 className="lan-serif" style={{ fontSize: "18px", fontWeight: 700, color: NAVY, margin: 0 }}>Recent Transactions</h3>
                                     </div>
-                                    <button
-                                        onClick={() => setShowTransactionHistory(true)}
-                                        style={{
-                                            fontSize: "11px",
-                                            fontWeight: 700,
-                                            color: NAVY,
-                                            background: "transparent",
-                                            border: "none",
-                                            cursor: "pointer",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "4px",
-                                            fontFamily: "'Lato',sans-serif",
-                                            letterSpacing: "0.04em",
-                                        }}
-                                    >
+                                    <button onClick={() => setShowTransactionHistory(true)}
+                                        style={{ fontSize: "11px", fontWeight: 700, color: NAVY, background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", fontFamily: "'Lato',sans-serif", letterSpacing: "0.04em", flexShrink: 0 }}>
                                         View all <ChevronRight size={13} />
                                     </button>
                                 </div>
 
-                                {/* empty state */}
                                 {transactions.length === 0 ? (
-                                    <div
-                                        style={{
-                                            textAlign: "center",
-                                            padding: "40px 0",
-                                            borderTop: "0.5px solid #f0ebe0",
-                                        }}
-                                    >
+                                    <div style={{ textAlign: "center", padding: "40px 0", borderTop: "0.5px solid #f0ebe0" }}>
                                         <ShoppingBag size={36} style={{ color: "#ddd", margin: "0 auto 10px" }} />
-                                        <p style={{ fontSize: "13px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>
-                                            No transactions yet
-                                        </p>
+                                        <p style={{ fontSize: "13px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>No transactions yet</p>
                                     </div>
                                 ) : (
-                                    /* ── transaction rows ── */
                                     transactions.slice(0, 5).map((txn) => {
-                                        const isOut =
-                                            txn.type === "transfer_out" || txn.type === "bounty_posted";
+                                        const isOut = txn.type === "transfer_out" || txn.type === "bounty_posted";
                                         const isBountyPayout = txn.type === "bounty_payout";
-
+                                        const sellerAmt = txn.sellerAmount || txn.amount * 0.8;
                                         const amountDisplay = isOut
-                                            ? `-₦${Number(txn.amount).toLocaleString()}`
-                                            : `+₦${Number(
-                                                txn.sellerAmount || txn.amount * 0.8
-                                            ).toLocaleString()}`;
-
-                                        const statusLabel = isBountyPayout
-                                            ? "🎯 Bounty Bonus"
-                                            : txn.type === "bounty_posted"
-                                                ? "📌 Escrow Locked"
-                                                : txn.type === "transfer_out"
-                                                    ? "Sent"
-                                                    : txn.type === "transfer_in"
-                                                        ? "Received"
-                                                        : txn.type === "physical_sale"
-                                                            ? "📦 Physical Sale"
-                                                            : "Success";
-
-                                        const icon =
-                                            txn.type === "transfer_out" ? (
-                                                <ArrowUpRight size={16} style={{ color: "#ef4444" }} />
-                                            ) : txn.type === "transfer_in" ? (
-                                                <ArrowDownLeft size={16} style={{ color: "#16a34a" }} />
-                                            ) : txn.type === "physical_sale" ? (
-                                                <Package size={16} style={{ color: GOLD }} />
-                                            ) : isBountyPayout ? (
-                                                <svg
-                                                    width="16"
-                                                    height="16"
-                                                    viewBox="0 0 24 24"
-                                                    fill="none"
-                                                    stroke="#16a34a"
-                                                    strokeWidth="2"
-                                                >
-                                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                                                </svg>
-                                            ) : txn.type === "bounty_posted" ? (
-                                                <svg
-                                                    width="16"
-                                                    height="16"
-                                                    viewBox="0 0 24 24"
-                                                    fill="none"
-                                                    stroke={GOLD}
-                                                    strokeWidth="2"
-                                                >
-                                                    <rect x="3" y="11" width="18" height="11" rx="2" />
-                                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                                </svg>
-                                            ) : (
-                                                <ShoppingBag size={16} style={{ color: NAVY }} />
-                                            );
+                                            ? `-${fmt(Math.abs(sellerAmt))}`
+                                            : `+${fmt(Number(sellerAmt))}`;
+                                        const statusLabel = isBountyPayout ? "🎯 Bounty Bonus" : txn.type === "bounty_posted" ? "📌 Escrow Locked" : txn.type === "transfer_out" ? "Sent" : txn.type === "transfer_in" ? "Received" : txn.type === "physical_sale" ? "📦 Physical Sale" : "Success";
+                                        const icon = txn.type === "transfer_out" ? <ArrowUpRight size={16} style={{ color: "#ef4444" }} />
+                                            : txn.type === "transfer_in" ? <ArrowDownLeft size={16} style={{ color: "#16a34a" }} />
+                                                : txn.type === "physical_sale" ? <Package size={16} style={{ color: GOLD }} />
+                                                    : isBountyPayout ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+                                                        : txn.type === "bounty_posted" ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                                                            : <ShoppingBag size={16} style={{ color: NAVY }} />;
 
                                         return (
                                             <div key={txn.id} className="txn-row">
-                                                {/* ── left: icon + title + date ── */}
-                                                <div
-                                                    style={{
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: "12px",
-                                                        flex: 1,
-                                                        minWidth: 0,
-                                                    }}
-                                                >
-                                                    {/* icon box */}
-                                                    <div
-                                                        style={{
-                                                            width: "38px",
-                                                            height: "38px",
-                                                            border: "0.5px solid #e5ddd0",
-                                                            display: "flex",
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
-                                                            background: CREAM,
-                                                            flexShrink: 0,
-                                                        }}
-                                                    >
-                                                        {icon}
-                                                    </div>
-
-                                                    {/* title + date */}
+                                                <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
+                                                    <div style={{ width: "36px", height: "36px", border: "0.5px solid #e5ddd0", display: "flex", alignItems: "center", justifyContent: "center", background: CREAM, flexShrink: 0 }}>{icon}</div>
                                                     <div style={{ minWidth: 0 }}>
-                                                        <p
-                                                            style={{
-                                                                fontSize: "12px",
-                                                                fontWeight: 700,
-                                                                color: NAVY,
-                                                                margin: "0 0 2px",
-                                                                fontFamily: "'Lato',sans-serif",
-                                                                overflow: "hidden",
-                                                                textOverflow: "ellipsis",
-                                                                whiteSpace: "nowrap",
-                                                            }}
-                                                        >
+                                                        <p style={{ fontSize: "12px", fontWeight: 700, color: NAVY, margin: "0 0 2px", fontFamily: "'Lato',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                                             {txn.bookTitle || "Transaction"}
                                                         </p>
-                                                        <p
-                                                            style={{
-                                                                fontSize: "10px",
-                                                                color: "#aaa",
-                                                                margin: 0,
-                                                                fontFamily: "'Lato',sans-serif",
-                                                            }}
-                                                        >
+                                                        <p style={{ fontSize: "10px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>
                                                             {txn.createdAtDate?.toLocaleDateString?.() || ""}
                                                         </p>
                                                     </div>
                                                 </div>
-
-                                                {/* ── right: amount + status badge ── */}
-                                                <div
-                                                    style={{
-                                                        textAlign: "right",
-                                                        flexShrink: 0,
-                                                        marginLeft: "12px",
-                                                    }}
-                                                >
-                                                    <p
-                                                        style={{
-                                                            fontSize: "13px",
-                                                            fontWeight: 700,
-                                                            color: isOut ? "#ef4444" : "#16a34a",
-                                                            margin: "0 0 2px",
-                                                            fontFamily: "'Lato',sans-serif",
-                                                        }}
-                                                    >
-                                                        {amountDisplay}
-                                                    </p>
-                                                    <p
-                                                        style={{
-                                                            fontSize: "10px",
-                                                            color: "#aaa",
-                                                            margin: 0,
-                                                            fontFamily: "'Lato',sans-serif",
-                                                        }}
-                                                    >
-                                                        {statusLabel}
-                                                    </p>
+                                                <div style={{ textAlign: "right", flexShrink: 0, marginLeft: "8px" }}>
+                                                    <p style={{ fontSize: "12px", fontWeight: 700, color: isOut ? "#ef4444" : "#16a34a", margin: "0 0 2px", fontFamily: "'Lato',sans-serif", whiteSpace: "nowrap" }}>{amountDisplay}</p>
+                                                    <p style={{ fontSize: "10px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif", whiteSpace: "nowrap" }}>{statusLabel}</p>
                                                 </div>
                                             </div>
                                         );
                                     })
                                 )}
                             </div>
-                            );
+
+                            {/* Security Notice */}
+                            <div style={{
+                                background: CREAM, border: `0.5px solid rgba(184,150,62,0.25)`,
+                                borderLeft: `3px solid ${GOLD}`, padding: "14px 16px",
+                                display: "flex", alignItems: "flex-start", gap: "10px",
+                            }}>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: "1px" }}>
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                    <line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                                <div>
+                                    <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: NAVY, margin: "0 0 3px", fontFamily: "'Lato',sans-serif" }}>Security Reminder</p>
+                                    <p style={{ fontSize: "11px", color: "#666", margin: 0, fontFamily: "'Lato',sans-serif", lineHeight: 1.65 }}>
+                                        Keep your login credentials secure. <strong style={{ color: NAVY }}>We will never ask for your password</strong> via email or phone.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
-                        {/* RIGHT */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* RIGHT COLUMN */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
 
                             {/* Quick Actions */}
-                            <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '24px' }}>
+                            <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '20px' }}>
                                 <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: GOLD, marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Navigate</p>
-                                <h3 className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: NAVY, margin: '0 0 16px' }}>Quick Actions</h3>
+                                <h3 className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: NAVY, margin: '0 0 14px' }}>Quick Actions</h3>
                                 {[
                                     { href: "/my-account/seller-account/my-books", icon: <Book size={16} style={{ color: NAVY }} />, title: 'My uploaded documents', sub: 'View uploaded docs' },
                                     { href: "/documents", icon: <Globe size={16} style={{ color: NAVY }} />, title: 'Browse documents', sub: 'Explore library' },
                                     { href: "/upload-document", icon: <TrendingUp size={16} style={{ color: NAVY }} />, title: 'Upload documents', sub: 'Add new document' },
                                     { href: "/upload-document/my-pending-books", icon: <TrendingUp size={16} style={{ color: NAVY }} />, title: 'Pending documents', sub: 'Track documents' },
                                     { href: "/my-account/seller-account/share-profile", icon: <Globe size={16} style={{ color: NAVY }} />, title: 'Share Profile', sub: 'Copy your public link' },
-
                                 ].map(({ href, icon, title, sub }) => (
-                                    <Link key={href} href={href} className="action-row" style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', border: '0.5px solid #e5ddd0', background: '#fff', textDecoration: 'none', transition: 'all 0.18s' }}>
+                                    <Link key={href} href={href} className="action-row" style={{ marginBottom: '6px', textDecoration: 'none' }}>
                                         <div style={{ width: '34px', height: '34px', border: `0.5px solid #e5ddd0`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: CREAM }}>{icon}</div>
-                                        <div style={{ flex: 1 }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
                                             <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 1px', fontFamily: "'Lato',sans-serif" }}>{title}</p>
                                             <p style={{ fontSize: '11px', color: '#aaa', margin: 0, fontFamily: "'Lato',sans-serif" }}>{sub}</p>
                                         </div>
                                         <ChevronRight size={14} style={{ color: '#ccc', flexShrink: 0 }} />
                                     </Link>
                                 ))}
-
                             </div>
 
-                            {/* Boost Visibility Banner */}
+                            {/* Boost Visibility */}
                             <a href="/my-account/seller-account/ads" style={{
-                                display: "flex", alignItems: "center", gap: "14px",
+                                display: "flex", alignItems: "center", gap: "12px",
                                 background: "#fff", border: `1.5px solid ${GOLD}`,
-                                padding: "16px 18px", textDecoration: "none", transition: "all 0.18s",
+                                padding: "14px 16px", textDecoration: "none", transition: "all 0.18s",
                             }}
                                 onMouseEnter={e => e.currentTarget.style.background = CREAM}
-                                onMouseLeave={e => e.currentTarget.style.background = "#fff"}
-                            >
-                                <div style={{
-                                    width: "40px", height: "40px", background: "rgba(184,150,62,0.12)",
-                                    border: `0.5px solid rgba(184,150,62,0.35)`,
-                                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                                }}>
+                                onMouseLeave={e => e.currentTarget.style.background = "#fff"}>
+                                <div style={{ width: "38px", height: "38px", background: "rgba(184,150,62,0.12)", border: `0.5px solid rgba(184,150,62,0.35)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                                     <Zap size={18} style={{ color: GOLD }} />
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                    <p style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>
-                                        Boost Your Visibility
-                                    </p>
-                                    <p style={{ fontSize: "11px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>
-                                        Reach 2.4M+ students with a sponsored ad
-                                    </p>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <p style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>Boost Your Visibility</p>
+                                    <p style={{ fontSize: "11px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>Reach 2.4M+ students with a sponsored ad</p>
                                 </div>
                                 <ChevronRight size={14} style={{ color: GOLD, flexShrink: 0 }} />
                             </a>
 
                             {/* Referral Banner */}
-                            <div style={{ background: NAVY, backgroundImage: 'radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)', backgroundSize: '20px 20px', padding: '24px', position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ background: NAVY, backgroundImage: 'radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)', backgroundSize: '20px 20px', padding: '20px', position: 'relative', overflow: 'hidden' }}>
                                 <div style={{ position: 'absolute', bottom: '-20px', right: '-20px', width: '80px', height: '80px', border: '0.5px solid rgba(184,150,62,0.2)', transform: 'rotate(45deg)' }} />
-                                <div className="gold-pill" style={{ marginBottom: '14px' }}>
+                                <div className="gold-pill" style={{ marginBottom: '12px' }}>
                                     <Sparkles size={10} style={{ color: GOLD }} />
                                     <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: GOLD, fontFamily: "'Lato',sans-serif" }}>Special Bonus</span>
                                 </div>
-                                <p className="lan-serif" style={{ fontSize: '22px', fontWeight: 700, color: '#fff', margin: '0 0 6px' }}>Up to ₦5,000,000</p>
-                                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '18px', fontFamily: "'Lato',sans-serif", lineHeight: 1.6 }}>Earn up to 6% by inviting friends to the platform</p>
-                                <button onClick={referral} style={{ width: '100%', background: GOLD, color: NAVY, padding: '12px', border: 'none', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'background 0.18s' }}
+                                <p className="lan-serif" style={{ fontSize: '20px', fontWeight: 700, color: '#fff', margin: '0 0 6px' }}>Up to {fmt(5000000)}</p>
+                                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '14px', fontFamily: "'Lato',sans-serif", lineHeight: 1.6 }}>Earn up to 6% by inviting friends to the platform</p>
+                                <button onClick={referral} style={{ width: '100%', background: GOLD, color: NAVY, padding: '11px', border: 'none', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", letterSpacing: '0.05em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'background 0.18s' }}
                                     onMouseEnter={e => e.currentTarget.style.background = GOLDD}
                                     onMouseLeave={e => e.currentTarget.style.background = GOLD}
                                 ><Users size={14} /> Invite Your Friends</button>
@@ -1754,70 +1484,36 @@ export default function SellerAccountClient() {
 
                             {/* Bank Details Card */}
                             {user?.bankDetails && (
-                                <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '24px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '16px' }}>
+                                <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '20px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '14px' }}>
                                         <div>
                                             <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: GOLD, marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Withdrawal</p>
-                                            <h3 className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: NAVY, margin: 0 }}>Bank Details</h3>
+                                            <h3 className="lan-serif" style={{ fontSize: '16px', fontWeight: 700, color: NAVY, margin: 0 }}>Bank Details</h3>
                                         </div>
                                         <button onClick={() => setShowBankModal(true)} style={{ fontSize: '10px', fontWeight: 700, color: NAVY, background: 'transparent', border: 'none', cursor: 'pointer', letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: "'Lato',sans-serif" }}>Edit</button>
                                     </div>
                                     {seller?.accountNumber && (
-                                        <div style={{ background: CREAM, border: '0.5px solid rgba(184,150,62,0.2)', padding: '10px 14px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#aaa', fontFamily: "'Lato',sans-serif" }}>LAN Account</span>
-                                            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: NAVY, fontSize: '13px' }}>
+                                        <div style={{ background: CREAM, border: '0.5px solid rgba(184,150,62,0.2)', padding: '8px 12px', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, overflow: 'hidden' }}>
+                                            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#aaa', fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>LAN Account</span>
+                                            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: NAVY, fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                 {(() => { const n = seller.accountNumber.replace('LAN', ''); return `LAN-${n.slice(0, 3)}-${n.slice(3)}`; })()}
                                             </span>
                                         </div>
                                     )}
                                     {[['Account Name', user.bankDetails.accountName], ['Account Number', user.bankDetails.accountNumber], ['Bank', user.bankDetails.bankName]].map(([k, v]) => (
-                                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '8px 0', borderBottom: '0.5px solid #f0ebe0' }}>
-                                            <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{k}</span>
-                                            <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{v}</span>
+                                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '7px 0', borderBottom: '0.5px solid #f0ebe0', gap: 8 }}>
+                                            <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{k}</span>
+                                            <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </div>
-                    {/* Security Notice */}
-                        <div style={{
-                        background: CREAM,
-                        border: `0.5px solid rgba(184,150,62,0.25)`,
-                        borderLeft: `3px solid ${GOLD}`,
-                        padding: "14px 16px",
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: "10px",
-                        }}>
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={GOLD}
-                            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: "1px" }}>
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                            <line x1="12" y1="8" x2="12" y2="12" />
-                            <line x1="12" y1="16" x2="12.01" y2="16" />
-                        </svg>
-                        <div>
-                            <p style={{
-                            fontSize: "10px", fontWeight: 700, letterSpacing: "0.12em",
-                            textTransform: "uppercase", color: NAVY, margin: "0 0 3px",
-                            fontFamily: "'Lato',sans-serif",
-                            }}>Security Reminder</p>
-                            <p style={{
-                            fontSize: "11px", color: "#666", margin: 0,
-                            fontFamily: "'Lato',sans-serif", lineHeight: 1.65,
-                            }}>
-                            Keep your login credentials secure.{" "}
-                            <strong style={{ color: NAVY }}>We will never ask for your password</strong>{" "}
-                            via email or phone.
-                            </p>
-                        </div>
-                        </div>
                     </div>
-                    
                 </div>
 
                 {/* ── Bottom Nav (mobile) ── */}
-                <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: NAVY, borderTop: `0.5px solid rgba(184,150,62,0.2)`, display: 'flex', justifyContent: 'space-around', padding: '10px 0 14px', zIndex: 40 }} className="lg-hide">
-                    <style>{`@media(min-width:1024px){.lg-hide{display:none !important;}}`}</style>
+                <div className="lg-hide" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: NAVY, borderTop: `0.5px solid rgba(184,150,62,0.2)`, justifyContent: 'space-around', padding: '10px 0 14px', zIndex: 40 }}>
                     {[
                         { href: "/home", icon: <DollarSign size={20} />, label: 'Home' },
                         { href: "/my-account/seller-account/my-books", icon: <Book size={20} />, label: 'My Books' },
@@ -1833,107 +1529,57 @@ export default function SellerAccountClient() {
                         <User size={20} /><span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.06em' }}>Me</span>
                     </button>
                 </div>
-                <div className="lg-hide" style={{ height: '72px' }} />
 
-                {/* ══════ MODALS (preserved exactly) ══════ */}
+                {/* ══════ TIER MODALS ══════ */}
+                {showSellerTierModal && (
+                    <TierModal onClose={() => setShowSellerTierModal(false)} totalEarnings={totalEarnings} isFaculty={false} fmt={fmt} />
+                )}
+                {showFacultyTierModal && (
+                    <TierModal onClose={() => setShowFacultyTierModal(false)} totalEarnings={totalEarnings} isFaculty={true} fmt={fmt} />
+                )}
+
+                {/* ══════ MODALS ══════ */}
 
                 {/* Profile Modal */}
                 {showProfileModal && (
-                    <div className="modal-overlay mt-25">
+                    <div className="modal-overlay" style={{ paddingTop: 0, marginTop: "100px" }}>
                         <div className="modal-inner">
-                            <div style={{ background: NAVY, padding: '32px 24px', textAlign: 'center', position: 'relative' }}>
-                                <button onClick={() => setShowProfileModal(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
-                                    <X size={22} />
-                                </button>
+                            <div style={{ background: NAVY, padding: '28px 20px', textAlign: 'center', position: 'relative', flexShrink: 0 }}>
+                                <button onClick={() => setShowProfileModal(false)} style={{ position: 'absolute', top: '14px', right: '14px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}><X size={22} /></button>
                                 <div style={{ position: 'relative', display: 'inline-block', marginBottom: '12px' }}>
-                                    <img src={user?.photoBase64 || "/lan-logo.png"} style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${GOLD}` }} alt="Profile" />
+                                    <img src={user?.photoBase64 || "/lan-logo.png"} style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${GOLD}` }} alt="Profile" />
                                 </div>
-                                <p className="lan-serif" style={{ fontSize: '22px', fontWeight: 700, color: '#fff', margin: '0 0 4px' }}> {seller?.title ? `${seller.title} ` : ""}{user?.firstName} {user?.surname}</p>
-                                <p style={{ fontSize: '12px', color: GOLD, fontFamily: "'Lato',sans-serif" }}>+234{user?.phone || user?.phoneNumber || '0000000000'}</p>
+                                <p className="lan-serif" style={{ fontSize: '20px', fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>
+                                    {seller?.title ? `${seller.title} ` : ""}{user?.firstName} {user?.surname}
+                                </p>
+                                <p style={{ fontSize: '12px', color: GOLD, fontFamily: "'Lato',sans-serif", margin: 0 }}>+234{user?.phone || user?.phoneNumber || '0000000000'}</p>
                             </div>
                             <div style={{ background: BG, flex: 1, overflowY: 'auto', padding: '12px' }}>
                                 {[
                                     { label: 'My Profile', icon: <User size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setIsEditing(true); } },
                                     { label: 'Bank Details', icon: <Building size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setShowBankModal(true); if (user?.bankDetails) setBankFormData({ accountName: user.bankDetails.accountName || "", accountNumber: user.bankDetails.accountNumber || "", bankName: user.bankDetails.bankName || "", bankCode: user.bankDetails.bankCode || "" }); } },
                                     { label: 'Transaction History', icon: <TrendingUp size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setShowTransactionHistory(true); } },
+                                    { label: 'Earnings Overview', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>, onClick: () => { setShowProfileModal(false); router.push('/my-account/seller-account/earning/overview'); } },
                                     { label: 'Physical Repository', icon: <Package size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); router.push('/my-account/seller-account/repository'); } },
-                                    {
-                                        label: "My Physical Orders",
-                                        icon: <Package size={18} style={{ color: GOLD }} />,
-                                        onClick: () => {
-                                            setShowProfileModal(false);
-                                            fetchPhysicalOrders();
-                                            setShowPhysicalOrdersModal(true);
-                                        },
-                                    },
-                                    {
-                                        label: "My Bounties",
-                                        icon: (
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2">
-                                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                                            </svg>
-                                        ),
-                                        onClick: () => {
-                                            setShowProfileModal(false);
-                                            setShowBountyDashboardModal(true);
-                                        }
-                                    },
-                                   {
-                                        id: 'print-license-ledger',
-                                        icon: <Receipt size={18} style={{ color: NAVY }} />,   // ← correct JSX element
-                                        label: 'Print License Ledger',
-                                        onClick: () => { setShowProfileModal(false); setShowPrintLicenseLedger(true); }
-                                    },
-                                    {
-                                        label: "Promotion Analytics",
-                                        icon: (
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                                                stroke={GOLD} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                                                <line x1="18" y1="20" x2="18" y2="10" />
-                                                <line x1="12" y1="20" x2="12" y2="4" />
-                                                <line x1="6" y1="20" x2="6" y2="14" />
-                                                <line x1="2" y1="20" x2="22" y2="20" />
-                                            </svg>
-                                        ),
-                                        onClick: () => {
-                                            setShowProfileModal(false);
-                                            router.push("/my-account/seller-account/promotion-analytics");
-                                        },
-                                    },
-                                    {
-                                        label: user?.lecturerVerificationStatus === 'pending'
-                                            ? 'Impact Analytics (Pending)'
-                                            : 'Impact Analytics',
-                                        icon: (
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                                                stroke={user?.lecturerVerificationStatus === 'pending' ? '#d97706' : NAVY}
-                                                strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                                                <line x1="18" y1="20" x2="18" y2="10" />
-                                                <line x1="12" y1="20" x2="12" y2="4" />
-                                                <line x1="6" y1="20" x2="6" y2="14" />
-                                                <line x1="2" y1="20" x2="22" y2="20" />
-                                            </svg>
-                                        ),
-                                        onClick: () => { setShowProfileModal(false); router.push('/my-account/seller-account/Impact-analytics'); }
-                                    },
+                                    { label: "My Physical Orders", icon: <Package size={18} style={{ color: GOLD }} />, onClick: () => { setShowProfileModal(false); fetchPhysicalOrders(); setShowPhysicalOrdersModal(true); } },
+                                    { label: "My Bounties", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>, onClick: () => { setShowProfileModal(false); setShowBountyDashboardModal(true); } },
+                                    { label: 'Print License Ledger', icon: <Receipt size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setShowPrintLicenseLedger(true); } },
+                                    { label: "Promotion Analytics", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /><line x1="2" y1="20" x2="22" y2="20" /></svg>, onClick: () => { setShowProfileModal(false); router.push("/my-account/seller-account/promotion-analytics"); } },
+                                    { label: user?.lecturerVerificationStatus === 'pending' ? 'Impact Analytics (Pending)' : 'Impact Analytics', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={user?.lecturerVerificationStatus === 'pending' ? '#d97706' : NAVY} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /><line x1="2" y1="20" x2="22" y2="20" /></svg>, onClick: () => { setShowProfileModal(false); router.push('/my-account/seller-account/Impact-analytics'); } },
                                     { label: 'Reset Transfer PIN', icon: <Settings size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setResetPinView('forgot'); setResetPinError(''); setResetPinSuccess(false); setResetOtpInput(''); setResetNewPin(''); setShowResetPinModal(true); } },
                                     { label: 'Help', icon: <AlertCircle size={18} style={{ color: NAVY }} />, onClick: handleButton },
                                 ].map(({ label, icon, onClick }) => (
-                                    <button key={label} onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', border: '0.5px solid #e5ddd0', background: '#fff', marginBottom: '6px', cursor: 'pointer', transition: 'all 0.15s', textAlign: 'left' }}
-                                        onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.background = CREAM; }}
-                                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5ddd0'; e.currentTarget.style.background = '#fff'; }}>
+                                    <button key={label} onClick={onClick} className="action-row" style={{ marginBottom: '6px', textAlign: 'left' }}>
                                         <div style={{ width: '36px', height: '36px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}>{icon}</div>
                                         <span style={{ fontSize: '13px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", flex: 1 }}>{label}</span>
-                                        <ChevronRight size={14} style={{ color: '#ccc' }} />
+                                        <ChevronRight size={14} style={{ color: '#ccc', flexShrink: 0 }} />
                                     </button>
                                 ))}
 
-                                {/* Other info block */}
-                                <div style={{ border: '0.5px solid #e5ddd0', background: '#fff', padding: '16px', marginBottom: '6px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-                                        <div style={{ width: '36px', height: '36px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}>
-                                            <Settings size={18} style={{ color: NAVY }} />
-                                        </div>
+                                {/* Other info */}
+                                <div style={{ border: '0.5px solid #e5ddd0', background: '#fff', padding: '14px', marginBottom: '6px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                                        <div style={{ width: '36px', height: '36px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}><Settings size={18} style={{ color: NAVY }} /></div>
                                         <span style={{ fontSize: '13px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>Other Information</span>
                                     </div>
                                     {[
@@ -1942,42 +1588,13 @@ export default function SellerAccountClient() {
                                         ['Date of Birth', user?.dateOfBirth || 'Not set'],
                                         ['Address', user?.address || 'Not set'],
                                         ['Country', user?.country || 'Not set'],
-                                        ...(
-                                            user?.isLecturer === true ||
-                                                user?.role === 'lecturer' ||
-                                                user?.role === 'faculty' ||
-                                                FACULTY_TITLES.includes(seller?.title) ||
-                                                FACULTY_TITLES.includes(user?.lecturerTitle) ||
-                                                user?.lecturerVerificationStatus === 'pending' ||
-                                                user?.lecturerVerificationStatus === 'approved' ||
-                                                user?.lecturerVerificationStatus === 'rejected'
-                                                ? [
-                                                ] : []
-                                        ),
                                         ['LAN Account No.', user?.lanAccountNumber || 'Not set'],
                                         ['Referral Code', user?.referralCode || 'Not set'],
-                                        ['Account Type', user?.isLecturer === true ||
-                                            user?.role === 'lecturer' ||
-                                            user?.role === 'faculty' ||
-                                            FACULTY_TITLES.includes(seller?.title) ||
-                                            FACULTY_TITLES.includes(user?.lecturerTitle) ||
-                                            user?.lecturerVerificationStatus === 'pending' ||
-                                            user?.lecturerVerificationStatus === 'approved' ||
-                                            user?.lecturerVerificationStatus === 'rejected'
-                                            ? `${seller?.title || user?.lecturerTitle || ''} · Verified Faculty`.trim()
-                                            : 'Verified Seller'],
-                                        ['Verification', user?.lecturerVerificationStatus === 'approved'
-                                            ? '✅ Approved'
-                                            : user?.lecturerVerificationStatus === 'pending'
-                                                ? '⏳ Pending'
-                                                : user?.lecturerVerificationStatus === 'rejected'
-                                                    ? '❌ Rejected'
-                                                    : 'N/A'],
-                                        ['Member Since', user?.createdAt?.toDate
-                                            ? user.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-                                            : 'N/A'],
+                                        ['Account Type', isFacultyUser ? `${seller?.title || user?.lecturerTitle || ''} · Verified Faculty`.trim() : 'Verified Seller'],
+                                        ['Verification', user?.lecturerVerificationStatus === 'approved' ? '✅ Approved' : user?.lecturerVerificationStatus === 'pending' ? '⏳ Pending' : user?.lecturerVerificationStatus === 'rejected' ? '❌ Rejected' : 'N/A'],
+                                        ['Member Since', user?.createdAt?.toDate ? user.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'],
                                     ].map(([k, v]) => (
-                                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '8px 0', borderBottom: '0.5px solid #f0ebe0' }}>
+                                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '7px 0', borderBottom: '0.5px solid #f0ebe0', gap: 8 }}>
                                             <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{k}</span>
                                             <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", textAlign: 'right', maxWidth: '60%', wordBreak: 'break-word' }}>{v}</span>
                                         </div>
@@ -1985,11 +1602,9 @@ export default function SellerAccountClient() {
                                 </div>
 
                                 {FACULTY_TITLES.includes(seller?.title) && (
-                                    <button onClick={() => { setShowProfileModal(false); setShowExportModal(true); }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', border: '0.5px solid #e5ddd0', background: '#fff', marginBottom: '6px', cursor: 'pointer', transition: 'all 0.15s' }}
-                                        onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.background = CREAM; }}
-                                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5ddd0'; e.currentTarget.style.background = '#fff'; }}>
+                                    <button onClick={() => { setShowProfileModal(false); setShowExportModal(true); }} className="action-row" style={{ marginBottom: '6px' }}>
                                         <div style={{ width: '36px', height: '36px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}><Download size={18} style={{ color: NAVY }} /></div>
-                                        <div style={{ flex: 1, textAlign: 'left' }}>
+                                        <div style={{ flex: 1 }}>
                                             <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>Export Student List</p>
                                             <p style={{ fontSize: '11px', color: '#aaa', margin: 0, fontFamily: "'Lato',sans-serif" }}>Download buyer CSV</p>
                                         </div>
@@ -2004,7 +1619,7 @@ export default function SellerAccountClient() {
                                     onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}>
                                     <div style={{ width: '36px', height: '36px', border: '0.5px solid #fecaca', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fee2e2', flexShrink: 0 }}><AlertCircle size={18} style={{ color: '#ef4444' }} /></div>
                                     <span style={{ fontSize: '13px', fontWeight: 700, color: '#dc2626', fontFamily: "'Lato',sans-serif", flex: 1, textAlign: 'left' }}>Deactivate Account</span>
-                                    <ChevronRight size={14} style={{ color: '#f87171' }} />
+                                    <ChevronRight size={14} style={{ color: '#f87171', flexShrink: 0 }} />
                                 </button>
                             </div>
                         </div>
@@ -2013,13 +1628,13 @@ export default function SellerAccountClient() {
 
                 {/* Transaction History Modal */}
                 {showTransactionHistory && (
-                    <div className="modal-overlay mt-25">
-                        <div className="modal-inner">
-                            <div style={{ background: NAVY, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: '14px', position: 'sticky', top: 0 }}>
-                                <button onClick={() => setShowTransactionHistory(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}><X size={22} /></button>
-                                <h2 className="lan-serif" style={{ fontSize: '20px', fontWeight: 700, color: '#fff', margin: 0 }}>Transaction History</h2>
+                    <div className="modal-overlay" style={{ marginTop: "94px" }}>
+                        <div className="modal-inner" >
+                            <div style={{ background: NAVY, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0,  }}>
+                                <button onClick={() => setShowTransactionHistory(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff', flexShrink: 0 }}><X size={22} /></button>
+                                <h2 className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>Transaction History</h2>
                             </div>
-                            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: BG }}>
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '14px', background: BG }}>
                                 {transactions.length === 0 ? (
                                     <div style={{ textAlign: 'center', padding: '60px 0' }}>
                                         <ShoppingBag size={40} style={{ color: '#ddd', margin: '0 auto 12px' }} />
@@ -2027,35 +1642,33 @@ export default function SellerAccountClient() {
                                     </div>
                                 ) : (
                                     transactions.map(txn => (
-                                        <div key={txn.id} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '16px', marginBottom: '8px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <div style={{ width: '36px', height: '36px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}>
+                                        <div key={txn.id} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '14px', marginBottom: '8px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', gap: 8 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                                                    <div style={{ width: '34px', height: '34px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}>
                                                         {txn.type === 'transfer_out' ? <ArrowUpRight size={16} style={{ color: '#ef4444' }} /> : txn.type === 'transfer_in' ? <ArrowDownLeft size={16} style={{ color: '#16a34a' }} /> : <ShoppingBag size={16} style={{ color: NAVY }} />}
                                                     </div>
-                                                    <div>
-                                                        <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>{txn.bookTitle}</p>
+                                                    <div style={{ minWidth: 0 }}>
+                                                        <p style={{ fontSize: '12px', fontWeight: 700, color: NAVY, margin: '0 0 2px', fontFamily: "'Lato',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{txn.bookTitle}</p>
                                                         <p style={{ fontSize: '10px', color: '#aaa', margin: 0, fontFamily: "'Lato',sans-serif" }}>{txn.createdAtDate?.toLocaleDateString()} {txn.createdAtDate?.toLocaleTimeString()}</p>
                                                     </div>
                                                 </div>
-                                                <div style={{ textAlign: 'right' }}>
-                                                    <p style={{ fontSize: '13px', fontWeight: 700, color: '#16a34a', margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>+₦{(txn.sellerAmount || (txn.amount * 0.85)).toLocaleString()}</p>
-                                                    <span style={{ fontSize: '10px', background: '#f0fdf4', color: '#16a34a', padding: '2px 8px', fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>Success</span>
+                                                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                                    <p style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a', margin: '0 0 2px', fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap' }}>+{fmt(Number(txn.sellerAmount || (txn.amount * 0.85)))}</p>
+                                                    <span style={{ fontSize: '10px', background: '#f0fdf4', color: '#16a34a', padding: '2px 6px', fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>Success</span>
                                                 </div>
                                             </div>
-                                            <div style={{ background: CREAM, border: '0.5px solid #f0ebe0', padding: '10px 12px' }}>
+                                            <div style={{ background: CREAM, border: '0.5px solid #f0ebe0', padding: '8px 10px' }}>
                                                 {[
                                                     ['Buyer', txn.buyerName || txn.studentName || '—'],
-                                                    ['Price', `₦${(txn.amount || txn.salePrice || 0).toLocaleString()}`],
+                                                    ['Price', fmt(Number(txn.amount || txn.salePrice || 0))],
                                                     ['Country', txn.buyerCountry ? `${getCountryFlag(txn.buyerCountry)} ${txn.buyerCountry}` : '—'],
-                                                    ['Your Payout (80%)', `+₦${(txn.sellerAmount || txn.sellerPayout || (txn.amount * 0.80) || 0).toLocaleString()}`],
-                                                    ['Platform Fee (20%)', `-₦${(txn.platformFee || txn.fee || ((txn.amount || txn.salePrice || 0) * 0.20)).toLocaleString()}`],
+                                                    ['Your Payout (80%)', `+${fmt(Number(txn.sellerAmount || txn.sellerPayout || (txn.amount * 0.80) || 0))}`],
+                                                    ['Platform Fee (20%)', `-${fmt(Number(txn.platformFee || txn.fee || ((txn.amount || txn.salePrice || 0) * 0.20)))}`],
                                                 ].map(([k, v]) => (
-                                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0' }}>
-                                                        <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{k}</span>
-                                                        <span style={{
-                                                            fontWeight: 700, color: k.includes('Fee') ? '#ef4444' : k.includes('Payout') ? '#16a34a' : NAVY, fontFamily: "'Lato',sans-serif"
-                                                        }}>{v}</span>
+                                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '3px 0', gap: 8 }}>
+                                                        <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{k}</span>
+                                                        <span style={{ fontWeight: 700, color: k.includes('Fee') ? '#ef4444' : k.includes('Payout') ? '#16a34a' : NAVY, fontFamily: "'Lato',sans-serif", textAlign: 'right' }}>{v}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -2063,27 +1676,27 @@ export default function SellerAccountClient() {
                                     ))
                                 )}
                                 {withdrawals.length > 0 && (
-                                    <div style={{ marginTop: '24px' }}>
+                                    <div style={{ marginTop: '20px' }}>
                                         <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: GOLD, marginBottom: '12px', fontFamily: "'Lato',sans-serif" }}>Withdrawal History</p>
                                         {withdrawals.map(w => (
-                                            <div key={w.id} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '16px', marginBottom: '8px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                        <div style={{ width: '36px', height: '36px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}><Download size={16} style={{ color: NAVY }} /></div>
-                                                        <div>
-                                                            <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>Withdrawal Request</p>
+                                            <div key={w.id} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '14px', marginBottom: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', gap: 8 }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                                                        <div style={{ width: '34px', height: '34px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}><Download size={16} style={{ color: NAVY }} /></div>
+                                                        <div style={{ minWidth: 0 }}>
+                                                            <p style={{ fontSize: '12px', fontWeight: 700, color: NAVY, margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>Withdrawal Request</p>
                                                             <p style={{ fontSize: '10px', color: '#aaa', margin: 0, fontFamily: "'Lato',sans-serif" }}>{w.requestedAtDate?.toLocaleDateString()}</p>
                                                         </div>
                                                     </div>
-                                                    <div style={{ textAlign: 'right' }}>
-                                                        <p style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444', margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>₦{w.amount?.toLocaleString()}</p>
-                                                        <span style={{ fontSize: '10px', fontWeight: 700, fontFamily: "'Lato',sans-serif", padding: '2px 8px', background: w.status === 'pending' ? '#fef9c3' : w.status === 'completed' ? '#f0fdf4' : '#fef2f2', color: w.status === 'pending' ? '#a16207' : w.status === 'completed' ? '#16a34a' : '#dc2626' }}>
+                                                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                                        <p style={{ fontSize: '12px', fontWeight: 700, color: '#ef4444', margin: '0 0 2px', fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap' }}>{fmt(w.amount || 0)}</p>
+                                                        <span style={{ fontSize: '10px', fontWeight: 700, fontFamily: "'Lato',sans-serif", padding: '2px 6px', background: w.status === 'pending' ? '#fef9c3' : w.status === 'completed' ? '#f0fdf4' : '#fef2f2', color: w.status === 'pending' ? '#a16207' : w.status === 'completed' ? '#16a34a' : '#dc2626' }}>
                                                             {w.status === 'pending' ? '⏳ Pending' : w.status === 'completed' ? '✅ Completed' : '❌ ' + w.status}
                                                         </span>
                                                     </div>
                                                 </div>
-                                                {w.reference && <p style={{ fontSize: '11px', color: '#aaa', background: CREAM, padding: '8px 10px', fontFamily: 'monospace', wordBreak: 'break-all' }}>Ref: {w.reference}</p>}
-                                                {w.adminNote && <div style={{ background: '#eff6ff', border: '0.5px solid #bfdbfe', padding: '10px 12px', marginTop: '8px' }}><p style={{ fontSize: '11px', fontWeight: 700, color: NAVY, margin: '0 0 2px' }}>Admin Note:</p><p style={{ fontSize: '11px', color: '#1d4ed8', margin: 0 }}>{w.adminNote}</p></div>}
+                                                {w.reference && <p style={{ fontSize: '10px', color: '#aaa', background: CREAM, padding: '6px 8px', fontFamily: 'monospace', wordBreak: 'break-all', margin: 0 }}>Ref: {w.reference}</p>}
+                                                {w.adminNote && <div style={{ background: '#eff6ff', border: '0.5px solid #bfdbfe', padding: '8px 10px', marginTop: '6px' }}><p style={{ fontSize: '11px', fontWeight: 700, color: NAVY, margin: '0 0 2px' }}>Admin Note:</p><p style={{ fontSize: '11px', color: '#1d4ed8', margin: 0 }}>{w.adminNote}</p></div>}
                                             </div>
                                         ))}
                                     </div>
@@ -2095,57 +1708,59 @@ export default function SellerAccountClient() {
 
                 {/* Withdraw Modal */}
                 {showWithdrawModal && (
-                    <div className="modal-overlay mt-25 ">
+                    <div className="modal-overlay" style={{ marginTop: "4px" }}>
                         <div className="modal-inner">
-                            <div style={{ background: NAVY, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0 }}>
-                                <h2 className="lan-serif" style={{ fontSize: '20px', fontWeight: 700, color: '#fff', margin: 0 }}>Withdraw Funds</h2>
+                            <div style={{ background: NAVY, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, marginTop: "100px" }}>
+                                <h2 className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>Withdraw Funds</h2>
                                 <button onClick={() => { setShowWithdrawModal(false); setWithdrawalError(""); setWithdrawAmount(""); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}><X size={22} /></button>
                             </div>
-                            <div style={{ padding: '16px 24px', borderBottom: '0.5px solid #f0ebe0', background: '#fffbeb', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <AlertCircle size={16} style={{ color: '#d97706', flexShrink: 0 }} />
-                                <div>
-                                    <p style={{ fontSize: '12px', fontWeight: 700, color: '#92400e', margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>LAN Approval Required</p>
-                                    <p style={{ fontSize: '11px', color: '#92400e', margin: 0, fontFamily: "'Lato',sans-serif" }}>Processed within 24–48 hours. Email notification sent once approved.</p>
+                            <div style={{ flex: 1, overflowY: 'auto' }}>
+                                <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #f0ebe0', background: '#fffbeb', display: 'flex', alignItems: 'flex-start', gap: '10px',  }}>
+                                    <AlertCircle size={16} style={{ color: '#d97706', flexShrink: 0, marginTop: 1 }} />
+                                    <div>
+                                        <p style={{ fontSize: '12px', fontWeight: 700, color: '#92400e', margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>LAN Approval Required</p>
+                                        <p style={{ fontSize: '11px', color: '#92400e', margin: 0, fontFamily: "'Lato',sans-serif" }}>Processed within 24–48 hours. Email notification sent once approved.</p>
+                                    </div>
                                 </div>
-                            </div>
-                            {user?.bankDetails ? (
-                                <div style={{ padding: '16px 24px', borderBottom: '0.5px solid #f0ebe0', background: CREAM }}>
-                                    <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD, margin: '0 0 8px', fontFamily: "'Lato',sans-serif" }}>Sending to</p>
-                                    {[['Account Name', user.bankDetails.accountName], ['Account Number', user.bankDetails.accountNumber], ['Bank', user.bankDetails.bankName]].map(([k, v]) => (
-                                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '4px 0' }}>
-                                            <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{k}</span>
-                                            <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{v}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div style={{ padding: '16px 24px', borderBottom: '0.5px solid #f0ebe0', background: '#fef9c3', display: 'flex', gap: '10px' }}>
-                                    <AlertCircle size={14} style={{ color: '#d97706', flexShrink: 0, marginTop: '1px' }} />
-                                    <p style={{ fontSize: '12px', color: '#92400e', fontFamily: "'Lato',sans-serif", margin: 0 }}>Please add bank details to your profile first</p>
-                                </div>
-                            )}
-                            <div style={{ padding: '24px' }}>
-                                <div style={{ background: NAVY, padding: '20px', marginBottom: '16px' }}>
-                                    <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD, margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>Available Balance</p>
-                                    <p className="lan-serif" style={{ fontSize: '32px', fontWeight: 700, color: '#fff', margin: 0 }}>₦{accountBalance.toLocaleString()}</p>
-                                </div>
-                                {withdrawalError && (
-                                    <div style={{ display: 'flex', gap: '10px', background: '#fef2f2', border: '0.5px solid #fecaca', padding: '12px', marginBottom: '14px' }}>
-                                        <AlertCircle size={14} style={{ color: '#ef4444', flexShrink: 0, marginTop: '1px' }} />
-                                        <p style={{ fontSize: '12px', color: '#dc2626', fontFamily: "'Lato',sans-serif", margin: 0 }}>{withdrawalError}</p>
+                                {user?.bankDetails ? (
+                                    <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #f0ebe0', background: CREAM }}>
+                                        <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD, margin: '0 0 8px', fontFamily: "'Lato',sans-serif" }}>Sending to</p>
+                                        {[['Account Name', user.bankDetails.accountName], ['Account Number', user.bankDetails.accountNumber], ['Bank', user.bankDetails.bankName]].map(([k, v]) => (
+                                            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '4px 0', gap: 8 }}>
+                                                <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{k}</span>
+                                                <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", textAlign: 'right' }}>{v}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #f0ebe0', background: '#fef9c3', display: 'flex', gap: '10px' }}>
+                                        <AlertCircle size={14} style={{ color: '#d97706', flexShrink: 0, marginTop: '1px' }} />
+                                        <p style={{ fontSize: '12px', color: '#92400e', fontFamily: "'Lato',sans-serif", margin: 0 }}>Please add bank details to your profile first</p>
                                     </div>
                                 )}
-                                <label style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '8px', fontFamily: "'Lato',sans-serif" }}>Amount</label>
-                                <input type="number" value={withdrawAmount} onChange={e => { setWithdrawAmount(e.target.value); setWithdrawalError(""); }} placeholder="Enter amount" min="1000" max={accountBalance}
-                                    style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '12px 14px', fontSize: '15px', fontWeight: 700, color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box', marginBottom: '6px' }} />
-                                <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '20px', fontFamily: "'Lato',sans-serif" }}>Minimum: ₦1,000</p>
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                    <button onClick={() => { setShowWithdrawModal(false); setWithdrawalError(""); setWithdrawAmount(""); }}
-                                        style={{ flex: 1, background: '#f5f5f5', color: '#666', padding: '13px', border: '0.5px solid #e5ddd0', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>Cancel</button>
-                                    <button onClick={handleWithdraw} disabled={withdrawing || !user?.bankDetails}
-                                        style={{ flex: 1, background: NAVY, color: '#fff', padding: '13px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: (!user?.bankDetails || withdrawing) ? 0.5 : 1 }}>
-                                        {withdrawing ? <><div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> Processing…</> : <><Download size={15} /> Withdraw Now</>}
-                                    </button>
+                                <div style={{ padding: '20px' }}>
+                                    <div style={{ background: NAVY, padding: '18px', marginBottom: '14px' }}>
+                                        <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD, margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>Available Balance</p>
+                                        <p className="lan-serif" style={{ fontSize: '28px', fontWeight: 700, color: '#fff', margin: 0 }}>₦{accountBalance.toLocaleString()}</p>
+                                    </div>
+                                    {withdrawalError && (
+                                        <div style={{ display: 'flex', gap: '10px', background: '#fef2f2', border: '0.5px solid #fecaca', padding: '10px 12px', marginBottom: '12px' }}>
+                                            <AlertCircle size={14} style={{ color: '#ef4444', flexShrink: 0, marginTop: '1px' }} />
+                                            <p style={{ fontSize: '12px', color: '#dc2626', fontFamily: "'Lato',sans-serif", margin: 0 }}>{withdrawalError}</p>
+                                        </div>
+                                    )}
+                                    <label style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Amount</label>
+                                    <input type="number" value={withdrawAmount} onChange={e => { setWithdrawAmount(e.target.value); setWithdrawalError(""); }} placeholder="Enter amount" min="1000" max={accountBalance}
+                                        style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '12px 14px', fontSize: '15px', fontWeight: 700, color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif', boxSizing: 'border-box', marginBottom: '6px" }} />
+                                    <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '18px', fontFamily: "'Lato',sans-serif" }}>Minimum: ₦1,000</p>
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        <button onClick={() => { setShowWithdrawModal(false); setWithdrawalError(""); setWithdrawAmount(""); }}
+                                            style={{ flex: 1, background: '#f5f5f5', color: '#666', padding: '12px', border: '0.5px solid #e5ddd0', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>Cancel</button>
+                                        <button onClick={handleWithdraw} disabled={withdrawing || !user?.bankDetails}
+                                            style={{ flex: 1, background: NAVY, color: '#fff', padding: '12px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: (!user?.bankDetails || withdrawing) ? 0.5 : 1 }}>
+                                            {withdrawing ? <><div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> Processing…</> : <><Download size={14} /> Withdraw Now</>}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -2154,62 +1769,56 @@ export default function SellerAccountClient() {
 
                 {/* Edit Profile Modal */}
                 {isEditing && (
-                    <div className="modal-overlay mt-25">
+                    <div className="modal-overlay" style={{ marginTop: "94px" }}>
                         <div className="modal-inner">
-                            <div style={{ background: NAVY, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0 }}>
-                                <h2 className="lan-serif" style={{ fontSize: '20px', fontWeight: 700, color: '#fff', margin: 0 }}>Edit Profile</h2>
+                            <div style={{ background: NAVY, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                                <h2 className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>Edit Profile</h2>
                                 <button onClick={() => setIsEditing(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}><X size={22} /></button>
                             </div>
-                            <div style={{ padding: '24px' }}>
-                                {/* Avatar */}
-                                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+                                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
                                     <div style={{ position: 'relative', display: 'inline-block' }}>
-                                        <img src={user?.photoURL || user?.photoBase64 || "/api/placeholder/128/128"} style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${GOLD}` }} alt="profile" />
-                                        <label style={{ position: 'absolute', bottom: 0, right: 0, background: NAVY, width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '2px solid #fff' }}>
-                                            <Camera size={15} style={{ color: '#fff' }} />
+                                        <img src={user?.photoURL || user?.photoBase64 || "/api/placeholder/128/128"} style={{ width: '88px', height: '88px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${GOLD}` }} alt="profile" />
+                                        <label style={{ position: 'absolute', bottom: 0, right: 0, background: NAVY, width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '2px solid #fff' }}>
+                                            <Camera size={14} style={{ color: '#fff' }} />
                                             <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
                                         </label>
                                     </div>
                                     {uploading && <p style={{ fontSize: '11px', color: GOLD, marginTop: '8px', fontFamily: "'Lato',sans-serif" }}>Uploading photo…</p>}
                                 </div>
-
-                                {/* Section: Personal */}
                                 <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '10px', fontFamily: "'Lato',sans-serif" }}>Personal Details</p>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
                                     {[['First Name', 'firstName'], ['Surname', 'surname']].map(([label, key]) => (
                                         <div key={key}>
                                             <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>{label}</label>
-                                            <input value={formData[key]} onChange={e => setFormData({ ...formData, [key]: e.target.value })} style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '11px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box' }} />
+                                            <input value={formData[key]} onChange={e => setFormData({ ...formData, [key]: e.target.value })} style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '10px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif" }} />
                                         </div>
                                     ))}
                                     <div>
                                         <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Phone Number</label>
-                                        <input
-                                            type="tel"
-                                            value={formData.phoneNumber}
-                                            onChange={e => setFormData({ ...formData, phone: e.target.value, phoneNumber: e.target.value })}
-                                            placeholder="e.g. +2347013727629"
-                                            style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '11px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box' }} />
+                                        <input type="tel" value={formData.phoneNumber} onChange={e => setFormData({ ...formData, phone: e.target.value, phoneNumber: e.target.value })} placeholder="e.g. +2347013727629"
+                                            style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '10px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif" }} />
                                     </div>
                                     <div>
                                         <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Date of Birth</label>
-                                        <input type="date" value={formData.dateOfBirth} onChange={e => setFormData({ ...formData, dateOfBirth: e.target.value })} style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '11px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box' }} />
+                                        <input type="date" value={formData.dateOfBirth} onChange={e => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                                            style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '10px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif" }} />
                                     </div>
                                     <div style={{ gridColumn: 'span 2' }}>
                                         <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Address</label>
-                                        <input value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '11px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box' }} />
+                                        <input value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })}
+                                            style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '10px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif" }} />
                                     </div>
                                     <div style={{ gridColumn: 'span 2' }}>
                                         <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Country</label>
-                                        <input value={formData.country} onChange={e => setFormData({ ...formData, country: e.target.value })} placeholder="e.g. Nigeria" style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '11px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box' }} />
+                                        <input value={formData.country} onChange={e => setFormData({ ...formData, country: e.target.value })} placeholder="e.g. Nigeria"
+                                            style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '10px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif" }} />
                                     </div>
                                 </div>
-
-                                {/* Actions */}
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
-                                    <button onClick={() => setIsEditing(false)} style={{ flex: 1, background: '#f5f5f5', color: '#666', padding: '13px', border: '0.5px solid #e5ddd0', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>Cancel</button>
-                                    <button onClick={handleSave} style={{ flex: 1, background: NAVY, color: '#fff', padding: '13px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                        <Save size={15} /> Save Changes
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button onClick={() => setIsEditing(false)} style={{ flex: 1, background: '#f5f5f5', color: '#666', padding: '12px', border: '0.5px solid #e5ddd0', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>Cancel</button>
+                                    <button onClick={handleSave} style={{ flex: 1, background: NAVY, color: '#fff', padding: '12px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                        <Save size={14} /> Save Changes
                                     </button>
                                 </div>
                             </div>
@@ -2219,54 +1828,51 @@ export default function SellerAccountClient() {
 
                 {/* Bank Details Modal */}
                 {showBankModal && (
-                    <div className="modal-overlay mt-25">
+                    <div className="modal-overlay" style={{ marginTop: "94px" }}>
                         <div className="modal-inner">
-                            <div style={{ background: NAVY, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0 }}>
-                                <h2 className="lan-serif" style={{ fontSize: '20px', fontWeight: 700, color: '#fff', margin: 0 }}>Bank Details</h2>
+                            <div style={{ background: NAVY, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                                <h2 className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>Bank Details</h2>
                                 <button onClick={() => { setShowBankModal(false); setBankFormData({ accountName: "", accountNumber: "", bankName: "", bankCode: "" }); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}><X size={22} /></button>
                             </div>
-                            <div style={{ padding: '24px' }}>
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
                                 {user?.bankDetails && (
-                                    <div style={{ background: CREAM, border: '0.5px solid rgba(184,150,62,0.2)', padding: '14px 16px', marginBottom: '20px' }}>
+                                    <div style={{ background: CREAM, border: '0.5px solid rgba(184,150,62,0.2)', padding: '12px 14px', marginBottom: '18px' }}>
                                         <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD, margin: '0 0 8px', fontFamily: "'Lato',sans-serif" }}>Current Bank Details</p>
                                         {[['Account Name', user.bankDetails.accountName], ['Account Number', user.bankDetails.accountNumber], ['Bank', user.bankDetails.bankName]].map(([k, v]) => (
-                                            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '4px 0' }}>
-                                                <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{k}</span>
-                                                <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{v}</span>
+                                            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '4px 0', gap: 8 }}>
+                                                <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{k}</span>
+                                                <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", textAlign: 'right' }}>{v}</span>
                                             </div>
                                         ))}
                                     </div>
                                 )}
-                                {[
-                                    { label: 'Account Name', key: 'accountName', type: 'text', placeholder: 'Enter account holder name' },
-                                    { label: 'Account Number', key: 'accountNumber', type: 'text', placeholder: 'Enter account number', maxLength: 10 },
-                                ].map(({ label, key, type, placeholder, maxLength }) => (
+                                {[{ label: 'Account Name', key: 'accountName', type: 'text', placeholder: 'Enter account holder name' }, { label: 'Account Number', key: 'accountNumber', type: 'text', placeholder: 'Enter account number', maxLength: 10 }].map(({ label, key, type, placeholder, maxLength }) => (
                                     <div key={key} style={{ marginBottom: '14px' }}>
                                         <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>{label} <span style={{ color: '#ef4444' }}>*</span></label>
                                         <input type={type} value={bankFormData[key]} onChange={e => setBankFormData({ ...bankFormData, [key]: e.target.value })} placeholder={placeholder} maxLength={maxLength}
-                                            style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '11px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box' }} />
+                                            style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '10px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif" }} />
                                     </div>
                                 ))}
                                 <div style={{ marginBottom: '14px' }}>
                                     <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Bank Name <span style={{ color: '#ef4444' }}>*</span></label>
                                     <select value={bankFormData.bankName} onChange={e => { const b = nigerianBanks.find(x => x.name === e.target.value); setBankFormData({ ...bankFormData, bankName: e.target.value, bankCode: b ? b.code : "" }); }}
-                                        style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '11px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box', background: '#fff' }}>
+                                        style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '10px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", background: '#fff' }}>
                                         <option value="">Select your bank</option>
                                         {nigerianBanks.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
                                     </select>
                                 </div>
-                                <div style={{ marginBottom: '20px' }}>
+                                <div style={{ marginBottom: '18px' }}>
                                     <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Bank Code</label>
                                     <input type="text" value={bankFormData.bankCode} readOnly placeholder="Auto-filled"
-                                        style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '11px 12px', fontSize: '13px', color: '#aaa', background: '#f9f9f9', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box', cursor: 'not-allowed' }} />
+                                        style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '10px 12px', fontSize: '13px', color: '#aaa', background: '#f9f9f9', fontFamily: "'Lato',sans-serif", cursor: 'not-allowed' }} />
                                     <p style={{ fontSize: '10px', color: '#aaa', marginTop: '4px', fontFamily: "'Lato',sans-serif" }}>✓ Auto-filled when you select a bank</p>
                                 </div>
-                                <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
+                                <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
                                     <button onClick={() => { setShowBankModal(false); setBankFormData({ accountName: "", accountNumber: "", bankName: "", bankCode: "" }); }}
-                                        style={{ flex: 1, background: '#f5f5f5', color: '#666', padding: '13px', border: '0.5px solid #e5ddd0', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>Cancel</button>
+                                        style={{ flex: 1, background: '#f5f5f5', color: '#666', padding: '12px', border: '0.5px solid #e5ddd0', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>Cancel</button>
                                     <button onClick={handleSaveBank} disabled={savingBank}
-                                        style={{ flex: 1, background: NAVY, color: '#fff', padding: '13px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: savingBank ? 0.6 : 1 }}>
-                                        {savingBank ? <><div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> Saving…</> : <><Save size={15} /> Save Bank Details</>}
+                                        style={{ flex: 1, background: NAVY, color: '#fff', padding: '12px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: savingBank ? 0.6 : 1 }}>
+                                        {savingBank ? <><div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> Saving…</> : <><Save size={14} /> Save Bank Details</>}
                                     </button>
                                 </div>
                                 <div style={{ background: '#fffbeb', border: '0.5px solid #fde68a', padding: '10px 12px' }}>
@@ -2277,37 +1883,18 @@ export default function SellerAccountClient() {
                     </div>
                 )}
 
+                {/* Physical Orders Modal */}
                 {showPhysicalOrdersModal && (
-                    <div className="modal-overlay mt-25">
+                    <div className="modal-overlay" style={{ marginTop: "94px" }}>
                         <div className="modal-inner">
-                            {/* Header */}
-                            <div style={{
-                                background: NAVY,
-                                padding: "20px 24px",
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                position: "sticky",
-                                top: 0,
-                            }}>
+                            <div style={{ background: NAVY, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
                                 <div>
-                                    <p style={{ color: GOLD, fontSize: "10px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "4px", fontFamily: "'Lato',sans-serif" }}>
-                                        Physical Copies
-                                    </p>
-                                    <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: "20px", fontWeight: 700, color: "#fff", margin: 0 }}>
-                                        My Physical Orders
-                                    </h2>
+                                    <p style={{ color: GOLD, fontSize: "10px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "4px", fontFamily: "'Lato',sans-serif" }}>Physical Copies</p>
+                                    <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: "18px", fontWeight: 700, color: "#fff", margin: 0 }}>My Physical Orders</h2>
                                 </div>
-                                <button
-                                    onClick={() => { setShowPhysicalOrdersModal(false); setRevealedCodes({}); }}
-                                    style={{ background: "transparent", border: "none", cursor: "pointer", color: "#fff" }}
-                                >
-                                    <X size={22} />
-                                </button>
+                                <button onClick={() => { setShowPhysicalOrdersModal(false); setRevealedCodes({}); }} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#fff" }}><X size={22} /></button>
                             </div>
-
-                            {/* Body */}
-                            <div style={{ flex: 1, overflowY: "auto", padding: "16px", background: BG }}>
+                            <div style={{ flex: 1, overflowY: "auto", padding: "14px", background: BG }}>
                                 {physicalOrdersLoading ? (
                                     <div style={{ textAlign: "center", padding: "60px 0" }}>
                                         <div style={{ width: "40px", height: "40px", border: `3px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
@@ -2317,135 +1904,50 @@ export default function SellerAccountClient() {
                                     <div style={{ textAlign: "center", padding: "60px 0" }}>
                                         <Package size={40} style={{ color: "#ddd", margin: "0 auto 12px" }} />
                                         <p style={{ fontSize: "14px", fontWeight: 700, color: NAVY, fontFamily: "'Playfair Display',serif", marginBottom: "6px" }}>No physical orders yet</p>
-                                        <p style={{ fontSize: "12px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>
-                                            When you reserve a physical copy, your orders will appear here.
-                                        </p>
+                                        <p style={{ fontSize: "12px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>When you reserve a physical copy, your orders will appear here.</p>
                                     </div>
                                 ) : (
                                     physicalOrders.map(order => {
                                         const isRevealed = !!revealedCodes[order.id];
-                                        const maskedCode = isRevealed
-                                            ? order.pickupCode
-                                            : order.pickupCode?.replace(/./g, "•");
+                                        const maskedCode = isRevealed ? order.pickupCode : order.pickupCode?.replace(/./g, "•");
                                         const isCancelled = order.status === "cancelled";
                                         const isPending = order.status === "pending_pickup";
-
                                         return (
-                                            <div key={order.id} style={{
-                                                background: "#fff",
-                                                border: `0.5px solid ${isCancelled ? "#fecaca" : "#e5ddd0"}`,
-                                                padding: "0",
-                                                marginBottom: "12px",
-                                                overflow: "hidden",
-                                                opacity: isCancelled ? 0.7 : 1,
-                                            }}>
-                                                {/* Perforated top strip */}
-                                                {!isCancelled && (
-                                                    <div style={{ height: "4px", background: `repeating-linear-gradient(90deg, ${GOLD} 0, ${GOLD} 8px, transparent 8px, transparent 14px)` }} />
-                                                )}
-                                                {isCancelled && (
-                                                    <div style={{ height: "4px", background: "repeating-linear-gradient(90deg, #fecaca 0, #fecaca 8px, transparent 8px, transparent 14px)" }} />
-                                                )}
-
-                                                <div style={{ padding: "18px 20px" }}>
-                                                    {/* Book title + status */}
-                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", gap: "10px" }}>
-                                                        <div style={{ flex: 1 }}>
-                                                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "14px", fontWeight: 700, color: NAVY, margin: "0 0 3px", lineHeight: 1.3 }}>
-                                                                {order.bookTitle}
-                                                            </p>
-                                                            <p style={{ fontSize: "11px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>
-                                                                {order.createdAtDate?.toLocaleDateString()}
-                                                            </p>
+                                            <div key={order.id} style={{ background: "#fff", border: `0.5px solid ${isCancelled ? "#fecaca" : "#e5ddd0"}`, marginBottom: "12px", overflow: "hidden", opacity: isCancelled ? 0.7 : 1 }}>
+                                                {!isCancelled && <div style={{ height: "4px", background: `repeating-linear-gradient(90deg, ${GOLD} 0, ${GOLD} 8px, transparent 8px, transparent 14px)` }} />}
+                                                {isCancelled && <div style={{ height: "4px", background: "repeating-linear-gradient(90deg, #fecaca 0, #fecaca 8px, transparent 8px, transparent 14px)" }} />}
+                                                <div style={{ padding: "16px" }}>
+                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px", gap: 8 }}>
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "14px", fontWeight: 700, color: NAVY, margin: "0 0 3px", lineHeight: 1.3 }}>{order.bookTitle}</p>
+                                                            <p style={{ fontSize: "11px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>{order.createdAtDate?.toLocaleDateString()}</p>
                                                         </div>
-                                                        <span style={{
-                                                            display: "inline-flex",
-                                                            alignItems: "center",
-                                                            gap: "5px",
-                                                            background: isCancelled ? "#fef2f2" : isPending ? "#fef9c3" : "#f0fdf4",
-                                                            border: `0.5px solid ${isCancelled ? "#fecaca" : isPending ? "#fde68a" : "#86efac"}`,
-                                                            padding: "3px 10px",
-                                                            fontSize: "10px",
-                                                            fontWeight: 700,
-                                                            color: isCancelled ? "#dc2626" : isPending ? "#a16207" : "#16a34a",
-                                                            flexShrink: 0,
-                                                            fontFamily: "'Lato',sans-serif",
-                                                        }}>
+                                                        <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: isCancelled ? "#fef2f2" : isPending ? "#fef9c3" : "#f0fdf4", border: `0.5px solid ${isCancelled ? "#fecaca" : isPending ? "#fde68a" : "#86efac"}`, padding: "3px 8px", fontSize: "10px", fontWeight: 700, color: isCancelled ? "#dc2626" : isPending ? "#a16207" : "#16a34a", flexShrink: 0, fontFamily: "'Lato',sans-serif" }}>
                                                             <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: isCancelled ? "#dc2626" : isPending ? "#a16207" : "#16a34a", display: "inline-block" }} />
                                                             {isCancelled ? "Cancelled" : isPending ? "Awaiting Pickup" : order.status}
                                                         </span>
                                                     </div>
-
-                                                    {/* Pickup Code — hidden until revealed; hidden entirely if cancelled */}
                                                     {!isCancelled && (
                                                         <>
-                                                            <div style={{ background: NAVY, padding: "14px 16px", textAlign: "center", marginBottom: "12px" }}>
-                                                                <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "0 0 6px", fontFamily: "'Lato',sans-serif" }}>
-                                                                    Pickup Code
-                                                                </p>
-                                                                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "24px", fontWeight: 900, color: "#fff", margin: 0, letterSpacing: "0.12em" }}>
-                                                                    {maskedCode}
-                                                                </p>
+                                                            <div style={{ background: NAVY, padding: "12px 14px", textAlign: "center", marginBottom: "10px" }}>
+                                                                <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "0 0 5px", fontFamily: "'Lato',sans-serif" }}>Pickup Code</p>
+                                                                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "22px", fontWeight: 900, color: "#fff", margin: 0, letterSpacing: "0.12em" }}>{maskedCode}</p>
                                                             </div>
-
-                                                            {/* Reveal / Hide toggle */}
-                                                            <button
-                                                                onClick={() => setRevealedCodes(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
-                                                                style={{
-                                                                    width: "100%",
-                                                                    background: isRevealed ? CREAM : NAVY,
-                                                                    color: isRevealed ? NAVY : "#fff",
-                                                                    border: `0.5px solid ${isRevealed ? "#e5ddd0" : NAVY}`,
-                                                                    padding: "10px",
-                                                                    fontSize: "11px",
-                                                                    fontWeight: 700,
-                                                                    cursor: "pointer",
-                                                                    fontFamily: "'Lato',sans-serif",
-                                                                    letterSpacing: "0.05em",
-                                                                    display: "flex",
-                                                                    alignItems: "center",
-                                                                    justifyContent: "center",
-                                                                    gap: "7px",
-                                                                    transition: "all 0.18s",
-                                                                    marginBottom: "12px",
-                                                                }}
-                                                                onMouseEnter={e => { if (!isRevealed) e.currentTarget.style.background = "#1a3a6e"; }}
-                                                                onMouseLeave={e => { e.currentTarget.style.background = isRevealed ? CREAM : NAVY; }}
-                                                            >
-                                                                {isRevealed
-                                                                    ? <><EyeOff size={13} /> Hide Code</>
-                                                                    : <><Eye size={13} /> Reveal Pickup Code</>
-                                                                }
+                                                            <button onClick={() => setRevealedCodes(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
+                                                                style={{ width: "100%", background: isRevealed ? CREAM : NAVY, color: isRevealed ? NAVY : "#fff", border: `0.5px solid ${isRevealed ? "#e5ddd0" : NAVY}`, padding: "9px", fontSize: "11px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.05em", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", marginBottom: "10px" }}>
+                                                                {isRevealed ? <><EyeOff size={12} /> Hide Code</> : <><Eye size={12} /> Reveal Pickup Code</>}
                                                             </button>
                                                         </>
                                                     )}
-
-                                                    {/* Cancelled message */}
-                                                    {isCancelled && (
-                                                        <div style={{ background: "#fef2f2", border: "0.5px solid #fecaca", padding: "10px 14px", marginBottom: "12px" }}>
-                                                            <p style={{ fontSize: "12px", color: "#dc2626", fontFamily: "'Lato',sans-serif", margin: 0, textAlign: "center" }}>
-                                                                This order was cancelled. You may place a new order for this book.
-                                                            </p>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Order meta */}
-                                                    {[
-                                                        ["Order ID", order.orderId],
-                                                        ["Collection", "LAN Head Office, Abuja Registry"],
-                                                        ["Location", [order.section, order.shelfLocation].filter(Boolean).join(" — ") || "Ask staff"],
-                                                    ].map(([label, value]) => (
-                                                        <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", padding: "5px 0", borderBottom: "0.5px solid #f5f0e8" }}>
-                                                            <span style={{ color: "#aaa", fontFamily: "'Lato',sans-serif" }}>{label}</span>
-                                                            <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", textAlign: "right", maxWidth: "60%" }}>{value}</span>
+                                                    {isCancelled && <div style={{ background: "#fef2f2", border: "0.5px solid #fecaca", padding: "10px 12px", marginBottom: "10px" }}><p style={{ fontSize: "12px", color: "#dc2626", fontFamily: "'Lato',sans-serif", margin: 0, textAlign: "center" }}>This order was cancelled.</p></div>}
+                                                    {[["Order ID", order.orderId], ["Collection", "LAN Head Office, Abuja Registry"], ["Location", [order.section, order.shelfLocation].filter(Boolean).join(" — ") || "Ask staff"]].map(([label, value]) => (
+                                                        <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", padding: "4px 0", borderBottom: "0.5px solid #f5f0e8", gap: 8 }}>
+                                                            <span style={{ color: "#aaa", fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{label}</span>
+                                                            <span style={{ fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", textAlign: "right" }}>{value}</span>
                                                         </div>
                                                     ))}
                                                 </div>
-
-                                                {/* Perforated bottom strip */}
-                                                {!isCancelled && (
-                                                    <div style={{ height: "4px", background: `repeating-linear-gradient(90deg, ${GOLD} 0, ${GOLD} 8px, transparent 8px, transparent 14px)` }} />
-                                                )}
+                                                {!isCancelled && <div style={{ height: "4px", background: `repeating-linear-gradient(90deg, ${GOLD} 0, ${GOLD} 8px, transparent 8px, transparent 14px)` }} />}
                                             </div>
                                         );
                                     })
@@ -2455,19 +1957,18 @@ export default function SellerAccountClient() {
                     </div>
                 )}
 
+                {/* Bounty Submissions Modal */}
                 {showBountySubmissionsModal && (
-                    <div className="modal-overlay mt-25">
+                    <div className="modal-overlay" style={{ marginTop: "94px" }}>
                         <div className="modal-inner">
-                            <div style={{ background: NAVY, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0 }}>
+                            <div style={{ background: NAVY, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
                                 <div>
                                     <p style={{ color: GOLD, fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Bounties</p>
-                                    <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: '20px', fontWeight: 700, color: '#fff', margin: 0 }}>My Bounty Submissions</h2>
+                                    <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>My Bounty Submissions</h2>
                                 </div>
-                                <button onClick={() => setShowBountySubmissionsModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}>
-                                    <X size={22} />
-                                </button>
+                                <button onClick={() => setShowBountySubmissionsModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}><X size={22} /></button>
                             </div>
-                            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: BG }}>
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '14px', background: BG }}>
                                 {myClaimedBounties.length === 0 ? (
                                     <div style={{ textAlign: 'center', padding: '60px 0' }}>
                                         <Receipt size={40} style={{ color: '#ddd', margin: '0 auto 12px' }} />
@@ -2476,31 +1977,19 @@ export default function SellerAccountClient() {
                                     </div>
                                 ) : (
                                     myClaimedBounties.map(bounty => (
-                                        <div key={bounty.id} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '16px', marginBottom: '8px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                                <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>
+                                        <div key={bounty.id} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '14px', marginBottom: '8px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', gap: 8 }}>
+                                                <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif', flex: 1, minWidth: 0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap" }}>
                                                     {bounty.title || bounty.bookTitle || 'Bounty Submission'}
                                                 </p>
-                                                <span style={{
-                                                    fontSize: '10px', fontWeight: 700, padding: '2px 8px', fontFamily: "'Lato',sans-serif",
-                                                    background: bounty.status === 'fulfilled' ? '#f0fdf4' : bounty.status === 'disputed' ? '#fef2f2' : '#fef9c3',
-                                                    color: bounty.status === 'fulfilled' ? '#16a34a' : bounty.status === 'disputed' ? '#dc2626' : '#a16207',
-                                                }}>
+                                                <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', fontFamily: "'Lato',sans-serif", flexShrink: 0, background: bounty.status === 'fulfilled' ? '#f0fdf4' : bounty.status === 'disputed' ? '#fef2f2' : '#fef9c3', color: bounty.status === 'fulfilled' ? '#16a34a' : bounty.status === 'disputed' ? '#dc2626' : '#a16207' }}>
                                                     {bounty.status === 'fulfilled' ? '✅ Approved' : bounty.status === 'disputed' ? '🚩 Disputed' : '⏳ Pending'}
                                                 </span>
                                             </div>
-                                            {bounty.reward && (
-                                                <p style={{ fontSize: '12px', color: GOLD, fontWeight: 700, margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>
-                                                    Reward: ₦{Number(bounty.reward).toLocaleString()}
-                                                </p>
-                                            )}
-                                            <p style={{ fontSize: '11px', color: '#aaa', margin: '0 0 10px', fontFamily: "'Lato',sans-serif" }}>
-                                                {bounty.claimedAt?.toDate?.()?.toLocaleDateString() || ''}
-                                            </p>
-                                            <button
-                                                onClick={() => { setShowBountySubmissionsModal(false); setApprovalBounty({ id: bounty.id, data: bounty }); }}
-                                                style={{ background: NAVY, color: '#fff', border: 'none', padding: '8px 14px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}
-                                            >
+                                            {bounty.reward && <p style={{ fontSize: '12px', color: GOLD, fontWeight: 700, margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>Reward: ₦{Number(bounty.reward).toLocaleString()}</p>}
+                                            <p style={{ fontSize: '11px', color: '#aaa', margin: '0 0 10px', fontFamily: "'Lato',sans-serif" }}>{bounty.claimedAt?.toDate?.()?.toLocaleDateString() || ''}</p>
+                                            <button onClick={() => { setShowBountySubmissionsModal(false); setApprovalBounty({ id: bounty.id, data: bounty }); }}
+                                                style={{ background: NAVY, color: '#fff', border: 'none', padding: '7px 12px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
                                                 View Details →
                                             </button>
                                         </div>
@@ -2510,7 +1999,7 @@ export default function SellerAccountClient() {
                         </div>
                     </div>
                 )}
-                
+
                 {/* PIN Modal */}
                 {showPinModal && (
                     <PinModal amount={withdrawAmount} bankDetails={user?.bankDetails} pinValue={pinValue} pinError={pinError}
@@ -2526,30 +2015,30 @@ export default function SellerAccountClient() {
                 {showResetPinModal && (
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
                         <div style={{ background: '#fff', width: '100%', maxWidth: '360px', overflow: 'hidden', boxShadow: '0 32px 64px rgba(13,34,68,0.3)' }}>
-                            <div style={{ background: NAVY, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ background: NAVY, padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div>
                                     <p style={{ color: GOLD, fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Security</p>
                                     <p className="lan-serif" style={{ color: '#fff', fontSize: '16px', fontWeight: 700, margin: 0 }}>Reset Transfer PIN</p>
                                 </div>
-                                <button onClick={() => setShowResetPinModal(false)} style={{ width: '34px', height: '34px', border: '0.5px solid rgba(255,255,255,0.2)', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}><X size={15} /></button>
+                                <button onClick={() => setShowResetPinModal(false)} style={{ width: '32px', height: '32px', border: '0.5px solid rgba(255,255,255,0.2)', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}><X size={15} /></button>
                             </div>
-                            <div style={{ padding: '24px' }}>
+                            <div style={{ padding: '22px' }}>
                                 {resetPinError && <div style={{ display: 'flex', gap: '8px', background: '#fef2f2', border: '0.5px solid #fecaca', padding: '10px 12px', marginBottom: '14px' }}><AlertCircle size={14} style={{ color: '#ef4444', flexShrink: 0 }} /><p style={{ fontSize: '12px', color: '#dc2626', margin: 0, fontFamily: "'Lato',sans-serif" }}>{resetPinError}</p></div>}
                                 {resetPinSuccess && (
-                                    <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                                        <div style={{ width: '60px', height: '60px', background: '#f0fdf4', border: '0.5px solid #86efac', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
-                                            <svg style={{ width: '28px', height: '28px' }} fill="none" stroke="#16a34a" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                    <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                                        <div style={{ width: '56px', height: '56px', background: '#f0fdf4', border: '0.5px solid #86efac', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                                            <svg style={{ width: '26px', height: '26px' }} fill="none" stroke="#16a34a" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
                                         </div>
                                         <p className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: NAVY, margin: '0 0 6px' }}>PIN Reset Successful!</p>
-                                        <p style={{ fontSize: '12px', color: '#aaa', marginBottom: '20px', fontFamily: "'Lato',sans-serif" }}>Your transfer PIN has been updated.</p>
-                                        <button onClick={() => setShowResetPinModal(false)} style={{ width: '100%', background: NAVY, color: '#fff', padding: '13px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>Done</button>
+                                        <p style={{ fontSize: '12px', color: '#aaa', marginBottom: '18px', fontFamily: "'Lato',sans-serif" }}>Your transfer PIN has been updated.</p>
+                                        <button onClick={() => setShowResetPinModal(false)} style={{ width: '100%', background: NAVY, color: '#fff', padding: '12px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>Done</button>
                                     </div>
                                 )}
                                 {!resetPinSuccess && resetPinView === 'forgot' && (
                                     <>
-                                        <p style={{ fontSize: '13px', color: '#888', textAlign: 'center', marginBottom: '20px', lineHeight: 1.6, fontFamily: "'Lato',sans-serif" }}>We'll send a 6-digit reset code to your email to verify your identity.</p>
+                                        <p style={{ fontSize: '13px', color: '#888', textAlign: 'center', marginBottom: '18px', lineHeight: 1.6, fontFamily: "'Lato',sans-serif" }}>We'll send a 6-digit reset code to your email.</p>
                                         <button onClick={async () => { setResetPinError(''); const r = await requestPinReset(); if (r.success) setResetPinView('otp'); else setResetPinError('Failed to send code. Try again.'); }} disabled={Processing}
-                                            style={{ width: '100%', background: NAVY, color: '#fff', padding: '13px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", marginBottom: '10px', opacity: Processing ? 0.6 : 1 }}>
+                                            style={{ width: '100%', background: NAVY, color: '#fff', padding: '12px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", marginBottom: '10px', opacity: Processing ? 0.6 : 1 }}>
                                             {Processing ? 'Sending…' : 'Send Reset Code'}
                                         </button>
                                         <button onClick={() => setShowResetPinModal(false)} style={{ width: '100%', background: 'transparent', border: 'none', fontSize: '12px', color: '#aaa', cursor: 'pointer', padding: '8px', fontFamily: "'Lato',sans-serif" }}>Cancel</button>
@@ -2557,14 +2046,14 @@ export default function SellerAccountClient() {
                                 )}
                                 {!resetPinSuccess && resetPinView === 'otp' && (
                                     <>
-                                        <p style={{ fontSize: '13px', color: '#888', textAlign: 'center', marginBottom: '16px', lineHeight: 1.6, fontFamily: "'Lato',sans-serif" }}>Enter the 6-digit code and choose a new PIN.</p>
+                                        <p style={{ fontSize: '13px', color: '#888', textAlign: 'center', marginBottom: '14px', lineHeight: 1.6, fontFamily: "'Lato',sans-serif" }}>Enter the 6-digit code and choose a new PIN.</p>
                                         <input type="text" value={resetOtpInput} onChange={e => setResetOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit code" maxLength={6}
-                                            style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '12px', fontSize: '18px', textAlign: 'center', letterSpacing: '0.3em', color: NAVY, outline: 'none', fontFamily: 'monospace', boxSizing: 'border-box', marginBottom: '10px' }} />
+                                            style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '12px', fontSize: '18px', textAlign: 'center', letterSpacing: '0.3em', color: NAVY, outline: 'none', fontFamily: 'monospace', marginBottom: '10px' }} />
                                         <input type="password" value={resetNewPin} onChange={e => setResetNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="New 4-digit PIN" maxLength={4}
-                                            style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '12px', fontSize: '22px', textAlign: 'center', letterSpacing: '0.4em', color: NAVY, outline: 'none', fontFamily: 'monospace', boxSizing: 'border-box', marginBottom: '16px' }} />
+                                            style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '12px', fontSize: '22px', textAlign: 'center', letterSpacing: '0.4em', color: NAVY, outline: 'none', fontFamily: 'monospace', marginBottom: '14px' }} />
                                         <button onClick={async () => { setResetPinError(''); if (resetOtpInput.length < 6) { setResetPinError('Enter the 6-digit code.'); return; } if (resetNewPin.length < 4) { setResetPinError('New PIN must be 4 digits.'); return; } try { await verifyOtpAndSetPin(resetOtpInput, resetNewPin); setResetPinSuccess(true); } catch (err) { setResetPinError(err.message); } }}
                                             disabled={Processing || resetOtpInput.length < 6 || resetNewPin.length < 4}
-                                            style={{ width: '100%', background: NAVY, color: '#fff', padding: '13px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", marginBottom: '10px', opacity: (Processing || resetOtpInput.length < 6 || resetNewPin.length < 4) ? 0.4 : 1 }}>
+                                            style={{ width: '100%', background: NAVY, color: '#fff', padding: '12px', border: 'none', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", marginBottom: '10px', opacity: (Processing || resetOtpInput.length < 6 || resetNewPin.length < 4) ? 0.4 : 1 }}>
                                             {Processing ? 'Verifying…' : 'Reset PIN & Save'}
                                         </button>
                                         <button onClick={() => { setResetPinView('forgot'); setResetPinError(''); }} style={{ width: '100%', background: 'transparent', border: 'none', fontSize: '12px', color: '#aaa', cursor: 'pointer', padding: '8px', fontFamily: "'Lato',sans-serif" }}>Back</button>
@@ -2582,40 +2071,40 @@ export default function SellerAccountClient() {
                 {showDeactivateModal && (
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 80, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
                         <div style={{ background: '#fff', width: '100%', maxWidth: '440px', overflow: 'hidden' }}>
-                            <div style={{ background: '#A32D2D', padding: '32px 24px', textAlign: 'center', position: 'relative' }}>
+                            <div style={{ background: '#A32D2D', padding: '28px 20px', textAlign: 'center', position: 'relative' }}>
                                 <button onClick={() => { setShowDeactivateModal(false); setDeactivateConfirmText(""); setDeactivateError(""); }}
-                                    style={{ position: 'absolute', top: '14px', right: '14px', width: '30px', height: '30px', background: 'rgba(255,255,255,0.12)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)' }}><X size={15} /></button>
-                                <div style={{ width: '64px', height: '64px', border: '1.5px solid rgba(255,255,255,0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
-                                    <AlertCircle size={28} style={{ color: '#fff' }} />
+                                    style={{ position: 'absolute', top: '12px', right: '12px', width: '28px', height: '28px', background: 'rgba(255,255,255,0.12)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)' }}><X size={14} /></button>
+                                <div style={{ width: '60px', height: '60px', border: '1.5px solid rgba(255,255,255,0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                                    <AlertCircle size={26} style={{ color: '#fff' }} />
                                 </div>
-                                <p className="lan-serif" style={{ fontSize: '20px', fontWeight: 700, color: '#fff', margin: '0 0 6px' }}>Deactivate account?</p>
+                                <p className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: '0 0 6px' }}>Deactivate account?</p>
                                 <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', fontFamily: "'Lato',sans-serif", margin: 0 }}>This action is permanent and cannot be undone</p>
                             </div>
-                            <div style={{ padding: '20px 20px 0' }}>
-                                <div style={{ background: '#FCEBEB', border: '0.5px solid #F7C1C1', padding: '14px', marginBottom: '16px' }}>
-                                    <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#791F1F', margin: '0 0 10px', fontFamily: "'Lato',sans-serif" }}>What happens when you deactivate</p>
+                            <div style={{ padding: '18px 18px 0' }}>
+                                <div style={{ background: '#FCEBEB', border: '0.5px solid #F7C1C1', padding: '12px', marginBottom: '14px' }}>
+                                    <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#791F1F', margin: '0 0 8px', fontFamily: "'Lato',sans-serif" }}>What happens when you deactivate</p>
                                     {["You will be immediately signed out", "All uploaded documents will be hidden", "Wallet balance will be frozen", "You will lose access to all earnings", "Cannot be reversed without contacting support"].map((w, i) => (
-                                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
-                                            <div style={{ width: '16px', height: '16px', background: '#F09595', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}><X size={8} color="#A32D2D" strokeWidth={2.5} /></div>
-                                            <p style={{ fontSize: '12px', color: '#791F1F', margin: 0, lineHeight: 1.5, fontFamily: "'Lato',sans-serif" }}>{w}</p>
+                                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '5px' }}>
+                                            <div style={{ width: '14px', height: '14px', background: '#F09595', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}><X size={7} color="#A32D2D" strokeWidth={2.5} /></div>
+                                            <p style={{ fontSize: '11px', color: '#791F1F', margin: 0, lineHeight: 1.5, fontFamily: "'Lato',sans-serif" }}>{w}</p>
                                         </div>
                                     ))}
                                 </div>
-                                <div style={{ marginBottom: '16px' }}>
+                                <div style={{ marginBottom: '14px' }}>
                                     <label style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#aaa', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Type <span style={{ color: '#A32D2D' }}>DELETE</span> to confirm</label>
                                     <input type="text" value={deactivateConfirmText} onChange={e => setDeactivateConfirmText(e.target.value.toUpperCase())} placeholder="Type DELETE here" maxLength={6}
-                                        style={{ width: '100%', border: `1.5px solid ${deactivateConfirmText === 'DELETE' ? '#A32D2D' : '#e5e7eb'}`, padding: '12px', fontSize: '15px', fontFamily: 'monospace', letterSpacing: '0.3em', textAlign: 'center', background: deactivateConfirmText === 'DELETE' ? '#FCEBEB' : '#f9fafb', color: deactivateConfirmText === 'DELETE' ? '#A32D2D' : '#374151', outline: 'none', boxSizing: 'border-box' }} />
+                                        style={{ width: '100%', border: `1.5px solid ${deactivateConfirmText === 'DELETE' ? '#A32D2D' : '#e5e7eb'}`, padding: '11px', fontSize: '15px', fontFamily: 'monospace', letterSpacing: '0.3em', textAlign: 'center', background: deactivateConfirmText === 'DELETE' ? '#FCEBEB' : '#f9fafb', color: deactivateConfirmText === 'DELETE' ? '#A32D2D' : '#374151', outline: 'none' }} />
                                     {deactivateConfirmText.length > 0 && deactivateConfirmText !== 'DELETE' && <p style={{ fontSize: '10px', color: '#aaa', textAlign: 'center', marginTop: '4px', fontFamily: "'Lato',sans-serif" }}>{6 - deactivateConfirmText.length} character{6 - deactivateConfirmText.length !== 1 ? 's' : ''} remaining</p>}
                                 </div>
                                 {deactivateError && <div style={{ display: 'flex', gap: '8px', background: '#FCEBEB', border: '0.5px solid #F7C1C1', padding: '10px 12px', marginBottom: '12px' }}><AlertCircle size={13} style={{ color: '#A32D2D', flexShrink: 0 }} /><p style={{ fontSize: '11px', color: '#A32D2D', margin: 0, fontFamily: "'Lato',sans-serif" }}>{deactivateError}</p></div>}
                             </div>
-                            <div style={{ padding: '10px 20px 32px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ padding: '10px 18px 28px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <button onClick={handleDeactivateAccount} disabled={deactivateConfirmText !== 'DELETE' || deactivating}
-                                    style={{ width: '100%', padding: '14px', fontSize: '13px', fontWeight: 700, fontFamily: "'Lato',sans-serif", border: 'none', cursor: deactivateConfirmText === 'DELETE' && !deactivating ? 'pointer' : 'not-allowed', background: deactivateConfirmText === 'DELETE' && !deactivating ? '#A32D2D' : '#f3f4f6', color: deactivateConfirmText === 'DELETE' && !deactivating ? '#fff' : '#9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                    {deactivating ? <><div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Deactivating…</> : 'Yes, deactivate my account'}
+                                    style={{ width: '100%', padding: '13px', fontSize: '13px', fontWeight: 700, fontFamily: "'Lato',sans-serif", border: 'none', cursor: deactivateConfirmText === 'DELETE' && !deactivating ? 'pointer' : 'not-allowed', background: deactivateConfirmText === 'DELETE' && !deactivating ? '#A32D2D' : '#f3f4f6', color: deactivateConfirmText === 'DELETE' && !deactivating ? '#fff' : '#9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                    {deactivating ? <><div style={{ width: '13px', height: '13px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Deactivating…</> : 'Yes, deactivate my account'}
                                 </button>
                                 <button onClick={() => { setShowDeactivateModal(false); setDeactivateConfirmText(""); setDeactivateError(""); }} disabled={deactivating}
-                                    style={{ width: '100%', padding: '12px', fontSize: '13px', fontWeight: 700, color: '#6b7280', background: 'transparent', border: '0.5px solid #e5e7eb', cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
+                                    style={{ width: '100%', padding: '11px', fontSize: '13px', fontWeight: 700, color: '#6b7280', background: 'transparent', border: '0.5px solid #e5e7eb', cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
                                     Cancel, keep my account
                                 </button>
                             </div>
@@ -2623,43 +2112,46 @@ export default function SellerAccountClient() {
                     </div>
                 )}
 
-               {showBountyDashboardModal && (
-    <div className="modal-overlay mt-25">
-        <div className="modal-inner">
-            <div style={{ background: NAVY, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0 }}>
-                <div>
-                    <p style={{ color: GOLD, fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Bounty Board</p>
-                    <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: '20px', fontWeight: 700, color: '#fff', margin: 0 }}>My Bounties</h2>
-                </div>
-                <button onClick={() => setShowBountyDashboardModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}>
-                    <X size={22} />
-                </button>
-            </div>
-            <div style={{ padding: '16px', background: BG, overflowY: 'auto' }}>
-                <BountyDashboardCard user={user} />
-            </div>
-        </div>
-    </div>
-)}
+                {/* Bounty Dashboard Modal */}
+                {showBountyDashboardModal && (
+                    <div className="modal-overlay" style={{ marginTop: "94px" }}>
+                        <div className="modal-inner">
+                            <div style={{ background: NAVY, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                                <div>
+                                    <p style={{ color: GOLD, fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '4px', fontFamily: "'Lato',sans-serif" }}>Bounty Board</p>
+                                    <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>My Bounties</h2>
+                                </div>
+                                <button onClick={() => setShowBountyDashboardModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}><X size={22} /></button>
+                            </div>
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '14px', background: BG }}>
+                                <BountyDashboardCard user={user} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showCurrPicker && typeof document !== "undefined" && (
+                    <CurrencyPickerModal currentCurrency={currency} onSelect={handleCurrencyChange} onClose={() => setShowCurrPicker(false)} />
+                )}
 
                 <ExportStudentsModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} sellerId={user?.uid} sellerBooks={sellerBooks} />
-           
-              {/* Print License Ledger Modal */}
-{showPrintLicenseLedger && (
-  <div className="modal-overlay mt-25">
-    <div className="modal-inner">
-      <div style={{ background: NAVY, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0 }}>
-        <h2 className="lan-serif" style={{ fontSize: '20px', fontWeight: 700, color: '#fff', margin: 0 }}>Print License Ledger</h2>
-        <button onClick={() => setShowPrintLicenseLedger(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}>
-          <X size={22} />
-        </button>
-      </div>
-      <div style={{ padding: '24px', background: BG, minHeight: '400px' }}>
-        <PrintLicensingControl user={user} />
-      </div>
-    </div>
-  </div>
-)}
+
+                {/* Print License Ledger Modal */}
+                {showPrintLicenseLedger && (
+                    <div className="modal-overlay" style={{ marginTop: "94px" }}>
+                        <div className="modal-inner">
+                            <div style={{ background: NAVY, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                                <h2 className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>Print License Ledger</h2>
+                                <button onClick={() => setShowPrintLicenseLedger(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}><X size={22} /></button>
+                            </div>
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '20px', background: BG }}>
+                                <PrintLicensingControl user={user} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
         </>
     );

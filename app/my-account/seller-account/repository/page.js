@@ -18,28 +18,29 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
 import ConsignmentModal from "@/components/ConsignmentModal";
+import { useCurrency } from "@/app/context/CurrencyContext";
 
 /* ─── colour tokens ──────────────────────────────────────────── */
-const NAVY  = "#0d2244";
-const GOLD  = "#b8963e";
+const NAVY = "#0d2244";
+const GOLD = "#b8963e";
 const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
-const BG    = "#f5f1ea";
+const BG = "#f5f1ea";
 
 /* ─── Stock health thresholds ────────────────────────────────── */
 const stockStatus = (current, total) => {
-  if (total === 0) return { label: "No Stock",     color: "#aaa",     bg: "#f5f5f5" };
+  if (total === 0) return { label: "No Stock", color: "#aaa", bg: "#f5f5f5" };
   const pct = current / total;
-  if (pct === 0)   return { label: "Out of Stock", color: "#dc2626",  bg: "#fef2f2" };
-  if (pct <= 0.2)  return { label: "Critical",     color: "#ea580c",  bg: "#fff7ed" };
-  if (pct <= 0.5)  return { label: "Low",          color: "#d97706",  bg: "#fffbeb" };
-  return               { label: "Good",         color: "#16a34a",  bg: "#f0fdf4" };
+  if (pct === 0) return { label: "Out of Stock", color: "#dc2626", bg: "#fef2f2" };
+  if (pct <= 0.2) return { label: "Critical", color: "#ea580c", bg: "#fff7ed" };
+  if (pct <= 0.5) return { label: "Low", color: "#d97706", bg: "#fffbeb" };
+  return { label: "Good", color: "#16a34a", bg: "#f0fdf4" };
 };
 
 /* ─── Stock Health Bar ───────────────────────────────────────── */
 function StockBar({ current, total }) {
   const pct = total > 0 ? Math.max(0, Math.min(1, current / total)) : 0;
-  const st  = stockStatus(current, total);
+  const st = stockStatus(current, total);
   return (
     <div>
       <div style={{ height: "6px", background: "#e5ddd0", overflow: "hidden", marginBottom: "4px" }}>
@@ -64,7 +65,7 @@ function StockBar({ current, total }) {
 /* ─── Notification Bell ──────────────────────────────────────── */
 function NotificationBell({ userId }) {
   const [unread, setUnread] = useState(0);
-  const [open,   setOpen]   = useState(false);
+  const [open, setOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
   const ref = useRef(null);
 
@@ -92,8 +93,8 @@ function NotificationBell({ userId }) {
   }, []);
 
   const typeIcon = (type) => {
-    if (type === "physical_sale")       return "📦";
-    if (type === "physical_low_stock")  return "⚠️";
+    if (type === "physical_sale") return "📦";
+    if (type === "physical_low_stock") return "⚠️";
     return "🔔";
   };
 
@@ -220,7 +221,7 @@ function LedgerTable({ sales, loading }) {
           <div style={{ display: "flex", alignItems: "center" }}>
             <div>
               <p style={{ fontSize: "13px", fontWeight: 700, color: "#16a34a", margin: "0 0 1px", fontFamily: "'Lato',sans-serif" }}>
-                +₦{Number(s.sellerPayout || 0).toLocaleString()}
+                +{fmt(Number(s.sellerPayout || 0))}
               </p>
               <span style={{ fontSize: "9px", fontWeight: 700, color: "#16a34a", background: "#f0fdf4", padding: "1px 6px", fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                 Cleared
@@ -248,7 +249,7 @@ function LedgerTable({ sales, loading }) {
         </span>
         <div>
           <p style={{ fontSize: "13px", fontWeight: 700, color: "#16a34a", margin: 0, fontFamily: "'Lato',sans-serif" }}>
-            +₦{sales.reduce((s, r) => s + (r.sellerPayout || 0), 0).toLocaleString()}
+            +{fmt(sales.reduce((s, r) => s + (r.sellerPayout || 0), 0))}
           </p>
           <p style={{ fontSize: "9px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Total Credited</p>
         </div>
@@ -259,7 +260,7 @@ function LedgerTable({ sales, loading }) {
 
 /* ─── Asset Ledger Drawer ────────────────────────────────────── */
 function LedgerDrawer({ asset, userId, onClose }) {
-  const [sales,   setSales]   = useState([]);
+  const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
 
   /* ── Real-time listener on physicalSales for this asset ── */
@@ -268,7 +269,7 @@ function LedgerDrawer({ asset, userId, onClose }) {
     setLoading(true);
     const q = query(
       collection(db, "physicalSales"),
-      where("assetId",  "==", asset.assetId),
+      where("assetId", "==", asset.assetId),
       where("sellerId", "==", asset.sellerId),
       orderBy("soldAt", "desc")
     );
@@ -283,7 +284,7 @@ function LedgerDrawer({ asset, userId, onClose }) {
   }, [asset]);
 
   if (!asset) return null;
-  const st      = stockStatus(asset.currentStock, asset.totalConsignment);
+  const st = stockStatus(asset.currentStock, asset.totalConsignment);
   const revenue = sales.reduce((s, r) => s + (r.sellerPayout || 0), 0);
 
   return (
@@ -315,10 +316,10 @@ function LedgerDrawer({ asset, userId, onClose }) {
         {/* Stats grid */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px", background: "#e5ddd0", borderBottom: "1px solid #e5ddd0" }}>
           {[
-            { label: "Copies Consigned", val: asset.totalConsignment,       icon: <Package    size={14} style={{ color: GOLD }} /> },
-            { label: "On Shelf",         val: asset.currentStock,           icon: <Layers     size={14} style={{ color: GOLD }} /> },
-            { label: "Copies Sold",      val: asset.soldCount || 0,         icon: <ShoppingBag size={14} style={{ color: GOLD }} /> },
-            { label: "Your Earnings",    val: `₦${revenue.toLocaleString()}`, icon: <DollarSign size={14} style={{ color: GOLD }} /> },
+            { label: "Copies Consigned", val: asset.totalConsignment, icon: <Package size={14} style={{ color: GOLD }} /> },
+            { label: "On Shelf", val: asset.currentStock, icon: <Layers size={14} style={{ color: GOLD }} /> },
+            { label: "Copies Sold", val: asset.soldCount || 0, icon: <ShoppingBag size={14} style={{ color: GOLD }} /> },
+            { label: "Your Earnings", val: fmt(revenue), icon: <DollarSign size={14} style={{ color: GOLD }} /> },
           ].map(({ label, val, icon }) => (
             <div key={label} style={{ background: "#fff", padding: "16px 18px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
@@ -339,9 +340,9 @@ function LedgerDrawer({ asset, userId, onClose }) {
         {/* Shelf + date info */}
         <div style={{ padding: "18px 24px", borderBottom: "0.5px solid #f0ebe0" }}>
           {[
-            { icon: <MapPin    size={13} style={{ color: GOLD }} />, label: "Shelf Location", val: asset.shelfLocation || "Unassigned" },
-            { icon: <Calendar  size={13} style={{ color: GOLD }} />, label: "Checked In",     val: asset.checkedInAt ? new Date(asset.checkedInAt.seconds ? asset.checkedInAt.seconds * 1000 : asset.checkedInAt).toLocaleDateString("en-NG", { day: "2-digit", month: "long", year: "numeric" }) : "—" },
-            { icon: <RefreshCw size={13} style={{ color: GOLD }} />, label: "Last Restock",   val: asset.lastRestockDate ? new Date(asset.lastRestockDate.seconds ? asset.lastRestockDate.seconds * 1000 : asset.lastRestockDate).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" }) : "—" },
+            { icon: <MapPin size={13} style={{ color: GOLD }} />, label: "Shelf Location", val: asset.shelfLocation || "Unassigned" },
+            { icon: <Calendar size={13} style={{ color: GOLD }} />, label: "Checked In", val: asset.checkedInAt ? new Date(asset.checkedInAt.seconds ? asset.checkedInAt.seconds * 1000 : asset.checkedInAt).toLocaleDateString("en-NG", { day: "2-digit", month: "long", year: "numeric" }) : "—" },
+            { icon: <RefreshCw size={13} style={{ color: GOLD }} />, label: "Last Restock", val: asset.lastRestockDate ? new Date(asset.lastRestockDate.seconds ? asset.lastRestockDate.seconds * 1000 : asset.lastRestockDate).toLocaleDateString("en-NG", { day: "2-digit", month: "short", year: "numeric" }) : "—" },
           ].map(({ icon, label, val }) => (
             <div key={label} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderBottom: "0.5px solid #f8f5ef" }}>
               {icon}
@@ -412,7 +413,7 @@ function LedgerDrawer({ asset, userId, onClose }) {
                   <div style={{ display: "flex", alignItems: "center" }}>
                     <div>
                       <p style={{ fontSize: "12px", fontWeight: 700, color: "#16a34a", margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>
-                        +₦{Number(s.sellerPayout || 0).toLocaleString()}
+                        +{fmt(Number(s.sellerPayout || 0))}
                       </p>
                       <span style={{ fontSize: "9px", fontWeight: 700, color: "#16a34a", background: "#f0fdf4", padding: "1px 5px", fontFamily: "'Lato',sans-serif", letterSpacing: "0.04em" }}>CLEARED</span>
                     </div>
@@ -432,7 +433,7 @@ function LedgerDrawer({ asset, userId, onClose }) {
                 </span>
                 <div>
                   <p style={{ fontSize: "13px", fontWeight: 700, color: "#16a34a", margin: 0, fontFamily: "'Lato',sans-serif" }}>
-                    +₦{revenue.toLocaleString()}
+                    +{fmt(revenue)}
                   </p>
                   <p style={{ fontSize: "9px", color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Total Earned</p>
                 </div>
@@ -449,18 +450,18 @@ function LedgerDrawer({ asset, userId, onClose }) {
    MAIN PAGE — Seller Repository
 ════════════════════════════════════════════════════════════════ */
 export default function SellerRepository() {
-  const [user,          setUser]          = useState(null);
-  const [assets,        setAssets]        = useState([]);
-  const [allSales,      setAllSales]      = useState([]); // all sales for this seller
-  const [loading,       setLoading]       = useState(true);
-  const [salesLoading,  setSalesLoading]  = useState(true);
-  const [search,        setSearch]        = useState("");
-  const [filter,        setFilter]        = useState("all");
-  const [view,          setView]          = useState("inventory"); // "inventory" | "ledger"
+  const [user, setUser] = useState(null);
+  const [assets, setAssets] = useState([]);
+  const [allSales, setAllSales] = useState([]); // all sales for this seller
+  const [loading, setLoading] = useState(true);
+  const [salesLoading, setSalesLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [view, setView] = useState("inventory"); // "inventory" | "ledger"
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [showConsign, setShowConsign] = useState(false);  // ← ADD THIS
   const router = useRouter();
-
+  const { fmt } = useCurrency();
   /* ── Auth ── */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -506,9 +507,9 @@ export default function SellerRepository() {
   }, [user]);
 
   /* ── Derived stats ── */
-  const totalOnShelf  = assets.reduce((s, a) => s + (a.currentStock    || 0), 0);
-  const totalSold     = assets.reduce((s, a) => s + (a.soldCount        || 0), 0);
-  const totalRevenue  = allSales.reduce((s, r) => s + (r.sellerPayout   || 0), 0);
+  const totalOnShelf = assets.reduce((s, a) => s + (a.currentStock || 0), 0);
+  const totalSold = assets.reduce((s, a) => s + (a.soldCount || 0), 0);
+  const totalRevenue = allSales.reduce((s, r) => s + (r.sellerPayout || 0), 0);
 
   /* ── Filtered + searched assets ── */
   const displayed = assets.filter(a => {
@@ -522,11 +523,11 @@ export default function SellerRepository() {
     return true;
   });
 
-  const lowStockCount   = assets.filter(a => { const pct = a.totalConsignment > 0 ? a.currentStock / a.totalConsignment : 0; return pct <= 0.3 && pct > 0; }).length;
+  const lowStockCount = assets.filter(a => { const pct = a.totalConsignment > 0 ? a.currentStock / a.totalConsignment : 0; return pct <= 0.3 && pct > 0; }).length;
   const outOfStockCount = assets.filter(a => a.currentStock === 0 && a.totalConsignment > 0).length;
 
   /* ── Ledger search (all-sales view) ── */
-  const ledgerSearch   = search.toLowerCase();
+  const ledgerSearch = search.toLowerCase();
   const displayedSales = view === "ledger"
     ? allSales.filter(s => !ledgerSearch || s.studentName?.toLowerCase().includes(ledgerSearch) || s.assetId?.toLowerCase().includes(ledgerSearch) || s.bookTitle?.toLowerCase().includes(ledgerSearch))
     : [];
@@ -610,10 +611,10 @@ export default function SellerRepository() {
               <style>{`@media(min-width:640px){.stats-grid-4{grid-template-columns:repeat(4,1fr) !important;}}`}</style>
               <div className="stats-grid-4" style={{ display: "contents" }}>
                 {[
-                  { label: "Titles Consigned",  val: assets.length,                       icon: <FileText    size={16} style={{ color: GOLD }} />, dark: false },
-                  { label: "Total On Shelf",    val: totalOnShelf,                         icon: <Layers      size={16} style={{ color: GOLD }} />, dark: false },
-                  { label: "Copies Sold",       val: totalSold,                            icon: <ShoppingBag size={16} style={{ color: GOLD }} />, dark: false },
-                  { label: "Your Earnings",     val: `₦${totalRevenue.toLocaleString()}`,  icon: <TrendingUp  size={16} style={{ color: GOLD }} />, dark: true  },
+                  { label: "Titles Consigned", val: assets.length, icon: <FileText size={16} style={{ color: GOLD }} />, dark: false },
+                  { label: "Total On Shelf", val: totalOnShelf, icon: <Layers size={16} style={{ color: GOLD }} />, dark: false },
+                  { label: "Copies Sold", val: totalSold, icon: <ShoppingBag size={16} style={{ color: GOLD }} />, dark: false },
+                  { label: "Your Earnings", val: `${fmt(totalRevenue)}`, icon: <TrendingUp size={16} style={{ color: GOLD }} />, dark: true },
                 ].map(({ label, val, icon, dark }) => (
                   <div key={label} style={{ background: dark ? NAVY : "#fff", border: `0.5px solid ${dark ? "transparent" : "#e5ddd0"}`, padding: "18px 20px", backgroundImage: dark ? "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)" : "none", backgroundSize: "16px 16px" }}>
                     <div style={{ width: "34px", height: "34px", background: dark ? "rgba(184,150,62,0.15)" : CREAM, border: `0.5px solid ${dark ? "rgba(184,150,62,0.3)" : "#e5ddd0"}`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "10px" }}>
@@ -633,7 +634,7 @@ export default function SellerRepository() {
               <AlertTriangle size={16} style={{ color: "#d97706", flexShrink: 0 }} />
               <p style={{ fontSize: "12px", color: "#78350f", fontFamily: "'Lato',sans-serif", margin: 0, flex: 1, lineHeight: 1.6 }}>
                 {outOfStockCount > 0 && <><strong>{outOfStockCount} title{outOfStockCount > 1 ? "s" : ""} out of stock</strong> — contact the Abuja Registry to arrange a restock. </>}
-                {lowStockCount   > 0 && <><strong>{lowStockCount} title{lowStockCount > 1 ? "s" : ""}</strong> at ≤30% stock.</>}
+                {lowStockCount > 0 && <><strong>{lowStockCount} title{lowStockCount > 1 ? "s" : ""}</strong> at ≤30% stock.</>}
               </p>
               <button onClick={() => { setFilter("out"); setView("inventory"); }} style={{ background: "#d97706", color: "#fff", border: "none", padding: "6px 14px", fontSize: "11px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", whiteSpace: "nowrap" }}>
                 View Critical
@@ -645,7 +646,7 @@ export default function SellerRepository() {
           <div className="fade-up" style={{ display: "flex", marginBottom: "20px", borderBottom: `2px solid ${NAVY}` }}>
             {[
               { key: "inventory", label: `Inventory (${assets.length})` },
-              { key: "ledger",    label: `Sales Ledger (${allSales.length})` },
+              { key: "ledger", label: `Sales Ledger (${allSales.length})` },
             ].map(({ key, label }) => (
               <button key={key} className={`view-tab${view === key ? " active" : ""}`} onClick={() => setView(key)}>
                 {label}
@@ -725,8 +726,8 @@ export default function SellerRepository() {
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "14px" }}>
                           {[
                             { label: "Consigned", val: asset.totalConsignment || 0 },
-                            { label: "On Shelf",  val: asset.currentStock || 0 },
-                            { label: "Sold",      val: asset.soldCount || 0 },
+                            { label: "On Shelf", val: asset.currentStock || 0 },
+                            { label: "Sold", val: asset.soldCount || 0 },
                           ].map(({ label, val }) => (
                             <div key={label}>
                               <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#bbb", margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>{label}</p>

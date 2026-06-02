@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
+import { useCurrency } from "@/app/context/CurrencyContext";
 
 /* ─── Design Tokens ─────────────────────────────────────────── */
 const NAVY  = "#0d2244";
@@ -555,7 +556,7 @@ export default function FacultyAnalyticsPage() {
     const [analytics, setAnalytics] = useState(null);
     const [loading,   setLoading]   = useState(true);
     const [error,     setError]     = useState(null);
-
+    const { fmt } = useCurrency();
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (cu) => {
             if (!cu) { router.push("/auth/signin"); return; }
@@ -791,25 +792,23 @@ function AnalyticsDashboard({ analytics, user, seller, isFaculty }) {
                     alt={user?.displayName}
                 />
                 <div style={{ flex: 1 }}>
-                    <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>
-                        {/* Show the user's title (Dr., Prof., etc.) if available */}
+                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "clamp(13px,3.5vw,17px)", fontWeight: 700, color: NAVY, margin: "0 0 4px", lineHeight: 1.3, wordBreak: "break-word" }}>
+                            {/* Show the user's title (Dr., Prof., etc.) if available */}
                         {seller?.title || user?.title ? `${seller?.title || user?.title} ` : ""}
                         {user?.firstName} {user?.surname}
                     </p>
-                    <p style={{ fontSize: 12, color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif" }}>
-                        {isFaculty
+                        <p style={{ fontSize: 12, color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {isFaculty
                             ? `${seller?.department || seller?.university || "Department not set"} · Academic Analytics`
                             : `${seller?.businessInfo?.businessName || seller?.sellerName || `${user?.firstName || ""} ${user?.surname || ""}`.trim() || "Store"} · Sales Analytics`
                         }
                     </p>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: GOLD, margin: "0 0 2px", fontFamily: "'Lato',sans-serif", textTransform: "uppercase" }}>
-                        Last updated
+               <div style={{ textAlign: "right", flexShrink: 0, minWidth: 80, marginLeft: "auto" }}>
+                    <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "clamp(24px,6vw,40px)", fontWeight: 700, color: GOLDD, margin: 0, lineHeight: 1 }}>
+                            {a.wishlistCount.toLocaleString()}
                     </p>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>
-                        {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                    </p>
+                    <p style={{ fontSize: 11, color: "rgba(184,150,62,0.5)", fontFamily: "'Lato',sans-serif", margin: "4px 0 0" }}>wishlisted</p>
                 </div>
             </div>
 
@@ -919,7 +918,8 @@ function OverviewTab({ analytics: a, isFaculty }) {
                     {courseEntries.length === 0
                         ? <EmptyState message="No course engagement recorded yet." />
                         : (
-                            <div>
+                           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                            <div style={{ minWidth: 480 }}>
                                 <div style={{
                                     display: "grid",
                                     gridTemplateColumns: "1fr 55px 65px 55px 55px 55px",
@@ -972,10 +972,11 @@ function OverviewTab({ analytics: a, isFaculty }) {
                                             </p>
                                             <p style={{ fontSize: 12, fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif", textAlign: "right" }}>{total}</p>
                                         </div>
-                                    );
+                                    )
                                 })}
+                                </div>  
                             </div>
-                        )}
+        )}
                 </div>
 
                 {/* Departmental Reach */}
@@ -1006,7 +1007,7 @@ function OverviewTab({ analytics: a, isFaculty }) {
                 background: NAVY,
                 backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)",
                 backgroundSize: "24px 24px",
-                padding: "28px 32px", display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap",
+                padding: "28px 32px", display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap",
             }}>
                 <div style={{ width: 56, height: 56, border: "0.5px solid rgba(184,150,62,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <HeartIcon color={GOLD} size={24} />
@@ -1024,8 +1025,8 @@ function OverviewTab({ analytics: a, isFaculty }) {
                         {a.physicalPendingOrders.length > 0 && ` · ${a.physicalPendingOrders.length} physical copies pending pickup at Abuja Registry.`}
                     </p>
                 </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 40, fontWeight: 700, color: GOLDD, margin: 0, lineHeight: 1 }}>
+                <div style={{ textAlign: "right", flexShrink: 0, minWidth: 64, marginLeft: "auto" }}>
+                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 40, fontWeight: 700, color: GOLDD, margin: 0, lineHeight: 1 }}>
                         {a.wishlistCount.toLocaleString()}
                     </p>
                     <p style={{ fontSize: 11, color: "rgba(184,150,62,0.5)", fontFamily: "'Lato',sans-serif", margin: "4px 0 0" }}>wishlisted</p>
@@ -1148,6 +1149,7 @@ function DownloadsTab({ analytics: a }) {
    TAB: PHYSICAL SALES & INVENTORY
 ══════════════════════════════════════════════════════════════ */
 function PhysicalTab({ analytics: a }) {
+    const { fmt } = useCurrency();
     const totalRevenue = a.physicalSales.reduce((s, sale) => s + (sale.sellerPayout || 0), 0);
 
     return (
@@ -1156,7 +1158,7 @@ function PhysicalTab({ analytics: a }) {
                 {[
                     { label: "Copies Sold",        value: a.totalPhysicalSales,              color: NAVY      },
                     { label: "Pending Pickup",      value: a.physicalPendingOrders.length,    color: "#d97706" },
-                    { label: "Payout Earned",       value: `₦${totalRevenue.toLocaleString()}`, color: "#16a34a" },
+                    { label: "Payout Earned",       value: fmt(totalRevenue),                 color: "#16a34a" },
                     { label: "Assets at Registry",  value: a.physicalInventory.length,        color: NAVY      },
                 ].map(({ label, value, color }) => (
                     <div key={label} style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "16px 20px", textAlign: "center" }}>
@@ -1171,9 +1173,10 @@ function PhysicalTab({ analytics: a }) {
                 {a.physicalInventory.length === 0
                     ? <EmptyState message="No physical copies registered at the Abuja Registry yet." />
                     : (
-                        <div>
-                            <div style={{
-                                display: "grid", gridTemplateColumns: "1fr 90px 90px 90px 100px",
+                        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                            <div style={{ minWidth: 520 }}>
+                                <div style={{
+                                    display: "grid", gridTemplateColumns: "1fr 90px 90px 90px 100px",
                                 gap: 6, padding: "8px 12px", background: CREAM, borderBottom: "0.5px solid #e5ddd0",
                             }}>
                                 {["Book", "Asset ID", "In Stock", "Total", "Shelf"].map((h) => (
@@ -1213,15 +1216,17 @@ function PhysicalTab({ analytics: a }) {
                                 );
                             })}
                         </div>
+                        </div>
                     )}
             </div>
 
-            {a.physicalPendingOrders.length > 0 && (
-                <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24 }}>
-                    <SectionHeader label="Awaiting Collection" title="Pending Pickup Orders" />
-                    <div>
-                        <div style={{
-                            display: "grid", gridTemplateColumns: "1fr 120px 100px 110px",
+           {a.physicalPendingOrders.length > 0 && (
+    <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24 }}>
+        <SectionHeader label="Awaiting Collection" title="Pending Pickup Orders" />
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ minWidth: 480 }}>
+            <div style={{
+                display: "grid", gridTemplateColumns: "1fr 120px 100px 110px",
                             gap: 6, padding: "8px 12px", background: CREAM, borderBottom: "0.5px solid #e5ddd0",
                         }}>
                             {["Book / Buyer", "Pickup Code", "Price", "Reserved On"].map((h) => (
@@ -1241,27 +1246,29 @@ function PhysicalTab({ analytics: a }) {
                                     {order.pickupCode}
                                 </p>
                                 <p style={{ fontSize: 12, fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Playfair Display',serif", alignSelf: "center" }}>
-                                    ₦{(order.price || 0).toLocaleString()}
+                                    {fmt(order.price || 0)}
                                 </p>
                                 <p style={{ fontSize: 11, color: "#888", margin: 0, fontFamily: "'Lato',sans-serif", alignSelf: "center" }}>
                                     {order.createdAt
                                         ? new Date(order.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })
                                         : "—"}
                                 </p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+                          </div>
+                     ))}
+        </div>
+        </div>
+        </div>
+    )}
 
             <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: 24 }}>
                 <SectionHeader label="Sales Ledger" title="Completed Physical Sales" />
-                {a.physicalSales.length === 0
-                    ? <EmptyState message="No physical sales recorded at the registry yet." />
-                    : (
-                        <div>
-                            <div style={{
-                                display: "grid", gridTemplateColumns: "1fr 140px 100px 110px",
+              {a.physicalSales.length === 0
+    ? <EmptyState message="No physical sales recorded at the registry yet." />
+    : (
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ minWidth: 480 }}>
+            <div style={{
+                display: "grid", gridTemplateColumns: "1fr 140px 100px 110px",
                                 gap: 6, padding: "8px 12px", background: CREAM, borderBottom: "0.5px solid #e5ddd0",
                             }}>
                                 {["Book / Student", "Asset ID", "Your Payout", "Date Sold"].map((h) => (
@@ -1279,7 +1286,7 @@ function PhysicalTab({ analytics: a }) {
                                     </div>
                                     <p style={{ fontSize: 11, color: GOLD, margin: 0, fontFamily: "monospace", alignSelf: "center" }}>{sale.assetId}</p>
                                     <p style={{ fontSize: 13, fontWeight: 700, color: "#16a34a", margin: 0, fontFamily: "'Playfair Display',serif", alignSelf: "center" }}>
-                                        ₦{(sale.sellerPayout || 0).toLocaleString()}
+                                        {fmt(sale.sellerPayout || 0)}
                                     </p>
                                     <p style={{ fontSize: 11, color: "#888", margin: 0, fontFamily: "'Lato',sans-serif", alignSelf: "center" }}>
                                         {sale.soldAt
@@ -1287,9 +1294,10 @@ function PhysicalTab({ analytics: a }) {
                                             : "—"}
                                     </p>
                                 </div>
-                            ))}
-                        </div>
-                    )}
+                       ))}
+        </div>
+        </div>
+        )}
             </div>
         </div>
     );
@@ -1325,8 +1333,8 @@ function WishlistTab({ analytics: a, isFaculty }) {
                                 <div key={country} style={{ padding: "16px 0", borderBottom: "0.5px solid #f5f0e8" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
                                         <span style={{ fontSize: 24, lineHeight: 1 }}>{getFlagEmoji(country)}</span>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
                                                 <p style={{ fontSize: 14, fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>{country}</p>
                                                 <span style={{ fontSize: 11, fontWeight: 700, background: "rgba(184,150,62,0.12)", color: GOLD, padding: "2px 8px", borderRadius: 999, fontFamily: "'Lato',sans-serif" }}>
                                                     {data.count} {isFaculty ? "student" : "user"}{data.count !== 1 ? "s" : ""}
@@ -1355,12 +1363,12 @@ function WishlistTab({ analytics: a, isFaculty }) {
             </div>
 
             {countryEntries.length > 0 && (
-                <div style={{
-                    background: NAVY,
-                    backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)",
-                    backgroundSize: "24px 24px",
-                    padding: "20px 28px", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap",
-                }}>
+              <div style={{
+    background: NAVY,
+    backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)",
+    backgroundSize: "24px 24px",
+    padding: "28px 32px", display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap",
+}}>
                     <GlobeIcon color={GOLD} size={28} />
                     <div>
                         <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 700, color: "#fff", margin: "0 0 2px" }}>
@@ -1649,8 +1657,8 @@ function FeedbackTab({ analytics: a, isFaculty }) {
                                                 {(fb.userName || "?")[0].toUpperCase()}
                                             </span>
                                         </div>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                                                 <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>
                                                     {fb.userName || "Anonymous"}
                                                 </p>

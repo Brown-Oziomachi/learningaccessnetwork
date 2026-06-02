@@ -12,6 +12,7 @@ import {
     X, AlertCircle, Lock, CreditCard, Wallet,
 } from "lucide-react";
 import { initializeFlutterwave } from "@/lib/flutterwaveService";
+import { useCurrency } from "@/app/context/CurrencyContext";
 
 /* ─── tokens (matches your existing platform theme) ──────── */
 const NAVY = "#0d2244";
@@ -52,6 +53,7 @@ const DURATIONS = [7, 14, 30, 60, 90];
 
 /* ══════════════════════════════════════════════════════════ */
 export default function SellerAdCreatorClient() {
+    const { fmt } = useCurrency();
     /* ── auth + books ─────────────────────────────────────── */
     const [user, setUser] = useState(null);
     const [books, setBooks] = useState([]);
@@ -85,7 +87,6 @@ export default function SellerAdCreatorClient() {
     const [processing, setProcessing] = useState(false);
     const [payError, setPayError] = useState("");
     const [submitted, setSubmitted] = useState(false);
-
 
 
     /* ── auth ─────────────────────────────────────────────── */
@@ -262,7 +263,7 @@ const canOpenPay = selectedBook && headline.trim();
                 if (enteredPin.trim() !== storedPin.toString().trim()) throw new Error("Incorrect PIN. Try again.");
 
                 const balance = data.accountBalance || 0;
-                if (balance < totalPrice) throw new Error(`Insufficient balance. You have ₦${balance.toLocaleString()}.`);
+                if (balance < totalPrice) throw new Error(`Insufficient balance. You have ${fmt(balance)}.`);
 
                 newBalance = balance - totalPrice;
                 tx.update(sellerRef, { accountBalance: newBalance, updatedAt: serverTimestamp() });
@@ -498,7 +499,7 @@ const canOpenPay = selectedBook && headline.trim();
                                     <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 13, fontWeight: 700, color: NAVY, margin: "0 0 3px", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                                         {b.bookTitle || b.title}
                                     </p>
-                                    <p style={{ fontSize: 10, color: "#aaa", margin: 0 }}>₦{Number(b.price).toLocaleString()}</p>
+                                    <p style={{ fontSize: 10, color: "#aaa", margin: 0 }}>{fmt(Number(b.price) || 0)}</p>
                                 </div>
                             ))}
                         </div>
@@ -522,7 +523,7 @@ const canOpenPay = selectedBook && headline.trim();
                                         </div>
                                         <div>
                                             <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: 0 }}>{key}</p>
-                                            <p style={{ fontSize: 10, color: t.color, fontWeight: 700, margin: 0 }}>₦{t.dailyRate.toLocaleString()}/day</p>
+                                            <p style={{ fontSize: 10, color: t.color, fontWeight: 700, margin: 0 }}>{fmt(t.dailyRate)}/day</p>
                                         </div>
                                     </div>
                                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -590,10 +591,10 @@ const canOpenPay = selectedBook && headline.trim();
                     <div>
                         <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: "rgba(184,150,62,.6)", margin: "0 0 4px" }}>Total Investment</p>
                         <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 40, fontWeight: 900, color: GOLD, margin: "0 0 4px", lineHeight: 1 }}>
-                            ₦{totalPrice.toLocaleString()}
+                            {fmt(totalPrice)}
                         </p>
                         <p style={{ fontSize: 11, color: "rgba(255,255,255,.35)", margin: 0 }}>
-                            {selectedTier} · {selectedDays} days · ₦{tier.dailyRate.toLocaleString()}/day
+                            {selectedTier} · {selectedDays} days · {fmt(tier.dailyRate)}/day
                         </p>
                     </div>
                     <button
@@ -636,7 +637,8 @@ const canOpenPay = selectedBook && headline.trim();
                                     Ad Promotion Payment
                                 </p>
                                 <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 700, color: "#fff", margin: 0 }}>
-                                    {selectedTier} Tier · {selectedDays} days · ₦{totalPrice.toLocaleString()}
+                                    {selectedTier} Tier · {selectedDays} days · {fmt(totalPrice)}
+
                                 </p>
                             </div>
                             <button
@@ -678,11 +680,11 @@ const canOpenPay = selectedBook && headline.trim();
 
                                     <div style={{ background: CREAM, border: "0.5px solid rgba(184,150,62,0.2)", padding: "10px 14px", margin: "16px 0", display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                                         <span style={{ color: "#888" }}>Total</span>
-                                        <span style={{ fontWeight: 700, color: NAVY }}>₦{totalPrice.toLocaleString()}</span>
+                                        <span style={{ fontWeight: 700, color: NAVY }}>{fmt(totalPrice)}</span>
                                     </div>
 
                                     <button onClick={handleFlutterwavePayment} disabled={processing} style={navyBtn(processing)}>
-                                        {processing ? "Processing…" : `PAY ₦${totalPrice.toLocaleString()} VIA CARD/BANK`}
+                                        {processing ? "Processing…" : `PAY ${fmt(totalPrice)} VIA CARD/BANK`}
                                     </button>
                                 </>
                             )}
@@ -704,7 +706,7 @@ const canOpenPay = selectedBook && headline.trim();
                                     {pinView === "enter" && (
                                         <>
                                             <p style={{ fontSize: 12, color: "#888", textAlign: "center", marginBottom: 16 }}>
-                                                Authorise <strong style={{ color: NAVY }}>₦{totalPrice.toLocaleString()}</strong> from your LAN Wallet
+                                                Authorise <strong style={{ color: NAVY }}>{fmt(totalPrice)}</strong> from your LAN Wallet
                                             </p>
                                             {/* PIN dots */}
                                             <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 12 }}>

@@ -1,7 +1,11 @@
 import { Suspense } from "react";
-import SchoolRegistrationClient from "./register";
+import StudentNetworkClient from "./network";
 
-export default function SearchPage() {
+export const metadata = {
+    title: "Explore Student Network | LAN Library",
+    description: "Recharge your mobile credit and pay bills with ease! Join LAN Library and enjoy exclusive benefits together."
+}
+export default function StudentNetworkPage() {
     return (
         <Suspense
             fallback={
@@ -10,7 +14,7 @@ export default function SearchPage() {
                 </div>
             }
         >
-            <SchoolRegistrationClient />
+            <StudentNetworkClient />
         </Suspense>
     );
 }

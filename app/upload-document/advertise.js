@@ -14,6 +14,7 @@ import {
     Globe, TrendingUp,
 } from "lucide-react";
 import { UNIVERSITIES_BY_COUNTRY, UNIVERSITY_COUNTRIES } from "@/lib/africanUniversities";
+import { useCurrency } from "../context/CurrencyContext";
 
 /* ─────────────────────────────────────────────────────────────────
    CONSTANTS
@@ -423,7 +424,7 @@ export default function AdvertiseClient() {
     const [showDriveWarn, setShowDriveWarn] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [selectedCoverImage, setSelectedCoverImage] = useState(null);
-
+    const { fmt } = useCurrency();
     /* ── Exchange rates (mirrors payment page) ── */
     const [exchangeRates, setExchangeRates] = useState(FALLBACK_RATES);
     const [ratesLoaded, setRatesLoaded] = useState(false);
@@ -643,8 +644,8 @@ export default function AdvertiseClient() {
     );
     const isPending = userData?.lecturerVerificationStatus === "pending";
 
-    const earnings = form.price ? (Number(form.price) * 0.8).toLocaleString() : "0";
-    const platformFee = form.price ? (Number(form.price) * 0.2).toLocaleString() : "0";
+    const earnings = form.price ? Number(form.price) * 0.8 : 0;
+    const platformFee = form.price ? Number(form.price) * 0.2 : 0;
     const activeIntent = INTENTS.find(i => i.id === intent);
 
     return (
@@ -1172,14 +1173,14 @@ export default function AdvertiseClient() {
                                                 {form.price && Number(form.price) > 0 && (
                                                     <div style={{ marginTop: 10, padding: "13px 15px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10 }}>
                                                         <p style={{ fontSize: 10, color: "#15803d", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 2px" }}>Your earnings per sale</p>
-                                                        <p className="pf" style={{ fontSize: 26, fontWeight: 800, color: "#15803d", margin: "0 0 1px" }}>₦{earnings}</p>
+                                                        <p className="pf" style={{ fontSize: 26, fontWeight: 800, color: "#15803d", margin: "0 0 1px" }}>{fmt(earnings)}</p>
                                                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#16a34a", borderTop: "1px solid #bbf7d0", paddingTop: 6, marginTop: 6 }}>
                                                             <span>Your share (80%)</span>
-                                                            <span style={{ fontWeight: 700 }}>₦{earnings}</span>
+                                                            <span style={{ fontWeight: 700 }}>{fmt(earnings)}</span>
                                                         </div>
                                                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9ca3af" }}>
                                                             <span>Platform (20%)</span>
-                                                            <span>₦{platformFee}</span>
+                                                            <span>{fmt(platformFee)}</span>
                                                         </div>
                                                     </div>
                                                 )}
@@ -1233,15 +1234,15 @@ export default function AdvertiseClient() {
                                     {form.accessType !== "free" && (
                                         <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "15px 18px" }}>
                                             <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6b7280", margin: "0 0 10px" }}>💡 Pricing Guide</p>
-                                            {[
-                                                ["Past Questions / Notes", "₦500 – ₦1,500"],
-                                                ["Lecture Notes / Summaries", "₦1,000 – ₦3,000"],
-                                                ["Textbooks / Full Projects", "₦2,500 – ₦8,000"],
-                                                ["Premium Thesis / Dissertation", "₦5,000 – ₦15,000"],
-                                            ].map(([t, r]) => (
+                                           {[
+                                                ["Past Questions / Notes",        500,   1500],
+                                                ["Lecture Notes / Summaries",    1000,   3000],
+                                                ["Textbooks / Full Projects",    2500,   8000],
+                                                ["Premium Thesis / Dissertation", 5000, 15000],
+                                            ].map(([t, min, max]) => (
                                                 <div key={t} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "2px 0" }}>
                                                     <span style={{ color: "#6b7280" }}>{t}</span>
-                                                    <span style={{ fontWeight: 700, color: "#111827" }}>{r}</span>
+                                                    <span style={{ fontWeight: 700, color: "#111827" }}>{fmt(min)} – {fmt(max)}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -1318,9 +1319,9 @@ export default function AdvertiseClient() {
                             <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", margin: "0 0 3px" }}>
                                 Potential Earnings
                             </p>
-                            <p className="pf" style={{ fontSize: 34, fontWeight: 800, margin: "0 0 2px" }}>₦{earnings}</p>
+                            <p className="pf" style={{ fontSize: 34, fontWeight: 800, margin: "0 0 2px" }}>{fmt(earnings)}</p>
                             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "0 0 14px" }}>
-                                per sale at ₦{form.price ? Number(form.price).toLocaleString() : "0"}
+                                per sale at {form.price ? fmt(Number(form.price)) : fmt(0)}
                             </p>
                             <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 13, display: "flex", flexDirection: "column", gap: 7 }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>

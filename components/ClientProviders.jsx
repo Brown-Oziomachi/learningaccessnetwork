@@ -6,6 +6,8 @@ import { Toaster, toast } from "react-hot-toast";
 import dynamic from "next/dynamic";
 import { SessionTimeoutProvider } from "./SessionTimeoutProvider";
 import { auth } from "@/lib/firebaseConfig";
+import { CurrencyProvider } from "@/app/context/CurrencyContext";
+
 // import BountyPopup from "./BountyPopup";
 
 // ← Dynamic import prevents SSR crash + white page
@@ -49,8 +51,10 @@ export default function ClientProviders({ children }) {
         timeoutMs={1_800_000}
         showToast={(msg) => toast.error(msg)}
       >
-        {children}
-      </SessionTimeoutProvider>
+        <CurrencyProvider>
+          {children}
+        </CurrencyProvider>      
+        </SessionTimeoutProvider>
 
       <BountyPopup />
     </>

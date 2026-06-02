@@ -13,13 +13,14 @@ import {
 } from "lucide-react";
 import { auth, db } from "@/lib/firebaseConfig";
 import { collection, getDocs } from "firebase/firestore";
+import NetworkModal from "@/components/NetworkModal";
 
 /* ─── design tokens (matches home + report pages) ─────────────── */
-const NAVY  = "#0d2244";
-const GOLD  = "#b8963e";
+const NAVY = "#0d2244";
+const GOLD = "#b8963e";
 const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
-const BG    = "#f5f1ea";
+const BG = "#f5f1ea";
 
 /* ─── shared CSS injected once ────────────────────────────────── */
 const GLOBAL_STYLES = `
@@ -175,7 +176,7 @@ const getThumbnailUrl = (book) => {
   if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
   if (book.embedUrl) {
     const m = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
-    if (m) { const id = m[1]||m[2]||m[3]; if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`; }
+    if (m) { const id = m[1] || m[2] || m[3]; if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`; }
   }
   if (book.pdfUrl?.includes("drive.google.com")) {
     const m = book.pdfUrl.match(/[-\w]{25,}/);
@@ -186,36 +187,140 @@ const getThumbnailUrl = (book) => {
 
 /* ─── data ───────────────────────────────────────────────────── */
 const STATS = [
-  { val: "90M+",   label: "Documents"    },
-  { val: "2.4M+",  label: "Learners"     },
+  { val: "90M+", label: "Documents" },
+  { val: "2.4M+", label: "Learners" },
   { val: "200+", label: "Institutions" },
-  { val: "85%",    label: "Revenue Share" },
+  { val: "85%", label: "Revenue Share" },
 ];
 
 const STUDENT_FEATURES = [
-  { title: "Discover Specialized Content",  body: "Course-specific books, lecture notes, and research documents tailored to your university curriculum." },
-  { title: "Instant Knowledge Unlock",      body: "Gain immediate digital access to materials that help you ace your exams and master your field." },
-  { title: "Global Academic Reach",         body: "Browse thousands of verified resources from top-performing students and academics worldwide." },
+  { title: "Discover Specialized Content", body: "Course-specific books, lecture notes, and research documents tailored to your university curriculum." },
+  { title: "Instant Knowledge Unlock", body: "Gain immediate digital access to materials that help you ace your exams and master your field." },
+  { title: "Global Academic Reach", body: "Browse thousands of verified resources from top-performing students and academics worldwide." },
+];
+
+const FOOTER_COLUMNS = [
+  {
+    heading: "For Students",
+    links: [
+      { label: "AI Tutor", href: "/students/ai-tutor" },
+      { label: "My Library", href: "/students/my-library" },
+      { label: "How to Buy", href: "/students/how-to-buy" },
+      { label: "Past Questions", href: "/students/past-questions" },
+      { label: "Study Groups", href: "/students/study-groups" },
+      { label: "Saved", href: "/students/wishlist" },
+      { label: "Student Network", href: "/students/network" },
+    ],
+  },
+  {
+    heading: "For Sellers",
+    links: [
+      { label: "Seller Network", href: "/seller/network" },
+      { label: "Upload Document", href: "/seller/upload-document" },
+      { label: "LAN Wallet", href: "/seller/lan-wallet" },
+      { label: "Withdraw Earnings", href: "/seller/withdraw-earnings" },
+      { label: "Referral Programme", href: "/seller/referral" },
+      { label: "Seller Dashboard", href: "/seller/seller-dashboard" },
+      { label: "Recharge Services", href: "/seller/recharge-services" },
+    ],
+  },
+  {
+    heading: "For Faculty",
+    links: [
+      { label: "Faculty Network", href: "/faculty/network" },
+      { label: "Faculty Verification", href: "/faculty/verify" },
+      { label: "Upload Materials", href: "/faculty/upload" },
+      { label: "Faculty Dashboard", href: "/faculty/dashboard" },
+      { label: "Withdraw Earnings", href: "/faculty/withdraw" },
+      { label: "Recharge Services", href: "/faculty/recharge" },
+      { label: "Referral Programme", href: "/faculty/referral" },
+    ],
+  },
+  {
+    heading: "Company",
+    links: [
+      { label: "About LAN", href: "/about/lan" },
+      { label: "Help Centre", href: "/lan/net/help-center" },
+      { label: "Documentation", href: "/docs" },
+      { label: "Invite a Friend", href: "/ref/invite-friends" },
+      { label: "Social Impact", href: "/social-impart" },
+      { label: "Privacy Policy", href: "/lan/privacy-policy" },
+      { label: "Terms of Service", href: "/lan/terms-of-service" },
+      { label: "User Agreement", href: "/user-agreement=lib" },
+      { label: "Author Development Series", href: "/writers-mindset" },
+    ],
+  },
+];
+
+const NETWORKS = [
+  {
+    key: "student",
+    href: "/students/network",
+    image: "/stud2.png",           // swap to your real asset
+    fallback: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800",
+    tag: "🎓 Student Network",
+    tagColor: "#7c3aed",
+    tagBg: "rgba(124,58,237,.15)",
+    tagBorder: "rgba(124,58,237,.35)",
+    title: "Learn Smarter,\nConnect Deeper",
+    body: "Access 128,000+ documents, join study groups, post Bounty requests, and build your academic reputation — all in one place.",
+    cta: "Explore Student Network",
+    accent: "#7c3aed",
+    overlayFrom: "rgba(124,58,237,.85)",
+    overlayTo: "rgba(11,11,15,.95)",
+  },
+  {
+    key: "seller",
+    href: "/seller/network",
+    image: "/LAN seller.png",
+    fallback: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800",
+    tag: "📚 Seller Network",
+    tagColor: "#b8963e",
+    tagBg: "rgba(184,150,62,.15)",
+    tagBorder: "rgba(184,150,62,.35)",
+    title: "Turn Knowledge\nInto Income",
+    body: "Upload once, earn forever. 2,400+ verified sellers already earning passive income from their academic materials.",
+    cta: "Explore Seller Network",
+    accent: "#b8963e",
+    overlayFrom: "rgba(13,34,68,.88)",
+    overlayTo: "rgba(13,34,68,.97)",
+  },
+  {
+    key: "faculty",
+    href: "/faculty/network",
+    image: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=800",
+    fallback: "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800",
+    tag: "🏛️ Faculty Network",
+    tagColor: "#0f7173",
+    tagBg: "rgba(15,113,115,.15)",
+    tagBorder: "rgba(15,113,115,.35)",
+    title: "Publish Beyond\nYour Classroom",
+    body: "Verified lecturers and professors reach students across Africa and earn from course materials they already have.",
+    cta: "Explore Faculty Network",
+    accent: "#0f7173",
+    overlayFrom: "rgba(10,85,87,.88)",
+    overlayTo: "rgba(26,26,46,.97)",
+  },
 ];
 
 const SELLER_FEATURES = [
-  { title: "Monetize Your Knowledge",  body: "Turn your high-quality study guides, research papers, or written books into a steady stream of passive income." },
-  { title: "Empower Your Peers",       body: "Help fellow students succeed by sharing the resources that helped you excel." },
-  { title: "Seamless Selling",         body: "Upload once, set your price, and reach a global audience of 90M+ learners with automated payouts." },
+  { title: "Monetize Your Knowledge", body: "Turn your high-quality study guides, research papers, or written books into a steady stream of passive income." },
+  { title: "Empower Your Peers", body: "Help fellow students succeed by sharing the resources that helped you excel." },
+  { title: "Seamless Selling", body: "Upload once, set your price, and reach a global audience of 90M+ learners with automated payouts." },
 ];
 
 const BENEFITS = [
-  { emoji: "⚡", title: "Instant Seller Payout",    body: "Get paid immediately after a buyer purchases your book, directly into your LAN wallet." },
-  { emoji: "🔄", title: "Flexible Withdrawal",       body: "Withdraw your earnings at any time that suits you, to any Nigerian bank account." },
-  { emoji: "🚫", title: "No Hidden Charges",         body: "Transfer your money without surprise fees. What you earn is what you get." },
-  { emoji: "💰", title: "Earn Up to ₦500K Monthly",  body: "Top sellers on LAN Library earn consistently, from small daily sales to large monthly payouts." },
+  { emoji: "⚡", title: "Instant Seller Payout", body: "Get paid immediately after a buyer purchases your book, directly into your LAN wallet." },
+  { emoji: "🔄", title: "Flexible Withdrawal", body: "Withdraw your earnings at any time that suits you, to any Nigerian bank account." },
+  { emoji: "🚫", title: "No Hidden Charges", body: "Transfer your money without surprise fees. What you earn is what you get." },
+  { emoji: "💰", title: "Earn Up to ₦500K Monthly", body: "Top sellers on LAN Library earn consistently, from small daily sales to large monthly payouts." },
 ];
 
 const SERVICES = [
-  { gradient: "linear-gradient(135deg,#ea580c,#c2410c)", emoji: "📱", title: "Airtime",     sub: "Instant top-up for all networks", cta: "From ₦50" },
-  { gradient: "linear-gradient(135deg,#1d4ed8,#1e40af)", emoji: "📶", title: "Cheap Data",  sub: "SME bundles from ₦250", cta: "Save up to 40%" },
-  { gradient: "linear-gradient(135deg,#16a34a,#15803d)", emoji: "⚡", title: "Electricity",  sub: "Pay for your hostel units", cta: "All discos supported" },
-  { gradient: "linear-gradient(135deg,#7c3aed,#6d28d9)", emoji: "📺", title: "TV / Cable",  sub: "DSTV, GOTV & Startimes", cta: "Quick renewal" },
+  { gradient: "linear-gradient(135deg,#ea580c,#c2410c)", emoji: "📱", title: "Airtime", sub: "Instant top-up for all networks", cta: "From ₦50" },
+  { gradient: "linear-gradient(135deg,#1d4ed8,#1e40af)", emoji: "📶", title: "Cheap Data", sub: "SME bundles from ₦250", cta: "Save up to 40%" },
+  { gradient: "linear-gradient(135deg,#16a34a,#15803d)", emoji: "⚡", title: "Electricity", sub: "Pay for your hostel units", cta: "All discos supported" },
+  { gradient: "linear-gradient(135deg,#7c3aed,#6d28d9)", emoji: "📺", title: "TV / Cable", sub: "DSTV, GOTV & Startimes", cta: "Quick renewal" },
 ];
 
 const TESTIMONIALS = [
@@ -244,18 +349,195 @@ const TESTIMONIALS = [
   },
 ];
 
+
+function NetworkCardsSection() {
+  return (
+    <section style={{ background: BG, padding: "96px 24px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+
+        {/* ── header ── */}
+        <div style={{ textAlign: "center", marginBottom: 56 }}>
+          <p style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: ".22em",
+            textTransform: "uppercase", color: GOLD, marginBottom: 12,
+            fontFamily: "'Lato',sans-serif",
+          }}>
+            The LAN Ecosystem
+          </p>
+          <h2 className="lan-serif" style={{
+            fontSize: "clamp(30px,4vw,52px)", fontWeight: 700,
+            color: NAVY, margin: "0 0 14px", lineHeight: 1.08,
+          }}>
+            Three Networks.{" "}
+            <span style={{ color: GOLD, fontStyle: "italic" }}>One Platform.</span>
+          </h2>
+      <div style={{ textAlign: "center", padding: "20px 0" }}>
+  <p style={{
+    fontSize: "16px", 
+    color: "#555555", 
+    maxWidth: "540px",
+    margin: "0 auto 16px auto", 
+    lineHeight: "1.6", 
+    fontWeight: "400",
+    fontFamily: "'Lato', sans-serif"
+  }}>
+    Think of the entire LAN platform as a large <strong>Academic Airport</strong>, where these three networks are the different groups of people making it run:
+  </p>
+  
+  <p style={{
+    fontSize: "15px", 
+    color: NAVY, 
+    maxWidth: "460px",
+    margin: "0 auto 30px auto", 
+    lineHeight: "1.8", 
+    fontWeight: "300",
+    fontFamily: "'Lato', sans-serif"
+  }}>
+    A student in the 
+    <a href="/students/network" style={{ color: NAVY, textDecoration: "underline", fontWeight: "700", marginLeft: "4px", marginRight: "4px" }}>
+      Student Network
+    </a> 
+    buys a document created by a graduate in the 
+    <a href="/seller/network" style={{ color: NAVY, textDecoration: "underline", fontWeight: "700", marginLeft: "4px", marginRight: "4px" }}>
+      Seller Network
+    </a>, 
+    which might be vetted or supplemented by resources from a professor in the 
+    <a href="/faculty/network" style={{ color: NAVY, textDecoration: "underline", fontWeight: "700", marginLeft: "4px" }}>
+      Faculty Network
+    </a>.         
+  </p>
+</div>
+        </div>
+
+        {/* ── cards ── */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gap: 20,
+        }}>
+          {NETWORKS.map(n => (
+            <a
+              key={n.key}
+              href={n.href}
+              style={{
+                display: "block", textDecoration: "none",
+                position: "relative", overflow: "hidden",
+                border: "0.5px solid #e5ddd0",
+                transition: "transform .25s cubic-bezier(.4,0,.2,1), box-shadow .25s",
+                minHeight: 440,
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = "translateY(-8px)";
+                e.currentTarget.style.boxShadow = "0 24px 56px rgba(13,34,68,.16)";
+                e.currentTarget.querySelector(".net-img").style.transform = "scale(1.07)";
+                e.currentTarget.querySelector(".net-cta").style.gap = "14px";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.querySelector(".net-img").style.transform = "scale(1)";
+                e.currentTarget.querySelector(".net-cta").style.gap = "8px";
+              }}
+            >
+              {/* background image */}
+              <img
+                src={n.image}
+                alt={n.tag}
+                className="net-img"
+                style={{
+                  position: "absolute", inset: 0,
+                  width: "100%", height: "100%",
+                  objectFit: "cover",
+                  transition: "transform .55s cubic-bezier(.4,0,.2,1)",
+                }}
+                onError={e => { e.target.src = n.fallback; }}
+              />
+
+              {/* gradient overlay */}
+              <div style={{
+                position: "absolute", inset: 0,
+                background: `linear-gradient(to top, ${n.overlayTo} 10%, ${n.overlayFrom} 40%, rgba(0,0,0,.2) 100%)`,
+              }} />
+
+              {/* content */}
+              <div style={{
+                position: "relative", zIndex: 2,
+                height: "100%", minHeight: 440,
+                display: "flex", flexDirection: "column",
+                justifyContent: "flex-end",
+                padding: "28px 28px 32px",
+              }}>
+                {/* top tag */}
+                <div style={{ position: "absolute", top: 24, left: 28 }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, letterSpacing: ".14em",
+                    textTransform: "uppercase", fontFamily: "'Lato',sans-serif",
+                    color: n.tagColor, background: n.tagBg,
+                    border: `1px solid ${n.tagBorder}`,
+                    padding: "5px 14px",
+                  }}>
+                    {n.tag}
+                  </span>
+                </div>
+
+                {/* title */}
+                <h3 className="lan-serif" style={{
+                  fontSize: "clamp(24px,2.8vw,34px)", fontWeight: 700,
+                  color: "#fff", lineHeight: 1.15, marginBottom: 12,
+                  whiteSpace: "pre-line",
+                }}>
+                  {n.title}
+                </h3>
+
+                {/* body */}
+                <p style={{
+                  fontSize: 13, color: "rgba(245,240,232,.65)",
+                  lineHeight: 1.8, marginBottom: 22,
+                  fontFamily: "'Lato',sans-serif", fontWeight: 300,
+                  maxWidth: 320,
+                }}>
+                  {n.body}
+                </p>
+
+                {/* cta row */}
+                <div
+                  className="net-cta"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 8,
+                    fontSize: 11, fontWeight: 700, letterSpacing: ".1em",
+                    textTransform: "uppercase", color: n.accent,
+                    fontFamily: "'Lato',sans-serif",
+                    transition: "gap .2s",
+                    borderTop: `1px solid rgba(255,255,255,.1)`,
+                    paddingTop: 16,
+                  }}
+                >
+                  {n.cta}
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M2 7h10M8 3l4 4-4 4" stroke={n.accent} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 /* ════════════════════════════════════════════════════════════════
    COMPONENT
 ════════════════════════════════════════════════════════════════ */
 export default function LandingPage() {
   const router = useRouter();
-  const [loading,       setLoading]       = useState(true);
+  const [loading, setLoading] = useState(true);
   const [featuredBooks, setFeaturedBooks] = useState([]);
-  const [loadingBooks,  setLoadingBooks]  = useState(true);
-  const [heroIdx,       setHeroIdx]       = useState(0);
-  const [showVideo,     setShowVideo]     = useState(false);
+  const [loadingBooks, setLoadingBooks] = useState(true);
+  const [heroIdx, setHeroIdx] = useState(0);
+  const [showVideo, setShowVideo] = useState(false);
   const currentYear = new Date().getFullYear();
-
+  const [showPresentation, setShowPresentation] = useState(false);
+  const [showNetworkModal, setShowNetworkModal] = useState(false);
   const heroImages = ["/lanstu.png"];
 
   /* auth guard */
@@ -293,7 +575,7 @@ export default function LandingPage() {
           books.push(b);
         });
         setFeaturedBooks(books.sort(() => 0.5 - Math.random()));
-      } catch {}
+      } catch { }
       finally { setLoadingBooks(false); }
     })();
   }, []);
@@ -304,36 +586,36 @@ export default function LandingPage() {
   if (loading) return (
     <>
       <style>{GLOBAL_STYLES}</style>
-      <div className="hero-bg" style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:32 }}>
+      <div className="hero-bg" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 32 }}>
         {/* wordmark */}
-        <div className="anim-up" style={{ textAlign:"center" }}>
-          <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(184,150,62,0.12)", border:"1px solid rgba(184,150,62,0.25)", borderRadius:999, padding:"7px 18px", marginBottom:20 }}>
-            <Sparkles size={12} style={{ color:GOLD }} />
-            <span style={{ fontSize:10, fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", color:GOLDD, fontFamily:"'Lato',sans-serif" }}>Africa's #1 Student Library</span>
+        <div className="anim-up" style={{ textAlign: "center" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(184,150,62,0.12)", border: "1px solid rgba(184,150,62,0.25)", borderRadius: 999, padding: "7px 18px", marginBottom: 20 }}>
+            <Sparkles size={12} style={{ color: GOLD }} />
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: GOLDD, fontFamily: "'Lato',sans-serif" }}>Africa's #1 Student Library</span>
           </div>
-          <h1 className="lan-serif" style={{ fontSize:"clamp(36px,8vw,72px)", fontWeight:900, color:"#fff", letterSpacing:"-1px", lineHeight:1 }}>
-            LAN <span style={{ color:GOLD, fontStyle:"italic" }}>Library</span>
+          <h1 className="lan-serif" style={{ fontSize: "clamp(36px,8vw,72px)", fontWeight: 900, color: "#fff", letterSpacing: "-1px", lineHeight: 1 }}>
+            LAN <span style={{ color: GOLD, fontStyle: "italic" }}>Library</span>
           </h1>
-          <p style={{ fontSize:12, color:"rgba(245,240,232,0.5)", marginTop:8, fontFamily:"'Lato',sans-serif", letterSpacing:".14em", textTransform:"uppercase" }}>
+          <p style={{ fontSize: 12, color: "rgba(245,240,232,0.5)", marginTop: 8, fontFamily: "'Lato',sans-serif", letterSpacing: ".14em", textTransform: "uppercase" }}>
             The Global Student Library
           </p>
         </div>
 
         {/* animated book */}
-        <div style={{ position:"relative", width:88, height:104 }}>
-          <div style={{ position:"absolute", inset:0, background:`linear-gradient(135deg,${NAVY},#1a3560)`, borderRadius:8, boxShadow:"0 24px 48px rgba(0,0,0,0.4)" }}>
-            <div style={{ position:"absolute", left:0, top:0, bottom:0, width:8, background:"rgba(0,0,0,0.3)", borderRadius:"8px 0 0 8px" }} />
+        <div style={{ position: "relative", width: 88, height: 104 }}>
+          <div style={{ position: "absolute", inset: 0, background: `linear-gradient(135deg,${NAVY},#1a3560)`, borderRadius: 8, boxShadow: "0 24px 48px rgba(0,0,0,0.4)" }}>
+            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 8, background: "rgba(0,0,0,0.3)", borderRadius: "8px 0 0 8px" }} />
             <div className="page-turn p1" />
             <div className="page-turn p2" />
             <div className="page-turn p3" />
-            <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <BookOpen size={36} style={{ color:GOLD }} strokeWidth={1.5} />
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <BookOpen size={36} style={{ color: GOLD }} strokeWidth={1.5} />
             </div>
-            <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg,rgba(255,255,255,0.15),transparent)", borderRadius:8, pointerEvents:"none" }} />
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg,rgba(255,255,255,0.15),transparent)", borderRadius: 8, pointerEvents: "none" }} />
           </div>
-          <div style={{ position:"absolute", bottom:-20, left:"50%", transform:"translateX(-50%)", display:"flex", gap:6 }}>
-            {[0,1,2].map(i => (
-              <div key={i} className="dot-anim" style={{ width:7, height:7, borderRadius:"50%", background:GOLD, animationDelay:`${i*0.2}s` }} />
+          <div style={{ position: "absolute", bottom: -20, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 6 }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} className="dot-anim" style={{ width: 7, height: 7, borderRadius: "50%", background: GOLD, animationDelay: `${i * 0.2}s` }} />
             ))}
           </div>
         </div>
@@ -348,115 +630,125 @@ export default function LandingPage() {
       <div className="lan-landing">
 
         {/* ══════ HEADER ══════ */}
-        <header className="hero-bg" style={{ position:"sticky", top:0, zIndex:50, borderBottom:"0.5px solid rgba(184,150,62,0.18)" }}>
-          <div style={{ maxWidth:1200, margin:"0 auto", padding:"0 24px", display:"flex", alignItems:"center", justifyContent:"space-between", height:72 }}>
+        <header className="hero-bg" style={{ position: "sticky", top: 0, zIndex: 50, borderBottom: "0.5px solid rgba(184,150,62,0.18)" }}>
+          <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 72 }}>
             {/* wordmark */}
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              <img src="/lanlog.png" alt="LAN" style={{ width:44, height:44, borderRadius:"50%", objectFit:"cover", border:`1px solid rgba(184,150,62,0.3)` }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <img src="/lanlog.png" alt="LAN" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", border: `1px solid rgba(184,150,62,0.3)` }} />
               <div>
-                <div className="lan-serif" style={{ fontSize:22, fontWeight:900, color:"#fff", lineHeight:1 }}>LAN Library</div>
-                <div style={{ fontSize:9, fontWeight:700, letterSpacing:".16em", textTransform:"uppercase", color:"rgba(184,150,62,0.7)", fontFamily:"'Lato',sans-serif" }}>The Global Student Library</div>
+                <div className="lan-serif" style={{ fontSize: 22, fontWeight: 900, color: "#fff", lineHeight: 1 }}>LAN Library</div>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", fontFamily: "'Lato',sans-serif" }}>The Global Student Library</div>
               </div>
             </div>
           </div>
         </header>
 
         {/* ══════ HERO ══════ */}
-        <section className="hero-bg" style={{ position:"relative", minHeight:680, overflow:"hidden" }}>
+        <section className="hero-bg" style={{ position: "relative", minHeight: 680, overflow: "hidden" }}>
           {/* image layer */}
           <AnimatePresence mode="wait">
-            <motion.div key={heroIdx} initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} transition={{ duration:1 }}
-              style={{ position:"absolute", inset:0 }}>
-              <img src={heroImages[heroIdx]} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", opacity:.49 }} />
+            <motion.div key={heroIdx} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1 }}
+              style={{ position: "absolute", inset: 0 }}>
+              <img src={heroImages[heroIdx]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: .49 }} />
             </motion.div>
           </AnimatePresence>
 
           {/* content */}
-          <div style={{ position:"relative", zIndex:2, maxWidth:1200, margin:"0 auto", padding:"96px 24px 80px" }}>
+          <div style={{ position: "relative", zIndex: 2, maxWidth: 1200, margin: "0 auto", padding: "96px 24px 80px" }}>
             {/* eyebrow */}
-            <div className="anim-up" style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(184,150,62,0.14)", border:"1px solid rgba(184,150,62,0.3)", borderRadius:999, padding:"7px 16px", marginBottom:28 }}>
-              <Sparkles size={13} style={{ color:GOLD }} />
-              <span style={{ fontSize:11, fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:GOLDD, fontFamily:"'Lato',sans-serif" }}>Africa's #1 Student Library</span>
+            <div className="anim-up" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(184,150,62,0.14)", border: "1px solid rgba(184,150,62,0.3)", borderRadius: 999, padding: "7px 16px", marginBottom: 28 }}>
+              <Sparkles size={13} style={{ color: GOLD }} />
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: GOLDD, fontFamily: "'Lato',sans-serif" }}>Africa's #1 Student Library</span>
             </div>
 
-            <h1 className="lan-serif anim-up-2" style={{ fontSize:"clamp(44px,8vw,88px)", fontWeight:900, color:"#fff", lineHeight:1.02, letterSpacing:"-2px", margin:"0 0 12px" }}>
+            <h1 className="lan-serif anim-up-2" style={{ fontSize: "clamp(44px,8vw,88px)", fontWeight: 900, color: "#fff", lineHeight: 1.02, letterSpacing: "-2px", margin: "0 0 12px" }}>
               Share the wealth
             </h1>
-            <h1 className="lan-serif anim-up-2" style={{ fontSize:"clamp(44px,8vw,88px)", fontWeight:900, color:GOLD, fontStyle:"italic", lineHeight:1.02, letterSpacing:"-2px", margin:"0 0 28px" }}>
+            <h1 className="lan-serif anim-up-2" style={{ fontSize: "clamp(44px,8vw,88px)", fontWeight: 900, color: GOLD, fontStyle: "italic", lineHeight: 1.02, letterSpacing: "-2px", margin: "0 0 28px" }}>
               [of knowledge].
             </h1>
 
-            <p className="anim-up-3" style={{ fontSize:17, color:"rgba(245,240,232,0.7)", maxWidth:560, lineHeight:1.8, fontWeight:300, margin:"0 0 44px" }}>
+            <p className="anim-up-3" style={{ fontSize: 17, color: "rgba(245,240,232,0.7)", maxWidth: 560, lineHeight: 1.8, fontWeight: 300, margin: "0 0 12px" }}>
               Turn your books into income. Upload your work, reach a global audience of{" "}
-              <strong style={{ color:"#fff", fontWeight:700 }}>90M+</strong> learners,
-              and earn whenever readers discover and purchase your content.
+              <strong style={{ color: "#fff", fontWeight: 700 }}>90M+</strong> learners,
+              and earn whenever readers discover and purchase your content.{" "}
             </p>
+         <p className="anim-up-3" style={{ fontSize: 17, color: "rgba(245,240,232,0.7)", maxWidth: 560, lineHeight: 1.8, fontWeight: 300, margin: "0 0 44px" }}>
+            Join an ecosystem of thousands of members across Africa. Whether you are collaborating in the Student Network, earning in the Seller Network, or publishing verified resources in the Faculty Network, you can share strategies, request feedback, and grow together in the LAN Community hub.{" "}
+           <button onClick={() => setShowNetworkModal(true)} style={{ color: GOLDD, fontWeight: 100, textDecoration: "underline", textUnderlineOffset: 9, background: "none", border: "none", cursor: "pointer", fontSize: 17 }}>
+              Learn more
+            </button>
+          </p>
 
-            <div className="anim-up-4" style={{ display:"flex", flexWrap:"wrap", gap:12 }}>
+            <div className="anim-up-4" style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
               <button className="btn-primary" onClick={goSignIn}>
                 Create Account <ArrowRight size={14} />
               </button>
-              <a style={{color: GOLD, background: NAVY}} href="/docs" className="btn-ghost font-extrabold">
+              <a style={{ color: GOLD, background: NAVY }} href="/docs" className="btn-ghost font-extrabold">
                 Documentation
               </a>
+
             </div>
 
-            
+
             {/* stats strip */}
-            <div style={{ marginTop:64, borderTop:"0.5px solid rgba(184,150,62,0.2)", display:"flex", flexWrap:"wrap" }}>
+            <div style={{ marginTop: 64, borderTop: "0.5px solid rgba(184,150,62,0.2)", display: "flex", flexWrap: "wrap" }}>
               {STATS.map(({ val, label }) => (
                 <div key={label} className="stat-item">
-                  <div className="lan-serif" style={{ fontSize:30, fontWeight:700, color:"#fff" }}>{val}</div>
-                  <div style={{ fontSize:10, fontWeight:700, letterSpacing:".12em", textTransform:"uppercase", color:"rgba(184,150,62,0.7)", marginTop:4, fontFamily:"'Lato',sans-serif" }}>{label}</div>
+                  <div className="lan-serif" style={{ fontSize: 30, fontWeight: 700, color: "#fff" }}>{val}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", marginTop: 4, fontFamily: "'Lato',sans-serif" }}>{label}</div>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
+
+        <NetworkCardsSection />
+
         {/* ══════ FOR STUDENTS ══════ */}
-        <section style={{ background:"#fff", padding:"96px 24px" }}>
-          <div style={{ maxWidth:1200, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", gap:56, alignItems:"center" }}>
+        <section style={{ background: "#fff", padding: "96px 24px" }}>
+          <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 56, alignItems: "center" }}>
 
             {/* text col */}
             <div>
-              <p style={{ fontSize:10, fontWeight:700, letterSpacing:".22em", textTransform:"uppercase", color:GOLD, marginBottom:12, fontFamily:"'Lato',sans-serif" }}>For Students & Learners</p>
-              <h2 className="lan-serif" style={{ fontSize:"clamp(30px,4vw,48px)", fontWeight:700, color:NAVY, margin:"0 0 12px" }}>
-                Every document<br/><span style={{ color:GOLD, fontStyle:"italic" }}>your campus needs.</span>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".22em", textTransform: "uppercase", color: GOLD, marginBottom: 12, fontFamily: "'Lato',sans-serif" }}>For Students & Learners</p>
+              <h2 className="lan-serif" style={{ fontSize: "clamp(30px,4vw,48px)", fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>
+                Every document<br /><span style={{ color: GOLD, fontStyle: "italic" }}>your campus needs.</span>
               </h2>
-              <div className="gold-line" style={{ maxWidth:220, margin:"0 0 32px" }}>
-                <div style={{ width:8, height:8, background:GOLD, transform:"rotate(45deg)", flexShrink:0 }} />
+              <div className="gold-line" style={{ maxWidth: 220, margin: "0 0 32px" }}>
+                <div style={{ width: 8, height: 8, background: GOLD, transform: "rotate(45deg)", flexShrink: 0 }} />
               </div>
 
-              <div className="lan-card" style={{ marginBottom:24 }}>
+              <div className="lan-card" style={{ marginBottom: 24 }}>
                 {STUDENT_FEATURES.map(({ title, body }) => (
                   <div key={title} className="feat-row">
-                    <div className="feat-icon"><CheckCircle size={15} style={{ color:GOLD }} /></div>
+                    <div className="feat-icon"><CheckCircle size={15} style={{ color: GOLD }} /></div>
                     <div>
-                      <div style={{ fontSize:13, fontWeight:700, color:NAVY, marginBottom:4, fontFamily:"'Lato',sans-serif" }}>{title}</div>
-                      <div style={{ fontSize:12, color:"#888", lineHeight:1.65, fontFamily:"'Lato',sans-serif" }}>{body}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 4, fontFamily: "'Lato',sans-serif" }}>{title}</div>
+                      <div style={{ fontSize: 12, color: "#888", lineHeight: 1.65, fontFamily: "'Lato',sans-serif" }}>{body}</div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <button  className="btn-navy" onClick={goSignIn}>
+              <button className="btn-navy" onClick={goSignIn}>
                 <BookOpenText size={14} /> Start Learning
               </button>
             </div>
 
             {/* image col */}
-            <div style={{ position:"relative" }}>
-              <div style={{ position:"absolute", top:-20, right:-20, width:200, height:200, background:`radial-gradient(circle, rgba(184,150,62,0.12), transparent 70%)`, zIndex:0 }} />
-              <div style={{ position:"relative", zIndex:1, border:`0.5px solid #e5ddd0`, overflow:"hidden" }}>
+            <div style={{ position: "relative" }}>
+              <div style={{ position: "absolute", top: -20, right: -20, width: 200, height: 200, background: `radial-gradient(circle, rgba(184,150,62,0.12), transparent 70%)`, zIndex: 0 }} />
+              <div style={{ position: "relative", zIndex: 1, border: `0.5px solid #e5ddd0`, overflow: "hidden" }}>
                 <img src="/studs.png" alt="Students using LAN Library"
-                  style={{ width:"100%", aspectRatio:"4/3", objectFit:"cover", display:"block" }}
-                  onError={e => { e.target.src="/stud2.png"; }}
+                  style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }}
+                  onError={e => { e.target.src = "/stud2.png"; }}
                 />
                 {/* overlay badge */}
-                <div style={{ position:"absolute", bottom:1, left:1, background:NAVY, padding:"12px 18px", display:"flex", flexDirection:"column", gap:3 }}>
-                  <span style={{ fontSize:10, fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:GOLD, fontFamily:"'Lato',sans-serif" }}>Students Active Now</span>
-                  <span style={{ fontSize:12, color:"rgba(255,255,255,0.7)", fontFamily:"'Lato',sans-serif" }}>Reading purchased books · Browsing materials</span>
+                <div style={{ position: "absolute", bottom: 1, left: 1, background: NAVY, padding: "12px 18px", display: "flex", flexDirection: "column", gap: 3 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: GOLD, fontFamily: "'Lato',sans-serif" }}>Students Active Now</span>
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Lato',sans-serif" }}>Reading purchased books · Browsing materials</span>
                 </div>
               </div>
             </div>
@@ -464,48 +756,48 @@ export default function LandingPage() {
         </section>
 
         {/* ══════ FOR SELLERS ══════ */}
-        <section className="cream-bg" style={{ padding:"96px 24px" }}>
-          <div style={{ maxWidth:1200, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", gap:56, alignItems:"center" }}>
+        <section className="cream-bg" style={{ padding: "96px 24px" }}>
+          <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 56, alignItems: "center" }}>
 
             {/* image col — reversed order on desktop via order */}
-            <div style={{ position:"relative", order:0 }}>
-              <div style={{ position:"absolute", bottom:-20, left:-20, width:220, height:220, background:`radial-gradient(circle, rgba(22,163,74,0.1), transparent 70%)`, zIndex:0 }} />
-              <div style={{ position:"relative", zIndex:1, border:`0.5px solid #e5ddd0`, overflow:"hidden" }}>
-                <img src="https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=800" alt="Seller earning on LAN Library"
-                  style={{ width:"100%", aspectRatio:"4/3", objectFit:"cover", display:"block" }} />
-                <div style={{ position:"absolute", bottom:1, left:1, background:"#16a34a", padding:"12px 18px", display:"flex", flexDirection:"column", gap:3 }}>
-                  <span style={{ fontSize:10, fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:"rgba(255,255,255,0.7)", fontFamily:"'Lato',sans-serif" }}>Sellers Earning Now</span>
-                  <span style={{ fontSize:12, color:"rgba(255,255,255,0.85)", fontFamily:"'Lato',sans-serif" }}>Uploading content · Processing transactions</span>
+            <div style={{ position: "relative", order: 0 }}>
+              <div style={{ position: "absolute", bottom: -20, left: -20, width: 220, height: 220, background: `radial-gradient(circle, rgba(22,163,74,0.1), transparent 70%)`, zIndex: 0 }} />
+              <div style={{ position: "relative", zIndex: 1, border: `0.5px solid #e5ddd0`, overflow: "hidden" }}>
+                <img src="/LAN seller.png" alt="Seller earning on LAN Library"
+                  style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }} />
+                <div style={{ position: "absolute", bottom: 1, left: 1, background: "#16a34a", padding: "12px 18px", display: "flex", flexDirection: "column", gap: 3 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)", fontFamily: "'Lato',sans-serif" }}>Sellers Earning Now</span>
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", fontFamily: "'Lato',sans-serif" }}>Uploading content · Processing transactions</span>
                 </div>
               </div>
             </div>
 
             {/* text col */}
-            <div style={{ order:1 }}>
-              <p style={{ fontSize:10, fontWeight:700, letterSpacing:".22em", textTransform:"uppercase", color:"#16a34a", marginBottom:12, fontFamily:"'Lato',sans-serif" }}>For Sellers · Students & Authors</p>
-              <h2 className="lan-serif" style={{ fontSize:"clamp(30px,4vw,48px)", fontWeight:700, color:NAVY, margin:"0 0 12px" }}>
-                Monetize your<br/><span style={{ color:"#16a34a", fontStyle:"italic" }}>expertise.</span>
+            <div style={{ order: 1 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".22em", textTransform: "uppercase", color: "#16a34a", marginBottom: 12, fontFamily: "'Lato',sans-serif" }}>For Sellers · Students & Authors</p>
+              <h2 className="lan-serif" style={{ fontSize: "clamp(30px,4vw,48px)", fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>
+                Monetize your<br /><span style={{ color: "#16a34a", fontStyle: "italic" }}>expertise.</span>
               </h2>
-              <div className="gold-line" style={{ maxWidth:220, margin:"0 0 32px" }}>
-                <div style={{ width:8, height:8, background:"#16a34a", transform:"rotate(45deg)", flexShrink:0 }} />
+              <div className="gold-line" style={{ maxWidth: 220, margin: "0 0 32px" }}>
+                <div style={{ width: 8, height: 8, background: "#16a34a", transform: "rotate(45deg)", flexShrink: 0 }} />
               </div>
 
-              <div className="lan-card" style={{ marginBottom:24 }}>
+              <div className="lan-card" style={{ marginBottom: 24 }}>
                 {SELLER_FEATURES.map(({ title, body }) => (
                   <div key={title} className="feat-row">
-                    <div className="feat-icon" style={{ border:"0.5px solid rgba(22,163,74,0.3)" }}><CheckCircle size={15} style={{ color:"#16a34a" }} /></div>
+                    <div className="feat-icon" style={{ border: "0.5px solid rgba(22,163,74,0.3)" }}><CheckCircle size={15} style={{ color: "#16a34a" }} /></div>
                     <div>
-                      <div style={{ fontSize:13, fontWeight:700, color:NAVY, marginBottom:4, fontFamily:"'Lato',sans-serif" }}>{title}</div>
-                      <div style={{ fontSize:12, color:"#888", lineHeight:1.65, fontFamily:"'Lato',sans-serif" }}>{body}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 4, fontFamily: "'Lato',sans-serif" }}>{title}</div>
+                      <div style={{ fontSize: 12, color: "#888", lineHeight: 1.65, fontFamily: "'Lato',sans-serif" }}>{body}</div>
                     </div>
                   </div>
                 ))}
               </div>
 
               <button onClick={goSignIn}
-                style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"14px 28px", background:"#16a34a", color:"#fff", fontSize:13, fontWeight:700, fontFamily:"'Lato',sans-serif", letterSpacing:".06em", textTransform:"uppercase", border:"none", cursor:"pointer", transition:"background .18s" }}
-                onMouseEnter={e=>e.currentTarget.style.background="#15803d"}
-                onMouseLeave={e=>e.currentTarget.style.background="#16a34a"}>
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", background: "#16a34a", color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: "'Lato',sans-serif", letterSpacing: ".06em", textTransform: "uppercase", border: "none", cursor: "pointer", transition: "background .18s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "#15803d"}
+                onMouseLeave={e => e.currentTarget.style.background = "#16a34a"}>
                 <Upload size={14} /> Start Selling
               </button>
             </div>
@@ -548,7 +840,7 @@ export default function LandingPage() {
 
                 {/* Feature rows */}
                 <div className="lan-card"
-                 style={{ border: "0.5px solid #e5ddd0", background: "#fff", marginBottom: 32 }}>
+                  style={{ border: "0.5px solid #e5ddd0", background: "#fff", marginBottom: 32 }}>
                   {[
                     {
                       icon: <BookOpen size={15} style={{ color: GOLD }} />,
@@ -633,11 +925,11 @@ export default function LandingPage() {
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: "'Lato',sans-serif" }}>Barr. Justice Mercy</div>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 3, fontSize: 10, fontWeight: 700, color: GOLD, fontFamily: "'Lato',sans-serif", letterSpacing: ".06em" }}>
                           <span style={{ width: 5, height: 5, borderRadius: "50%", background: GOLD, display: "inline-block" }} />
-                          Verified Faculty · 
+                          Verified Faculty ·
                         </div>
                       </div>
                     </div>
-                    
+
                   </div>
                   {/* Top-left status badge */}
                   <div style={{ position: "absolute", top: 2, left: 2, background: NAVY, padding: "10px 16px", display: "flex", flexDirection: "column", gap: 3 }}>
@@ -674,32 +966,32 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
-        
+
 
         {/* ══════ APP SHOWCASE BANNER ══════ */}
-        <section className="crest-bg" style={{ padding:"88px 24px", overflow:"hidden" }}>
-          <div style={{ maxWidth:1200, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:48, alignItems:"center" }}>
+        <section className="crest-bg" style={{ padding: "88px 24px", overflow: "hidden" }}>
+          <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 48, alignItems: "center" }}>
             {/* text */}
             <div>
-              <p style={{ fontSize:10, fontWeight:700, letterSpacing:".22em", textTransform:"uppercase", color:GOLD, marginBottom:16, fontFamily:"'Lato',sans-serif" }}>One Smart Platform</p>
-              <h2 className="lan-serif" style={{ fontSize:"clamp(40px,7vw,80px)", fontWeight:900, color:"#fff", lineHeight:1, margin:"0 0 20px", letterSpacing:"-2px" }}>
-                Knowledge<br/>that works<br/>for every<br/><span style={{ color:GOLD, fontStyle:"italic" }}>student.</span>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".22em", textTransform: "uppercase", color: GOLD, marginBottom: 16, fontFamily: "'Lato',sans-serif" }}>One Smart Platform</p>
+              <h2 className="lan-serif" style={{ fontSize: "clamp(40px,7vw,80px)", fontWeight: 900, color: "#fff", lineHeight: 1, margin: "0 0 20px", letterSpacing: "-2px" }}>
+                Knowledge<br />that works<br />for every<br /><span style={{ color: GOLD, fontStyle: "italic" }}>student.</span>
               </h2>
-              <p style={{ fontSize:15, color:"rgba(245,240,232,0.55)", lineHeight:1.8, maxWidth:400, marginBottom:36, fontWeight:300, fontFamily:"'Lato',sans-serif" }}>
+              <p style={{ fontSize: 15, color: "rgba(245,240,232,0.55)", lineHeight: 1.8, maxWidth: 400, marginBottom: 36, fontWeight: 300, fontFamily: "'Lato',sans-serif" }}>
                 Buy, sell, and access books instantly. Stay ahead with one smart library built for African scholars.
               </p>
-              <button className="btn-primary" onClick={goSignIn} style={{ fontSize:14, padding:"16px 32px" }}>
+              <button className="btn-primary" onClick={goSignIn} style={{ fontSize: 14, padding: "16px 32px" }}>
                 Create Account <ArrowRight size={15} />
               </button>
             </div>
 
             {/* screenshot */}
-            <div style={{ display:"flex", justifyContent:"center" }}>
-              <div style={{ position:"relative" }}>
-                <div style={{ position:"absolute", inset:-2, background:`linear-gradient(135deg,${GOLD},transparent,${GOLD})`, borderRadius:42, opacity:.4 }} />
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <div style={{ position: "relative" }}>
+                <div style={{ position: "absolute", inset: -2, background: `linear-gradient(135deg,${GOLD},transparent,${GOLD})`, borderRadius: 42, opacity: .4 }} />
                 <img src="/dashboard.png" alt="LAN Library App"
-                  style={{ position:"relative", width:"clamp(260px,40vw,460px)", borderRadius:40, boxShadow:"0 40px 80px rgba(0,0,0,0.5)", display:"block" }}
-                  onError={e => { e.target.style.display="none"; }}
+                  style={{ position: "relative", width: "clamp(260px,40vw,460px)", borderRadius: 40, boxShadow: "0 40px 80px rgba(0,0,0,0.5)", display: "block" }}
+                  onError={e => { e.target.style.display = "none"; }}
                 />
               </div>
             </div>
@@ -707,26 +999,26 @@ export default function LandingPage() {
         </section>
 
         {/* ══════ KEY BENEFITS ══════ */}
-        <section style={{ background:"#fff", padding:"96px 24px" }}>
-          <div style={{ maxWidth:1100, margin:"0 auto" }}>
-            <div style={{ textAlign:"center", marginBottom:56 }}>
-              <p style={{ fontSize:10, fontWeight:700, letterSpacing:".22em", textTransform:"uppercase", color:GOLD, marginBottom:12, fontFamily:"'Lato',sans-serif" }}>Why LAN Library</p>
-              <h2 className="lan-serif" style={{ fontSize:"clamp(30px,4vw,48px)", fontWeight:700, color:NAVY, margin:"0 0 16px" }}>Key Benefits</h2>
-              <div className="gold-line" style={{ maxWidth:200, margin:"0 auto 16px" }}>
-                <div style={{ width:8, height:8, background:GOLD, transform:"rotate(45deg)", flexShrink:0 }} />
+        <section style={{ background: "#fff", padding: "96px 24px" }}>
+          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: 56 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".22em", textTransform: "uppercase", color: GOLD, marginBottom: 12, fontFamily: "'Lato',sans-serif" }}>Why LAN Library</p>
+              <h2 className="lan-serif" style={{ fontSize: "clamp(30px,4vw,48px)", fontWeight: 700, color: NAVY, margin: "0 0 16px" }}>Key Benefits</h2>
+              <div className="gold-line" style={{ maxWidth: 200, margin: "0 auto 16px" }}>
+                <div style={{ width: 8, height: 8, background: GOLD, transform: "rotate(45deg)", flexShrink: 0 }} />
               </div>
-              <p style={{ fontSize:14, color:"#888", maxWidth:500, margin:"0 auto", lineHeight:1.75, fontWeight:300, fontFamily:"'Lato',sans-serif" }}>
+              <p style={{ fontSize: 14, color: "#888", maxWidth: 500, margin: "0 auto", lineHeight: 1.75, fontWeight: 300, fontFamily: "'Lato',sans-serif" }}>
                 Our payment system is designed for sellers who need fast, reliable access to their earnings.
               </p>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 16 }}>
               {BENEFITS.map(({ emoji, title, body }) => (
                 <div key={title} className="ben-card">
-                  <div style={{ width:72, height:72, border:`0.5px solid rgba(184,150,62,0.25)`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", fontSize:32 }}>
+                  <div style={{ width: 72, height: 72, border: `0.5px solid rgba(184,150,62,0.25)`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 32 }}>
                     {emoji}
                   </div>
-                  <h3 className="lan-serif" style={{ fontSize:17, fontWeight:700, color:NAVY, margin:"0 0 10px" }}>{title}</h3>
-                  <p style={{ fontSize:12, color:"#888", lineHeight:1.7, fontFamily:"'Lato',sans-serif" }}>{body}</p>
+                  <h3 className="lan-serif" style={{ fontSize: 17, fontWeight: 700, color: NAVY, margin: "0 0 10px" }}>{title}</h3>
+                  <p style={{ fontSize: 12, color: "#888", lineHeight: 1.7, fontFamily: "'Lato',sans-serif" }}>{body}</p>
                 </div>
               ))}
             </div>
@@ -734,35 +1026,35 @@ export default function LandingPage() {
         </section>
 
         {/* ══════ CAMPUS SERVICES ══════ */}
-        <section className="cream-bg" style={{ padding:"96px 24px" }}>
-          <div style={{ maxWidth:1100, margin:"0 auto" }}>
+        <section className="cream-bg" style={{ padding: "96px 24px" }}>
+          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
             {/* header */}
-            <div style={{ textAlign:"center", marginBottom:56 }}>
-              <img src="/lanlog.png" alt="" style={{ width:64, height:64, borderRadius:"50%", objectFit:"cover", margin:"0 auto 20px", border:`1px solid rgba(184,150,62,0.3)`, display:"block" }} />
-              <div style={{ display:"inline-block", background:NAVY, color:"#fff", padding:"6px 20px", fontSize:10, fontWeight:700, letterSpacing:".18em", textTransform:"uppercase", fontFamily:"'Lato',sans-serif", marginBottom:16 }}>
+            <div style={{ textAlign: "center", marginBottom: 56 }}>
+              <img src="/lanlog.png" alt="" style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", margin: "0 auto 20px", border: `1px solid rgba(184,150,62,0.3)`, display: "block" }} />
+              <div style={{ display: "inline-block", background: NAVY, color: "#fff", padding: "6px 20px", fontSize: 10, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", marginBottom: 16 }}>
                 Beyond Books
               </div>
-              <h2 className="lan-serif" style={{ fontSize:"clamp(30px,4vw,48px)", fontWeight:700, color:NAVY, margin:"0 0 10px" }}>
-                Campus Life <span style={{ color:GOLD, fontStyle:"italic" }}>Made Easy.</span>
+              <h2 className="lan-serif" style={{ fontSize: "clamp(30px,4vw,48px)", fontWeight: 700, color: NAVY, margin: "0 0 10px" }}>
+                Campus Life <span style={{ color: GOLD, fontStyle: "italic" }}>Made Easy.</span>
               </h2>
-              <p style={{ fontSize:15, color:"#888", maxWidth:520, margin:"0 auto", lineHeight:1.75, fontWeight:300, fontFamily:"'Lato',sans-serif" }}>
+              <p style={{ fontSize: 15, color: "#888", maxWidth: 520, margin: "0 auto", lineHeight: 1.75, fontWeight: 300, fontFamily: "'Lato',sans-serif" }}>
                 Buy books, sell notes, and recharge everything — all in one platform built for students.
               </p>
             </div>
 
-          <div className="grid-2col" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:16 }}>              
-            {SERVICES.map(({ gradient, emoji, title, sub, cta }) => (
-                <div key={title} className="svc-card" style={{ background:gradient, padding:"36px 28px", borderRadius:0 }}>
+            <div className="grid-2col" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 16 }}>
+              {SERVICES.map(({ gradient, emoji, title, sub, cta }) => (
+                <div key={title} className="svc-card" style={{ background: gradient, padding: "36px 28px", borderRadius: 0 }}>
                   {/* decorative circles */}
-                  <div style={{ position:"absolute", top:-40, right:-40, width:120, height:120, background:"rgba(255,255,255,0.08)", borderRadius:"50%", pointerEvents:"none" }} />
-                  <div style={{ position:"absolute", bottom:-30, left:-30, width:90, height:90, background:"rgba(255,255,255,0.06)", borderRadius:"50%", pointerEvents:"none" }} />
-                  <div style={{ position:"relative", zIndex:1 }}>
-                    <div style={{ width:60, height:60, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, marginBottom:18 }}>
+                  <div style={{ position: "absolute", top: -40, right: -40, width: 120, height: 120, background: "rgba(255,255,255,0.08)", borderRadius: "50%", pointerEvents: "none" }} />
+                  <div style={{ position: "absolute", bottom: -30, left: -30, width: 90, height: 90, background: "rgba(255,255,255,0.06)", borderRadius: "50%", pointerEvents: "none" }} />
+                  <div style={{ position: "relative", zIndex: 1 }}>
+                    <div style={{ width: 60, height: 60, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, marginBottom: 18 }}>
                       {emoji}
                     </div>
-                    <h3 style={{ fontFamily:"'Playfair Display',serif", fontSize:20, fontWeight:700, color:"#fff", margin:"0 0 8px" }}>{title}</h3>
-                    <p style={{ fontSize:12, color:"rgba(255,255,255,0.7)", lineHeight:1.6, margin:"0 0 20px", fontFamily:"'Lato',sans-serif" }}>{sub}</p>
-                    <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.6)", fontFamily:"'Lato',sans-serif", letterSpacing:".08em" }}>
+                    <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: "#fff", margin: "0 0 8px" }}>{title}</h3>
+                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.6, margin: "0 0 20px", fontFamily: "'Lato',sans-serif" }}>{sub}</p>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", fontFamily: "'Lato',sans-serif", letterSpacing: ".08em" }}>
                       {cta} →
                     </div>
                   </div>
@@ -771,13 +1063,13 @@ export default function LandingPage() {
             </div>
 
             {/* trust badges */}
-            <div style={{ marginTop:48, display:"flex", flexWrap:"wrap", justifyContent:"center", gap:32 }}>
-              {["Instant Delivery","100% Secure","24/7 Support","Best Rates"].map(badge => (
-                <div key={badge} style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  <div style={{ width:18, height:18, borderRadius:"50%", background:"#16a34a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <div style={{ marginTop: 48, display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 32 }}>
+              {["Instant Delivery", "100% Secure", "24/7 Support", "Best Rates"].map(badge => (
+                <div key={badge} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#16a34a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </div>
-                  <span style={{ fontSize:12, fontWeight:700, color:NAVY, fontFamily:"'Lato',sans-serif" }}>{badge}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{badge}</span>
                 </div>
               ))}
             </div>
@@ -786,36 +1078,36 @@ export default function LandingPage() {
 
         {/* ══════ FEATURED BOOKS ══════ */}
         {!loadingBooks && featuredBooks.length > 0 && (
-          <section style={{ background:"#fff", padding:"96px 24px" }}>
-            <div style={{ maxWidth:1200, margin:"0 auto" }}>
-              <div style={{ textAlign:"center", marginBottom:48 }}>
-                <p style={{ fontSize:10, fontWeight:700, letterSpacing:".22em", textTransform:"uppercase", color:GOLD, marginBottom:12, fontFamily:"'Lato',sans-serif" }}>Community Uploads</p>
-                <h2 className="lan-serif" style={{ fontSize:"clamp(28px,4vw,44px)", fontWeight:700, color:NAVY, margin:"0 0 8px" }}>Featured Books</h2>
-                <p style={{ fontSize:13, color:"#aaa", fontFamily:"'Lato',sans-serif", fontWeight:300 }}>Recently published by our community of scholars</p>
+          <section style={{ background: "#fff", padding: "96px 24px" }}>
+            <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+              <div style={{ textAlign: "center", marginBottom: 48 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".22em", textTransform: "uppercase", color: GOLD, marginBottom: 12, fontFamily: "'Lato',sans-serif" }}>Community Uploads</p>
+                <h2 className="lan-serif" style={{ fontSize: "clamp(28px,4vw,44px)", fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>Featured Books</h2>
+                <p style={{ fontSize: 13, color: "#aaa", fontFamily: "'Lato',sans-serif", fontWeight: 300 }}>Recently published by our community of scholars</p>
               </div>
 
-              <div className="grid-2col" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:20 }}>
-                {featuredBooks.slice(0,6).map(book => (
-                  <button key={book.id} className="book-card" onClick={goSignIn} style={{ background:"#fff", border:"none", textAlign:"left", cursor:"pointer", display:"block", width:"100%" }}>
-                    <div style={{ position:"relative", background:"#ede8df" }}>
+              <div className="grid-2col" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 20 }}>
+                {featuredBooks.slice(0, 6).map(book => (
+                  <button key={book.id} className="book-card" onClick={goSignIn} style={{ background: "#fff", border: "none", textAlign: "left", cursor: "pointer", display: "block", width: "100%" }}>
+                    <div style={{ position: "relative", background: "#ede8df" }}>
                       <img src={book.image} alt={book.title} className="book-img"
-                        style={{ width:"100%", aspectRatio:"3/4", objectFit:"cover", display:"block" }}
-                        onError={e => { e.target.src="/lanlog.png"; }}
+                        style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block" }}
+                        onError={e => { e.target.src = "/lanlog.png"; }}
                       />
-                      <div style={{ position:"absolute", top:8, left:8, display:"inline-flex", alignItems:"center", gap:4, background:NAVY, padding:"3px 8px", fontSize:9, fontWeight:700, color:"#fff", fontFamily:"'Lato',sans-serif" }}>
-                        <span style={{ width:5, height:5, borderRadius:"50%", background:"#22c55e", display:"inline-block" }} /> PDF
+                      <div style={{ position: "absolute", top: 8, left: 8, display: "inline-flex", alignItems: "center", gap: 4, background: NAVY, padding: "3px 8px", fontSize: 9, fontWeight: 700, color: "#fff", fontFamily: "'Lato',sans-serif" }}>
+                        <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} /> PDF
                       </div>
-                      <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top,rgba(0,0,0,0.5),transparent)", opacity:0, transition:"opacity .2s", display:"flex", alignItems:"flex-end", justifyContent:"center", paddingBottom:12 }}
-                        onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity="0"}>
-                        <span style={{ fontSize:11, fontWeight:700, color:"#fff", fontFamily:"'Lato',sans-serif" }}>Sign in to view</span>
+                      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(0,0,0,0.5),transparent)", opacity: 0, transition: "opacity .2s", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 12 }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = "1"} onMouseLeave={e => e.currentTarget.style.opacity = "0"}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", fontFamily: "'Lato',sans-serif" }}>Sign in to view</span>
                       </div>
                     </div>
-                    <div style={{ padding:"10px 10px 12px", borderTop:"0.5px solid #f0ebe0" }}>
-                      <h4 className="lan-serif" style={{ fontSize:13, fontWeight:700, color:NAVY, margin:"0 0 4px", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden", lineHeight:1.35 }}>{book.title}</h4>
-                      <p style={{ fontSize:11, color:"#888", margin:"0 0 8px", fontFamily:"'Lato',sans-serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{book.author}</p>
-                      <div style={{ display:"flex", alignItems:"center", gap:4 }}>
-                        <Star size={11} style={{ color:GOLD, fill:GOLD }} />
-                        <span style={{ fontSize:11, fontWeight:700, color:NAVY, fontFamily:"'Lato',sans-serif" }}>{book.rating}</span>
+                    <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0" }}>
+                      <h4 className="lan-serif" style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: "0 0 4px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>{book.title}</h4>
+                      <p style={{ fontSize: 11, color: "#888", margin: "0 0 8px", fontFamily: "'Lato',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.author}</p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <Star size={11} style={{ color: GOLD, fill: GOLD }} />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{book.rating}</span>
                       </div>
                     </div>
                   </button>
@@ -882,15 +1174,15 @@ export default function LandingPage() {
                           {role}
                         </div>
                       </div>
-                    
+
                     </div>
                   </div>
                 );
               })}
               {/* video card */}
-              <button onClick={() => setShowVideo(true)}
+              <a href="/presentation"
                 style={{ position: "relative", minHeight: 240, border: "0.5px solid #e5ddd0", overflow: "hidden", cursor: "pointer", background: "none" }}>
-                <img src="/lanlogo.jpg" alt="Watch video" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                <img src="/LAN seller.png" alt="Watch video" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
                   onError={e => { e.target.style.background = NAVY; e.target.style.display = "none"; }} />
                 <div style={{ position: "absolute", inset: 0, background: "rgba(13,34,68,0.55)" }} />
                 <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
@@ -902,7 +1194,7 @@ export default function LandingPage() {
                 <div style={{ position: "absolute", bottom: 16, left: 16, display: "flex", alignItems: "center", gap: 10 }}>
                   <span className="lan-serif" style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>How to Monetize Your Knowledge on LAN Library</span>
                 </div>
-              </button>
+              </a>
 
             </div>
 
@@ -915,242 +1207,127 @@ export default function LandingPage() {
         </section>
 
         {/* ══════ FINAL CTA ══════ */}
-        <section className="crest-bg" style={{ padding:"96px 24px", textAlign:"center" }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:16, marginBottom:28 }}>
-            <div style={{ height:1, width:60, background:"rgba(184,150,62,0.4)" }} />
-            <Star size={14} style={{ color:GOLD, fill:GOLD }} />
-            <div style={{ height:1, width:60, background:"rgba(184,150,62,0.4)" }} />
+        <section className="crest-bg" style={{ padding: "46px 24px", textAlign: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 28 }}>
+            <div style={{ height: 1, width: 60, background: "rgba(184,150,62,0.4)" }} />
+            <Star size={14} style={{ color: GOLD, fill: GOLD }} />
+            <div style={{ height: 1, width: 60, background: "rgba(184,150,62,0.4)" }} />
           </div>
 
-          <h2 className="lan-serif" style={{ fontSize:"clamp(32px,5vw,60px)", fontWeight:700, color:"#fff", margin:"0 0 16px", lineHeight:1.1 }}>
-            Ready to <span style={{ color:GOLD, fontStyle:"italic" }}>Start Earning?</span>
+          <h2 className="lan-serif" style={{ fontSize: "clamp(32px,5vw,60px)", fontWeight: 700, color: "#fff", margin: "0 0 16px", lineHeight: 1.1 }}>
+            Ready to <span style={{ color: GOLD, fontStyle: "italic" }}>Start Earning?</span>
           </h2>
-          <p style={{ fontSize:15, color:"rgba(255,255,255,0.5)", maxWidth:500, margin:"0 auto 44px", lineHeight:1.8, fontWeight:300, fontFamily:"'Lato',sans-serif" }}>
+          <p style={{ fontSize: 15, color: "rgba(255,255,255,0.5)", maxWidth: 500, margin: "0 auto 44px", lineHeight: 1.8, fontWeight: 300, fontFamily: "'Lato',sans-serif" }}>
             Join thousands of sellers making money with their knowledge. Get 85% revenue share on every sale.
           </p>
 
-          <div style={{ display:"flex", flexWrap:"wrap", gap:14, justifyContent:"center", marginBottom:56 }}>
-            <button className="btn-primary" onClick={goSignIn} style={{ fontSize:14, padding:"16px 32px" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center", marginBottom: 56 }}>
+            <button className="btn-primary" onClick={goSignIn} style={{ fontSize: 14, padding: "16px 32px" }}>
               <Upload size={15} /> Start Selling Now
             </button>
-            <button className="btn-ghost" onClick={goSignIn} style={{ fontSize:14, padding:"16px 32px" }}>
+            <button className="btn-ghost" onClick={goSignIn} style={{ fontSize: 14, padding: "12px 32px" }}>
               <Search size={15} /> Browse Books
             </button>
           </div>
-
-          <div style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap:48, borderTop:"0.5px solid rgba(184,150,62,0.2)", paddingTop:40 }}>
-            {[{ val:"80%", label:"Revenue Share" }, { val:"90M+", label:"Global Reach" }, { val:"24/7", label:"Support" }].map(({ val, label }) => (
-              <div key={label} style={{ textAlign:"center" }}>
-                <div className="lan-serif" style={{ fontSize:40, fontWeight:900, color:"#fff" }}>{val}</div>
-                <div style={{ fontSize:11, fontWeight:700, letterSpacing:".12em", textTransform:"uppercase", color:"rgba(184,150,62,0.6)", marginTop:4, fontFamily:"'Lato',sans-serif" }}>{label}</div>
-              </div>
-            ))}
-          </div>
         </section>
 
-      <footer
-  className="hero-bg"
-  style={{
-    padding: "64px 16px 32px",
-    borderTop: "0.5px solid rgba(184,150,62,0.15)",
-    overflow: "hidden",
-  }}
->
-  <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-    
-    {/* GRID */}
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-        gap: 32,
-        marginBottom: 48,
-      }}
-    >
-      {/* BRAND */}
-      <div>
-        <div
-          className="lan-serif"
+        <footer
+          className="hero-bg"
           style={{
-            fontSize: 28,
-            fontWeight: 900,
-            color: "#fff",
-            marginBottom: 4,
+            padding: "64px 16px 32px",
+            borderTop: "0.5px solid rgba(184,150,62,0.15)",
+            overflow: "hidden",
           }}
         >
-          LAN Library
-        </div>
-        <p
-          style={{
-            fontSize: 12,
-            color: "rgba(245,240,232,0.4)",
-            lineHeight: 1.7,
-            maxWidth: 260,
-            fontFamily: "'Lato',sans-serif",
-            fontWeight: 300,
-          }}
-        >
-          Africa's #1 Student Library. Share the wealth of knowledge with 90M+
-          learners worldwide.
-        </p>
-      </div>
+          <div style={{ maxWidth: 1200, margin: "0 auto" }}>
 
-      {/* LINKS */}
-      {[
-        {
-          heading: "For Students",
-          links: ["Browse Books", "Categories", "My Books", "Saved Books"],
-        },
-        {
-          heading: "For Sellers",
-          links: ["LAN Wallet", "Transfer", "Recharge", "Referral"],
-        },
-        {
-          heading: "Company",
-          links: [
-            { label: "About Us", href: "/about/lan" },
-            { label: "Documentation", href: "/docs" },
-            { label: "Privacy Policy", href: "/lan/privacy-policy" },
-            { label: "Terms of Service", href: "/lan/terms-of-service" },
-          ],
-        },
-      ].map(({ heading, links }) => (
-        <div key={heading}>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: ".18em",
-              textTransform: "uppercase",
-              color: GOLD,
-              marginBottom: 18,
-              fontFamily: "'Lato',sans-serif",
-            }}
-          >
-            {heading}
-          </div>
-
-          <ul
-            style={{
-              listStyle: "none",
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-            }}
-          >
-            {links.map((item) => {
-              // COMPANY LINKS (real routing)
-              if (typeof item === "object") {
-                return (
-                  <li key={item.label}>
-                    <a href={item.href} className="footer-link">
-                      {item.label}
-                    </a>
-                  </li>
-                );
-              }
-
-              // OTHER LINKS → SIGN IN
-              return (
-                <li key={item}>
-                  <button
-                    onClick={() => router.push("/auth/signin")}
-                    className="footer-link"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      padding: 0,
-                    }}
-                  >
-                    {item}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
-    </div>
-
-    {/* BOTTOM */}
-    <div
-      style={{
-        borderTop: "0.5px solid rgba(184,150,62,0.15)",
-        paddingTop: 24,
-        display: "flex",
-        flexWrap: "wrap",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: 12,
-      }}
-    >
-      <p
-        style={{
-          fontSize: 12,
-          color: "rgba(245,240,232,0.35)",
-          fontFamily: "'Lato',sans-serif",
-        }}
-      >
-        © 2026 LAN Library — Learning Access Network. All rights reserved.
-      </p>
-
-             
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: "50%",
-            background: "#22c55e",
-          }}
-        />
-        <span
-          style={{
-            fontSize: 11,
-            color: "rgba(245,240,232,0.4)",
-            fontFamily: "'Lato',sans-serif",
-          }}
-        >
-          All systems operational
-                </span>
-      </div>
-            </div>
-          </div>
-          <div
-            style={{
-              fontSize: 10,
-              color: "rgba(245,240,232,0.35)",
-              fontFamily: "'Lato',sans-serif",
-              paddingTop: 24,
-              alignItems: "center",
-              textAlign: "center",
-
-            }}
+            {/* GRID */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: 32,
+                marginBottom: 48,
+              }}
             >
-
-            <p>LAN Library is operated by Learning Access Network Ltd., a digital academic resource platform dedicated to connecting African students and educators with quality learning materials. We are headquartered in Abuja, Nigeria, and serve learners within the African continent.</p>
+              {/* BRAND */}
+              <div>
+                <div className="lan-serif" style={{ fontSize: 28, fontWeight: 900, color: "#fff", marginBottom: 4 }}>
+                  LAN Library
                 </div>
-         
-      </footer>
+                <p style={{ fontSize: 12, color: "rgba(245,240,232,0.4)", lineHeight: 1.7, maxWidth: 260, fontFamily: "'Lato',sans-serif", fontWeight: 300 }}>
+                  Africa's #1 Student Library. Share the wealth of knowledge with 90M+ learners worldwide.
+                </p>
+              </div>
 
-
-        {/* ══════ VIDEO MODAL ══════ */}
-        {showVideo && (
-          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.92)", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}
-            onClick={() => setShowVideo(false)}>
-            <button onClick={() => setShowVideo(false)}
-              style={{ position:"fixed", top:20, right:20, width:44, height:44, background:"rgba(255,255,255,0.1)", border:"0.5px solid rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"#fff" }}>
-              <X size={20} />
-            </button>
-            <div onClick={e => e.stopPropagation()} style={{ width:"100%", maxWidth:900, maxHeight:"80vh" }}>
-              <video src="/seller tools.mp4" controls autoPlay style={{ width:"100%", maxHeight:"80vh", display:"block" }} />
+              {/* FOOTER COLUMNS — this is all you need, delete the stray <ul> below */}
+              {FOOTER_COLUMNS.map(({ heading, links }) => (
+                <div key={heading}>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, letterSpacing: ".18em",
+                    textTransform: "uppercase", color: GOLD, marginBottom: 18,
+                    fontFamily: "'Lato',sans-serif"
+                  }}>
+                    {heading}
+                  </div>
+                  <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
+                    {links.map(({ label, href }) => (
+                      <li key={label}>
+                        <a href={href} className="footer-link">{label}</a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
           </div>
-        )}
 
+          {/* BOTTOM */}
+          <div style={{
+            borderTop: "0.5px solid rgba(184,150,62,0.15)",
+            paddingTop: 24,
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            maxWidth: 1200,
+            margin: "0 auto",
+          }}>
+            <p style={{ fontSize: 12, color: "rgba(245,240,232,0.35)", fontFamily: "'Lato',sans-serif" }}>
+              © 2026 LAN Library — Learning Access Network. All rights reserved.
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} />
+              <span style={{ fontSize: 11, color: "rgba(245,240,232,0.4)", fontFamily: "'Lato',sans-serif" }}>
+                All systems operational
+              </span>
+            </div>
+          </div>
+
+          <div style={{ fontSize: 10, color: "rgba(245,240,232,0.35)", fontFamily: "'Lato',sans-serif", paddingTop: 24, textAlign: "center" }}>
+            <p>LAN Library is operated by Learning Access Network Ltd., a digital academic resource platform dedicated to connecting African students and educators with quality learning materials. We are headquartered in Abuja, Nigeria, and serve learners within the African continent.</p>
+          </div>
+
+        </footer>
+
+      {/* ══════ VIDEO MODAL ══════ */ }
+  {
+    showVideo && (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+        onClick={() => setShowVideo(false)}>
+        <button onClick={() => setShowVideo(false)}
+          style={{ position: "fixed", top: 20, right: 20, width: 44, height: 44, background: "rgba(255,255,255,0.1)", border: "0.5px solid rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff" }}>
+          <X size={20} />
+        </button>
+        <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 900, maxHeight: "80vh" }}>
+          <video src="/presentation" controls autoPlay style={{ width: "100%", maxHeight: "80vh", display: "block" }} />
+        </div>
       </div>
+    )
+  }
+      </div >
+      {showNetworkModal && <NetworkModal onClose={() => setShowNetworkModal(false)} />}
     </>
   );
 }

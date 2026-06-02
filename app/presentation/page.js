@@ -1,17 +1,16 @@
-// app/payment/page.jsx
 import { Suspense } from "react";
-import LatestDocsClient from "./latest";
+import PresentationClient from "./presentation";
 
-export default function PaymentPage() {
+export default function PresentationPage() {
     return (
         <Suspense
             fallback={
                 <div className="min-h-screen flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-950"></div>
+                    <div className="animate-spin h-10 w-10 border-b-2 border-blue-950 rounded-full"></div>
                 </div>
             }
         >
-            <LatestDocsClient />
+            <PresentationClient />
         </Suspense>
     );
 }

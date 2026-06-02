@@ -31,6 +31,7 @@ import {
     AlertCircle, ArrowUpRight, BarChart2,
 } from "lucide-react";
 import Link from "next/link";
+import { useCurrency } from "@/app/context/CurrencyContext";
 
 /* ── brand tokens ──────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -251,7 +252,7 @@ function PromoCard({ promo, onClickLink }) {
                     </Link>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", color: "#aaa" }}>
                         <Clock size={11} />
-                        <span>₦{Number(promo.totalPrice).toLocaleString()} investment</span>
+                        <span>{fmt(Number(promo.totalPrice))} investment</span>
                     </div>
                 </div>
             )}
@@ -277,7 +278,7 @@ export default function PromotionAnalyticsDashboard() {
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
     const [filter, setFilter] = useState("all");
-
+    const { fmt } = useCurrency();
     /* ── auth → fetch ───────────────────────────────────── */
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (u) => {
@@ -363,7 +364,7 @@ export default function PromotionAnalyticsDashboard() {
                                 { label: "Total Impressions", value: fmt(totals.impressions), icon: Eye, color: "#3b82f6" },
                                 { label: "Total Clicks", value: fmt(totals.clicks), icon: MousePointer, color: "#10b981" },
                                 { label: "Overall CTR", value: `${overallCtr}%`, icon: TrendingUp, color: GOLD },
-                                { label: "Total Spend", value: `₦${totals.spend.toLocaleString()}`, icon: Zap, color: "#8b5cf6" },
+                                { label: "Total Spend", value: fmt(totals.spend), icon: Zap, color: "#8b5cf6" },
                             ].map(({ label, value, icon: Icon, color }) => (
                                 <div key={label} style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "18px 16px" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "7px", marginBottom: "10px" }}>

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { subscribeToLatestOpenBounties } from "@/lib/bountyService";
+import { useCurrency } from "@/app/context/CurrencyContext";
 
 const NAVY = "#0d2244";
 const GOLD = "#b8963e";
@@ -38,12 +39,21 @@ const BoltIcon = () => (
 export default function HomeBountyStrip() {
   const [bounties, setBounties] = useState([]);
   const [loading, setLoading] = useState(true);
+const { fmt, currency } = useCurrency();
 
   useEffect(() => {
-    const unsub = subscribeToLatestOpenBounties((list) => {
-      setBounties(list);
-      setLoading(false);
-    }, 4);
+   const unsub = subscribeToLatestOpenBounties((list) => {
+     const now = Date.now();
+     const active = list.filter((b) => {
+       if (!b.deadline) return true;
+       const d = b.deadline?.toDate
+         ? b.deadline.toDate()
+         : new Date(b.deadline);
+       return d > now;
+     });
+     setBounties(active);
+     setLoading(false);
+   }, 4);
     return () => unsub();
   }, []);
 
@@ -161,11 +171,10 @@ export default function HomeBountyStrip() {
                 href={`/academic/bounty/board?highlight=${b.id}`}
                 style={{ textDecoration: "none" }}
               >
-                <BountyCard b={b} />
+                <BountyCard b={b} fmt={fmt} />
               </Link>
             ))}
 
-            {/* Desktop only: cards 3 & 4 */}
             {desktopOnlyCards.map((b) => (
               <Link
                 key={b.id}
@@ -173,7 +182,7 @@ export default function HomeBountyStrip() {
                 style={{ textDecoration: "none" }}
                 className="hbs-desktop-only"
               >
-                <BountyCard b={b} />
+                <BountyCard b={b} fmt={fmt} />
               </Link>
             ))}
           </div>
@@ -183,7 +192,7 @@ export default function HomeBountyStrip() {
   );
 }
 
-function BountyCard({ b }) {
+function BountyCard({ b, fmt }) {
   return (
     <div
       className="hbs-card"
@@ -242,7 +251,7 @@ function BountyCard({ b }) {
               lineHeight: 1.1,
             }}
           >
-            {b.rewardFmt}
+            {fmt(b.reward)}
           </div>
         </div>
       </div>

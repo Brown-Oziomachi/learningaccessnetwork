@@ -108,7 +108,7 @@ const SAVED_MENU_ITEMS = [
     icon: ShoppingBag,
     label: "Explore Sellers",
     description: "Browse document from sellers",
-    href: "/lan-sellers/en/@/lib",
+    href: "/lan-sellers",
     color: GOLD,
   },
   {

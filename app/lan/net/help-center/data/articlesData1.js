@@ -691,8 +691,8 @@ export const articlesP1 = {
       },
     ],
     relatedArticles: [
-      { title: 'How to Purchase a Book', slug: 'how-to-purchase-book' },
-      { title: 'Becoming a Seller', slug: 'seller-account-overview' },
+      { title: 'Earning Money on the Bounty Board', slug: 'bounty-board-for-authors' },
+      { title: 'Becoming a LAN Seller', slug: 'seller-account-overview' },
       { title: 'Understanding Pricing', slug: 'understanding-pricing' },
     ],
   },
@@ -882,7 +882,7 @@ export const articlesP1 = {
       {
         type: 'list',
         items: [
-          'All prices displayed in Nigerian Naira (₦)',
+          'All prices displayed in your currency',
           'Prices include applicable taxes',
           'No additional fees at checkout',
           'International cards accepted with automatic conversion'

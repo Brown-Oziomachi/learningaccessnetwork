@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { subscribeToLatestOpenBounties } from "@/lib/bountyService";
+import { useCurrency } from "@/app/context/CurrencyContext";
 
 const NAVY = "#0d2244";
 const GOLD = "#b8963e";
@@ -10,7 +11,7 @@ const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
 const AUTO_CLOSE_MS = 5 * 60 * 1000; // 5 minutes
 
-/* tiny icons */
+/* ── tiny icons ── */
 const XIcon = () => (
   <svg
     width="14"
@@ -50,10 +51,11 @@ const BoltIcon = () => (
   </svg>
 );
 
-/* progress bar that drains over AUTO_CLOSE_MS */
+/* ── timer bar that drains over AUTO_CLOSE_MS ── */
 function TimerBar({ durationMs }) {
   const [pct, setPct] = useState(100);
   const start = useRef(Date.now());
+
   useEffect(() => {
     const id = setInterval(() => {
       const elapsed = Date.now() - start.current;
@@ -61,6 +63,7 @@ function TimerBar({ durationMs }) {
     }, 500);
     return () => clearInterval(id);
   }, [durationMs]);
+
   return (
     <div
       style={{ height: 2, background: "rgba(184,150,62,.2)", width: "100%" }}
@@ -78,30 +81,38 @@ function TimerBar({ durationMs }) {
 }
 
 export default function BountyPopup() {
+  const { fmt, currency } = useCurrency();
   const [bounties, setBounties] = useState([]);
   const [visible, setVisible] = useState(false);
-  const [shown, setShown] = useState(false); // only pop up once per session
+const shownIds = useRef(new Set());
   const timerRef = useRef(null);
 
-  /* subscribe to live open bounties */
+  /* ── subscribe to live open bounties ── */
   useEffect(() => {
-const unsub = subscribeToLatestOpenBounties((list) => {
-  const available = list.filter(
-    (b) =>
-      b.status !== "fulfilled" &&
-      b.status !== "disputed" &&
-      (b.proposals || 0) < (b.maxProposals || 10),
-  );
-  setBounties(available);
-  if (available.length > 0 && !shown) {
-    setVisible(true);
-    setShown(true);
-  }
-}, 999); 
+    const unsub = subscribeToLatestOpenBounties((list) => {
+     const now = Date.now();
+     const available = list.filter((b) => {
+       if (b.status === "fulfilled" || b.status === "disputed") return false;
+       if ((b.proposals || 0) >= (b.maxProposals || 10)) return false;
+       if (b.deadline) {
+         const d = b.deadline?.toDate
+           ? b.deadline.toDate()
+           : new Date(b.deadline);
+         if (d <= now) return false;
+       }
+       return true;
+     });
+    setBounties(available);
+    const newOnes = available.filter((b) => !shownIds.current.has(b.id));
+    if (newOnes.length > 0) {
+      newOnes.forEach((b) => shownIds.current.add(b.id));
+      setVisible(true);
+    }
+    }, 999);
     return () => unsub();
-  }, [shown]);
+  }, [shownIds]);
 
-  /* auto-close */
+  /* ── auto-close ── */
   useEffect(() => {
     if (visible) {
       timerRef.current = setTimeout(() => setVisible(false), AUTO_CLOSE_MS);
@@ -117,19 +128,28 @@ const unsub = subscribeToLatestOpenBounties((list) => {
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@400;700;900&display=swap');
+
         @keyframes slideInRight {
           from { transform: translateX(110%); opacity: 0; }
           to   { transform: translateX(0);   opacity: 1; }
         }
-        @keyframes slideOutRight {
-          from { transform: translateX(0);   opacity: 1; }
-          to   { transform: translateX(110%); opacity: 0; }
+
+        .bounty-popup-card {
+          transition: background .15s, border-color .15s;
         }
-        .bounty-popup-card { transition: background .15s, border-color .15s; }
-        .bounty-popup-card:hover { background: rgba(184,150,62,.06) !important; border-color: ${GOLD} !important; }
+        .bounty-popup-card:hover {
+          background: rgba(184,150,62,.06) !important;
+          border-color: ${GOLD} !important;
+        }
+
+        /* slim gold scrollbar */
+        .bounty-scroll::-webkit-scrollbar { width: 3px; }
+        .bounty-scroll::-webkit-scrollbar-track { background: transparent; }
+        .bounty-scroll::-webkit-scrollbar-thumb { background: ${GOLD}; border-radius: 2px; }
       `}</style>
 
       <div
+        key={currency}   // ← add this
         role="dialog"
         aria-label="New bounty requests"
         style={{
@@ -145,22 +165,27 @@ const unsub = subscribeToLatestOpenBounties((list) => {
         {/* Timer bar at very top */}
         <TimerBar durationMs={AUTO_CLOSE_MS} />
 
-        {/* Panel */}
+        {/* ── Panel — flex column so scroll area fills remaining space ── */}
         <div
           style={{
             background: "#fff",
             border: `.5px solid #e5ddd0`,
             boxShadow: "0 24px 64px rgba(13,34,68,.18)",
+            display: "flex",
+            flexDirection: "column",
+            maxHeight: "80vh",
+            overflow: "hidden",
           }}
         >
-          {/* Header */}
+          {/* ── Header ── */}
           <div
             style={{
               background: NAVY,
-              padding: "14px 16px",
+              padding: "12px 14px",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
+              flexShrink: 0,
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -218,12 +243,13 @@ const unsub = subscribeToLatestOpenBounties((list) => {
             </button>
           </div>
 
-          {/* Sub-header */}
+          {/* ── Sub-header ── */}
           <div
             style={{
-              padding: "10px 16px 8px",
+              padding: "8px 14px",
               borderBottom: ".5px solid #f0ebe0",
               background: CREAM,
+              flexShrink: 0,
             }}
           >
             <p
@@ -238,8 +264,16 @@ const unsub = subscribeToLatestOpenBounties((list) => {
             </p>
           </div>
 
-          {/* Bounty cards */}
-          <div style={{ maxHeight: 420, overflowY: "auto" }}>
+          {/* ── Scrollable bounty list ── */}
+          <div
+            className="bounty-scroll"
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              scrollbarWidth: "thin",
+              scrollbarColor: `${GOLD} transparent`,
+            }}
+          >
             {bounties.map((b, i) => (
               <Link
                 key={b.id}
@@ -250,14 +284,14 @@ const unsub = subscribeToLatestOpenBounties((list) => {
                 <div
                   className="bounty-popup-card"
                   style={{
-                    padding: "12px 16px",
+                    padding: "10px 14px",
                     borderBottom:
                       i < bounties.length - 1 ? ".5px solid #f5f0e8" : "none",
                     cursor: "pointer",
                     background: "#fff",
                     border: ".5px solid transparent",
                     display: "flex",
-                    gap: 12,
+                    gap: 10,
                     alignItems: "flex-start",
                   }}
                 >
@@ -266,7 +300,7 @@ const unsub = subscribeToLatestOpenBounties((list) => {
                     style={{
                       flexShrink: 0,
                       background: NAVY,
-                      padding: "6px 10px",
+                      padding: "5px 9px",
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "center",
@@ -288,13 +322,14 @@ const unsub = subscribeToLatestOpenBounties((list) => {
                     <span
                       style={{
                         fontFamily: "'Playfair Display',serif",
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: 700,
                         color: "#fff",
                         lineHeight: 1.2,
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      {b.rewardFmt}
+                      {fmt(Math.round(b.reward * 0.8))}
                     </span>
                   </div>
 
@@ -306,7 +341,7 @@ const unsub = subscribeToLatestOpenBounties((list) => {
                         fontWeight: 700,
                         color: NAVY,
                         fontFamily: "'Lato',sans-serif",
-                        margin: "0 0 5px",
+                        margin: "0 0 4px",
                         display: "-webkit-box",
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: "vertical",
@@ -332,7 +367,7 @@ const unsub = subscribeToLatestOpenBounties((list) => {
                           fontWeight: 700,
                           letterSpacing: ".1em",
                           textTransform: "uppercase",
-                          padding: "2px 7px",
+                          padding: "2px 6px",
                           fontFamily: "'Lato',sans-serif",
                         }}
                       >
@@ -359,8 +394,8 @@ const unsub = subscribeToLatestOpenBounties((list) => {
             ))}
           </div>
 
-          {/* Footer CTA */}
-          <div style={{ borderTop: ".5px solid #f0ebe0" }}>
+          {/* ── Footer CTA — always pinned at bottom ── */}
+          <div style={{ borderTop: ".5px solid #f0ebe0", flexShrink: 0 }}>
             <Link
               href="/academic/bounty/board"
               onClick={close}
