@@ -562,23 +562,8 @@ const [resolvedUid, setResolvedUid] = useState(null);
     useEffect(() => {
         const resolveSlug = async () => {
             if (!sellerSlug) return;
-
             try {
-                // First try: direct UID lookup (no query needed)
-                try {
-                    const directSnap = await getDoc(doc(db, "sellers", sellerSlug));
-                    if (directSnap.exists()) {
-                        setResolvedUid(sellerSlug);
-                        return;
-                    }
-                } catch (err) {
-                    // If direct lookup fails, try query (might fail due to permissions)
-                    if (err?.code !== "permission-denied") {
-                        console.debug("Direct lookup skipped, trying query", err?.message);
-                    }
-                }
-
-                // Second try: query by slug (requires read permissions on sellers collection)
+                // 1. Try slug query first (most reliable)
                 try {
                     const q = query(
                         collection(db, "sellers"),
@@ -590,18 +575,28 @@ const [resolvedUid, setResolvedUid] = useState(null);
                         return;
                     }
                 } catch (err) {
-                    if (err?.code === "permission-denied") {
-                        console.debug("Slug query blocked by security rules - this is expected");
-                    } else {
-                        console.error("Slug query error:", err?.message);
+                    if (err?.code !== "permission-denied") {
+                        console.debug("Slug query error:", err?.message);
                     }
                 }
 
-                // If both fail, treat slug as UID and let it fail gracefully below
-                setResolvedUid(sellerSlug);
+                // 2. Try direct UID lookup (for legacy /profile/uid links)
+                try {
+                    const directSnap = await getDoc(doc(db, "sellers", sellerSlug));
+                    if (directSnap.exists()) {
+                        setResolvedUid(sellerSlug);
+                        return;
+                    }
+                } catch (err) {
+                    console.debug("Direct UID lookup failed:", err?.message);
+                }
+
+                // 3. Nothing found — set null so "Profile Not Found" renders
+                setResolvedUid(null);
+                setSeller(null);          // skip fetchSellerData entirely
             } catch (err) {
-                console.error("resolveSlug fallback error:", err);
-                setResolvedUid(sellerSlug);
+                console.error("resolveSlug error:", err);
+                setResolvedUid(null);
             } finally {
                 setSlugResolving(false);
             }
@@ -609,8 +604,6 @@ const [resolvedUid, setResolvedUid] = useState(null);
         resolveSlug();
     }, [sellerSlug]);
 
-    /* ── Follow check ── */
-    // FIND:
     /* ── Follow check ── */
     useEffect(() => {
         if (!resolvedUid) return; 
@@ -708,7 +701,7 @@ const [resolvedUid, setResolvedUid] = useState(null);
 
         const fetchSellerData = async () => {
             try {
-                let sellerName = "Unknown",
+                let sellerName = "",          // start EMPTY, not "Unknown"
                     sellerTitle = "",
                     sellerDept = "",
                     sellerUni = "",
@@ -717,8 +710,10 @@ const [resolvedUid, setResolvedUid] = useState(null);
                 const sd = await getDoc(doc(db, "sellers", resolvedUid));
                 if (sd.exists()) {
                     const d = sd.data();
-                    sellerName = d.sellerName || d.displayName || sellerName;
-                    sellerTitle = d.title || "";
+                    // Only use sellers doc name if it's not a stale "Unknown"
+                    const rawName = d.sellerName || d.displayName || "";
+                    sellerName = rawName === "Unknown" ? "" : rawName;
+                    sellerTitle = d.title || d.sellerTitle || "";
                     sellerDept = d.department || "";
                     sellerUni = d.university || "";
                     sellerCountry = d.country || "";
@@ -728,16 +723,27 @@ const [resolvedUid, setResolvedUid] = useState(null);
                 if (ud.exists()) {
                     const u = ud.data();
                     setUserData(u);
-                    // Always prefer users collection — it's what edit profile updates
-                    const usersName = `${u.firstName || ""} ${u.surname || ""}`.trim() || u.displayName;
-                    if (usersName) sellerName = usersName;
+
+                    // users doc ALWAYS wins for name — it's what edit profile updates
+                    const firstName = u.firstName || "";
+                    const surname = u.surname || "";
+                    const usersName = (firstName + " " + surname).trim() || u.displayName || "";
+                    if (usersName) sellerName = usersName;   // override stale sellers value
+
                     setSellerPhoto(
                         u.photoBase64 || u.photoURL || u.profilePicture || null
                     );
                     if (!sellerDept) sellerDept = u.department || "";
                     if (!sellerUni) sellerUni = u.university || "";
                     if (!sellerCountry) sellerCountry = u.country || "";
-                    sellerTitle = sellerTitle || u.title || "";
+                    sellerTitle = sellerTitle || u.title || u.lecturerTitle || "";
+                }
+
+                // If we still have no name after checking both docs, bail out
+                if (!sellerName) {
+                    setSeller(null);
+                    setLoading(false);
+                    return;
                 }
 
                 /* Books */
@@ -1342,8 +1348,9 @@ const [resolvedUid, setResolvedUid] = useState(null);
                                 fontFamily: "'Lato',sans-serif",
                             }}
                         >
-                            {sellerBooks.length} materials · {followerCount} followers
-                        </p>
+                            {seller
+                                ? `${sellerBooks.length} materials · ${followerCount} followers`
+                                : "Loading…"}                        </p>
                     </div>
                 </div>
             </div>

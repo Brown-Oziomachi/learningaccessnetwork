@@ -1,6 +1,10 @@
 "use client";
+import {
+    DollarSign, TrendingUp, ShoppingBag, Download, Book, Globe, Settings,
+    X, Camera, Save, AlertCircle, ChevronRight, User, Building, Users,
+    ArrowUpRight, ArrowDownLeft, Sparkles, Package, Zap, Receipt
+} from "lucide-react";
 import React, { useState, useEffect } from "react";
-import { DollarSign, TrendingUp, ShoppingBag, Download, Book, Globe, Settings, X, Camera, Save, AlertCircle, ChevronRight, User, Building, Users, ArrowUpRight, ArrowDownLeft, Sparkles, Package, Zap, Eye, EyeOff, RefreshCw, Printer, Receipt } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, increment, setDoc } from "firebase/firestore";
@@ -388,7 +392,7 @@ function SuccessModal({ amount, reference, onClose }) {
             <div style={{ background: '#fff', width: '100%', maxWidth: '360px', overflow: 'hidden', boxShadow: '0 32px 64px rgba(13,34,68,0.3)' }}>
                 <div style={{ background: NAVY, padding: '40px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
                     <div style={{ width: '64px', height: '64px', background: '#16a34a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
-                        <svg style={{ width: '32px', height: '32px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg TESTING FRESH REBUILD style={{ width: '32px', height: '32px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
@@ -1751,7 +1755,7 @@ export default function SellerAccountClient() {
                                     )}
                                     <label style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Amount</label>
                                     <input type="number" value={withdrawAmount} onChange={e => { setWithdrawAmount(e.target.value); setWithdrawalError(""); }} placeholder="Enter amount" min="1000" max={accountBalance}
-                                        style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '12px 14px', fontSize: '15px', fontWeight: 700, color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif', boxSizing: 'border-box', marginBottom: '6px" }} />
+                                        style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '12px 14px', fontSize: '15px', fontWeight: 700, color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box', marginBottom: '6px' }} />                                   
                                     <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '18px', fontFamily: "'Lato',sans-serif" }}>Minimum: ₦1,000</p>
                                     <div style={{ display: 'flex', gap: '10px' }}>
                                         <button onClick={() => { setShowWithdrawModal(false); setWithdrawalError(""); setWithdrawAmount(""); }}
@@ -1935,8 +1939,12 @@ export default function SellerAccountClient() {
                                                             </div>
                                                             <button onClick={() => setRevealedCodes(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
                                                                 style={{ width: "100%", background: isRevealed ? CREAM : NAVY, color: isRevealed ? NAVY : "#fff", border: `0.5px solid ${isRevealed ? "#e5ddd0" : NAVY}`, padding: "9px", fontSize: "11px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.05em", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", marginBottom: "10px" }}>
-                                                                {isRevealed ? <><EyeOff size={12} /> Hide Code</> : <><Eye size={12} /> Reveal Pickup Code</>}
-                                                            </button>
+                                                        {isRevealed ? (
+                                                            <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg> Hide Code</>
+                                                        ) : (
+                                                            <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Reveal Pickup Code</>
+                                                        )}                                                           
+                                                        </button>
                                                         </>
                                                     )}
                                                     {isCancelled && <div style={{ background: "#fef2f2", border: "0.5px solid #fecaca", padding: "10px 12px", marginBottom: "10px" }}><p style={{ fontSize: "12px", color: "#dc2626", fontFamily: "'Lato',sans-serif", margin: 0, textAlign: "center" }}>This order was cancelled.</p></div>}
@@ -1979,7 +1987,7 @@ export default function SellerAccountClient() {
                                     myClaimedBounties.map(bounty => (
                                         <div key={bounty.id} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '14px', marginBottom: '8px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', gap: 8 }}>
-                                                <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif', flex: 1, minWidth: 0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap" }}>
+                                                <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif", flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                     {bounty.title || bounty.bookTitle || 'Bounty Submission'}
                                                 </p>
                                                 <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', fontFamily: "'Lato',sans-serif", flexShrink: 0, background: bounty.status === 'fulfilled' ? '#f0fdf4' : bounty.status === 'disputed' ? '#fef2f2' : '#fef9c3', color: bounty.status === 'fulfilled' ? '#16a34a' : bounty.status === 'disputed' ? '#dc2626' : '#a16207' }}>

@@ -23,6 +23,7 @@ import { db, auth } from '@/lib/firebaseConfig';
 import PromotionsAdminSection from './promotions-admin-section/page';
 import TrafficAnalyticsSection from './trafficAnalyticsSection/page';
 import PrintLicenseLedger from './printLicenseLedger/Page';
+import SellerReportsSection from './sellerReportsSection/page';
 
 /* ── CSS Variables & Global Styles ─────────────────────────────────────── */
 const globalStyles = `
@@ -380,10 +381,11 @@ const NAV_SECTIONS = [
   {
     label: 'Users & Support',
     items: [
+      { id: 'contact', icon: Mail, label: 'Contact Messages', badgeKey: 'openContactMessages', badgeType: 'danger' },
       { id: 'faculty-verification', icon: GraduationCap, label: 'Faculty Verify', badgeKey: 'pendingFaculty', badgeType: 'warn' },
       { id: 'support', icon: MessageSquare, label: 'Support', badgeKey: 'openTickets', badgeType: 'danger' },
       { id: 'reports', icon: Flag, label: 'Reports', badgeKey: 'pendingReports', badgeType: 'danger' },
-      { id: 'contact', icon: Mail, label: 'Contact Messages', badgeKey: 'openContactMessages', badgeType: 'danger' },
+      { id: "seller-reports", icon: Shield, label: "Seller Reports", badgeKey: "pendingSellerReports", badgeType: "danger" },
     ]
   },
   {
@@ -893,8 +895,9 @@ function LANMembersSection({ users, fetchUsers, openModal, updateUserStatus, get
               const initials = fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
               const isExpanded = expandedUser === u.id;
 
-             return (
+              return (
                 <React.Fragment key={u.id}>
+                  <tr onClick={() => setExpandedUser(isExpanded ? null : u.id)} style={{ cursor: "pointer" }}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{
@@ -934,6 +937,7 @@ function LANMembersSection({ users, fetchUsers, openModal, updateUserStatus, get
                         <Eye size={13} />
                       </button>
                     </td>
+                  </tr> 
 
                   {isExpanded && (
                     <tr>
@@ -1796,6 +1800,7 @@ export default function ComprehensiveAdminPanel() {
     pendingFaculty: users?.filter(u => u.lecturerVerificationStatus === 'pending').length || 0,
     pendingPromotions: promotions?.filter(p => p.status === 'pending').length || 0,
     pendingBountyEscrow: bounties?.filter(b => b.status === 'disputed').length || 0,
+    pendingSellerReports: 0, 
   };
 
   if (checkingAdmin) return (
@@ -2284,6 +2289,18 @@ export default function ComprehensiveAdminPanel() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {activeSection === "seller-reports" && (
+            <div>
+              <div className="section-header">
+                <div>
+                  <div className="section-title"><Shield size={18} />Seller Reports</div>
+                  <div className="section-sub">User complaints filed against marketplace sellers</div>
+                </div>
+              </div>
+              <SellerReportsSection adminUser={user} />
             </div>
           )}
 

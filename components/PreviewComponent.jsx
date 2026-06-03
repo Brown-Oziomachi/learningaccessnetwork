@@ -684,6 +684,22 @@ const submitReply = async (feedbackId) => {
           createdAt: serverTimestamp(),
         });
         try {
+          await addDoc(collection(db, "notifications"), {
+            userId: lecturerId, // notify the person being followed
+            type: "new_follower",
+            title: "New Follower",
+            message: `${user.displayName || user.email?.split("@")[0] || "Someone"} started following you.`,
+            followerId: user.uid,
+            followerName:
+              user.displayName || user.email?.split("@")[0] || "A user",
+            followerPhoto: user.photoURL || null,
+            createdAt: serverTimestamp(),
+            read: false,
+          });
+        } catch (e) {
+          console.warn("Follow notification failed:", e);
+        }
+        try {
           await updateDoc(sellerRef, { followersCount: increment(1) });
         } catch {
           await setDoc(sellerRef, { followersCount: 1 }, { merge: true });

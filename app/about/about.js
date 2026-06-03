@@ -364,6 +364,16 @@ export default function AboutClient() {
                         Academic<br />
                         <span style={{ color: '#c8922a' }}>Library.</span>
                     </h1>
+                    <p style={{
+                        fontSize: 'clamp(1rem, 2.2vw, 1.25rem)',
+                        color: 'rgba(255,255,255,0.55)',
+                        maxWidth: 580,
+                        lineHeight: 1.8,
+                        fontWeight: 300,
+                        marginBottom: '3rem',
+                        ...v, ...t('0.3s')
+                    }}>
+                        LAN Library is a digital academic resource platform dedicated to connecting African students and educators with quality learning materials. Operated by Learning Access Network Ltd. and proudly headquartered in Abuja, Nigeria, we are built to serve learners and institutions across the African continent. We believe that access to premium knowledge shouldn't have boundaries.                    </p>
 
                     <p style={{
                         fontSize: 'clamp(1rem, 2.2vw, 1.25rem)',

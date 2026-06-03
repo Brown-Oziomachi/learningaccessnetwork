@@ -1,67 +1,73 @@
+// utils/paymentProcessor.js
 
+/**
+ * Calculates the exact financial breakdown for a book purchase.
+ * Standardized to ensure consistent object schemas for any downstream financial collections.
+ */
 export const calculatePaymentDistribution = (book, amount) => {
+    const totalAmount = parseFloat(amount) || 0;
+    // Explicit boolean check; treats anything that isn't explicitly a platform book as a marketplace book
     const isPlatformBook = book.source === 'platform' || book.isPlatformBook === true;
 
     if (isPlatformBook) {
-        // Platform book: Platform owner gets 100%
+        // Platform book: Platform owner retains 100% of the funds
         return {
             isPlatformBook: true,
             bookSource: 'platform',
-            platformAmount: 0, 
-            platformFee: 0,
-            sellerAmount: amount, // Platform owner gets full amount
-            sellerReceivesPayment: true, // YES, platform owner gets paid
+            platformFee: totalAmount, // The platform's take is the entire amount
+            sellerAmount: totalAmount,
+            sellerReceivesPayment: true,
             distributionType: 'platform_owner_book',
             paymentSplit: '100% to platform owner',
             sellerDetails: {
-                sellerId: book.sellerId,
-                sellerName: book.sellerName,
-                sellerEmail: book.sellerEmail,
-                sellerPhone: book.sellerPhone,
+                sellerId: book.sellerId || 'PLATFORM_ADMIN',
+                sellerName: book.sellerName || 'Platform Admin',
+                sellerEmail: book.sellerEmail || null,
+                sellerPhone: book.sellerPhone || null,
                 accountType: 'platform_owner'
             }
         };
     } else {
-        // User-uploaded book: Seller gets 80%, Platform gets 20%
-        const platformFee = Math.round(amount * 0.20);
-        const sellerAmount = amount - platformFee;
+        // User-uploaded book: 80% to regular seller, 20% platform commission split
+        const platformFee = Math.round(totalAmount * 0.20);
+        const sellerAmount = totalAmount - platformFee;
 
         return {
             isPlatformBook: false,
-            bookSource: 'firestore',
-            platformAmount: platformFee,
+            bookSource: book.source || 'firestore',
             platformFee: platformFee,
             sellerAmount: sellerAmount,
-            sellerReceivesPayment: true, // YES, user seller gets paid
+            sellerReceivesPayment: true,
             distributionType: 'user_seller_book',
             paymentSplit: '80% to seller, 20% to platform',
             sellerDetails: {
                 sellerId: book.sellerId,
-                sellerName: book.sellerName,
-                sellerEmail: book.sellerEmail,
-                sellerPhone: book.sellerPhone,
+                sellerName: book.sellerName || 'Marketplace Seller',
+                sellerEmail: book.sellerEmail || null,
+                sellerPhone: book.sellerPhone || null,
                 accountType: 'regular_seller'
             }
         };
     }
 };
 
+/**
+ * Checks if an account exists that can safely receive virtual ledger credits.
+ */
 export const shouldCreditSeller = (book) => {
-    // Platform books: Credit platform owner
-    if (book.source === 'platform' || book.isPlatformBook) {
-        return book.sellerId ? true : false;
-    }
+    if (!book || !book.sellerId) return false;
 
-    // Firestore books: Credit user seller
-    if (book.source === 'firestore' && book.sellerId) {
-        return true;
-    }
-
-    return false;
+    // If it has a sellerId and isn't marked as platform, it's a valid user seller
+    return true;
 };
 
+/**
+ * Friendly helper primarily used to safely show payment details on the frontend UI
+ */
 export const getPaymentRecipient = (book) => {
-    if (book.source === 'platform' || book.isPlatformBook) {
+    const isPlatformBook = book?.source === 'platform' || book?.isPlatformBook === true;
+
+    if (isPlatformBook) {
         return {
             type: 'platform_owner',
             message: 'Payment will be credited to platform owner account',

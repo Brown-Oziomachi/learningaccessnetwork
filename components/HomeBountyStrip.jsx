@@ -39,21 +39,21 @@ const BoltIcon = () => (
 export default function HomeBountyStrip() {
   const [bounties, setBounties] = useState([]);
   const [loading, setLoading] = useState(true);
-const { fmt, currency } = useCurrency();
+  const { fmt, currency } = useCurrency();
 
   useEffect(() => {
-   const unsub = subscribeToLatestOpenBounties((list) => {
-     const now = Date.now();
-     const active = list.filter((b) => {
-       if (!b.deadline) return true;
-       const d = b.deadline?.toDate
-         ? b.deadline.toDate()
-         : new Date(b.deadline);
-       return d > now;
-     });
-     setBounties(active);
-     setLoading(false);
-   }, 4);
+    const unsub = subscribeToLatestOpenBounties((list) => {
+      const now = Date.now();
+      const active = list.filter((b) => {
+        if (!b.deadline) return true;
+        const d = b.deadline?.toDate
+          ? b.deadline.toDate()
+          : new Date(b.deadline);
+        return d > now;
+      });
+      setBounties(active);
+      setLoading(false);
+    }, 4);
     return () => unsub();
   }, []);
 
@@ -70,8 +70,11 @@ const { fmt, currency } = useCurrency();
         .hbs-card:hover { border-color: ${GOLD} !important; transform: translateY(-4px); box-shadow: 0 12px 32px rgba(13,34,68,.12); }
         .hbs-see-all { transition: color .15s; }
         .hbs-see-all:hover { color: ${GOLDD} !important; }
-        .hbs-grid { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+        
+        /* FIX: Stack items in a single column on mobile to prevent horizontal scroll */
+        .hbs-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
         @media (min-width: 768px) { .hbs-grid { grid-template-columns: repeat(4, 1fr); } }
+        
         .hbs-desktop-only { display: none !important; }
         @media (min-width: 768px) { .hbs-desktop-only { display: block !important; } }
       `}</style>
@@ -81,6 +84,8 @@ const { fmt, currency } = useCurrency();
           padding: "48px 24px",
           background: CREAM,
           fontFamily: "'Lato',sans-serif",
+          overflow:
+            "hidden" /* Safe guard option against unexpected outer container behavior */,
         }}
       >
         <div style={{ maxWidth: 1280, margin: "0 auto" }}>
@@ -205,6 +210,7 @@ function BountyCard({ b, fmt }) {
         flexDirection: "column",
         gap: 14,
         cursor: "pointer",
+        minWidth: 0 /* FIX: Prevents flex child grid items from overflowing their parents */,
       }}
     >
       {/* Top row: university badge + reward */}
@@ -213,9 +219,10 @@ function BountyCard({ b, fmt }) {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
+          gap: 8 /* FIX: keeps items from colliding if text values are long */,
         }}
       >
-        <div style={{ background: NAVY, padding: "3px 10px" }}>
+        <div style={{ background: NAVY, padding: "3px 10px", minWidth: 0 }}>
           <span
             style={{
               fontSize: 9,
@@ -224,12 +231,17 @@ function BountyCard({ b, fmt }) {
               textTransform: "uppercase",
               color: GOLD,
               fontFamily: "'Lato',sans-serif",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow:
+                "ellipsis" /* FIX: Long university names won't push dimensions out */,
+              display: "block",
             }}
           >
             {b.university}
           </span>
         </div>
-        <div style={{ textAlign: "right" }}>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div
             style={{
               fontSize: 8,
@@ -281,6 +293,7 @@ function BountyCard({ b, fmt }) {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          gap: 8,
         }}
       >
         <span
@@ -288,6 +301,10 @@ function BountyCard({ b, fmt }) {
             fontSize: 10,
             color: "#888",
             fontFamily: "'Lato',sans-serif",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow:
+              "ellipsis" /* FIX: text truncation for long department names */,
           }}
         >
           {b.department}
@@ -305,6 +322,7 @@ function BountyCard({ b, fmt }) {
             padding: "3px 9px",
             letterSpacing: ".06em",
             fontFamily: "'Lato',sans-serif",
+            flexShrink: 0,
           }}
         >
           <span

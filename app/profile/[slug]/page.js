@@ -24,7 +24,41 @@ export async function generateMetadata({ params }) {
     const q = query(collection(db, "sellers"), where("slug", "==", slug));
     const snap = await getDocs(q);
 
-    if (snap.empty) return buildFallbackMeta(slug);
+    if (snap.empty) {
+      // New accounts may not have slug indexed yet — try direct UID lookup
+      try {
+        const directUserSnap = await getDoc(doc(db, 'users', slug));
+        if (directUserSnap.exists()) {
+          const u = directUserSnap.data();
+          const name = [u.firstName, u.surname].filter(Boolean).join(' ') || 'LAN Educator';
+          const metaTitle = `${name} | LAN Library`;
+          const metaDesc = `Browse academic materials by ${name} on LAN Library.`;
+          return {
+            title: metaTitle,
+            description: metaDesc,
+            openGraph: {
+              title: metaTitle,
+              description: metaDesc,
+              type: 'profile',
+              images: u.photoURL
+                ? [{ url: u.photoURL, width: 400, height: 400, alt: name }]
+                : [{ url: 'https://learningaccessnetwork.vercel.app/og-default.png', width: 1200, height: 630 }],
+              siteName: 'LAN Library',
+              url: `https://learningaccessnetwork.vercel.app/profile/${slug}`,
+            },
+            twitter: {
+              card: 'summary_large_image',
+              title: metaTitle,
+              description: metaDesc,
+              images: u.photoURL ? [u.photoURL] : [],
+            },
+          };
+        }
+      } catch (e) {
+        console.error('UID fallback lookup failed:', e);
+      }
+      return buildFallbackMeta(slug);
+    }
 
     const sellerDoc = snap.docs[0];
     const sellerData = sellerDoc.data();

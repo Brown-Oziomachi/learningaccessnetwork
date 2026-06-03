@@ -17,6 +17,9 @@ import {
   AlertTriangle,
   ShoppingBag,
   Sparkles,
+  Star,
+  Users,
+  Flag, // ← add these three
 } from "lucide-react";
 import {
   collection,
@@ -143,13 +146,85 @@ const TYPE_CONFIG = {
     label: "Welcome",
   },
   new_bounty: {
-  icon: DollarSign,
-  iconColor: GOLD,
-  barColor: GOLD,
-  bg: "#fdf8ee",
-  border: "rgba(184,150,62,0.3)",
-  label: "New Bounty",
-},
+    icon: DollarSign,
+    iconColor: GOLD,
+    barColor: GOLD,
+    bg: "#fdf8ee",
+    border: "rgba(184,150,62,0.3)",
+    label: "New Bounty",
+  },
+  new_follower: {
+    icon: Users,
+    iconColor: NAVY,
+    barColor: GOLD,
+    bg: "#fdf8ee",
+    border: "rgba(184,150,62,0.3)",
+    label: "New Follower",
+  },
+  new_review: {
+    icon: Star,
+    iconColor: GOLD,
+    barColor: GOLD,
+    bg: "#fdf8ee",
+    border: "rgba(184,150,62,0.3)",
+    label: "New Review",
+  },
+  upload_approved: {
+    icon: CheckCircle,
+    iconColor: "#16a34a",
+    barColor: "#16a34a",
+    bg: "#f0fdf4",
+    border: "rgba(22,163,74,0.25)",
+    label: "Now Live",
+  },
+  upload_flagged: {
+    icon: AlertTriangle,
+    iconColor: "#d97706",
+    barColor: "#d97706",
+    bg: "#fffbeb",
+    border: "rgba(217,119,6,0.3)",
+    label: "Flagged",
+  },
+  account_health: {
+    icon: AlertCircle,
+    iconColor: "#dc2626",
+    barColor: "#dc2626",
+    bg: "#fef2f2",
+    border: "rgba(220,38,38,0.25)",
+    label: "Action Required",
+  },
+  buyer_dispute: {
+    icon: MessageSquare,
+    iconColor: "#7c3aed",
+    barColor: "#7c3aed",
+    bg: "#f5f3ff",
+    border: "rgba(124,58,237,0.25)",
+    label: "Buyer Dispute",
+  },
+  bank_verify: {
+    icon: AlertCircle,
+    iconColor: "#d97706",
+    barColor: "#d97706",
+    bg: "#fffbeb",
+    border: "rgba(217,119,6,0.3)",
+    label: "Bank Details",
+  },
+  referral_flagged: {
+    icon: Flag,
+    iconColor: "#dc2626",
+    barColor: "#dc2626",
+    bg: "#fef2f2",
+    border: "rgba(220,38,38,0.25)",
+    label: "Referral Flagged",
+  },
+  document_audit: {
+    icon: Eye,
+    iconColor: NAVY,
+    barColor: NAVY,
+    bg: CREAM,
+    border: "rgba(13,34,68,0.15)",
+    label: "Quality Audit",
+  },
 };
 
 const getConfig = (type) =>
@@ -338,6 +413,19 @@ const allNotifications = [
     (n) => !n.read && physicalTypes.has(n.type),
   ).length;
 
+  const accountHealthTypes = new Set([
+    "account_health",
+    "bank_verify",
+    "buyer_dispute",
+    "referral_flagged",
+    "document_audit",
+    "upload_flagged",
+  ]);
+
+  const accountHealthUnread = allNotifications.filter(
+    (n) => !n.read && accountHealthTypes.has(n.type),
+  ).length;
+
  const markAsRead = async (n) => {
   if (n._globalId) {
    setReadGlobalIds((prev) => {
@@ -499,7 +587,12 @@ next.add(n._globalId);
               right: "-6px",
               minWidth: "18px",
               height: "18px",
-              background: physicalUnread > 0 ? "#d97706" : "#dc2626",
+              background:
+                physicalUnread > 0
+                  ? "#d97706"
+                  : accountHealthUnread > 0
+                    ? "#dc2626"
+                    : "#dc2626",
               color: "#fff",
               fontSize: "9px",
               fontWeight: 700,
@@ -571,7 +664,12 @@ next.add(n._globalId);
                 {unreadCount > 0 && (
                   <span
                     style={{
-                      background: physicalUnread > 0 ? "#d97706" : "#dc2626",
+                      background:
+                        physicalUnread > 0
+                          ? "#d97706"
+                          : accountHealthUnread > 0
+                            ? "#dc2626"
+                            : "#dc2626",
                       color: "#fff",
                       fontSize: "9px",
                       fontWeight: 700,
@@ -900,6 +998,33 @@ next.add(n._globalId);
               })
             )}
 
+            {accountHealthUnread > 0 && (
+    <div style={{
+        background: "rgba(220,38,38,0.06)",
+        borderBottom: "0.5px solid rgba(220,38,38,0.2)",
+        padding: "9px 16px",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+    }}>
+        <AlertCircle size={12} style={{ color: "#dc2626" }} />
+        <span style={{
+            fontSize: "10px", fontWeight: 700,
+            color: NAVY, fontFamily: "'Lato',sans-serif", flex: 1,
+        }}>
+            {accountHealthUnread} account health alert{accountHealthUnread > 1 ? "s" : ""} requiring attention
+        </span>
+        <a href="/my-account/seller-account" onClick={() => setOpen(false)}
+            style={{
+                fontSize: "10px", fontWeight: 700, color: "#dc2626",
+                textDecoration: "none", fontFamily: "'Lato',sans-serif",
+                display: "flex", alignItems: "center", gap: "3px",
+            }}>
+            View Dashboard <ChevronRight size={10} />
+        </a>
+    </div>
+            )}
+            
             {/* ── Footer ── */}
             {allNotifications.length > 6 && (
               <div

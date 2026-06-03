@@ -2,10 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
-import {
-    doc, getDoc, collection, query, where,
-    getDocs, updateDoc, serverTimestamp,
-} from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import {
     CheckCircle, AlertCircle, X, GraduationCap,
     BookOpen, ChevronRight, ChevronDown, Globe,
@@ -21,7 +18,7 @@ import { OrderSummary } from "@/components/OrderSummary";
 import { useAds } from "@/lib/useAds";
 import FeaturedAdsCarousel from "@/components/FeaturedAdsCarousel";
 
-/* ─── Design tokens (matches your existing brand) ──────────────── */
+/* ─── Design tokens ─────────────────────────────────────────────── */
 const NAVY = "#0d2244";
 const GOLD = "#b8963e";
 const GOLDD = "#d4aa5a";
@@ -72,6 +69,24 @@ const FALLBACK_RATES = {
     XOF: 6.56, XAF: 6.56,
 };
 
+/* ─── GlobalStyles component (from Doc 2) ───────────────────────── */
+const GlobalStyles = () => (
+    <style dangerouslySetInnerHTML={{
+        __html: `
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .pay-root { font-family:'Lato',sans-serif; background:${BG}; min-height:100vh; }
+        .section-card { background:#fff; border:0.5px solid #e5ddd0; padding:24px; margin-bottom:16px; }
+        .warn-bar { background:rgba(234,179,8,0.08); border:0.5px solid rgba(234,179,8,0.3); padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
+        .country-list::-webkit-scrollbar { width:4px; }
+        .country-list::-webkit-scrollbar-track { background:#f5f1ea; }
+        .country-list::-webkit-scrollbar-thumb { background:rgba(184,150,62,0.3); border-radius:2px; }
+        .pay-btn:hover { background:#0a1c38 !important; }
+        .pay-grid { display:grid; grid-template-columns:1fr; gap:16px; }
+        @media(min-width:1024px) { .pay-grid { grid-template-columns:1fr 320px; } }
+    `}} />
+);
+
 /* ─── Helpers ────────────────────────────────────────────────────── */
 const getThumbnailUrl = (book) => {
     if (!book) return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
@@ -90,7 +105,6 @@ const getThumbnailUrl = (book) => {
 const formatLocalPrice = (ngnPrice, currency, rates, symbol) => {
     const rate = rates[currency] ?? FALLBACK_RATES[currency] ?? 1;
     const local = ngnPrice * rate;
-    // Whole numbers for high-value currencies, 2dp for others
     const formatted = ["UGX", "RWF", "TZS", "XOF", "XAF", "MWK"].includes(currency)
         ? Math.round(local).toLocaleString()
         : local.toFixed(2).replace(/\.00$/, "");
@@ -158,7 +172,6 @@ function CountrySelector({ selected, onSelect }) {
                             style={{ border: "none", outline: "none", flex: 1, fontSize: "13px", fontFamily: "'Lato',sans-serif", color: NAVY, background: "transparent" }}
                         />
                     </div>
-
                     {/* List */}
                     <div style={{ overflowY: "auto", flex: 1 }}>
                         {filtered.length === 0 ? (
@@ -173,8 +186,7 @@ function CountrySelector({ selected, onSelect }) {
                                     padding: "10px 14px", border: "none", cursor: "pointer",
                                     background: selected.code === c.code ? CREAM : "transparent",
                                     borderLeft: selected.code === c.code ? `3px solid ${GOLD}` : "3px solid transparent",
-                                    transition: "background 0.12s",
-                                    textAlign: "left",
+                                    transition: "background 0.12s", textAlign: "left",
                                 }}
                                 onMouseEnter={e => { if (selected.code !== c.code) e.currentTarget.style.background = "#fafaf8"; }}
                                 onMouseLeave={e => { if (selected.code !== c.code) e.currentTarget.style.background = "transparent"; }}
@@ -184,9 +196,7 @@ function CountrySelector({ selected, onSelect }) {
                                     <p style={{ fontSize: "12px", fontWeight: 700, color: NAVY, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</p>
                                     <p style={{ fontSize: "10px", color: "#aaa", margin: 0 }}>{c.currency} · {c.symbol}</p>
                                 </div>
-                                {selected.code === c.code && (
-                                    <CheckCircle size={13} style={{ color: GOLD, flexShrink: 0 }} />
-                                )}
+                                {selected.code === c.code && <CheckCircle size={13} style={{ color: GOLD, flexShrink: 0 }} />}
                             </button>
                         ))}
                     </div>
@@ -207,8 +217,7 @@ function LocalPriceBadge({ ngnPrice, selectedCountry, rates, ratesLoaded }) {
             backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px)",
             backgroundSize: "20px 20px",
             border: `0.5px solid rgba(184,150,62,0.25)`,
-            padding: "16px 20px",
-            marginBottom: "20px",
+            padding: "16px 20px", marginBottom: "20px",
             display: "flex", alignItems: "center", justifyContent: "space-between",
             flexWrap: "wrap", gap: "10px",
         }}>
@@ -251,7 +260,7 @@ export default function PaymentClient() {
     const rawBookId = searchParams.get("bookId");
     const bookId = rawBookId?.startsWith("firestore-") ? rawBookId : `firestore-${rawBookId}`;
 
-    /* State */
+    /* ── State ── */
     const [book, setBook] = useState(null);
     const [sellerDetails, setSellerDetails] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -317,7 +326,7 @@ export default function PaymentClient() {
                 if (data?.rates) {
                     setRates({
                         ...FALLBACK_RATES,  // safe defaults
-                        ...data.rates,      // live rates overwrite everything
+                        ...data.rates,      // live rates overwrite
                         NGN: 1,             // pin base currency
                     });
                 }
@@ -408,11 +417,19 @@ export default function PaymentClient() {
 
     const handlePayment = (e) => {
         e.preventDefault();
-        if (!formData.email || !formData.phone || !formData.name) { alert("Please fill in all required fields"); return; }
+        if (!formData.email || !formData.phone || !formData.name) {
+            alert("Please fill in all required fields");
+            return;
+        }
         if (isLecturerSeller) {
             setPendingPaymentAction(paymentMethod);
-            setStudentModalStep("question"); setIsClassStudent(null);
-            setStudentRegNo(""); setRegNoError(""); setShowStudentModal(true);
+            setStudentModalStep("question");
+            setIsClassStudent(null);
+            setStudentRegNo("");
+            setStudentDepartment("");
+            setRegNoError("");
+            setDepartmentError("");
+            setShowStudentModal(true);
             return;
         }
         executePayment(paymentMethod);
@@ -424,10 +441,13 @@ export default function PaymentClient() {
         else { setShowStudentModal(false); executePayment(pendingPaymentAction); }
     };
 
+    // Doc 2 fix: validate both fields before early return, not sequentially
     const handleRegNoSubmit = () => {
-        if (!studentRegNo.trim()) { setRegNoError("Please enter your registration number."); return; }
-        if (!studentDepartment.trim()) { setDepartmentError("Please enter your department."); return; }
-        setRegNoError(""); setDepartmentError(""); setShowStudentModal(false);
+        let isValid = true;
+        if (!studentRegNo.trim()) { setRegNoError("Please enter your registration number."); isValid = false; } else { setRegNoError(""); }
+        if (!studentDepartment.trim()) { setDepartmentError("Please enter your department."); isValid = false; } else { setDepartmentError(""); }
+        if (!isValid) return;
+        setShowStudentModal(false);
         executePayment(pendingPaymentAction);
     };
 
@@ -435,7 +455,8 @@ export default function PaymentClient() {
         setPinLocalError("");
         if (!enteredPin || enteredPin.length < 4) { setPinLocalError("Please enter your 4-digit PIN."); return; }
         processWalletPayment(enteredPin, pendingRegNoRef.current);
-        setShowPinModal(false); setEnteredPin("");
+        setShowPinModal(false);
+        setEnteredPin("");
     };
 
     const handleSetupPin = async () => {
@@ -477,7 +498,7 @@ export default function PaymentClient() {
     /* ══ LOADING ══ */
     if (loading) return (
         <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: BG }}>
-            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            <GlobalStyles />
             <div style={{ textAlign: "center" }}>
                 <div style={{ width: "48px", height: "48px", border: `3px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 14px" }} />
                 <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "16px", color: NAVY }}>Loading book details…</p>
@@ -488,7 +509,7 @@ export default function PaymentClient() {
     /* ══ ALREADY PURCHASED ══ */
     if (alreadyPurchased && book) return (
         <>
-            <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900&family=Lato:wght@300;400;700&display=swap');`}</style>
+            <GlobalStyles />
             <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", fontFamily: "'Lato',sans-serif" }}>
                 <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "40px 32px", maxWidth: "420px", width: "100%", textAlign: "center" }}>
                     <div style={{ width: "64px", height: "64px", border: `0.5px solid rgba(184,150,62,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", background: CREAM }}>
@@ -496,14 +517,24 @@ export default function PaymentClient() {
                     </div>
                     <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "0 0 6px" }}>Already Purchased</p>
                     <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: "22px", fontWeight: 700, color: NAVY, margin: "0 0 10px" }}>You already own this!</h2>
-                    <p style={{ fontSize: "13px", color: "#666", lineHeight: 1.7, margin: "0 0 20px" }}>You've already purchased <strong style={{ color: NAVY }}>{book.title}</strong>.</p>
-                    <img src={getThumbnailUrl(book)} alt={book.title} style={{ width: "80px", aspectRatio: "3/4", objectFit: "cover", margin: "0 auto 24px", display: "block", border: "0.5px solid #e5ddd0" }} />
+                    <p style={{ fontSize: "13px", color: "#666", lineHeight: 1.7, margin: "0 0 20px" }}>
+                        You've already purchased <strong style={{ color: NAVY }}>{book.title}</strong>.
+                    </p>
+                    <img
+                        src={getThumbnailUrl(book)}
+                        alt={book.title}
+                        style={{ width: "80px", aspectRatio: "3/4", objectFit: "cover", margin: "0 auto 24px", display: "block", border: "0.5px solid #e5ddd0" }}
+                    />
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                         <Link href={`/book/preview?id=${bookId}&purchased=true`} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", background: NAVY, color: "#fff", padding: "13px", fontSize: "12px", fontWeight: 700, textDecoration: "none", letterSpacing: "0.06em" }}>
                             <BookOpen size={14} /> READ BOOK NOW
                         </Link>
-                        <Link href="/my-books" style={{ display: "block", padding: "13px", border: "0.5px solid #e5ddd0", color: NAVY, fontSize: "12px", fontWeight: 700, textDecoration: "none", letterSpacing: "0.06em", textAlign: "center" }}>GO TO MY LIBRARY</Link>
-                        <button onClick={() => router.back()} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#aaa", fontSize: "12px", padding: "8px" }}>← Go Back</button>
+                        <Link href="/my-books" style={{ display: "block", padding: "13px", border: "0.5px solid #e5ddd0", color: NAVY, fontSize: "12px", fontWeight: 700, textDecoration: "none", letterSpacing: "0.06em", textAlign: "center" }}>
+                            GO TO MY LIBRARY
+                        </Link>
+                        <button onClick={() => router.back()} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#aaa", fontSize: "12px", padding: "8px" }}>
+                            ← Go Back
+                        </button>
                     </div>
                 </div>
             </div>
@@ -513,7 +544,7 @@ export default function PaymentClient() {
     /* ══ ERROR ══ */
     if (pageError || !book) return (
         <>
-            <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900&family=Lato:wght@300;400;700&display=swap');`}</style>
+            <GlobalStyles />
             <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
                 <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "48px 32px", maxWidth: "400px", width: "100%", textAlign: "center" }}>
                     <AlertCircle size={32} style={{ color: "#ef4444", margin: "0 auto 16px" }} />
@@ -526,9 +557,10 @@ export default function PaymentClient() {
     );
 
     /* ══ SUCCESS ══ */
+    // Doc 1 version preserved: includes full receipt rows + redirect CTA link
     if (paymentSuccess) return (
         <>
-            <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900&family=Lato:wght@300;400;700&display=swap'); @keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            <GlobalStyles />
             <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
                 <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "40px 32px", maxWidth: "420px", width: "100%", textAlign: "center" }}>
                     <div style={{ width: "64px", height: "64px", border: "0.5px solid #86efac", background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
@@ -564,26 +596,7 @@ export default function PaymentClient() {
     ══════════════════════════════════════════════════════════════════ */
     return (
         <>
-            <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .pay-root { font-family:'Lato',sans-serif; background:${BG}; min-height:100vh; }
-        .section-card { background:#fff; border:0.5px solid #e5ddd0; padding:24px; margin-bottom:16px; }
-        .warn-bar { background:rgba(234,179,8,0.08); border:0.5px solid rgba(234,179,8,0.3); padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
-
-        /* Country selector scrollbar */
-        .country-list::-webkit-scrollbar { width: 4px; }
-        .country-list::-webkit-scrollbar-track { background: #f5f1ea; }
-        .country-list::-webkit-scrollbar-thumb { background: rgba(184,150,62,0.3); border-radius: 2px; }
-
-        /* Pay button hover */
-        .pay-btn:hover { background: #0a1c38 !important; }
-
-        /* Grid layout */
-        .pay-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
-        @media(min-width: 1024px) { .pay-grid { grid-template-columns: 1fr 320px; } }
-      `}</style>
-
+            <GlobalStyles />
             <div className="pay-root">
                 <Navbar />
 
@@ -591,7 +604,10 @@ export default function PaymentClient() {
 
                     {/* Page header */}
                     <div style={{ marginBottom: "24px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                        <button onClick={() => router.back()} style={{ background: "transparent", border: "0.5px solid #e5ddd0", cursor: "pointer", width: "34px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", color: NAVY, flexShrink: 0 }}>
+                        <button
+                            onClick={() => router.back()}
+                            style={{ background: "transparent", border: "0.5px solid #e5ddd0", cursor: "pointer", width: "34px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", color: NAVY, flexShrink: 0 }}
+                        >
                             <ArrowLeft size={14} />
                         </button>
                         <div>
@@ -611,7 +627,9 @@ export default function PaymentClient() {
                     <div className="section-card" style={{ padding: "20px" }}>
                         <div style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
                             <div style={{ position: "relative", flexShrink: 0 }}>
-                                <img src={getThumbnailUrl(book)} alt={"Cover of " + book.title}
+                                <img
+                                    src={getThumbnailUrl(book)}
+                                    alt={"Cover of " + book.title}
                                     style={{ width: "90px", aspectRatio: "3/4", objectFit: "cover", display: "block", border: "0.5px solid #e5ddd0" }}
                                     onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
                                     loading="lazy"
@@ -628,8 +646,7 @@ export default function PaymentClient() {
                         {book.description && (
                             <div style={{ marginTop: "14px", background: CREAM, border: "0.5px solid rgba(184,150,62,0.15)", padding: "12px 14px" }}>
                                 <p style={{ fontSize: "10px", fontWeight: 700, color: GOLD, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 4px" }}>Description</p>
-                                <p style={{
-                                    fontSize: "12px", color: "#666", lineHeight: 1.65, margin: 0, WebkitLineClamp: 5, WebkitBoxOrient: "vertical", }}>{book.description}</p>
+                                <p style={{ fontSize: "12px", color: "#666", lineHeight: 1.65, margin: 0, WebkitLineClamp: 5, WebkitBoxOrient: "vertical" }}>{book.description}</p>
                             </div>
                         )}
                     </div>
@@ -643,7 +660,7 @@ export default function PaymentClient() {
                                 <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "0 0 4px" }}>Step 1 of 2</p>
                                 <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: "18px", fontWeight: 700, color: NAVY, margin: "0 0 20px" }}>Your Country & Currency</h3>
 
-                                {/* ── Country selector ── */}
+                                {/* Country selector */}
                                 <div style={{ marginBottom: "20px" }}>
                                     <label style={{ display: "block", fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aaa", marginBottom: "8px", fontFamily: "'Lato',sans-serif" }}>
                                         Select your country
@@ -651,7 +668,7 @@ export default function PaymentClient() {
                                     <CountrySelector selected={selectedCountry} onSelect={setSelectedCountry} />
                                 </div>
 
-                                {/* ── Live price badge ── */}
+                                {/* Live price badge */}
                                 <LocalPriceBadge
                                     ngnPrice={book.price}
                                     selectedCountry={selectedCountry}
@@ -685,14 +702,15 @@ export default function PaymentClient() {
                                     />
                                 </div>
 
-                                {/* ── Big pay button ── */}
+                                {/* Big pay button */}
                                 <button
                                     onClick={handlePayment}
                                     disabled={processing || !ratesLoaded}
                                     className="pay-btn"
                                     style={{
                                         width: "100%", background: NAVY, color: "#fff",
-                                        border: "none", padding: "16px 24px", cursor: processing ? "not-allowed" : "pointer",
+                                        border: "none", padding: "16px 24px",
+                                        cursor: processing ? "not-allowed" : "pointer",
                                         opacity: processing || !ratesLoaded ? 0.6 : 1,
                                         display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
                                         fontFamily: "'Lato',sans-serif", fontSize: "13px", fontWeight: 700, letterSpacing: "0.08em",
@@ -724,7 +742,7 @@ export default function PaymentClient() {
                         {/* ── RIGHT: order summary ── */}
                         <div>
                             {/* Currency summary card */}
-                            <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "16px", marginTop: "10" }}>
+                            <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "16px", marginBottom: "16px" }}>
                                 <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: GOLD, margin: "0 0 12px", fontFamily: "'Lato',sans-serif" }}>Payment Summary</p>
                                 {[
                                     ["Book price (NGN)", `₦${book.price?.toLocaleString()}`],
@@ -743,13 +761,12 @@ export default function PaymentClient() {
                                 </div>
                             </div>
                             <OrderSummary book={book} sellerDetails={sellerDetails} />
-
                         </div>
                     </div>
 
                     {/* Featured ads */}
                     <div style={{ marginTop: "40px" }}>
-                        <FeaturedAdsCarousel tier="Gold" maxAds={2} autoPlay={true} autoPlayMs={4500} style={{ marginBottom: "20px" }} />
+                        <FeaturedAdsCarousel goldAds={goldAds} silverAds={silverAds} tier="Gold" maxAds={2} autoPlay={true} autoPlayMs={4500} style={{ marginBottom: "20px" }} />
                     </div>
 
                 </main>
@@ -763,8 +780,10 @@ export default function PaymentClient() {
                                     <p style={{ fontSize: "9px", color: GOLD, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 3px", fontFamily: "'Lato',sans-serif" }}>Almost there</p>
                                     <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "17px", fontWeight: 700, color: "#fff", margin: 0 }}>One quick question</p>
                                 </div>
-                                <button style={modalClose}
-                                    onClick={() => { setShowStudentModal(false); setIsClassStudent(null); setStudentRegNo(""); setStudentDepartment(""); setRegNoError(""); setDepartmentError(""); }}>
+                                <button
+                                    style={modalClose}
+                                    onClick={() => { setShowStudentModal(false); setIsClassStudent(null); setStudentRegNo(""); setStudentDepartment(""); setRegNoError(""); setDepartmentError(""); }}
+                                >
                                     <X size={16} />
                                 </button>
                             </div>
@@ -780,16 +799,21 @@ export default function PaymentClient() {
                                                 <p style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: 0 }}>{lecturerName}</p>
                                             </div>
                                         </div>
-                                        <p style={{ fontSize: "13px", color: "#555", lineHeight: 1.65, marginBottom: "16px" }}>Are you a student of <strong style={{ color: NAVY }}>{lecturerName}</strong>?</p>
+                                        <p style={{ fontSize: "13px", color: "#555", lineHeight: 1.65, marginBottom: "16px" }}>
+                                            Are you a student of <strong style={{ color: NAVY }}>{lecturerName}</strong>?
+                                        </p>
                                         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                                             {[
                                                 { choice: true, title: "Yes, I'm in this lecturer's class", sub: "Reg No required for class records" },
                                                 { choice: false, title: "No, I'm buying for personal study", sub: "Reg No not required" },
                                             ].map(({ choice, title, sub }) => (
-                                                <button key={String(choice)} onClick={() => handleStudentChoice(choice)}
+                                                <button
+                                                    key={String(choice)}
+                                                    onClick={() => handleStudentChoice(choice)}
                                                     style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px", border: `1.5px solid ${choice ? NAVY : "#e5ddd0"}`, background: "#fff", cursor: "pointer", transition: "background 0.15s", fontFamily: "'Lato',sans-serif" }}
                                                     onMouseEnter={e => e.currentTarget.style.background = CREAM}
-                                                    onMouseLeave={e => e.currentTarget.style.background = "#fff"}>
+                                                    onMouseLeave={e => e.currentTarget.style.background = "#fff"}
+                                                >
                                                     <div style={{ textAlign: "left" }}>
                                                         <p style={{ fontSize: "13px", fontWeight: 700, color: choice ? NAVY : "#555", margin: "0 0 2px" }}>{title}</p>
                                                         <p style={{ fontSize: "11px", color: "#aaa", margin: 0 }}>{sub}</p>
@@ -803,14 +827,34 @@ export default function PaymentClient() {
                                 {studentModalStep === "regNo" && (
                                     <>
                                         <p style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>Enter your details</p>
-                                        <p style={{ fontSize: "12px", color: "#aaa", marginBottom: "16px", lineHeight: 1.6 }}>Your details will be recorded for <strong style={{ color: "#666" }}>{lecturerName}</strong>.</p>
-                                        <input type="text" value={studentRegNo} onChange={e => { setStudentRegNo(e.target.value); if (regNoError) setRegNoError(""); }} style={inputStyle(!!regNoError)} placeholder="Registration number e.g. 2021/123456" autoFocus />
+                                        <p style={{ fontSize: "12px", color: "#aaa", marginBottom: "16px", lineHeight: 1.6 }}>
+                                            Your details will be recorded for <strong style={{ color: "#666" }}>{lecturerName}</strong>.
+                                        </p>
+                                        <input
+                                            type="text"
+                                            value={studentRegNo}
+                                            onChange={e => { setStudentRegNo(e.target.value); if (regNoError) setRegNoError(""); }}
+                                            style={inputStyle(!!regNoError)}
+                                            placeholder="Registration number e.g. 2021/123456"
+                                            autoFocus
+                                        />
                                         {regNoError && <p style={{ fontSize: "11px", color: "#ef4444", margin: "0 0 8px" }}>{regNoError}</p>}
-                                        <input type="text" value={studentDepartment} onChange={e => { setStudentDepartment(e.target.value); if (departmentError) setDepartmentError(""); }} style={{ ...inputStyle(!!departmentError), marginTop: "8px" }} placeholder="Department e.g. Computer Science" />
+                                        <input
+                                            type="text"
+                                            value={studentDepartment}
+                                            onChange={e => { setStudentDepartment(e.target.value); if (departmentError) setDepartmentError(""); }}
+                                            style={{ ...inputStyle(!!departmentError), marginTop: "8px" }}
+                                            placeholder="Department e.g. Computer Science"
+                                        />
                                         {departmentError && <p style={{ fontSize: "11px", color: "#ef4444", margin: "0 0 8px" }}>{departmentError}</p>}
                                         <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
                                             <button onClick={handleRegNoSubmit} style={navyBtn}>CONFIRM & PROCEED TO PAYMENT</button>
-                                            <button onClick={() => { setStudentModalStep("question"); setRegNoError(""); setDepartmentError(""); }} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", padding: "6px" }}>← Back</button>
+                                            <button
+                                                onClick={() => { setStudentModalStep("question"); setRegNoError(""); setDepartmentError(""); }}
+                                                style={{ background: "transparent", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", padding: "6px" }}
+                                            >
+                                                ← Back
+                                            </button>
                                         </div>
                                     </>
                                 )}
@@ -821,16 +865,21 @@ export default function PaymentClient() {
 
                 {/* ══════════ PIN MODAL ════════════════════════════════════════ */}
                 {showPinModal && (
-                    <div style={modalOverlay} >
-                        <div style={modalBox} className="mt-10">
+                    <div style={modalOverlay}>
+                        <div style={modalBox}>
                             <div style={modalHeader}>
                                 <div>
-                                    <p style={{ fontSize: "9px", color: GOLD, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 3px", fontFamily: "'Lato',sans-serif", }}>Confirm payment</p>
+                                    <p style={{ fontSize: "9px", color: GOLD, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 3px", fontFamily: "'Lato',sans-serif" }}>Confirm payment</p>
                                     <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "17px", fontWeight: 700, color: "#fff", margin: 0 }}>
                                         {pinView === "setup" ? "Create Your PIN" : pinView === "forgot" ? "Reset PIN" : pinView === "otp" ? "Enter Reset Code" : "Enter Your PIN"}
                                     </p>
                                 </div>
-                                <button style={modalClose} onClick={() => { setShowPinModal(false); setEnteredPin(""); setPinLocalError(""); setPinView("enter"); }}><X size={16} /></button>
+                                <button
+                                    style={modalClose}
+                                    onClick={() => { setShowPinModal(false); setEnteredPin(""); setPinLocalError(""); setPinView("enter"); }}
+                                >
+                                    <X size={16} />
+                                </button>
                             </div>
                             <div style={{ padding: "24px" }}>
                                 {(pinLocalError || paymentError) && (
@@ -846,6 +895,8 @@ export default function PaymentClient() {
                                             Authorise payment of <strong style={{ color: NAVY }}>{formatLocalPrice(book.price, selectedCountry.currency, rates, selectedCountry.symbol)}</strong>
                                         </p>
                                         <p style={{ fontSize: "11px", color: "#bbb", textAlign: "center", marginBottom: "20px" }}>for <em>{book.title}</em></p>
+
+                                        {/* Visual PIN dots */}
                                         <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginBottom: "16px" }}>
                                             {Array.from({ length: 4 }, (_, i) => i < enteredPin.length).map((filled, i) => (
                                                 <div key={i} style={{ width: "52px", height: "54px", border: `1.5px solid ${filled ? NAVY : "#e5ddd0"}`, background: filled ? CREAM : "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", color: filled ? NAVY : "#e5ddd0", transition: "all 0.15s" }}>
@@ -853,24 +904,49 @@ export default function PaymentClient() {
                                                 </div>
                                             ))}
                                         </div>
+
                                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
                                             <button onClick={() => { setPinView("forgot"); setPinLocalError(""); }} style={{ background: "transparent", border: "none", cursor: "pointer", color: GOLD, fontSize: "11px", fontWeight: 700 }}>Forgot PIN?</button>
-                                            {pinNotSet && <button onClick={() => { setPinView("setup"); setPinLocalError(""); }} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#16a34a", fontSize: "11px", fontWeight: 700 }}>Setup PIN Now</button>}
+                                            {pinNotSet && (
+                                                <button onClick={() => { setPinView("setup"); setPinLocalError(""); }} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#16a34a", fontSize: "11px", fontWeight: 700 }}>Setup PIN Now</button>
+                                            )}
                                         </div>
+
+                                        {/* Numpad */}
                                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "6px", marginBottom: "6px" }}>
                                             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-                                                <button key={n} onClick={() => { if (enteredPin.length < 4) { setEnteredPin(p => p + String(n)); setPinLocalError(""); setPaymentError(null); } }} disabled={enteredPin.length >= 4}
-                                                    style={{ height: "50px", border: "0.5px solid #e5ddd0", background: "#fff", fontSize: "18px", fontWeight: 700, color: NAVY, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>{n}
+                                                <button
+                                                    key={n}
+                                                    onClick={() => { if (enteredPin.length < 4) { setEnteredPin(p => p + String(n)); setPinLocalError(""); setPaymentError(null); } }}
+                                                    disabled={enteredPin.length >= 4}
+                                                    style={{ height: "50px", border: "0.5px solid #e5ddd0", background: "#fff", fontSize: "18px", fontWeight: 700, color: NAVY, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}
+                                                >
+                                                    {n}
                                                 </button>
                                             ))}
                                         </div>
                                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "6px", marginBottom: "16px" }}>
                                             <div />
-                                            <button onClick={() => { if (enteredPin.length < 4) { setEnteredPin(p => p + "0"); setPinLocalError(""); setPaymentError(null); } }} disabled={enteredPin.length >= 4}
-                                                style={{ height: "50px", border: "0.5px solid #e5ddd0", background: "#fff", fontSize: "18px", fontWeight: 700, color: NAVY, cursor: "pointer" }}>0</button>
-                                            <button onClick={() => setEnteredPin(p => p.slice(0, -1))} style={{ height: "50px", border: "0.5px solid #e5ddd0", background: "#fff", fontSize: "18px", color: "#aaa", cursor: "pointer" }}>⌫</button>
+                                            <button
+                                                onClick={() => { if (enteredPin.length < 4) { setEnteredPin(p => p + "0"); setPinLocalError(""); setPaymentError(null); } }}
+                                                disabled={enteredPin.length >= 4}
+                                                style={{ height: "50px", border: "0.5px solid #e5ddd0", background: "#fff", fontSize: "18px", fontWeight: 700, color: NAVY, cursor: "pointer" }}
+                                            >
+                                                0
+                                            </button>
+                                            <button
+                                                onClick={() => setEnteredPin(p => p.slice(0, -1))}
+                                                style={{ height: "50px", border: "0.5px solid #e5ddd0", background: "#fff", fontSize: "18px", color: "#aaa", cursor: "pointer" }}
+                                            >
+                                                ⌫
+                                            </button>
                                         </div>
-                                        <button onClick={handlePinConfirm} disabled={enteredPin.length < 4 || processing} style={{ ...navyBtn, opacity: enteredPin.length < 4 || processing ? 0.4 : 1 }}>
+
+                                        <button
+                                            onClick={handlePinConfirm}
+                                            disabled={enteredPin.length < 4 || processing}
+                                            style={{ ...navyBtn, opacity: enteredPin.length < 4 || processing ? 0.4 : 1 }}
+                                        >
                                             {processing ? "VERIFYING…" : "CONFIRM PAYMENT"}
                                         </button>
                                     </>
@@ -882,7 +958,9 @@ export default function PaymentClient() {
                                         <input type="password" value={setupPin} onChange={e => setSetupPin(e.target.value.replace(/\D/g, "").slice(0, 4))} style={{ ...inputStyle(false), textAlign: "center", fontSize: "22px", letterSpacing: "8px" }} placeholder="New PIN" maxLength={4} inputMode="numeric" />
                                         <input type="password" value={setupPinConfirm} onChange={e => setSetupPinConfirm(e.target.value.replace(/\D/g, "").slice(0, 4))} style={{ ...inputStyle(false), textAlign: "center", fontSize: "22px", letterSpacing: "8px", marginTop: "8px" }} placeholder="Confirm PIN" maxLength={4} inputMode="numeric" />
                                         <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "16px" }}>
-                                            <button onClick={handleSetupPin} disabled={processing || setupPin.length < 4 || setupPinConfirm.length < 4} style={{ ...goldBtn, opacity: processing || setupPin.length < 4 || setupPinConfirm.length < 4 ? 0.4 : 1 }}>{processing ? "SAVING…" : "SET PIN & CONTINUE"}</button>
+                                            <button onClick={handleSetupPin} disabled={processing || setupPin.length < 4 || setupPinConfirm.length < 4} style={{ ...goldBtn, opacity: processing || setupPin.length < 4 || setupPinConfirm.length < 4 ? 0.4 : 1 }}>
+                                                {processing ? "SAVING…" : "SET PIN & CONTINUE"}
+                                            </button>
                                             <button onClick={() => { setPinView("enter"); setPinLocalError(""); }} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", padding: "6px" }}>Back</button>
                                         </div>
                                     </>
@@ -892,7 +970,9 @@ export default function PaymentClient() {
                                     <>
                                         <p style={{ fontSize: "12px", color: "#888", textAlign: "center", marginBottom: "20px" }}>We'll send a 6-digit reset code to verify your identity.</p>
                                         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                                            <button onClick={handleRequestOtp} disabled={processing} style={{ ...navyBtn, opacity: processing ? 0.5 : 1 }}>{processing ? "SENDING…" : "SEND RESET CODE"}</button>
+                                            <button onClick={handleRequestOtp} disabled={processing} style={{ ...navyBtn, opacity: processing ? 0.5 : 1 }}>
+                                                {processing ? "SENDING…" : "SEND RESET CODE"}
+                                            </button>
                                             <button onClick={() => { setPinView("enter"); setPinLocalError(""); }} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", padding: "6px" }}>Back</button>
                                         </div>
                                     </>
@@ -904,7 +984,9 @@ export default function PaymentClient() {
                                         <input type="text" value={otpInput} onChange={e => setOtpInput(e.target.value.replace(/\D/g, "").slice(0, 6))} style={{ ...inputStyle(false), textAlign: "center", fontSize: "18px", letterSpacing: "6px" }} placeholder="6-digit code" maxLength={6} inputMode="numeric" />
                                         <input type="password" value={newResetPin} onChange={e => setNewResetPin(e.target.value.replace(/\D/g, "").slice(0, 4))} style={{ ...inputStyle(false), textAlign: "center", fontSize: "22px", letterSpacing: "8px", marginTop: "8px" }} placeholder="New 4-digit PIN" maxLength={4} inputMode="numeric" />
                                         <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "16px" }}>
-                                            <button onClick={handleVerifyOtp} disabled={processing || otpInput.length < 6 || newResetPin.length < 4} style={{ ...navyBtn, opacity: processing || otpInput.length < 6 || newResetPin.length < 4 ? 0.4 : 1 }}>{processing ? "VERIFYING…" : "RESET PIN & CONTINUE"}</button>
+                                            <button onClick={handleVerifyOtp} disabled={processing || otpInput.length < 6 || newResetPin.length < 4} style={{ ...navyBtn, opacity: processing || otpInput.length < 6 || newResetPin.length < 4 ? 0.4 : 1 }}>
+                                                {processing ? "VERIFYING…" : "RESET PIN & CONTINUE"}
+                                            </button>
                                             <button onClick={() => { setPinView("forgot"); setPinLocalError(""); }} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", padding: "6px" }}>Back</button>
                                         </div>
                                     </>

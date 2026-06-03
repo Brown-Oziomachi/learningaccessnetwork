@@ -240,6 +240,7 @@ const FOOTER_COLUMNS = [
     heading: "Company",
     links: [
       { label: "About LAN", href: "/about/lan" },
+      { label: "LAN Shift", href: "/seller/lan-shift" },
       { label: "Help Centre", href: "/lan/net/help-center" },
       { label: "Documentation", href: "/docs" },
       { label: "Invite a Friend", href: "/ref/invite-friends" },

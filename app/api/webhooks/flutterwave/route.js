@@ -1,305 +1,534 @@
-// app/api/webhooks/flutterwave/route.js
-// NOTE: Seller wallet crediting and transaction recording are DISABLED here.
-// usePayment.js handles both directly on purchase — running them here too
-// was causing double-increments on booksSold/totalEarnings and
-// inconsistent accountBalance updates.
-
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebaseConfig';
-import {
-    doc,
-    getDoc,
-    setDoc,
-    updateDoc,
-    addDoc,
-    collection,
-    getDocs,
-    query,
-    where,
-    arrayUnion,
-    serverTimestamp,
-    increment,
-} from 'firebase/firestore';
+import { calculatePaymentDistribution } from '@/utils/paymentProcessor';
+import { sendServerNotification } from '@/lib/notificationEngine';
+import { serverFetchBookDetails } from '@/lib/serverBookUtils';
+import { adminDb, admin } from '@/lib/firebase-admin';
 
 export async function POST(request) {
     try {
         const payload = await request.json();
 
-        // Verify webhook signature
+        // ── 1. Verify Webhook Authenticity ────────────────────────────────────
         const signature = request.headers.get('verif-hash');
         const secretHash = process.env.FLUTTERWAVE_SECRET_HASH;
 
         if (!signature || signature !== secretHash) {
-            console.error('Invalid webhook signature');
+            console.error('🔒 Security Breach: Invalid webhook signature');
             return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
         }
 
-        console.log('Webhook received:', payload);
-
-        // Only process successful payments
+        // ── 2. Filter Operational Event Types ────────────────────────────────
         if (payload.event !== 'charge.completed' || payload.data.status !== 'successful') {
-            console.log('Not a successful payment, skipping');
             return NextResponse.json({ message: 'Event ignored' }, { status: 200 });
         }
 
         const paymentData = payload.data;
         const { tx_ref, customer, amount, currency } = paymentData;
-
-        // Extract metadata
         const metadata = paymentData.meta || paymentData.metadata || {};
 
         /* ══════════════════════════════════════════════════════════
-           ROUTE: AD BOOST
-           Triggered when SellerAdCreator sends meta.type = "ad_boost"
-        ══════════════════════════════════════════════════════════ */
-        if (metadata.type === 'ad_boost') {
+            ROUTE A: AD BOOST PROCESSING
+           ══════════════════════════════════════════════════════════ */
+        if (metadata.type === 'ad_boost' || tx_ref.startsWith('AD-FLW-')) {
             const { tier, days, bookId, sellerId } = metadata;
 
-            console.log('Processing ad_boost payment:', { sellerId, tier, days, bookId, amount });
-
-            try {
-                // Idempotency: skip if this tx_ref already logged in revenue
-                const existingRevenue = await getDocs(
-                    query(collection(db, 'revenue'), where('txRef', '==', tx_ref))
+            // Validate required fields before processing
+            if (!sellerId || !bookId) {
+                console.error('❌ Missing promotion configuration references:', metadata);
+                return NextResponse.json(
+                    { error: 'Missing metadata parameters for promotion setup' },
+                    { status: 400 }
                 );
-                if (!existingRevenue.empty) {
-                    console.log('ad_boost already recorded — skipping:', tx_ref);
-                    return NextResponse.json({ message: 'Duplicate — skipped' }, { status: 200 });
-                }
+            }
 
-                // 1. Mark the promotion doc as "paid" + webhook-confirmed.
-                //    The client already wrote it with status "paid" on the
-                //    Flutterwave callback. This is the safety-net in case that
-                //    write failed — and also stamps webhookConfirmed: true either way.
-                const promoSnap = await getDocs(
-                    query(collection(db, 'promotions'), where('paymentRef', '==', tx_ref))
-                );
-                if (!promoSnap.empty) {
-                    // Client write succeeded — just confirm it
-                    await updateDoc(promoSnap.docs[0].ref, {
-                        status: 'paid',
+            const revenueRef   = adminDb.collection('revenue').doc(`boost-${tx_ref}`);
+            const promoDocRef  = adminDb.collection('promotions').doc(`promo-${tx_ref}`);
+            const bookRef      = adminDb.collection('books').doc(bookId);
+            const txDocRef     = adminDb.collection('transactions').doc(tx_ref);
+            const durationDays = days || 7;
+
+            await adminDb.runTransaction(async (tx) => {
+                // Idempotency check
+                const txSnap = await tx.get(txDocRef);
+                if (txSnap.exists) return;
+
+                const revSnap = await tx.get(revenueRef);
+                if (revSnap.exists) return;
+
+                // A. Immutable financial ledger row
+                tx.set(txDocRef, {
+                    transactionRef: tx_ref,
+                    userId:         sellerId,
+                    buyerEmail:     customer.email,
+                    buyerName:      customer.name || 'Seller Account',
+                    amount,
+                    currency,
+                    type:           'ad_boost_purchase',
+                    bookId,
+                    tier,
+                    durationDays,
+                    status:         'completed',
+                    paymentMethod:  paymentData.payment_type || 'card',
+                    createdAt:      admin.firestore.FieldValue.serverTimestamp(),
+                });
+
+                // B. Upsert or create the promotion document
+                const promoQuery = await adminDb
+                    .collection('promotions')
+                    .where('paymentRef', '==', tx_ref)
+                    .limit(1)
+                    .get();
+
+                if (!promoQuery.empty) {
+                    tx.update(promoQuery.docs[0].ref, {
+                        status:           'paid',
                         webhookConfirmed: true,
-                        updatedAt: serverTimestamp(),
+                        updatedAt:        admin.firestore.FieldValue.serverTimestamp(),
                     });
-                    console.log('✓ Promotion doc confirmed via webhook');
                 } else {
-                    // Client write failed — create the doc from webhook metadata
-                    await addDoc(collection(db, 'promotions'), {
+                    tx.set(promoDocRef, {
+                        promoId:          `promo-${tx_ref}`,
                         sellerId,
-                        sellerEmail: customer?.email || null,
-                        bookId: bookId || null,
+                        sellerEmail:      customer?.email || null,
+                        bookId,
                         tier,
-                        durationDays: Number(days),
-                        totalPrice: amount,
-                        status: 'paid',
-                        expiryDate: null,     // admin sets this on approval
-                        clicks: 0,
-                        impressions: 0,
-                        paymentMethod: 'flutterwave',
-                        paymentRef: tx_ref,
+                        durationDays:     Number(durationDays),
+                        totalPrice:       amount,
+                        status:           'active',
+                        paymentRef:       tx_ref,
+                        paymentMethod:    'flutterwave',
                         webhookConfirmed: true,
-                        createdAt: serverTimestamp(),
+                        clicks:           0,
+                        impressions:      0,
+                        expiryDate:       null,
+                        startDate:        admin.firestore.FieldValue.serverTimestamp(),
+                        createdAt:        admin.firestore.FieldValue.serverTimestamp(),
                     });
-                    console.log('✓ Promotion doc created via webhook (client write had failed)');
                 }
 
-                // 2. Log to revenue collection — your admin dashboard reads this
-                await addDoc(collection(db, 'revenue'), {
-                    type: 'ad_boost',
+                // C. Set boost visibility flags on the book document
+                tx.update(bookRef, {
+                    isBoosted:      true,
+                    boostTier:      tier,
+                    boostExpiresAt: new Date(
+                        Date.now() + Number(durationDays) * 24 * 60 * 60 * 1000
+                    ).toISOString(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+
+                // D. Revenue record
+                tx.set(revenueRef, {
+                    type:          'ad_boost',
                     amount,
                     currency,
                     sellerId,
-                    sellerEmail: customer?.email || null,
+                    sellerEmail:   customer?.email || null,
                     tier,
-                    durationDays: Number(days),
-                    bookId: bookId || null,
+                    durationDays:  Number(durationDays),
+                    bookId,
                     paymentMethod: 'flutterwave',
-                    txRef: tx_ref,
-                    status: 'completed',
-                    createdAt: serverTimestamp(),
+                    txRef:         tx_ref,
+                    status:        'completed',
+                    createdAt:     admin.firestore.FieldValue.serverTimestamp(),
                 });
-                console.log('✓ Revenue entry logged for ad_boost');
+            });
 
-                // 3. Notify seller (same non-blocking pattern as book purchase)
-                try {
-                    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-seller-notification`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            sellerId,
-                            type: 'ad_boost',
-                            tier,
-                            durationDays: Number(days),
-                            amount,
-                            buyerEmail: customer?.email || null,
-                        }),
-                    });
-                    console.log('✓ Seller notification sent for ad_boost');
-                } catch (notifError) {
-                    console.error('Failed to send ad_boost notification:', notifError);
-                    // Non-blocking — don't fail the webhook if notification fails
-                }
-
-                console.log('✅ ad_boost webhook processed successfully');
-                return NextResponse.json({
-                    message: 'ad_boost processed successfully',
-                    details: { sellerId, tier, days, amount },
-                }, { status: 200 });
-
-            } catch (adErr) {
-                console.error('ad_boost webhook error:', adErr);
-                return NextResponse.json({
-                    error: 'ad_boost processing failed',
-                    details: adErr.message,
-                }, { status: 500 });
+            // Email confirmation
+            if (customer.email) {
+                sendServerNotification({
+                    type:   'ad_boost',
+                    to:     customer.email,
+                    userId: sellerId,
+                    data: {
+                        sellerName:  customer.name || 'Seller',
+                        tier,
+                        durationDays,
+                        amount,
+                    },
+                }).catch(e => console.error('📧 Ad Boost email notification failure:', e.message));
             }
+
+            return NextResponse.json(
+                { message: 'Ad visibility parameters activated successfully' },
+                { status: 200 }
+            );
         }
 
         /* ══════════════════════════════════════════════════════════
-           ROUTE: BOOK PURCHASE  (everything below is unchanged)
-        ══════════════════════════════════════════════════════════ */
-        const { userId, bookId, bookTitle, bookPrice, sellerId, sellerEmail, sellerName } = metadata;
+            ROUTE B: BOUNTY ESCROW PROCESSING
+           ══════════════════════════════════════════════════════════ */
+        if (tx_ref.startsWith('bounty_')) {
+            const posterId    = metadata.userId || tx_ref.split('_')[1];
+            const bountyTitle = metadata.bountyTitle || 'Academic Request Documentation';
 
-        if (!userId || !bookId || !sellerId) {
-            console.error('Missing required metadata:', metadata);
-            return NextResponse.json({ error: 'Missing metadata' }, { status: 400 });
-        }
+            const txDocRef    = adminDb.collection('transactions').doc(tx_ref);
+            const bountyDocRef = adminDb.collection('bounties').doc(`escrow-${tx_ref}`);
 
-        console.log('Processing payment for:', { userId, bookId, sellerId, amount });
+            const escrowResult = await adminDb.runTransaction(async (transaction) => {
+                // Idempotency check
+                const txSnap = await transaction.get(txDocRef);
+                if (txSnap.exists) return { duplicate: true };
 
-        // Calculate seller earnings (80% to seller, 20% platform fee)
-        const netEarning = Math.floor(amount * 0.80);
-        const platformFee = amount - netEarning;
-
-        // 1. Update buyer's purchased books
-        // (kept here as a safety fallback in case usePayment.js fails)
-        const userRef = doc(db, 'users', userId);
-        const userDoc = await getDoc(userRef);
-
-        if (userDoc.exists()) {
-            const existingPurchases = userDoc.data().purchasedBooks || {};
-            const alreadyPurchased = existingPurchases[bookId] != null;
-
-            if (!alreadyPurchased) {
-                await updateDoc(userRef, {
-                    [`purchasedBooks.${bookId}`]: {
-                        id: bookId,
-                        title: bookTitle,
-                        purchasedAt: new Date().toISOString(),
-                        amount: amount,
-                        transactionRef: tx_ref,
-                    }
+                // A. Immutable ledger row
+                transaction.set(txDocRef, {
+                    transactionRef: tx_ref,
+                    userId:         posterId,
+                    buyerEmail:     customer.email,
+                    buyerName:      customer.name || 'Student',
+                    amount,
+                    currency,
+                    type:          'bounty_escrow_deposit',
+                    status:        'completed',
+                    paymentMethod: paymentData.payment_type || 'card',
+                    createdAt:     admin.firestore.FieldValue.serverTimestamp(),
                 });
-                console.log('✓ Added book to user purchases (webhook fallback)');
-            } else {
-                console.log('Book already in user purchases — skipping');
+
+                // B. Instantiate / verify the escrow bounty document
+                transaction.set(bountyDocRef, {
+                    bountyId:         `escrow-${tx_ref}`,
+                    posterId,
+                    posterEmail:      customer.email,
+                    posterName:       customer.name || 'Student',
+                    title:            bountyTitle,
+                    reward:           amount,
+                    status:           'open',
+                    paymentRef:       tx_ref,
+                    paymentMethod:    'flutterwave',
+                    university:       metadata.university || null,
+                    department:       metadata.department || null,
+                    webhookConfirmed: true,
+                    createdAt:        admin.firestore.FieldValue.serverTimestamp(),
+                    updatedAt:        admin.firestore.FieldValue.serverTimestamp(),
+                }, { merge: true });
+
+                return { duplicate: false };
+            });
+
+            if (escrowResult.duplicate) {
+                return NextResponse.json(
+                    { message: 'Bounty transaction already tracked' },
+                    { status: 200 }
+                );
             }
+
+            // Email confirmation
+            if (customer.email) {
+                sendServerNotification({
+                    type:   'new_bounty',
+                    to:     customer.email,
+                    userId: posterId,
+                    data: {
+                        posterName:   customer.name || 'Student',
+                        bountyTitle,
+                        reward:       amount,
+                        university:   metadata.university || '',
+                        department:   metadata.department || '',
+                        ctaUrl:       `${process.env.NEXT_PUBLIC_BASE_URL}/academic/bounty/board`,
+                    },
+                }).catch(e => console.error('📧 Bounty confirmation dispatch error:', e.message));
+            }
+
+            return NextResponse.json(
+                { message: 'Bounty escrow account captured cleanly' },
+                { status: 200 }
+            );
         }
 
-        // 2. DISABLED — seller wallet crediting
-        // usePayment.js already does this directly on purchase via setDoc merge:true.
-        // Running it here too was causing double-increments on booksSold and
-        // totalEarnings, and accountBalance was getting inconsistent values.
-        //
-        // const sellerRef = doc(db, 'sellers', sellerId);
-        // const sellerDoc = await getDoc(sellerRef);
-        // if (sellerDoc.exists()) {
-        //     await updateDoc(sellerRef, {
-        //         accountBalance: increment(netEarning),
-        //         totalEarnings: increment(netEarning),
-        //         booksSold: increment(1),
-        //         lastSaleAt: serverTimestamp()
-        //     });
-        // } else {
-        //     await setDoc(sellerRef, {
-        //         sellerId, sellerEmail, sellerName,
-        //         accountBalance: netEarning,
-        //         totalEarnings: netEarning,
-        //         booksSold: 1,
-        //         createdAt: serverTimestamp(),
-        //         lastSaleAt: serverTimestamp()
-        //     });
-        // }
+        /* ══════════════════════════════════════════════════════════
+            ROUTE C: PRINT LICENSE PROCESSING
+           ══════════════════════════════════════════════════════════ */
+        if (metadata.printLicense === true || metadata.printLicense === 'true') {
+            const buyerId = metadata.userId || payload.data.customer?.id;
+            const bookId  = metadata.bookId;
 
-        // 3. DISABLED — transaction recording
-        // usePayment.js already saves a full transaction doc to the
-        // 'transactions' collection. Recording it again here created
-        // duplicate transaction entries.
-        //
-        // const transactionRef = doc(db, 'transactions', tx_ref);
-        // await setDoc(transactionRef, {
-        //     transactionRef: tx_ref,
-        //     userId, buyerEmail: customer.email, buyerName: customer.name,
-        //     sellerId, sellerEmail, sellerName,
-        //     bookId, bookTitle, amount, netEarning, platformFee,
-        //     currency, status: 'completed',
-        //     paymentMethod: paymentData.payment_type,
-        //     date: serverTimestamp(), createdAt: serverTimestamp()
-        // });
-
-        // 4. Update book purchase count (if book exists in advertMyBook)
-        if (bookId && bookId.startsWith('firestore-')) {
-            try {
-                const firestoreBookId = bookId.replace('firestore-', '');
-                const bookRef = doc(db, 'advertMyBook', firestoreBookId);
-                const bookDoc = await getDoc(bookRef);
-
-                if (bookDoc.exists()) {
-                    await updateDoc(bookRef, {
-                        purchases: increment(1),
-                        lastPurchaseAt: serverTimestamp(),
-                    });
-                    console.log('✓ Updated book purchase count');
-                }
-            } catch (bookErr) {
-                console.error('Failed to update book count:', bookErr);
+            if (!buyerId || !bookId) {
+                console.error('❌ Missing print permission identification properties:', metadata);
+                return NextResponse.json(
+                    { error: 'Missing metadata for license configuration' },
+                    { status: 400 }
+                );
             }
-        }
 
-        // 5. Send notification to seller
-        try {
-            const sellerRef = doc(db, 'sellers', sellerId);
-            const sellerDocData = await getDoc(sellerRef);
-            const currentBalance = sellerDocData.exists()
-                ? sellerDocData.data().accountBalance
-                : netEarning;
+            const verifiedBook   = await serverFetchBookDetails(bookId);
+            const bookTitle      = verifiedBook ? verifiedBook.title : 'Academic Material Document';
+            const txDocRef       = adminDb.collection('transactions').doc(tx_ref);
+            const userLicenseRef = adminDb.collection('users').doc(buyerId);
 
-            await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-seller-notification`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sellerId,
+            const licenseResult = await adminDb.runTransaction(async (transaction) => {
+                // Idempotency check
+                const txSnap = await transaction.get(txDocRef);
+                if (txSnap.exists) return { duplicate: true };
+
+                // A. Immutable financial ledger row
+                transaction.set(txDocRef, {
+                    transactionRef: tx_ref,
+                    userId:         buyerId,
+                    buyerEmail:     customer.email,
+                    buyerName:      customer.name || 'Student',
+                    amount,
+                    currency,
+                    type:          'print_license_purchase',
+                    bookId,
                     bookTitle,
+                    status:        'completed',
+                    paymentMethod: paymentData.payment_type || 'card',
+                    createdAt:     admin.firestore.FieldValue.serverTimestamp(),
+                });
+
+                // B. Grant print permission on the user's profile document
+                const userSnap = await transaction.get(userLicenseRef);
+                if (userSnap.exists) {
+                    transaction.update(userLicenseRef, {
+                        [`printPermissions.${bookId}`]: {
+                            bookId,
+                            bookTitle,
+                            licensedAt:  new Date().toISOString(),
+                            paymentRef:  tx_ref,
+                            status:      'active',
+                        },
+                    });
+                }
+
+                return { duplicate: false };
+            });
+
+            if (licenseResult.duplicate) {
+                return NextResponse.json(
+                    { message: 'License transaction already tracked' },
+                    { status: 200 }
+                );
+            }
+
+            // Email confirmation
+            if (customer.email) {
+                sendServerNotification({
+                    type:   'print_license_confirmed',
+                    to:     customer.email,
+                    userId: buyerId,
+                    data: {
+                        buyerName:  customer.name || 'Reader',
+                        bookTitle,
+                        orderId:    tx_ref,
+                        ctaUrl:     `${process.env.NEXT_PUBLIC_BASE_URL}/document/${bookId}`,
+                    },
+                }).catch(e => console.error('📧 Print authorization confirmation dispatch error:', e.message));
+            }
+
+            return NextResponse.json(
+                { message: 'Print license permissions issued successfully' },
+                { status: 200 }
+            );
+        }
+
+        /* ══════════════════════════════════════════════════════════
+            ROUTE D: BOOK PURCHASE PROCESSING  (default / fallthrough)
+           ══════════════════════════════════════════════════════════ */
+        const { userId, bookId } = metadata;
+
+        if (!userId || !bookId) {
+            console.error('❌ Missing transaction properties inside meta payload:', metadata);
+            return NextResponse.json({ error: 'Missing metadata fields' }, { status: 400 });
+        }
+
+        // Fetch authoritative book details from the server
+        const verifiedBook = await serverFetchBookDetails(bookId);
+        if (!verifiedBook) {
+            console.error(`❌ Book not found for database lookup ID: ${bookId}`);
+            return NextResponse.json({ error: 'Book verification failed' }, { status: 404 });
+        }
+
+        const distribution    = calculatePaymentDistribution(verifiedBook, amount);
+        const netEarning      = distribution.sellerAmount;
+        const platformFee     = distribution.platformFee;
+        const activeSellerId  = verifiedBook.sellerId || 'PLATFORM_ADMIN';
+
+        const txDocRef  = adminDb.collection('transactions').doc(tx_ref);
+        const userRef   = adminDb.collection('users').doc(userId);
+        const sellerRef = adminDb.collection('sellers').doc(activeSellerId);
+
+        const referralResult = await adminDb.runTransaction(async (transaction) => {
+            // Idempotency check
+            const txSnap = await transaction.get(txDocRef);
+            if (txSnap.exists) return { duplicate: true };
+
+            // A. Referral qualification check
+            let qualifiedReferralRef = null;
+            let referralData         = null;
+
+            if (amount >= 1000) {
+                const refQuery = adminDb.collection('referrals')
+                    .where('referredUserId', '==', userId)
+                    .where('status', '==', 'pending')
+                    .limit(1);
+
+                const refDocs = await transaction.get(refQuery);
+
+                if (!refDocs.empty) {
+                    const potentialMatch = refDocs.docs[0];
+                    const data           = potentialMatch.data();
+                    const createdTime    = data.createdAt?.toDate() || new Date();
+                    const daysActive     = (Date.now() - createdTime.getTime()) / (1000 * 60 * 60 * 24);
+
+                    if (daysActive <= 30) {
+                        qualifiedReferralRef = potentialMatch.ref;
+                        referralData         = data;
+                    } else {
+                        transaction.update(potentialMatch.ref, { status: 'expired' });
+                    }
+                }
+            }
+
+            // B. Grant buyer access to the purchased book
+            const userSnap = await transaction.get(userRef);
+            if (userSnap.exists) {
+                transaction.update(userRef, {
+                    [`purchasedBooks.${bookId}`]: {
+                        id:             bookId,
+                        title:          verifiedBook.title,
+                        purchasedAt:    new Date().toISOString(),
+                        amount,
+                        transactionRef: tx_ref,
+                    },
+                });
+            }
+
+            // C. Credit seller wallet
+            let currentBalance = netEarning;
+            const sellerSnap   = await transaction.get(sellerRef);
+
+            if (sellerSnap.exists) {
+                currentBalance = (sellerSnap.data().accountBalance || 0) + netEarning;
+                transaction.update(sellerRef, {
+                    accountBalance: admin.firestore.FieldValue.increment(netEarning),
+                    totalEarnings:  admin.firestore.FieldValue.increment(netEarning),
+                    booksSold:      admin.firestore.FieldValue.increment(1),
+                    lastSaleAt:     admin.firestore.FieldValue.serverTimestamp(),
+                });
+            } else {
+                transaction.set(sellerRef, {
+                    sellerId:       activeSellerId,
+                    sellerEmail:    verifiedBook.sellerEmail || null,
+                    sellerName:     verifiedBook.sellerName || 'Marketplace Member',
+                    accountBalance: netEarning,
+                    totalEarnings:  netEarning,
+                    booksSold:      1,
+                    createdAt:      admin.firestore.FieldValue.serverTimestamp(),
+                    lastSaleAt:     admin.firestore.FieldValue.serverTimestamp(),
+                });
+            }
+
+            // D. Process referral payout atomically
+            if (qualifiedReferralRef && referralData) {
+                const referrerUserRef = adminDb.collection('users').doc(referralData.referrerId);
+                const rewardPayout    = referralData.reward || 500;
+
+                transaction.update(qualifiedReferralRef, {
+                    status:      'completed',
+                    qualifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+
+                transaction.update(referrerUserRef, {
+                    accountBalance: admin.firestore.FieldValue.increment(rewardPayout),
+                    updatedAt:      admin.firestore.FieldValue.serverTimestamp(),
+                });
+            }
+
+            // E. Immutable transaction record
+            transaction.set(txDocRef, {
+                transactionRef: tx_ref,
+                userId,
+                buyerEmail:    customer.email,
+                buyerName:     customer.name || 'Student',
+                sellerId:      activeSellerId,
+                bookId,
+                bookTitle:     verifiedBook.title,
+                amount,
+                netEarning,
+                platformFee,
+                currency,
+                status:        'completed',
+                paymentMethod: paymentData.payment_type || 'card',
+                createdAt:     admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            return {
+                duplicate:        false,
+                referralUnlocked: !!qualifiedReferralRef,
+                referralData,
+                currentBalance,
+            };
+        });
+
+        if (referralResult.duplicate) {
+            console.log('Duplicate transaction skipped:', tx_ref);
+            return NextResponse.json({ message: 'Transaction already tracked' }, { status: 200 });
+        }
+
+        // Post-transaction metrics (fire-and-forget)
+        if (bookId.startsWith('firestore-')) {
+            const cleanBookId = bookId.replace('firestore-', '');
+            adminDb.collection('advertMyBook').doc(cleanBookId).update({
+                purchases:       admin.firestore.FieldValue.increment(1),
+                lastPurchaseAt:  admin.firestore.FieldValue.serverTimestamp(),
+            }).catch(e => console.error('Metrics sync dropped:', e));
+        }
+
+        // Referral bonus in-app notification
+        if (referralResult.referralUnlocked) {
+            adminDb.collection('notifications').add({
+                userId:    referralResult.referralData.referrerId,
+                type:      'referral_bonus',
+                title:     'Referral Bonus Unlocked! 🎉',
+                message:   `${referralResult.referralData.referredUserName || 'Your friend'} made their first purchase! ₦${referralResult.referralData.reward || 500} added to your wallet.`,
+                link:      '/referral',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                read:      false,
+            }).catch(e => console.error('Referral notification drop:', e));
+        }
+
+        // Seller sale alert email
+        if (verifiedBook.sellerEmail) {
+            sendServerNotification({
+                type:   'sale_alert',
+                to:     verifiedBook.sellerEmail,
+                userId: activeSellerId,
+                data: {
+                    sellerName:     verifiedBook.sellerName || 'Seller',
+                    bookTitle:      verifiedBook.title,
                     amount,
                     netEarning,
-                    buyerEmail: customer.email,
-                    currentBalance,
-                }),
-            });
-            console.log('✓ Seller notification sent');
-        } catch (notifError) {
-            console.error('Failed to send seller notification:', notifError);
-            // Non-blocking — don't fail the webhook if notification fails
+                    buyerEmail:     customer.email,
+                    currentBalance: referralResult.currentBalance,
+                },
+            }).catch(e => console.error('📧 Seller Sale Alert delivery error:', e.message));
         }
 
-        console.log('✅ Webhook processed successfully');
+        // Buyer receipt email
+        if (customer.email) {
+            sendServerNotification({
+                type:   'order_receipt',
+                to:     customer.email,
+                userId,
+                data: {
+                    buyerName:  customer.name || 'Reader',
+                    bookTitle:  verifiedBook.title,
+                    amount,
+                    sellerName: verifiedBook.sellerName || 'LAN Library',
+                    orderId:    tx_ref,
+                },
+            }).catch(e => console.error('📧 Buyer Receipt delivery error:', e.message));
+        }
 
-        return NextResponse.json({
-            message: 'Webhook processed successfully',
-            details: {
-                buyer: userId,
-                seller: sellerId,
-                book: bookTitle,
-                amount,
-                sellerEarning: netEarning,
-            },
-        }, { status: 200 });
+        return NextResponse.json(
+            { message: 'Webhook ledger transaction processed securely' },
+            { status: 200 }
+        );
 
     } catch (error) {
-        console.error('Webhook error:', error);
-        return NextResponse.json({
-            error: 'Webhook processing failed',
-            details: error.message,
-        }, { status: 500 });
+        console.error('🚨 Fatal Webhook processing failure:', error);
+        return NextResponse.json(
+            { error: 'Server loop operational failure', details: error.message },
+            { status: 500 }
+        );
     }
 }

@@ -570,6 +570,139 @@ If your country or provider is not yet listed, the most effective way to acceler
         ],
         tags: ["Airtime", "Data", "Electricity", "Africa"],
     },
+
+    "lan-shift": {
+        badge: "The LAN Shift",
+        badgeIcon: "🔄",
+        category: "DEMOCRATIZING EDUCATION",
+        readTime: "9 min read",
+        title: "The LAN Shift: Engineering Intellectual Liquidity",
+        subtitle: "Dismantling the broken cycle of expensive tuition and low returns by decoupling learning from immediate financial liquidity.",
+        hero: "/lanlog.png",
+        intro: `Education in Africa is incredibly expensive, yet it often yields painfully low financial returns immediately after school. Students and their families make monumental financial sacrifices to pay for university tuition, accommodation, and materials, only to face a stagnant job market. The traditional system demands massive upfront financial investment for years, with delayed—and often missing—economic gratification.
+
+The LAN Shift directly dismantles this broken cycle by engineering an entirely new pattern of education across the African continent. We believe that financial constraints shouldn't freeze academic progress, and that a student's potential should never be limited by their immediate purchasing power.`,
+        sections: [
+            {
+                heading: "The Pre-School Preparation Pattern",
+                body: `Through LAN Library, we have invented an educational model that decouples learning from immediate financial liquidity. If an aspiring student gains admission to a university but lacks the money to pay tuition immediately, their academic journey no longer has to hit a standstill.
+
+Rather than sitting idle at home losing academic momentum while waiting for funds, the student can use LAN Library from anywhere in Africa to access vetted course notes, lecturer handouts, and past curriculum structures at prices that respect their budget. They can study, internalize, and thoroughly master the foundations of their course months before stepping foot into a physical classroom.
+
+When they eventually secure the funds to formally enroll, the courses are no longer overwhelming or hard to understand. They don't just survive; they excel. LAN gives them a psychological and intellectual head start that money couldn't buy, drastically reducing university dropout rates and academic shock.`,
+            },
+            {
+                heading: "Layer 1: Infinite Intelligence | Students",
+                body: `Our core philosophy is built on three pillars, starting with Infinite Intelligence. This represents the collective sum of human knowledge, scientific breakthroughs, and academic theories available globally. In the old system, this intelligence was locked inside expensive foreign textbooks, behind elite university firewalls, or restricted to students in wealthy nations.
+
+LAN acts as the open pipeline bringing Infinite Intelligence straight to the everyday African student. We break down the borders of premium knowledge, ensuring that a student in a small, remote town has the exact same access to foundational academic concepts as a student in Lagos, London, or Johannesburg. We replace artificial scarcity with absolute abundance.`,
+            },
+            {
+                heading: "Layer 2: Accumulated Experience | Student Sellers",
+                body: `Raw theory from a textbook is dry; it needs context to become alive. Accumulated Experience is the practical wisdom gained by senior students, brilliant peers, and local lecturers who have already navigated the academic trenches, written the exams, and figured out how to pass.
+
+This is where our marketplace thrives. Student Sellers do not just upload documents; they upload their Accumulated Experience. They take complex, abstract concepts from Infinite Intelligence and translate them into localized, highly digestible study guides, summaries, and exam-prep breakdowns. By monetizing this experience at an 80% payout, they transform their past academic struggles into an immediate economic lifesaver, funding their own allowances while lifting up the students coming behind them.`,
+            },
+            {
+                heading: "Layer 3: Experiment & Research | Faculty Members",
+                body: `Education is not a passive act of memorizing data; it is an active cycle of testing, questioning, and applying. The final tier of our philosophy focuses on fostering a culture of hands-on execution across African institutions.
+
+By hosting over 70 distinct document types—including lab reports, architectural drawings, software code, research drafts, and design blueprints—LAN creates a living archive of academic trial and error. Students don't just read dry definitions; they study real-world experiments and applied research. They learn how to THINK in practical rather than theoretical terms, transforming them from passive consumers of information into active creators of African innovation.`,
+            },
+            {
+                heading: "Peer-to-Peer Knowledge Sharing & Viral Distribution",
+                body: `The LAN Shift doesn't happen in isolation; it expands exponentially through the power of collective African communities. We have integrated smart social tools that allow students to share high-value documents seamlessly across university WhatsApp groups, student Telegram channels, and campus forums.
+
+When you discover a game-changing study guide or an exam breakdown that makes an impossible course easy to understand, sharing it isn't just helpful—it is incentivized. By utilizing your personalized links from the <link slug="referral-programme" text="Referral Programme" />, you can blast these vital resources to your class networks. You are simultaneously democratizing access to education for your peers while building a passive commission stream for yourself. On LAN, every shared document is a step closer to collective academic freedom.`,
+            },
+        ],
+        cta: { label: "Explore the Marketplace", href: "/marketplace" },
+        related: [
+            "referral-programme",
+            "seller-network",
+            "lan-wallet",
+            "upload-document",
+        ],
+        tags: ["LAN Shift", "Education Reform", "Africa", "Philosophy"],
+    },
+
+referral: {
+    badge: "Referral Programme",
+    badgeIcon: "🔗",
+    category: "EARN MORE",
+    readTime: "9 min read",
+    title: "Referral Programme",
+    subtitle: "Earn commissions every time someone you introduce joins LAN — as a buyer, a seller, or a verified faculty member.",
+    hero: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1400&q=80",
+    intro: `The LAN Referral Programme turns your social network into a passive income stream that runs alongside your document sales. Every student you refer who makes a purchase, every seller you introduce who uploads and sells, and every faculty member you bring to the platform who verifies and sells — all generate automatic commissions credited to your wallet with no action required after the initial introduction.
+
+For sellers who are active in academic communities — university WhatsApp groups, student forums, tutoring circles, departmental networks — the referral programme can generate income that rivals or exceeds their document sales income. The mechanics are straightforward and the upside is uncapped.`,
+    sections: [
+        {
+            heading: "How the Referral System Works",
+            body: `Every LAN account is assigned a unique referral link and referral code at the moment of account creation. Your referral link is a standard URL. When someone visits that link and creates a new LAN account, they are permanently attributed to you in the referral system.
+
+The attribution is durable — it does not expire and cannot be overwritten. A student you referred six months ago who finally makes their first purchase today generates your referral commission today. A seller you referred who uploads their first document and makes their first sale three weeks after joining generates your commission at the moment of that first sale.
+
+Share your referral link through any channel that reaches people who might benefit from LAN: WhatsApp groups, student Telegram channels, academic Facebook pages, university subreddits, email threads, in-person conversations, or your social media profiles. The link works identically regardless of sharing channel, and there is no limit on how many people can use it.`,
+        },
+        {
+            heading: "Commission Rates for Every Referral Type",
+            body: `Referral commissions are structured around the type of user you refer and the qualifying action that triggers your payment.
+
+Referring a student buyer who makes their first document purchase earns you a flat commission equivalent to approximately USD 0.50. Student buyers are the most numerous and fastest-converting referral type — a message in an active student WhatsApp group can generate multiple conversions within hours. The individual commission is modest, but volume makes this a significant income stream for sellers with large academic networks.
+
+Referring a new document seller who uploads their first document and completes their first sale earns you approximately USD 1.25. Document sellers are more engaged platform participants than casual buyers, and the commission reflects that value.
+
+Referring a new faculty member who completes <link slug="seller-network" text="Faculty Verification" /> and makes their first document sale earns the highest base commission — approximately USD 2.50. Verified faculty members generate large, consistent document income and long-term buyer traffic. Your referral commission reflects the significant lifetime value you contribute by bringing them to the platform.
+
+Volume bonuses apply on a monthly cycle. Referring ten or more people in a calendar month — any combination of buyer, seller, and faculty referrals — earns an additional bonus equivalent to approximately USD 12.50 paid at month end. Top referrers who consistently exceed the volume threshold earn the monthly bonus on top of their individual referral commissions every month.`,
+        },
+        {
+            heading: "Finding and Sharing Your Referral Link",
+            body: `Your referral link is always accessible from three locations in the platform. The primary location is your <link slug="seller-dashboard" text="Seller Dashboard" /> under the Referral Programme tab, where your full referral link and referral code are displayed with one-click copy buttons. Your profile settings page also shows both. In the LAN mobile app, the Referral Programme entry in the main menu provides your link with a built-in sharing interface integrated with WhatsApp, email, and your device's native sharing sheet.
+
+You can generate a custom referral code that is easier to communicate verbally or in written form — for example, TUTOR-KWAME or ACCRA-PREP — rather than sharing a raw URL. Custom codes are particularly useful when promoting LAN in contexts where a URL would look awkward, such as in spoken recommendations, on a whiteboard during a tutoring session, or in a short social media caption.
+
+Including your referral code in your standard communications — your tutoring WhatsApp message template, your social media bio, your email signature — creates passive referral generation. Once it is in place, every interaction you have through those channels is a potential referral without any additional effort.`,
+        },
+        {
+            heading: "Tracking Referrals and Conversions in Real Time",
+            body: `Your Referral Dashboard shows a complete picture of every referral you have made and every commission you have earned. The dashboard displays your total referred users broken down by type (buyer, seller, faculty), referrals who have signed up but not yet taken a qualifying action (pending), referrals who have converted (active with commission paid), total referral commission earned to date, your current month referral count relative to the volume bonus threshold, and your position on the monthly referral leaderboard.
+
+All data is updated in real time. You receive an in-app notification every time a referred user takes a qualifying action — a student you referred makes their first purchase, a seller you referred completes their first sale. The corresponding commission appears in your wallet transaction ledger simultaneously.
+
+The pending referrals list is particularly actionable for motivated referrers. It shows you which referred accounts have been created but not yet converted. For a friend who signed up after your recommendation but has not yet uploaded or purchased anything, a follow-up message is often all that is needed. You are in the best position to follow up because you have the personal relationship — the platform does not contact pending referrals on your behalf.`,
+        },
+        {
+            heading: "Referral Strategies That Work for Sellers",
+            body: `The most effective referral strategies for LAN sellers leverage the academic communities they are already part of. The highest-converting channels are almost always existing WhatsApp groups and Telegram channels where the members are active students with immediate academic needs.
+
+The most effective referral message is specific rather than generic. Instead of "join this platform," a message that says "I have past papers for GST 212 at LASU on LAN — here is my link if you want to check it out" converts at a much higher rate. You are simultaneously referencing content relevant to the recipient, demonstrating that you personally use the platform, and providing the referral link in context. This approach takes 30 seconds to craft and dramatically outperforms generic platform promotion.
+
+For sellers who are also tutors, mentioning LAN during sessions as a resource for past papers and study guides — and providing your referral code to students who ask — converts at very high rates because the student is in a learning context and has an immediate, relevant need. For sellers in university contexts, sharing your profile link (rather than just the generic referral link) at the start of examination season when students are actively searching for study materials creates a natural, high-conversion referral flow.`,
+        },
+        {
+            heading: "Is There a Limit on What You Can Earn?",
+            body: `There is no cap on referral earnings and no maximum number of referrals. The programme is designed to scale with the size of your network and the depth of your academic community engagement. There is also no expiry on your referral link — it remains active and attributing new sign-ups to your account indefinitely.
+
+Top-performing referrers in the Seller Network generate the equivalent of USD 80 to USD 250 per month in referral commissions alone, entirely separate from their passive document income. These are typically sellers embedded in large active academic communities — popular tutors, student leaders, academic content creators with substantial followings — who created a single system for referral sharing and let it run passively.
+
+Your referral income stacks with every other income stream on the platform. Document sales, referral commissions, and Bounty rewards all flow to the same <link slug="lan-wallet" text="LAN Wallet" /> and are equally available for <link slug="withdraw-earnings" text="withdrawal" /> or <link slug="recharge-services" text="Recharge Services" /> spending. There is no administrative separation between income types — your wallet is your wallet, and every source of income contributes to the same balance.`,
+        },
+    ],
+    cta: { label: "Get Your Referral Link", href: "/ref/invite-friends" },
+    related: [
+        "seller-network",
+        "withdraw-earnings",
+        "seller-dashboard",
+        "lan-wallet",
+        "upload-document",
+        "recharge-services",
+        "lan-shift",
+    ],
+    tags: ["Commission", "Community", "Africa", "Passive Income"],
+}
 };
 
 /* ─── Related meta ─────────────────────────────────────────── */
@@ -608,6 +741,11 @@ const RELATED_META = {
         label: "Recharge Services",
         icon: "⚡",
         desc: "Pay utilities directly from your wallet",
+    },
+    "lan-shift": {
+        label: "The LAN Shift",
+        icon: "🔄",
+        desc: "Dismantling expensive education via an entirely new pattern of learning and prep across Africa",
     },
 };
 
@@ -1311,7 +1449,7 @@ export default function SellerSlugPage() {
                                     flexShrink: 0,
                                 }}
                             >
-                                L
+                                <img  src="/lanlog.png"/>
                             </div>
                             <div>
                                 <div
@@ -1322,7 +1460,7 @@ export default function SellerSlugPage() {
                                         fontFamily: "'Lato', sans-serif",
                                     }}
                                 >
-                                    LAN Seller Team
+                                    LAN Academic Review Board.
                                 </div>
                                 <div
                                     style={{
