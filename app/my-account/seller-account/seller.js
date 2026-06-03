@@ -149,10 +149,11 @@ function VerifiedFacultyBadge({ user, seller }) {
         user?.lecturerVerificationStatus === "pending" ||
         user?.lecturerVerificationStatus === "approved";
     if (!isFaculty) return null;
-
-    const isVerified = user?.isVerified === true &&
-        user?.lecturerVerificationStatus !== "pending" &&
-        user?.lecturerVerificationStatus !== "rejected";
+    
+const isVerified = 
+    (user?.isVerified === true || user?.lecturerVerificationStatus === "approved") &&
+    user?.lecturerVerificationStatus !== "pending" &&
+    user?.lecturerVerificationStatus !== "rejected";
 
     const badgeColor = isVerified ? "#1d9bf0" : "#f59e0b"; // blue = verified, amber = pending
     const tooltip = isVerified
@@ -917,7 +918,7 @@ export default function SellerAccountClient() {
         firstName: "", surname: "", dateOfBirth: "", phone: "", phoneNumber: "",
         address: "", country: "", department: "", institution: "",
     });
-    const { processing: pinProcessing, requestPinReset, verifyOtpAndSetPin } = usePayment(null, formData, null);
+    const { processing: pinProcessing, requestPinReset, verifyOtpAndSetPin } = usePayment(null, formData, {});
     const isPendingLecturer = user?.lecturerVerificationStatus === 'pending';
 
     const [currency, setCurrency] = useState(() => {

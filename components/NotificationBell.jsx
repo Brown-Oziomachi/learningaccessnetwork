@@ -18,6 +18,7 @@ import {
   ShoppingBag,
   Sparkles,
   Star,
+  Eye,
   Users,
   Flag, // ← add these three
 } from "lucide-react";
