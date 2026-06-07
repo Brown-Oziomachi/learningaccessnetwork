@@ -1,10 +1,7 @@
 "use client"
 import { useState, useEffect } from 'react';
 import { db, auth } from '@/lib/firebaseConfig';
-import {
-    doc, updateDoc, serverTimestamp,
-    increment, getDoc, runTransaction, collection
-} from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 📊 Fallback African Exchange Matrix (NGN base)
@@ -16,7 +13,7 @@ const FALLBACK_EXCHANGE_MATRIX = {
     UGX: 2.85
 };
 
-// 🌐 Fetch live rates from exchangerate-api (free tier, no key needed)
+// 🌐 Fetch live rates from exchangerate-api
 const fetchLiveExchangeRates = async () => {
     try {
         const res = await fetch('https://open.er-api.com/v6/latest/NGN');
@@ -32,20 +29,29 @@ const fetchLiveExchangeRates = async () => {
         }
         return FALLBACK_EXCHANGE_MATRIX;
     } catch {
-        console.warn('[Exchange] Live rates unavailable, using fallback matrix');
         return FALLBACK_EXCHANGE_MATRIX;
     }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Hook
-// Parameters:
-//   book         — the book object being purchased
-//   formData     — { email, name, phone }
-//   onSuccess    — callback(bookId, txRef) fired after a successful Flutterwave
-//                  payment; use this in the parent to navigate to the reader
-// ─────────────────────────────────────────────────────────────────────────────
-export const usePayment = (book, formData, { onSuccess } = {}) => {
+// Unified helper to enforce network request time limits
+const fetchWithTimeout = async (url, options, timeoutMs = 15000) => {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(id);
+        return response;
+    } catch (err) {
+        clearTimeout(id);
+        if (err.name === 'AbortError') {
+            throw new Error('Request timed out. Please check your network connection and try again.');
+        }
+        throw err;
+    }
+};
+
+export const usePayment = (book, formData, options = {}) => {
+    const { onSuccess } = options || {};
     const [processing, setProcessing] = useState(false);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [error, setError] = useState(null);
@@ -55,7 +61,6 @@ export const usePayment = (book, formData, { onSuccess } = {}) => {
     const [withdrawalStep, setWithdrawalStep] = useState('INIT');
     const [tempWithdrawalData, setTempWithdrawalData] = useState(null);
 
-    // 🌐 Live exchange rates state
     const [exchangeMatrix, setExchangeMatrix] = useState(FALLBACK_EXCHANGE_MATRIX);
     const [ratesLoaded, setRatesLoaded] = useState(false);
 
@@ -77,36 +82,14 @@ export const usePayment = (book, formData, { onSuccess } = {}) => {
         fetchLiveExchangeRates().then(rates => {
             setExchangeMatrix(rates);
             setRatesLoaded(true);
-            console.log('[Exchange] Rates loaded:', rates);
         });
     }, []);
 
     // ─────────────────────────────────────────────────────────────────────────
     // ROUTE A: Flutterwave checkout
-    //
-    // ⚠️  SECURITY BOUNDARY — CLIENT DOES ZERO DB WRITES ON THIS PATH ⚠️
-    //
-    // All database mutations for Flutterwave purchases are owned exclusively
-    // by the backend webhook at /api/webhooks/flutterwave/route.js, which
-    // uses the Firebase Admin SDK and Flutterwave's HMAC signature to verify
-    // every event before writing. The client must not attempt to:
-    //
-    //   ✗  Write to `transactions` or any sub-collection
-    //   ✗  Write to `purchasedBooks`
-    //   ✗  Credit or debit any seller wallet document
-    //   ✗  Fire email notifications
-    //
-    // Doing any of the above client-side risks double-increments and violates
-    // Firestore security rules that are scoped to Admin SDK only for these
-    // collections. The client's sole responsibility after a successful
-    // Flutterwave callback is:
-    //
-    //   ✓  Update local UI state (paymentSuccess, processing)
-    //   ✓  Optionally poll for webhook confirmation (read-only status check)
-    //   ✓  Invoke onSuccess() so the parent can navigate to the reader
     // ─────────────────────────────────────────────────────────────────────────
     const processFlutterwavePayment = (extraData = {}, targetCurrency = 'NGN') => {
-        if (!book || !formData.email) {
+        if (!book || !formData?.email) {
             setError({ message: "Please fill in your email before paying." });
             return;
         }
@@ -115,7 +98,6 @@ export const usePayment = (book, formData, { onSuccess } = {}) => {
             return;
         }
 
-        // 🎯 Convert price to the selected regional currency
         let regionalChargedAmount;
         if (targetCurrency === 'NGN') {
             regionalChargedAmount = Math.round(book.price);
@@ -145,36 +127,21 @@ export const usePayment = (book, formData, { onSuccess } = {}) => {
                 logo: "/lanlog.png",
             },
 
-            // ── Success callback ──────────────────────────────────────────────
-            //
-            // NO DB WRITES HERE. The backend webhook handles all persistence.
-            // This block only manages UI state and hands off to the parent.
-            //
             callback: async (response) => {
                 if (response.status === "successful" || response.status === "completed") {
                     setProcessing(true);
                     setError(null);
 
                     try {
-                        // Optional read-only status poll — verifies the webhook
-                        // was received before surfacing success UI. Does not
-                        // write anything; throws if the webhook hasn't landed
-                        // yet, which is caught below and handled gracefully.
                         await pollForWebhookConfirmation(response.tx_ref);
                     } catch {
-                        // Webhook may still be in-flight; Flutterwave guarantees
-                        // delivery so we don't block the UX on this. The DB
-                        // write will land shortly regardless.
-                        console.warn('[Webhook] Confirmation poll timed out; proceeding to success UI.');
+                        // Webhook failsafe tracking gracefully managed here
                     } finally {
                         setProcessing(false);
                     }
 
-                    // ✅ Surface success state for the parent's toast / modal.
                     setPaymentSuccess(true);
 
-                    // 🚀 Delegate navigation to the parent. The parent decides
-                    //    whether to push to the reader route, show a modal, etc.
                     if (typeof onSuccess === 'function') {
                         onSuccess(book.id, response.tx_ref, extraData);
                     }
@@ -182,16 +149,10 @@ export const usePayment = (book, formData, { onSuccess } = {}) => {
                     setError({ message: "Payment was not completed. Please try again." });
                 }
             },
-
-            onclose: () => console.log("Flutterwave modal closed"),
+            onclose: () => { },
         });
     };
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Read-only webhook confirmation poll (max ~8 s).
-    // Calls a status route that checks whether the webhook has already written
-    // to Firestore — never writes anything itself.
-    // ─────────────────────────────────────────────────────────────────────────
     const pollForWebhookConfirmation = async (txRef, attempts = 4, delayMs = 2000) => {
         for (let i = 0; i < attempts; i++) {
             await new Promise(r => setTimeout(r, delayMs));
@@ -199,79 +160,60 @@ export const usePayment = (book, formData, { onSuccess } = {}) => {
             const data = await res.json();
             if (data?.status === 'completed') return true;
         }
-        throw new Error('Webhook not confirmed within timeout');
+        throw new Error('Webhook process pending confirmation');
     };
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ROUTE B: Wallet payment
-    //
-    // Wallet payments cannot go through a Flutterwave webhook because there is
-    // no external payment event to listen for. The client therefore owns these
-    // specific writes, scoped only to:
-    //
-    //   ✓  Deducting the buyer's wallet balance via a Firestore transaction
-    //      (atomic, with PIN verification inline)
-    //   ✓  Delegating the transaction ledger row + purchasedBooks entry to
-    //      the server action at /api/wallet-purchase, which uses Admin SDK
-    //
-    // The client still does NOT write to `transactions` or `purchasedBooks`
-    // directly — that remains server-side via recordWalletTransaction().
+    // ROUTE B: Wallet Book Purchase
     // ─────────────────────────────────────────────────────────────────────────
     const processWalletPayment = async (enteredPin, extraData = {}) => {
         setProcessing(true);
         setError(null);
+        setPaymentSuccess(false);
+
         try {
             const currentUser = auth.currentUser;
-            if (!currentUser) throw new Error("Please log in.");
+            if (!currentUser) throw new Error("Please log in to make a wallet purchase.");
+
+            if (!book || !book.id) {
+                throw new Error("Target core state initialization parameter missing.");
+            }
+
             if (!enteredPin || enteredPin.toString().trim().length < 4) {
                 throw new Error("Please enter your 4-digit PIN.");
             }
 
-            const sellerRef = doc(db, 'sellers', currentUser.uid);
-            let updatedBalance = null;
+            // Standardized with network request time boundary limits
+            const res = await fetchWithTimeout('/api/wallet-purchase', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: currentUser.uid,
+                    bookId: book.id,
+                    bookTitle: book.title || 'Unknown Title',
+                    // SECURITY NOTE: Your backend must evaluate real value from database via bookId
+                    pin: enteredPin.toString().trim(),
+                    email: formData?.email || null,
+                    name: formData?.name || null,
+                    extraData,
+                }),
+            }, 15000);
 
-            // Deduct balance atomically, verify PIN
-            await runTransaction(db, async (transaction) => {
-                const sellerSnap = await transaction.get(sellerRef);
-                if (!sellerSnap.exists()) throw new Error("Wallet not active. Become a seller to use LAN wallet");
+            const data = await res.json();
 
-                const sellerData = sellerSnap.data();
-                const storedValue = sellerData.transactionPin || sellerData.transferPin;
+            if (!res.ok) {
+                throw new Error(data.error || 'Wallet purchase processing encountered an issue.');
+            }
 
-                if (storedValue === undefined || storedValue === null) throw new Error("PIN_NOT_SET");
-                if (enteredPin.toString().trim() !== storedValue.toString().trim()) throw new Error("Incorrect PIN. Please try again.");
-
-                const currentBalance = sellerData.accountBalance || 0;
-                if (currentBalance < book.price) throw new Error(`Insufficient funds. Balance: ₦${currentBalance.toLocaleString()}`);
-
-                updatedBalance = currentBalance - book.price;
-                transaction.update(sellerRef, {
-                    accountBalance: updatedBalance,
-                    updatedAt: serverTimestamp(),
-                });
-            });
-
-            // Persist the transaction record + grant book access server-side
-            await recordWalletTransaction({
-                userId: currentUser.uid,
-                bookId: book.id,
-                bookTitle: book.title,
-                amount: book.price,
-                extraData,
-                email: formData.email,
-                name: formData.name,
-            });
-
-            setNewBalance(updatedBalance);
             setPaymentSuccess(true);
 
-            if (typeof onSuccess === 'function') {
-                onSuccess(book.id, `WAL-${Date.now()}`, extraData);
+            if (typeof onSuccess === 'function' && book?.id) {
+                onSuccess(book.id, data.txRef, extraData);
             }
         } catch (err) {
             setError({
-                message: err.message === "PIN_NOT_SET"
-                    ? "You haven't set a PIN yet. Please set pin to continue."
+                message: err.message === 'PIN_NOT_SET'
+                    ? "You haven't set a PIN yet. Please set a PIN to continue."
                     : err.message
             });
         } finally {
@@ -280,83 +222,54 @@ export const usePayment = (book, formData, { onSuccess } = {}) => {
     };
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Server action: record the wallet transaction + grant book access.
-    // Keeps the client free of multi-collection write logic for wallet path.
-    // Used exclusively by processWalletPayment — NOT called on the Flutterwave
-    // path (the webhook handles that instead).
-    // ─────────────────────────────────────────────────────────────────────────
-    const recordWalletTransaction = async (payload) => {
-        const res = await fetch('/api/wallet-purchase', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-            const { error } = await res.json().catch(() => ({}));
-            throw new Error(error || 'Failed to record wallet purchase.');
-        }
-        return res.json();
-    };
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // ROUTE C: Withdrawal
+    // ROUTE C: Process Account Withdrawals
     // ─────────────────────────────────────────────────────────────────────────
     const processWithdrawal = async (amount, pin, otp = null) => {
         setProcessing(true);
         setError(null);
-        const WITHDRAWAL_THRESHOLD = 5000;
+        setPaymentSuccess(false);
+
         try {
             const currentUser = auth.currentUser;
             if (!currentUser) throw new Error("Authentication required.");
 
-            const sellerRef = doc(db, 'sellers', currentUser.uid);
-            const sellerSnap = await getDoc(sellerRef);
-            const sellerData = sellerSnap.data();
-
-            if (pin.toString().trim() !== sellerData.transactionPin?.toString().trim()) {
-                throw new Error("Incorrect PIN.");
+            if (!amount || Number(amount) <= 0) {
+                throw new Error("Please enter a valid withdrawal amount.");
+            }
+            if (!pin) {
+                throw new Error("Please provide your authorization PIN.");
             }
 
-            if (amount > WITHDRAWAL_THRESHOLD && !otp) {
-                const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-                await updateDoc(sellerRef, {
-                    withdrawalOtp: generatedOtp,
-                    otpExpiry: Date.now() + 600000,
-                });
-                setTempWithdrawalData({ amount, pin });
-                setWithdrawalStep('OTP_REQUIRED');
-                return { status: "OTP_SENT" };
-            }
-
-            if (otp) {
-                if (otp !== sellerData.withdrawalOtp || Date.now() > sellerData.otpExpiry) {
-                    throw new Error("Invalid or expired OTP.");
-                }
-            }
-
-            await runTransaction(db, async (transaction) => {
-                const freshSnap = await transaction.get(sellerRef);
-                const balance = freshSnap.data().accountBalance || 0;
-                if (balance < amount) throw new Error("Insufficient funds.");
-                transaction.update(sellerRef, {
-                    accountBalance: increment(-amount),
-                    withdrawalOtp: null,
-                    otpExpiry: null,
-                });
-                const withdrawalLogRef = doc(collection(db, 'withdrawals'));
-                transaction.set(withdrawalLogRef, {
+            const res = await fetchWithTimeout('/api/wallet-withdraw', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                     userId: currentUser.uid,
-                    amount,
-                    status: 'completed',
-                    type: 'withdrawal',
-                    createdAt: serverTimestamp(),
-                });
-            });
+                    amount: Number(amount),
+                    pin: pin.toString().trim(),
+                    otp: otp || null
+                }),
+            }, 15000);
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                if (data.status === 'OTP_SENT') {
+                    setTempWithdrawalData({ amount, pin });
+                    setWithdrawalStep('OTP_REQUIRED');
+                    return;
+                }
+                throw new Error(data.error || 'Withdrawal processing failed.');
+            }
 
             setPaymentSuccess(true);
             setWithdrawalStep('COMPLETED');
         } catch (err) {
-            setError({ message: err.message });
+            setError({
+                message: err.message === 'PIN_NOT_SET'
+                    ? "You haven't set a PIN yet. Please set a PIN to continue."
+                    : err.message
+            });
         } finally {
             setProcessing(false);
         }
@@ -369,7 +282,8 @@ export const usePayment = (book, formData, { onSuccess } = {}) => {
         setProcessing(true);
         try {
             const currentUser = auth.currentUser;
-            if (!currentUser) throw new Error("Auth required");
+            if (!currentUser) throw new Error("Authentication verification expired.");
+
             const sellerRef = doc(db, 'sellers', currentUser.uid);
             await updateDoc(sellerRef, {
                 transactionPin: newPin.toString().trim(),
@@ -378,7 +292,7 @@ export const usePayment = (book, formData, { onSuccess } = {}) => {
             });
             return { success: true };
         } catch {
-            setError({ message: "Failed to set PIN. Please try again." });
+            setError({ message: "Failed to establish validation security pin context structures." });
             return { success: false };
         } finally {
             setProcessing(false);
@@ -403,6 +317,7 @@ export const usePayment = (book, formData, { onSuccess } = {}) => {
         const sellerRef = doc(db, 'sellers', currentUser.uid);
         const sellerSnap = await getDoc(sellerRef);
         const data = sellerSnap.data();
+
         if (enteredOtp === data?.resetOtp && Date.now() < data?.otpExpiry) {
             await updateDoc(sellerRef, {
                 transactionPin: newPin.toString().trim(),
@@ -412,11 +327,10 @@ export const usePayment = (book, formData, { onSuccess } = {}) => {
             });
             return true;
         } else {
-            throw new Error("Invalid or expired code.");
+            throw new Error("Invalid or expired validation code confirmation mapping.");
         }
     };
 
-    // ─────────────────────────────────────────────────────────────────────────
     return {
         processing,
         paymentSuccess,

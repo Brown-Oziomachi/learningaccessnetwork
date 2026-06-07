@@ -268,6 +268,7 @@ export default function PaymentClient() {
     const [paymentMethod, setPaymentMethod] = useState("flutterwave");
     const [alreadyPurchased, setAlreadyPurchased] = useState(false);
     const [isLecturerSeller, setIsLecturerSeller] = useState(false);
+    const [walletProcessing, setWalletProcessing] = useState(false);
 
     /* Country / currency */
     const [selectedCountry, setSelectedCountry] = useState(AFRICAN_COUNTRIES[0]); // Nigeria default
@@ -283,7 +284,7 @@ export default function PaymentClient() {
     const [regNoError, setRegNoError] = useState("");
     const [departmentError, setDepartmentError] = useState("");
     const [pendingPaymentAction, setPendingPaymentAction] = useState(null);
-
+const [descExpanded, setDescExpanded] = useState(false);
     /* PIN modal */
     const [showPinModal, setShowPinModal] = useState(false);
     const [enteredPin, setEnteredPin] = useState("");
@@ -312,7 +313,7 @@ export default function PaymentClient() {
         error: paymentError, setError: setPaymentError,
         processFlutterwavePayment, processWalletPayment,
         setupInitialPin, requestPinReset, verifyOtpAndSetPin,
-    } = usePayment(book, formData, sellerDetails);
+    } = usePayment(book, formData, sellerDetails ?? {});
 
     const pinNotSet = paymentError?.message?.includes("haven't set");
 
@@ -397,6 +398,8 @@ export default function PaymentClient() {
     /* ── Redirect on success ── */
     useEffect(() => {
         if (paymentSuccess) {
+            setShowPinModal(false);  
+            setEnteredPin("");      
             setTimeout(() => router.push(`/book/preview?id=${bookId}&purchased=true`), 3000);
         }
     }, [paymentSuccess, bookId, router]);
@@ -451,12 +454,22 @@ export default function PaymentClient() {
         executePayment(pendingPaymentAction);
     };
 
-    const handlePinConfirm = () => {
+    const handlePinConfirm = async () => {
         setPinLocalError("");
-        if (!enteredPin || enteredPin.length < 4) { setPinLocalError("Please enter your 4-digit PIN."); return; }
-        processWalletPayment(enteredPin, pendingRegNoRef.current);
-        setShowPinModal(false);
-        setEnteredPin("");
+        if (!enteredPin || enteredPin.length < 4) {
+            setPinLocalError("Please enter your 4-digit PIN.");
+            return;
+        }
+        setWalletProcessing(true);
+        try {
+            await processWalletPayment(enteredPin, pendingRegNoRef.current);
+        } catch {
+        } finally {
+            setWalletProcessing(false);
+            if (!paymentSuccess) {
+                setEnteredPin("");
+            }
+        }
     };
 
     const handleSetupPin = async () => {
@@ -487,8 +500,16 @@ export default function PaymentClient() {
     const lecturerName = sellerDetails?.name || book?.sellerName || "your Lecturer";
 
     /* ── Shared styles ── */
-    const modalOverlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" };
-    const modalBox = { background: "#fff", width: "100%", maxWidth: "420px", border: `0.5px solid rgba(184,150,62,0.3)`, overflow: "hidden" };
+    const modalOverlay = {
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.75)",
+        zIndex: 9999,   
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "16px"
+    };    const modalBox = { background: "#fff", width: "100%", maxWidth: "420px", border: `0.5px solid rgba(184,150,62,0.3)`, overflow: "hidden" };
     const modalHeader = { background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "24px 24px", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "0.5px solid rgba(184,150,62,0.2)" };
     const modalClose = { width: "32px", height: "32px", border: "0.5px solid rgba(255,255,255,0.2)", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.6)" };
     const inputStyle = (err) => ({ width: "100%", padding: "12px 14px", border: `0.5px solid ${err ? "#ef4444" : "#e5ddd0"}`, background: CREAM, fontSize: "13px", color: NAVY, fontFamily: "'Lato',sans-serif", outline: "none", boxSizing: "border-box", marginBottom: "4px" });
@@ -643,12 +664,31 @@ export default function PaymentClient() {
                                 <p style={{ fontSize: "20px", fontWeight: 700, color: NAVY, fontFamily: "'Playfair Display',serif", margin: 0 }}>₦{book.price?.toLocaleString()}</p>
                             </div>
                         </div>
-                        {book.description && (
-                            <div style={{ marginTop: "14px", background: CREAM, border: "0.5px solid rgba(184,150,62,0.15)", padding: "12px 14px" }}>
-                                <p style={{ fontSize: "10px", fontWeight: 700, color: GOLD, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 4px" }}>Description</p>
-                                <p style={{ fontSize: "12px", color: "#666", lineHeight: 1.65, margin: 0, WebkitLineClamp: 5, WebkitBoxOrient: "vertical" }}>{book.description}</p>
-                            </div>
-                        )}
+                      {book.description && (
+                        <div style={{ marginTop: "14px", background: CREAM, border: "0.5px solid rgba(184,150,62,0.15)", padding: "12px 14px" }}>
+                            <p style={{ fontSize: "10px", fontWeight: 700, color: GOLD, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 4px" }}>Description</p>
+                            <p style={{
+                                fontSize: "12px", color: "#666", lineHeight: 1.65, margin: "0 0 8px",
+                                display: "-webkit-box",
+                                WebkitLineClamp: descExpanded ? "unset" : 3,
+                                WebkitBoxOrient: "vertical",
+                                overflow: descExpanded ? "visible" : "hidden",
+                            }}>
+                                {book.description}
+                            </p>
+                            <button
+                                onClick={() => setDescExpanded(d => !d)}
+                                style={{
+                                    background: "none", border: "none", cursor: "pointer",
+                                    color: GOLD, fontSize: "11px", fontWeight: 700,
+                                    padding: 0, fontFamily: "'Lato', sans-serif",
+                                    letterSpacing: "0.06em",
+                                }}
+                            >
+                                {descExpanded ? "▲ SHOW LESS" : "▼ READ MORE"}
+                            </button>
+                        </div>
+                    )}
                     </div>
 
                     {/* Main grid */}
@@ -705,19 +745,19 @@ export default function PaymentClient() {
                                 {/* Big pay button */}
                                 <button
                                     onClick={handlePayment}
-                                    disabled={processing || !ratesLoaded}
+                                    disabled={(processing && paymentMethod === "flutterwave") || !ratesLoaded}
                                     className="pay-btn"
                                     style={{
                                         width: "100%", background: NAVY, color: "#fff",
                                         border: "none", padding: "16px 24px",
-                                        cursor: processing ? "not-allowed" : "pointer",
-                                        opacity: processing || !ratesLoaded ? 0.6 : 1,
+                                        cursor: (processing && paymentMethod === "flutterwave") ? "not-allowed" : "pointer",
+                                        opacity: ((processing && paymentMethod === "flutterwave") || !ratesLoaded) ? 0.6 : 1,
                                         display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
                                         fontFamily: "'Lato',sans-serif", fontSize: "13px", fontWeight: 700, letterSpacing: "0.08em",
                                         transition: "background 0.18s",
                                     }}
                                 >
-                                    {processing ? (
+                                    {(processing && paymentMethod === "flutterwave") ? (
                                         <>
                                             <div style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
                                             PROCESSING…
@@ -734,7 +774,7 @@ export default function PaymentClient() {
                                 {/* Referral strip */}
                                 <div style={{ marginTop: "14px", background: CREAM, border: "0.5px solid rgba(184,150,62,0.2)", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                                     <p style={{ fontSize: "11px", color: NAVY, fontWeight: 700, margin: 0 }}>Invite friends & earn ₦500</p>
-                                    <Link href="/referral" style={{ fontSize: "10px", fontWeight: 700, color: GOLD, textDecoration: "none" }}>Get link →</Link>
+                                    <Link href="/ref/invite-friends" style={{ fontSize: "10px", fontWeight: 700, color: GOLD, textDecoration: "none" }}>Get link →</Link>
                                 </div>
                             </div>
                         </div>
@@ -944,10 +984,10 @@ export default function PaymentClient() {
 
                                         <button
                                             onClick={handlePinConfirm}
-                                            disabled={enteredPin.length < 4 || processing}
-                                            style={{ ...navyBtn, opacity: enteredPin.length < 4 || processing ? 0.4 : 1 }}
+                                            disabled={enteredPin.length < 4 || walletProcessing}
+                                            style={{ ...navyBtn, opacity: enteredPin.length < 4 || walletProcessing ? 0.4 : 1 }}
                                         >
-                                            {processing ? "VERIFYING…" : "CONFIRM PAYMENT"}
+                                            {walletProcessing ? "VERIFYING…" : "CONFIRM PAYMENT"}
                                         </button>
                                     </>
                                 )}

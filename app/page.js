@@ -208,8 +208,9 @@ const FOOTER_COLUMNS = [
       { label: "How to Buy", href: "/students/how-to-buy" },
       { label: "Past Questions", href: "/students/past-questions" },
       { label: "Study Groups", href: "/students/study-groups" },
-      { label: "Saved", href: "/students/wishlist" },
+      { label: "Bookmark documents", href: "/students/wishlist" },
       { label: "Student Network", href: "/students/network" },
+
     ],
   },
   {
@@ -222,6 +223,8 @@ const FOOTER_COLUMNS = [
       { label: "Referral Programme", href: "/seller/referral" },
       { label: "Seller Dashboard", href: "/seller/seller-dashboard" },
       { label: "Recharge Services", href: "/seller/recharge-services" },
+      { label: "Growing Your Followers", href: "/seller/grow-followers" },
+
     ],
   },
   {
@@ -234,6 +237,8 @@ const FOOTER_COLUMNS = [
       { label: "Withdraw Earnings", href: "/faculty/withdraw" },
       { label: "Recharge Services", href: "/faculty/recharge" },
       { label: "Referral Programme", href: "/faculty/referral" },
+      { label: "Growing Your Followers", href: "/faculty/grow-followers" },
+
     ],
   },
   {
@@ -249,6 +254,7 @@ const FOOTER_COLUMNS = [
       { label: "Terms of Service", href: "/lan/terms-of-service" },
       { label: "User Agreement", href: "/user-agreement=lib" },
       { label: "Author Development Series", href: "/writers-mindset" },
+      { label: "Free Documents & Open Access", href: "/students/open-access" },
     ],
   },
 ];
@@ -581,7 +587,7 @@ export default function LandingPage() {
     })();
   }, []);
 
-  const goSignIn = () => router.push("/auth/signin");
+  const goSignIn = () => router.push("/signin");
 
   /* ── LOADING SCREEN ── */
   if (loading) return (
@@ -654,54 +660,107 @@ export default function LandingPage() {
             </motion.div>
           </AnimatePresence>
 
-          {/* content */}
-          <div style={{ position: "relative", zIndex: 2, maxWidth: 1200, margin: "0 auto", padding: "96px 24px 80px" }}>
-            {/* eyebrow */}
-            <div className="anim-up" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(184,150,62,0.14)", border: "1px solid rgba(184,150,62,0.3)", borderRadius: 999, padding: "7px 16px", marginBottom: 28 }}>
-              <Sparkles size={13} style={{ color: GOLD }} />
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: GOLDD, fontFamily: "'Lato',sans-serif" }}>Africa's #1 Student Library</span>
-            </div>
+         <div style={{
+    position: "relative", zIndex: 2,
+    maxWidth: 1200, margin: "0 auto",
+    padding: "96px 24px 0",
+    display: "flex", alignItems: "center",
+    gap: "48px", flexWrap: "wrap",
+}}>
+    {/* LEFT: text */}
+    <div style={{ flex: "1 1 460px" }}>
+        <div className="anim-up" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(184,150,62,0.14)", border: "1px solid rgba(184,150,62,0.3)", borderRadius: 999, padding: "7px 16px", marginBottom: 28 }}>
+            <Sparkles size={13} style={{ color: GOLD }} />
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: GOLDD, fontFamily: "'Lato',sans-serif" }}>Africa's #1 Student Library</span>
+        </div>
 
-            <h1 className="lan-serif anim-up-2" style={{ fontSize: "clamp(44px,8vw,88px)", fontWeight: 900, color: "#fff", lineHeight: 1.02, letterSpacing: "-2px", margin: "0 0 12px" }}>
-              Share the wealth
-            </h1>
-            <h1 className="lan-serif anim-up-2" style={{ fontSize: "clamp(44px,8vw,88px)", fontWeight: 900, color: GOLD, fontStyle: "italic", lineHeight: 1.02, letterSpacing: "-2px", margin: "0 0 28px" }}>
-              [of knowledge].
-            </h1>
+        <h1 className="lan-serif anim-up-2" style={{ fontSize: "clamp(44px,8vw,88px)", fontWeight: 900, color: "#fff", lineHeight: 1.02, letterSpacing: "-2px", margin: "0 0 12px" }}>
+            Share the wealth
+        </h1>
+        <h1 className="lan-serif anim-up-2" style={{ fontSize: "clamp(44px,8vw,88px)", fontWeight: 900, color: GOLD, fontStyle: "italic", lineHeight: 1.02, letterSpacing: "-2px", margin: "0 0 28px" }}>
+            [of knowledge].
+        </h1>
 
-            <p className="anim-up-3" style={{ fontSize: 17, color: "rgba(245,240,232,0.7)", maxWidth: 560, lineHeight: 1.8, fontWeight: 300, margin: "0 0 12px" }}>
-              Turn your books into income. Upload your work, reach a global audience of{" "}
-              <strong style={{ color: "#fff", fontWeight: 700 }}>90M+</strong> learners,
-              and earn whenever readers discover and purchase your content.{" "}
-            </p>
-         <p className="anim-up-3" style={{ fontSize: 17, color: "rgba(245,240,232,0.7)", maxWidth: 560, lineHeight: 1.8, fontWeight: 300, margin: "0 0 44px" }}>
-            Join an ecosystem of thousands of members across Africa. Whether you are collaborating in the Student Network, earning in the Seller Network, or publishing verified resources in the Faculty Network, you can share strategies, request feedback, and grow together in the LAN Community hub.{" "}
-           <button onClick={() => setShowNetworkModal(true)} style={{ color: GOLDD, fontWeight: 100, textDecoration: "underline", textUnderlineOffset: 9, background: "none", border: "none", cursor: "pointer", fontSize: 17 }}>
-              Learn more
+        <p className="anim-up-3" style={{ fontSize: 17, color: "rgba(245,240,232,0.7)", maxWidth: 560, lineHeight: 1.8, fontWeight: 300, margin: "0 0 12px" }}>
+            Turn your books into income. Upload your work, reach a global audience of{" "}
+            <strong style={{ color: "#fff", fontWeight: 700 }}>90M+</strong> learners,
+            and earn whenever readers discover and purchase your content.
+        </p>
+        <p className="anim-up-3" style={{ fontSize: 17, color: "rgba(245,240,232,0.7)", maxWidth: 560, lineHeight: 1.8, fontWeight: 300, margin: "0 0 44px" }}>
+            Join an ecosystem of thousands of members across Africa.{" "}
+            <button onClick={() => setShowNetworkModal(true)} style={{ color: GOLDD, fontWeight: 100, textDecoration: "underline", textUnderlineOffset: 9, background: "none", border: "none", cursor: "pointer", fontSize: 17 }}>
+                Learn more
             </button>
-          </p>
+        </p>
 
-            <div className="anim-up-4" style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-              <button className="btn-primary" onClick={goSignIn}>
+        <div className="anim-up-4" style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            <button className="btn-primary" onClick={goSignIn}>
                 Create Account <ArrowRight size={14} />
-              </button>
-              <a style={{ color: GOLD, background: NAVY }} href="/docs" className="btn-ghost font-extrabold">
+            </button>
+            <a style={{ color: GOLD, background: NAVY }} href="/docs" className="btn-ghost font-extrabold">
                 Documentation
-              </a>
+            </a>
+        </div>
+    </div>
 
+    {/* RIGHT: framed portrait — matches HomeClient exactly */}
+    <div className="anim-up-3" style={{
+        flex: "1 1 300px",
+        display: "flex", justifyContent: "center", alignItems: "center",
+    }}>
+        <div style={{
+            position: "relative",
+            width: "100%",
+            maxWidth: "360px",
+            aspectRatio: "4/5",
+            border: `1px solid rgba(184,150,62,0.35)`,
+            boxShadow: "0 32px 80px rgba(0,0,0,0.5)",
+            overflow: "hidden",
+        }}>
+            <img
+                src="/stud.png"
+                alt="LAN Library students"
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                onError={e => { e.target.src = "/lanstu.png"; }}
+            />
+
+            {/* gold corner accents */}
+            <div style={{ position: "absolute", top: 0, left: 0, width: 28, height: 28, borderTop: `2px solid ${GOLD}`, borderLeft: `2px solid ${GOLD}` }} />
+            <div style={{ position: "absolute", top: 0, right: 0, width: 28, height: 28, borderTop: `2px solid ${GOLD}`, borderRight: `2px solid ${GOLD}` }} />
+            <div style={{ position: "absolute", bottom: 0, left: 0, width: 28, height: 28, borderBottom: `2px solid ${GOLD}`, borderLeft: `2px solid ${GOLD}` }} />
+            <div style={{ position: "absolute", bottom: 0, right: 0, width: 28, height: 28, borderBottom: `2px solid ${GOLD}`, borderRight: `2px solid ${GOLD}` }} />
+
+            {/* bottom label */}
+            <div style={{
+                position: "absolute", bottom: 0, left: 0, right: 0,
+                background: "rgba(13,34,68,0.78)", padding: "10px 16px",
+                backdropFilter: "blur(4px)"
+            }}>
+                <p style={{
+                    fontFamily: "'Lato',sans-serif", fontSize: 9, fontWeight: 700,
+                    letterSpacing: "0.18em", textTransform: "uppercase", color: GOLD, margin: 0
+                }}>
+                    Africa's Academic EdTech Marketplace
+                </p>
             </div>
+        </div>
+    </div>
+</div>
 
-
-            {/* stats strip */}
-            <div style={{ marginTop: 64, borderTop: "0.5px solid rgba(184,150,62,0.2)", display: "flex", flexWrap: "wrap" }}>
-              {STATS.map(({ val, label }) => (
+         {/* stats strip */}
+        <div style={{
+            position: "relative", zIndex: 2,
+            borderTop: "0.5px solid rgba(184,150,62,0.2)",
+            marginTop: "48px", display: "flex", flexWrap: "wrap"
+        }}>
+            {STATS.map(({ val, label }) => (
                 <div key={label} className="stat-item">
-                  <div className="lan-serif" style={{ fontSize: 30, fontWeight: 700, color: "#fff" }}>{val}</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", marginTop: 4, fontFamily: "'Lato',sans-serif" }}>{label}</div>
+                    <div className="lan-serif" style={{ fontSize: 30, fontWeight: 700, color: "#fff" }}>{val}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", marginTop: 4, fontFamily: "'Lato',sans-serif" }}>{label}</div>
                 </div>
-              ))}
-            </div>
-          </div>
+            ))}
+        </div>
+
         </section>
 
 

@@ -113,7 +113,7 @@ function SellerCard({ seller, onReport, onView }) {
         seller.businessInfo?.country ||
         "Nigeria";
 
-    const category = seller.businessInfo?.category || "Document Seller";
+    const category = seller.businessInfo?.businessName || "LAN Seller";
 
     const photo =
         seller.photoBase64 ||

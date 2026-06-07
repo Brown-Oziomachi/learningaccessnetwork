@@ -149,7 +149,7 @@ function VerifiedFacultyBadge({ user, seller }) {
         user?.lecturerVerificationStatus === "pending" ||
         user?.lecturerVerificationStatus === "approved";
     if (!isFaculty) return null;
-    
+
 const isVerified = 
     (user?.isVerified === true || user?.lecturerVerificationStatus === "approved") &&
     user?.lecturerVerificationStatus !== "pending" &&
@@ -1106,33 +1106,82 @@ export default function SellerAccountClient() {
         } catch (error) { alert("Failed to save profile: " + error.message); }
     };
 
-    const handlePinConfirm = async () => {
-        if (pinValue !== seller?.transferPin) { setPinError("Incorrect PIN. Please try again."); setPinValue(""); return; }
-        setShowPinModal(false);
-        try {
-            setWithdrawing(true);
-            const amountToDeduct = parseFloat(withdrawAmount);
-            const timestamp = Date.now(); const randomStr = Math.random().toString(36).substring(2, 9); const userShort = user.uid.substring(0, 6);
-            const withdrawalRef = `WD-${timestamp}-${randomStr}-${userShort}`;
-            const withdrawalData = { sellerId: user.uid, sellerName: user.displayName || `${user.firstName} ${user.surname}`, sellerEmail: user.email, sellerPhone: user.phone || user.phoneNumber || null, amount: amountToDeduct, status: "pending", requestedAt: serverTimestamp(), processedAt: null, reference: withdrawalRef, bankDetails: { accountName: user.bankDetails.accountName, accountNumber: user.bankDetails.accountNumber, bankName: user.bankDetails.bankName, bankCode: user.bankDetails.bankCode || null }, flutterwaveTransferId: null, processingMethod: "admin_approval_required", processingNote: "Awaiting admin approval" };
-            await addDoc(collection(db, "withdrawals"), withdrawalData);
-            await updateDoc(doc(db, "sellers", user.uid), { accountBalance: increment(-amountToDeduct), lastWithdrawalRequestDate: serverTimestamp(), updatedAt: serverTimestamp() });
-            setAccountBalance(prev => prev - amountToDeduct);
-            setWithdrawals(prev => [{ id: `temp-${Date.now()}`, sellerId: user.uid, amount: amountToDeduct, status: "pending", reference: withdrawalRef, bankDetails: user.bankDetails, requestedAtDate: new Date() }, ...prev]);
-            setWithdrawAmount(""); setSuccessData({ amount: amountToDeduct, reference: withdrawalRef });
-        } catch (error) { setWithdrawalError("Failed to submit withdrawal request: " + error.message); }
-        finally { setWithdrawing(false); }
-    };
+ const handlePinConfirm = async (currentOtp = null) => {
+    setPinError("");
+    setWithdrawing(true);
+    
+    try {
+        const amountToDeduct = parseFloat(withdrawAmount);
+                const res = await fetch('/api/wallet-withdraw', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: user.uid,
+                amount: amountToDeduct,
+                pin: pinValue.toString().trim(),
+                otp: currentOtp 
+            })
+        });
 
-    const handleWithdraw = async () => {
-        const amount = parseFloat(withdrawAmount); setWithdrawalError("");
-        if (!amount || isNaN(amount)) { setWithdrawalError("Please enter a valid amount"); return; }
-        if (amount < 1000) { setWithdrawalError("Minimum withdrawal amount is ₦1,000"); return; }
-        if (amount > accountBalance) { setWithdrawalError(`Insufficient balance. Available: ₦${accountBalance.toLocaleString()}`); return; }
-        if (!user?.bankDetails) { setWithdrawalError("Please add bank details first"); return; }
-        if (!seller?.transferPin) { setWithdrawalError("Please set up a transfer PIN first in the Transfer page."); return; }
-        setShowWithdrawModal(false); setPinValue(""); setPinError(""); setShowPinModal(true);
-    };
+        const data = await res.json();
+
+        if (!res.ok) {
+            // 3. Handle OTP Challenge event if threshold is crossed (> 5000)
+            if (data.status === 'OTP_SENT') {
+                // Prompt the user for an OTP inside your UI
+                const promptedOtp = prompt("A verification code was sent for high-value withdrawals. Enter OTP:");
+                if (!promptedOtp) {
+                    throw new Error("OTP verification is required to authorize this payment.");
+                }
+                // Recursively call confirm passing down the string token challenge
+                setWithdrawing(false);
+                await handlePinConfirm(promptedOtp.trim());
+                return;
+            }
+            throw new Error(data.error || "Failed to process transaction.");
+        }
+
+        setShowPinModal(false);
+        setAccountBalance(prev => prev - amountToDeduct);
+        
+        // Optimistically update list layout locally before re-fetch cascades
+        setWithdrawals(prev => [{
+            id: `temp-${Date.now()}`,
+            sellerId: user.uid,
+            amount: amountToDeduct,
+            status: "pending",
+            reference: data.txRef || "PENDING-APPROVAL",
+            bankDetails: user.bankDetails,
+            requestedAtDate: new Date()
+        }, ...prev]);
+
+        setWithdrawAmount("");
+        setSuccessData({ amount: amountToDeduct, reference: data.txRef || "Pending Verification" });
+        setPinValue("");
+        
+    } catch (error) {
+        setPinError(error.message);
+        setPinValue("");
+    } finally {
+        setWithdrawing(false);
+    }
+};
+
+   const handleWithdraw = async () => {
+    const amount = parseFloat(withdrawAmount);
+    setWithdrawalError("");
+    
+    if (!amount || isNaN(amount)) { setWithdrawalError("Please enter a valid amount"); return; }
+    if (amount < 1000) { setWithdrawalError("Minimum withdrawal amount is ₦1,000"); return; }
+    if (amount > accountBalance) { setWithdrawalError(`Insufficient balance. Available: ₦${accountBalance.toLocaleString()}`); return; }
+    if (!user?.bankDetails) { setWithdrawalError("Please add bank details first"); return; }
+    if (!seller?.transferPin && !seller?.transactionPin) {  setWithdrawalError("Please set up a transfer PIN first in the Settings/Transfer page.");  return; }
+    
+    setShowWithdrawModal(false);
+    setPinValue("");
+    setPinError("");
+    setShowPinModal(true);
+};
 
     const handleDeactivateAccount = async () => {
         if (deactivateConfirmText !== "DELETE") return;

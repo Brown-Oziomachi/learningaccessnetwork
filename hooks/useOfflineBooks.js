@@ -1,13 +1,5 @@
 // hooks/useOfflineBooks.js
 // Encapsulates every piece of offline logic so MyBooksClient stays clean.
-//
-// Responsibilities:
-//  1. Track which books are saved offline (offlineIds Set)
-//  2. Download a PDF through the proxy and save it to IndexedDB
-//  3. Load a saved PDF blob and build an object URL for pdf.js
-//  4. Delete a book from offline storage
-//  5. Track online/offline state reactively
-//  6. Report storage usage
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -19,6 +11,8 @@ import {
     getTotalStorageBytes,
 } from '@/lib/offlineDB';
 
+const CRYPTO_KEY = 0x5A;
+
 /**
  * @typedef {Object} DownloadState
  * @property {'idle'|'downloading'|'saving'|'done'|'error'} status
@@ -26,17 +20,8 @@ import {
  * @property {string} [error]
  */
 
-/**
- * Convert a Google Drive or Firebase Storage URL into a URL that can be
- * fetched from the browser without CORS issues, via our /api/fetch-pdf proxy.
- *
- * @param {Object} book
- * @returns {string|null}
- */
 function getPdfProxyUrl(book) {
-    // Prefer embedUrl or driveFileId (Google Drive)
     let originalUrl = null;
-
     if (book.driveFileId) {
         originalUrl = `https://drive.google.com/uc?export=download&id=${book.driveFileId}&confirm=1`;
     } else if (book.embedUrl) {
@@ -46,17 +31,10 @@ function getPdfProxyUrl(book) {
     } else if (book.pdfLink) {
         originalUrl = book.pdfLink;
     }
-
     if (!originalUrl) return null;
     return `/api/fetch-pdf?url=${encodeURIComponent(originalUrl)}`;
 }
 
-/**
- * Fetch the cover image and return it as a base64 data URL so it works offline.
- * Falls back gracefully if the image is unavailable.
- * @param {string} imageUrl
- * @returns {Promise<string>}
- */
 async function fetchCoverAsDataUrl(imageUrl) {
     if (!imageUrl) return '';
     try {
@@ -69,29 +47,22 @@ async function fetchCoverAsDataUrl(imageUrl) {
             reader.readAsDataURL(blob);
         });
     } catch {
-        return imageUrl; // fall back to the original URL
+        return imageUrl;
     }
 }
-
-// ─── Main Hook ────────────────────────────────────────────────────────────────
 
 export function useOfflineBooks() {
     const [isOnline, setIsOnline] = useState(true);
     const [offlineIds, setOfflineIds] = useState(new Set());
     const [offlineBooks, setOfflineBooks] = useState([]);
-    const [downloadStates, setDownloadStates] = useState({});  // bookId → DownloadState
+    const [downloadStates, setDownloadStates] = useState({});
     const [totalStorageBytes, setTotalStorageBytes] = useState(0);
-
-    // Track active object URLs so we can revoke them on unmount (memory leak prevention)
     const objectUrlsRef = useRef([]);
 
-    // ── Online/offline detection ───────────────────────────────────────────
     useEffect(() => {
         setIsOnline(navigator.onLine);
-
         const goOnline = () => setIsOnline(true);
         const goOffline = () => setIsOnline(false);
-
         window.addEventListener('online', goOnline);
         window.addEventListener('offline', goOffline);
         return () => {
@@ -100,14 +71,12 @@ export function useOfflineBooks() {
         };
     }, []);
 
-    // ── Revoke object URLs on unmount ────────────────────────────────────────
     useEffect(() => {
         return () => {
             objectUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
         };
     }, []);
 
-    // ── Initial load from IndexedDB ──────────────────────────────────────────
     const refreshOfflineData = useCallback(async () => {
         try {
             const [ids, books, bytes] = await Promise.all([
@@ -116,7 +85,6 @@ export function useOfflineBooks() {
                 getTotalStorageBytes(),
             ]);
             setOfflineIds(ids);
-            // Strip the heavy pdfBlob from the list view records
             setOfflineBooks(books.map(({ pdfBlob, ...meta }) => meta));
             setTotalStorageBytes(bytes);
         } catch (err) {
@@ -128,7 +96,7 @@ export function useOfflineBooks() {
         refreshOfflineData();
     }, [refreshOfflineData]);
 
-    // ── Save a book offline ──────────────────────────────────────────────────
+    // ── Save a book offline (With Direct Uint8Array Storage) ─────────────────
     const downloadForOffline = useCallback(async (book) => {
         const bookId = String(book.id);
         const proxyUrl = getPdfProxyUrl(book);
@@ -147,9 +115,7 @@ export function useOfflineBooks() {
         }));
 
         try {
-            // ── Step 1: Fetch PDF via proxy with progress tracking ────────────
             const response = await fetch(proxyUrl);
-
             if (!response.ok) {
                 throw new Error(`Server returned ${response.status}: ${response.statusText}`);
             }
@@ -167,7 +133,7 @@ export function useOfflineBooks() {
                 receivedBytes += value.length;
 
                 if (totalBytes) {
-                    const progress = Math.round((receivedBytes / totalBytes) * 85); // cap at 85 — saving takes last 15
+                    const progress = Math.round((receivedBytes / totalBytes) * 85);
                     setDownloadStates(prev => ({
                         ...prev,
                         [bookId]: { status: 'downloading', progress },
@@ -175,23 +141,34 @@ export function useOfflineBooks() {
                 }
             }
 
-            // ── Step 2: Assemble the Uint8Array into a Blob ───────────────────
             setDownloadStates(prev => ({
                 ...prev,
                 [bookId]: { status: 'saving', progress: 88 },
             }));
 
-            const pdfBlob = new Blob(chunks, { type: 'application/pdf' });
+            const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+            const completeUint8Array = new Uint8Array(totalLength);
 
-            // ── Step 3: Fetch the cover as a data URL ─────────────────────────
+            let offset = 0;
+            for (const chunk of chunks) {
+                completeUint8Array.set(chunk, offset);
+                offset += chunk.length;
+            }
+
+            // XOR Cryptography: Scramble array contents
+            for (let i = 0; i < completeUint8Array.length; i++) {
+                completeUint8Array[i] = completeUint8Array[i] ^ CRYPTO_KEY;
+            }
+
             const coverDataUrl = await fetchCoverAsDataUrl(book.image || book.coverImage);
 
-            // ── Step 4: Write to IndexedDB ────────────────────────────────────
             setDownloadStates(prev => ({
                 ...prev,
                 [bookId]: { status: 'saving', progress: 95 },
             }));
 
+            // FIXED: Pass the completeUint8Array directly instead of .buffer reference.
+            // This guarantees Dexie clones the exact byte values without memory drops.
             await saveBookOffline({
                 id: bookId,
                 title: book.title,
@@ -200,8 +177,8 @@ export function useOfflineBooks() {
                 format: book.format || 'PDF',
                 pages: book.pages,
                 coverImage: coverDataUrl,
-                pdfBlob,
-                sizeBytes: pdfBlob.size,
+                pdfBlob: completeUint8Array,
+                sizeBytes: completeUint8Array.byteLength,
                 purchaseDate: book.purchaseDate,
                 transactionId: book.transactionId,
                 amount: book.amount,
@@ -214,7 +191,6 @@ export function useOfflineBooks() {
 
             await refreshOfflineData();
 
-            // Auto-reset the done state after 3 seconds
             setTimeout(() => {
                 setDownloadStates(prev => ({
                     ...prev,
@@ -235,24 +211,31 @@ export function useOfflineBooks() {
         }
     }, [refreshOfflineData]);
 
-    // ── Remove a book from offline storage ───────────────────────────────────
     const removeOfflineBook = useCallback(async (bookId) => {
         await deleteOfflineBook(String(bookId));
         await refreshOfflineData();
     }, [refreshOfflineData]);
 
-    // ── Load a PDF blob from IndexedDB and return an object URL ──────────────
-    // Returns null if the book is not saved offline.
+    // ── Load a PDF buffer from IndexedDB and Decrypt It on the Fly ───────────
     const getOfflinePdfUrl = useCallback(async (bookId) => {
         const record = await getOfflineBook(String(bookId));
         if (!record?.pdfBlob) return null;
 
-        const url = URL.createObjectURL(record.pdfBlob);
-        objectUrlsRef.current.push(url); // track for cleanup
+        // FIXED: Since it's stored directly as a Uint8Array, we instantiate a clean copy 
+        // to operate on so we don't mutate the database record cache directly.
+        const targetBytes = new Uint8Array(record.pdfBlob);
+
+        // Reverse the XOR encryption operation directly inside temporary execution RAM
+        for (let i = 0; i < targetBytes.length; i++) {
+            targetBytes[i] = targetBytes[i] ^ CRYPTO_KEY;
+        }
+
+        const decryptedBlob = new Blob([targetBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(decryptedBlob);
+        objectUrlsRef.current.push(url);
         return url;
     }, []);
 
-    // ── Convenience checkers ──────────────────────────────────────────────────
     const isBookOffline = useCallback(
         (bookId) => offlineIds.has(String(bookId)),
         [offlineIds]
@@ -263,7 +246,6 @@ export function useOfflineBooks() {
         [downloadStates]
     );
 
-    // ── Formatted storage size ────────────────────────────────────────────────
     const formattedStorageSize = (() => {
         if (totalStorageBytes < 1024) return `${totalStorageBytes} B`;
         if (totalStorageBytes < 1024 * 1024) return `${(totalStorageBytes / 1024).toFixed(1)} KB`;
@@ -271,22 +253,15 @@ export function useOfflineBooks() {
     })();
 
     return {
-        // State
         isOnline,
         offlineIds,
-        offlineBooks,           // metadata only (no blob) — for the Offline tab grid
+        offlineBooks,
         formattedStorageSize,
-
-        // Actions
         downloadForOffline,
         removeOfflineBook,
-        getOfflinePdfUrl,       // async — call when opening a book
-
-        // Per-book helpers
+        getOfflinePdfUrl,
         isBookOffline,
         getDownloadState,
-
-        // Refresh (call after any external data change)
         refreshOfflineData,
     };
 }

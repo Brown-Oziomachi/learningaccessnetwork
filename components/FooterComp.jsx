@@ -34,6 +34,7 @@ const FOOTER_COLUMNS = [
       { label: "Study Groups", href: "/students/study-groups" },
       { label: "Saved", href: "/students/wishlist" },
       { label: "Student Network", href: "/students/network" },
+      { label: "Growing Your Followers", href: "/seller/grow-followers" },
     ],
   },
   {
@@ -46,6 +47,7 @@ const FOOTER_COLUMNS = [
       { label: "Referral Programme", href: "/seller/referral" },
       { label: "Seller Dashboard", href: "/seller/seller-dashboard" },
       { label: "Recharge Services", href: "/seller/recharge-services" },
+      { label: "Growing Your Followers", href: "/seller/grow-followers" },
     ],
   },
   {
@@ -58,12 +60,15 @@ const FOOTER_COLUMNS = [
       { label: "Withdraw Earnings", href: "/faculty/withdraw" },
       { label: "Recharge Services", href: "/faculty/recharge" },
       { label: "Referral Programme", href: "/faculty/referral" },
+      { label: "Growing Your Followers", href: "/seller/grow-followers" },
     ],
   },
   {
     heading: "Quick Links",
     links: [
       { label: "About LAN", href: "/about/lan" },
+      { label: "Free Documents & Open Access", href: "/students/open-access" },
+      { label: "LAN Shift", href: "/seller/lan-shift" },
       { label: "Contact Us", href: "/contact/lan/4/enquiry" },
       { label: "Help Centre", href: "/lan/net/help-center" },
       { label: "Documentation", href: "/docs" },

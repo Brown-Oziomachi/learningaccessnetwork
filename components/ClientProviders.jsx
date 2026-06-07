@@ -47,7 +47,7 @@ export default function ClientProviders({ children }) {
 
       <SessionTimeoutProvider
         isAuthenticated={!!currentUser}
-        redirectPath="/auth/signin"
+        redirectPath="/signin"
         timeoutMs={1_800_000}
         showToast={(msg) => toast.error(msg)}
       >

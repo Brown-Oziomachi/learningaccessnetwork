@@ -79,6 +79,88 @@ Session data is retained for the duration of your LAN account and is deleted whe
         tags: ["AI", "Exam Prep", "Study Tools", "Claude"],
     },
 
+    "open-access": {
+        badge: "Open Access",
+        badgeIcon: "🔓",
+        category: "FREE DOCUMENTS",
+        readTime: "6 min read",
+        title: "Free Documents & Open Access on LAN Library",
+        subtitle:
+            "Some knowledge should have no price tag. Open Access documents on LAN Library are completely free — no wallet balance, no payment, no barriers.",
+        hero: "/freebook.jpeg",
+        intro: `Education in Africa is incredibly expensive, yet it often yields painfully low financial returns immediately after school. Students and their families make monumental financial sacrifices to pay for university tuition, accommodation, and materials — only to face a stagnant job market on the other side.
+
+The traditional system demands massive upfront financial investment for years, with delayed — and often missing — economic gratification. A student in Kano, Kumasi, or Kisumu should not have to choose between eating and accessing a lecture note that could help them pass their final exam.
+
+Open Access on LAN Library is our answer to that reality. It is a growing collection of documents — lecture notes, past questions, textbooks, research papers, study guides, and more — uploaded freely by lecturers, verified sellers, and students who believe that some knowledge should simply be available to everyone. No purchase required. No wallet balance needed. Just read.`,
+
+        sections: [
+            {
+                heading: "What Open Access Means on LAN Library",
+                body: `When a seller, faculty member, or student uploads a document and marks it as Free, that document is immediately added to the Open Access collection. Any visitor to LAN Library — whether they have an account or not, whether their wallet is empty or full — can open and read that document without paying a single naira.
+
+Open Access documents appear with a green 🔓 FREE badge across every page of the platform — in search results, on category pages, on the home feed, and inside the dedicated Open Access Hub at /open-access. They are indistinguishable from paid documents in quality and presentation; the only difference is that the price is zero.
+
+The Open Access Hub is a curated space inside LAN Library specifically built to surface these documents. Students who cannot afford paid materials can go directly to the Open Access Hub and find an expanding library of academic resources uploaded by educators and peers who have chosen to give their knowledge away. The hub is searchable by title, author, and category, making it easy to find materials relevant to a specific course or subject.`,
+            },
+            {
+                heading: "How to Upload a Free Document",
+                body: `Any verified seller or faculty member can make any document free at the point of upload. On the Upload Document page — the same page used for paid documents — Step 3 contains an Access Type toggle with two options: Paid and Free.
+
+Selecting Free sets the document price to zero automatically and flags it as Open Access in the system. From that point, the document goes through the same 24–48 hour review process as any paid document — LAN's content team checks it for quality, completeness, and compliance with platform guidelines. Once approved, it appears immediately in the Open Access Hub and across the main library.
+
+There is no separate upload flow, no additional form, and no approval penalty for free documents. The process is identical to uploading a paid document. The only difference is a single toggle on the pricing screen.
+
+Faculty members with verified accounts can mark their lecture notes, past questions, syllabi, and reading lists as free to give their own students — and students from other institutions — direct, barrier-free access to their course materials. Sellers can choose to make older editions, preview chapters, or sample materials free while keeping their premium content paid.`,
+            },
+            {
+                heading: "Why Upload a Free Document — The Case for Open Access",
+                body: `The argument for uploading a free document is not purely altruistic. There are concrete, practical reasons why LAN's top sellers and most respected faculty members choose to make some of their documents freely available.
+
+Visibility and discovery. Free documents are accessed far more frequently than paid ones. Every student who reads your free document sees your name, your institution, your expertise. When that student — or their classmate, or a lecturer browsing the platform — decides to look for more of your work, they find your paid catalogue. Free documents function as the most effective marketing a seller or faculty member can run on this platform. They cost nothing to distribute and they reach everyone.
+
+Credibility and trust. A faculty member who makes their introductory lecture notes freely available signals confidence in the quality of their work. A seller who offers a free sample chapter demonstrates that their full document is worth the purchase price. Open Access contributions build the kind of reputation that paid listings alone cannot manufacture.
+
+Community standing. LAN Library tracks Open Access contributions on seller and faculty profiles. Members who contribute to the Open Access collection are recognised across the platform. Their profiles display the number of free documents they have contributed, building a form of academic and professional credibility that extends beyond the financial transaction of a book sale.
+
+The platform itself grows stronger with every free document added. A richer Open Access collection brings more students to LAN Library — students who discover the platform through a free document and return to purchase paid materials. Every contributor to the Open Access collection is an indirect beneficiary of the growth that collection drives.`,
+            },
+            {
+                heading: "The Reality Behind the Price Tag",
+                body: `Here is what the numbers actually look like for a typical Nigerian university student. Tuition at a federal university costs between ₦50,000 and ₦200,000 per year depending on the faculty. Accommodation, feeding, transportation, and printing add another ₦300,000 to ₦600,000 annually. A single textbook can cost between ₦3,000 and ₦15,000. A student taking six courses in a semester may need materials for all six — that is potentially ₦90,000 in academic materials alone, on top of everything else.
+
+Now consider that the average Nigerian family earns between ₦50,000 and ₦150,000 per month. The mathematics of access is brutal. Students who cannot afford their materials do not simply learn less — they fail exams, repeat courses, and in some cases leave the university system entirely. The financial cost of inaccessible academic materials is not an inconvenience. For many families, it is the difference between a degree and no degree.
+
+Open Access on LAN Library is not a charity programme. It is a structural intervention. When a lecturer uploads their course notes for free, they are not losing money — they were never going to charge their own students for notes distributed in class. When a seller makes a past question pack free, they are investing in the discovery of their other work. The economic logic of Open Access works for contributors as well as for the students who benefit.
+
+Africa has produced extraordinary academic talent under extraordinarily difficult conditions. The question this platform asks of every seller and faculty member is simple: what would it cost you — really cost you — to give one document away? And what would it mean to the student who finds it at the moment they need it most?`,
+            },
+            {
+                heading: "What Open Access Does Not Mean",
+                body: `Open Access on LAN Library does not mean low quality. Every free document on the platform passes the same content review as every paid document. Materials that are incomplete, inaccurate, or do not meet LAN's quality standards are not approved regardless of their price.
+
+Open Access does not mean anonymous. Every free document on LAN Library is attributed to its uploader — the seller account or faculty profile that submitted it. Contributors to the Open Access collection are publicly recognised, not invisible. Their generosity is visible on their profile and on every document they have made free.
+
+Open Access does not mean permanent. Uploaders can change the access type of any document they have uploaded. A document that is free today can be set to paid in a future update if circumstances change. The decision to make a document free is not irreversible, and LAN does not lock contributors into a price they no longer want to maintain.
+
+Open Access does not mean unprotected. Free documents on LAN Library carry the same invisible buyer-specific watermarks as paid documents. This protects the integrity of the uploader's work and deters mass redistribution outside the platform. Making a document free on LAN is not the same as putting it into the public domain — it is making it accessible within a platform that tracks, attributes, and protects the work of its contributors.`,
+            },
+            {
+                heading: "Starting Your Open Access Contribution",
+                body: `If you are a verified seller or faculty member on LAN Library, you can upload your first free document today. Go to Upload Document, complete Steps 1 and 2 as normal, and on Step 3 select the Free toggle under Access Type. That is the only difference between a paid upload and an Open Access contribution.
+
+If you are a student who has produced high-quality notes, summaries, or study guides that helped you pass your own exams, you can make them available to students who come after you. Your document will carry your name. Your generosity will be visible on your profile. And somewhere, a student who cannot afford the paid version of the same material will find yours instead.
+
+The Open Access Hub on LAN Library grows with every contribution. Every document added makes the collection more comprehensive, more discoverable, and more useful to the students who need it most. The goal is not a token gesture toward access — it is a genuine, expanding library of free academic materials that makes a meaningful difference to the students who find it.
+
+Start with one document. That is enough.`,
+            },
+        ],
+        cta: { label: "Upload a Free Document", href: "/upload-document" },
+        related: ["my-library", "how-to-buy", "past-questions", "ai-tutor", "study-groups"],
+        tags: ["Open Access", "Free", "Documents", "Education", "Africa"],
+    },
+
     "my-library": {
         badge: "My Library",
         badgeIcon: "📚",
@@ -601,7 +683,7 @@ export default function StudentSlugPage() {
 
                         {/* Author meta */}
                         <div style={{ display: "flex", alignItems: "center", gap: 14, paddingTop: 20, borderTop: `1px solid ${BORDER}`, flexWrap: "wrap" }}>
-                            <div style={{ width: 36, height: 36, borderRadius: "50%", background: NAVY, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: GOLD, fontFamily: "'Playfair Display', serif", flexShrink: 0 }}>L</div>
+                            <div style={{ width: 36, height: 36, borderRadius: "50%", background: NAVY, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: GOLD, fontFamily: "'Playfair Display', serif", flexShrink: 0 }}><img src="/lanlog.png"/></div>
                             <div>
                                 <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, fontFamily: "'Lato', sans-serif" }}>LAN Student Team</div>
                                 <div style={{ fontSize: 11, color: "#aaa", fontFamily: "'Lato', sans-serif" }}>Academic Document Platform · Africa</div>

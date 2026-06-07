@@ -132,7 +132,7 @@ export default function ReferralClient() {
 
     const shortCode = user?.referralCode || '';
     const referralLink = shortCode && typeof window !== 'undefined'
-        ? `${window.location.origin}/auth/signup?referral_code=${shortCode}` : '';
+        ? `${window.location.origin}/signup?referral_code=${shortCode}` : '';
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {

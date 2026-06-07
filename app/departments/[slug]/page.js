@@ -13,8 +13,8 @@ import {
     FileText, GraduationCap, ChevronDown, ArrowUpRight,
     Layers,
 } from "lucide-react";
-import Navbar from "@/components/NavBar";
 import Footer from "@/components/FooterComp";
+import Navbar from "@/components/NavBar";
 
 /* ── colour tokens ─────────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -299,7 +299,7 @@ export default function DepartmentSlugPage() {
                 }
             `}</style>
 
-            <Navbar />
+            <Navbar/>
 
             {/* ══ HERO ════════════════════════════════════════════════ */}
             <section className="hero-bg" style={{ padding: "64px 24px 56px" }}>

@@ -60,7 +60,7 @@ export const useAuth = (redirectIfAuthenticated = false) => {
                             const reason = isDeactivated ? 'deactivated'
                                 : isSuspended ? 'suspended'
                                     : 'pending';
-                            router.replace(`/auth/signin?reason=${reason}`);
+                            router.replace(`/signin?reason=${reason}`);
                         }
                         return;
                     }

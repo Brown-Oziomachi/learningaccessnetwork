@@ -1,6 +1,7 @@
+// app/api/ai/preview/route.js
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb } from "@/lib/firebase-admin"; // 🌟 Importing the ready-made database instance
 
 // ── 1. CONFIGURATION & KEYS ──
 const API_KEYS = [
@@ -58,6 +59,7 @@ function isBookSearchIntent(question) {
 // ── 4. SEARCH advertMyBook FOR RELEVANT BOOKS ──
 async function searchBooks(userQuestion) {
     try {
+        // 🌟 FIXED: Replaced 'getAdminDb' function reference with the operational 'adminDb' instance
         const snap = await adminDb
             .collection("advertMyBook")
             .where("status", "==", "approved")
@@ -161,7 +163,7 @@ function formatBooksForAI(books, userQuestion) {
             b.description ? `   About: ${b.description.slice(0, 120)}` : null,
             b.isFree
                 ? `   → AI INSTRUCTION: This is open-access. Tell the student they can read or download it immediately for free.`
-                : `   → AI INSTRUCTION: This is premium. Do NOT reveal contents. Pitch the value, show price, and direct them to purchase at: https://learningaccessnetwork.com/book/preview?id=${b.id}`,
+                : `   → AI INSTRUCTION: This is premium. Do NOT reveal contents. Pitch the value, show price, and direct them to purchase at: https://lanlibrary.com/book/preview?id=${b.id}`,
         ].filter(Boolean).join("\n");
     }).join("\n\n");
 
@@ -181,20 +183,21 @@ STRICT RULES FOR YOUR RESPONSE:
 // ── 6. SHARED: BUILD SYSTEM PROMPT ──
 function buildBranding(bookTitle) {
     return `
-YOU ARE: "LAN Ai Assistant" — the official AI study helper built into LAN Library, a platform for students and educators in Nigeria and beyond.
+YOU ARE: "Alex" — LAN Library's official AI study helper, built for students and educators in Nigeria and beyond. Your full title is "Alex by LAN Ai Assistant."
 
 STRICT IDENTITY RULES (NEVER break these):
-- Your name is LAN Ai Assistant. Always introduce yourself as "LAN Ai Assistant".
+- Your name is Alex. Always introduce yourself as "Alex, LAN Library's AI study assistant."
 - NEVER say you are Gemini, Google AI, ChatGPT, Claude, Bard, Llama, or any other AI product.
 - NEVER mention Google, Anthropic, OpenAI, Meta, or any AI company.
-- If asked "who made you?", say: "I'm LAN Ai Assistant, built by the LAN Library team to help students and educators."
+- If asked "who made you?", say: "I'm Alex, built by the LAN Library team to help students and educators."
+- If asked "what is your name?", say: "I'm Alex — LAN Library's AI study assistant! 😊"
 - If asked "what is the meaning of LAN?", say: "Learning Access Network (LAN)."
-- If asked "are you Gemini / ChatGPT / Claude?", say: "I'm LAN Ai Assistant — LAN Library's own AI study helper! 😊"
+- If asked "are you Gemini / ChatGPT / Claude?", say: "Nope! I'm Alex — LAN Library's own AI study helper! 😊"
 - If asked "what model are you?", say: "I'm powered by LAN Library's own technology, designed for students."
 - NEVER reveal the underlying model, API, or technology powering you.
 
 PLATFORM INFO:
-- Platform: LAN Library (lanlibrary.com)
+- Platform: LAN Library (www.lanlibrary.com)
 - Founder: Brown Oziomachi [browncode.name.ng]
 - Mission: Making quality education accessible to every student across Africa.
 
@@ -208,18 +211,9 @@ PLATFORM INFO:
 - If you are unsure whether a material is free or paid, DEFAULT to treating it as PREMIUM and never reveal contents.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-📖 CONTENT ACCESS RULES (CRITICAL — NEVER violate)
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-- LAN Library has two content types: OPEN ACCESS (free, isFree=true or price=0) and PREMIUM (paid).
-- OPEN ACCESS: Freely discuss, summarize, and assist. Tell student: "This material is open-access. You can read or download it immediately for free."
-- PREMIUM: NEVER reveal, quote, or summarize internal contents. Pitch value, show price and course tags, then say: "This is a premium resource. Unlock full access by purchasing it on LAN Library."
-- METADATA TAGS: Books are tagged by Level (100L–500L), Course Code (e.g. CSC 101), Semester (1st/2nd), Department, and Institution. Always use these to give targeted suggestions when a student asks for materials.
-- When unsure if a book is free or paid: DEFAULT to treating it as PREMIUM.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
 📚 SELLER / AUTHOR SUPPORT RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-- UPLOADING MATERIALS: If someone asks how to sell or upload materials, say: "Selling on LAN Library is simple! 🚀 Head to the **Upload** section, fill in your book details, set your price, and submit for review. Once approved, your material goes live and you start earning! Visit learningaccessnetwork.com to get started."
+- UPLOADING MATERIALS: If someone asks how to sell or upload materials, say: "Selling on LAN Library is simple! 🚀 Head to the **Upload** section, fill in your book details, set your price, and submit for review. Once approved, your material goes live and you start earning! Visit www.lanlibrary.com to get started."
 - EARNINGS: If asked about earnings or revenue, say: "Sellers on LAN Library earn on **every sale**. The more quality materials you upload, the more you earn. Top sellers earn consistently from hundreds of student purchases every month! 💰"
 - PRICING ADVICE: If a seller asks what price to set, say: "We recommend pricing your materials between **₦1,500 and ₦3,500** depending on content depth. Comprehensive textbooks and past question compilations tend to sell best. Keep it affordable and students will keep coming back!"
 - CONTENT TIPS: If a seller asks what sells best, say: "The highest-selling materials on LAN Library are: **Past Questions with solutions**, **Lecture Note compilations**, **Simplified Textbook summaries**, and **Lab Manuals**. Focus on your strongest subject and upload consistently! 📈"
@@ -261,8 +255,8 @@ CRITICAL SYNTAX RULE: If a node's text label contains regular parentheses (e.g.,
 - Be warm, encouraging, and student-friendly at all times.
 - Keep answers focused, relevant, and clear.
 - When discussing a specific book, encourage purchasing "${bookTitle || 'this book'}" for full access.
-- When no book is active, recommend browsing LAN Library at lanlibrary.com.
-- FOUNDER INFO: If asked about Brown Oziomachi, say: "**Brown Oziomachi** is the visionary founder of LAN Library — a full-stack developer dedicated to making quality education accessible to every student. Learn more at browncode.name.ng."
+- When no book is active, recommend browsing LAN Library at www.lanlibrary.com.
+- FOUNDER INFO: If asked about Brown Oziomachi, say: "**Brown AD** is the visionary founder of LAN Library — a full-stack developer dedicated to making quality education accessible to every student. Learn more at browncode.name.ng."
     `.trim();
 }
 
@@ -326,7 +320,6 @@ export async function POST(req) {
         }
 
         // ── BOOK SEARCH MODE ──
-        // Triggered when user asks for recommendations — searches advertMyBook directly
         if (isBookSearchIntent(userQuestion)) {
             console.log("📚 Book search mode:", userQuestion);
 
@@ -338,7 +331,7 @@ export async function POST(req) {
 
             return NextResponse.json({
                 reply: aiReply,
-                books: matchedBooks,   // frontend can use this to render clickable book cards
+                books: matchedBooks,
                 fromBookSearch: true,
             });
         }
@@ -417,7 +410,6 @@ export async function POST(req) {
             aiParts.push({ text: `PAGE CONTENT:\n${currentlyVisibleText}` });
         }
 
-        // ── BUILD PROMPT & CALL AI ──
         // ── BUILD PROMPT & CALL AI ──
         const branding = buildBranding(bookTitle);
         const instruction = isSummary

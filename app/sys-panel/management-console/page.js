@@ -376,6 +376,7 @@ const NAV_SECTIONS = [
       { id: 'print-license-ledger', icon: Receipt, label: 'Print License Ledger' },
       { id: 'settings', icon: Settings, label: 'Fee Settings' },
       { id: 'bounty-escrow', icon: Lock, label: 'Bounty Escrow', badgeKey: 'pendingBountyEscrow', badgeType: 'warn' },
+      { id: 'lan-bank-link', icon: ExternalLink, label: 'LAN Bank ↗' },  // ← ADD THIS
     ]
   },
   {
@@ -643,13 +644,14 @@ function AnnouncementsSection({ user }) {
 }
 
 
-function AdminNotificationBell({ setActiveSection }) {
+function AdminNotificationBell({ setActiveSection, isAdmin }) {
   const [open, setOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
   const [unread, setUnread] = useState(0);
   const ref = useRef(null);
 
   useEffect(() => {
+    if (!isAdmin) return () => {};
     const q = query(
       collection(db, "adminNotifications"),
       orderBy("createdAt", "desc"),
@@ -664,7 +666,7 @@ function AdminNotificationBell({ setActiveSection }) {
       setUnread(docs.filter(n => !n.read).length);
     });
     return () => unsub();
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     const handler = e => {
@@ -1610,14 +1612,14 @@ export default function ComprehensiveAdminPanel() {
         );
         if (!followersSnap.empty) {
           await Promise.all(
-            followersSnap.docs.map(fd =>
+            followersSnap.docs.map(fd =>   
               addDoc(collection(db, "notifications"), {
                 userId: fd.data().followerId,
                 type: 'new_upload',
                 title: '📚 New Material Uploaded!',
                 message: `${lecturerName} just uploaded: "${bookTitle}"`,
-                link: `/book/preview?id=${id}`,   // ← was /lecturer-profile?sellerId=...
-                bookId: id,                         // ← add this
+                link: `/book/preview?id=${id}`,   
+                bookId: id,
                 createdAt: serverTimestamp(),
                 read: false,
               })
@@ -1674,44 +1676,106 @@ export default function ComprehensiveAdminPanel() {
     } catch (e) { alert('Failed: ' + e.message); }
 };
 
-  const processFlutterwaveTransfer = async (withdrawal) => {
+  // Admin Panel Console Functions
+  const processFlutterwaveTransfer = async (withdrawalId) => {
     try {
-      const response = await fetch('/api/flutterwave-transfer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ withdrawal }) });
+      // Authenticate client user session identity safely
+      if (!auth.currentUser) throw new Error("Admin session unauthenticated.");
+      const token = await auth.currentUser.getIdToken(true);
+
+      const response = await fetch('/api/flutterwave-transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // Pass token safely inside headers
+        },
+        body: JSON.stringify({ withdrawalId }) // Send ONLY the ID to prevent tampering
+      });
+
       const result = await response.json();
-      if (result.success) return { success: true, transferId: result.transferId, reference: result.reference, status: result.status };
+      if (response.ok && result.success) return result;
+
       throw new Error(result.error || 'Transfer failed');
-    } catch (error) { return { success: false, error: error.message || 'Failed to process transfer' }; }
+    } catch (error) {
+      return { success: false, error: error.message || 'Failed to process transfer' };
+    }
   };
 
   const approveWithdrawal = async (withdrawal) => {
     if (!skipConfirm) { setConfirmedWithdrawal(withdrawal); setShowConfirmModal(true); return; }
     setSkipConfirm(false);
-    if (!withdrawal.bankDetails?.bankCode || !withdrawal.bankDetails?.accountNumber || !withdrawal.bankDetails?.accountName) { alert('❌ Incomplete bank details.'); return; }
+
+    if (!withdrawal.bankDetails?.bankCode || !withdrawal.bankDetails?.accountNumber || !withdrawal.bankDetails?.accountName) {
+      alert('❌ Incomplete bank details.');
+      return;
+    }
+
     try {
       setProcessingWithdrawalId(withdrawal.id);
-      const transferResult = await processFlutterwaveTransfer(withdrawal);
-      if (!transferResult.success) { alert(`❌ Transfer Failed\n\n${transferResult.error}`); return; }
-      await updateDoc(doc(db, 'withdrawals', withdrawal.id), { status: 'completed', processedAt: serverTimestamp(), flutterwaveTransferId: transferResult.transferId, flutterwaveReference: transferResult.reference, adminNote: 'Approved via Flutterwave', processedBy: user.email });
-      const sellerDocRef = doc(db, 'sellers', withdrawal.sellerId);
-      const sellerDoc = await getDoc(sellerDocRef);
-      if (sellerDoc.exists()) await updateDoc(sellerDocRef, { totalWithdrawn: (sellerDoc.data().totalWithdrawn || 0) + withdrawal.amount, lastWithdrawalDate: serverTimestamp(), updatedAt: serverTimestamp() });
-      await addDoc(collection(db, 'notifications'), { userId: withdrawal.sellerId, type: 'withdrawal_approved', title: 'Withdrawal Approved ✅', message: `Your withdrawal of ₦${withdrawal.amount.toLocaleString()} has been processed. Ref: ${transferResult.reference}`, createdAt: serverTimestamp(), read: false });
-      setWithdrawalSuccessData({ amount: withdrawal.amount, sellerName: withdrawal.sellerName, bankName: withdrawal.bankDetails.bankName, accountNumber: withdrawal.bankDetails.accountNumber, transferId: transferResult.transferId, reference: transferResult.reference });
-      await fetchWithdrawals();
-    } catch (error) { alert(`❌ Failed: ${error.message}`); } finally { setProcessingWithdrawalId(null); }
+
+      // Call our server backend using ONLY the safe document identifier
+      const transferResult = await processFlutterwaveTransfer(withdrawal.id);
+      if (!transferResult.success) {
+        alert(`❌ Transfer Failed\n\n${transferResult.error}`);
+        return;
+      }
+
+      // State indicators update using secure payloads returned back straight from the server verification loop
+      setWithdrawalSuccessData({
+        amount: transferResult.amount,
+        sellerName: transferResult.sellerName,
+        bankName: transferResult.bankName,
+        accountNumber: withdrawal.bankDetails.accountNumber,
+        transferId: transferResult.transferId,
+        reference: transferResult.reference
+      });
+
+      alert('✅ Withdrawal approved and processed successfully.');
+      await fetchWithdrawals(); // Refresh local list view
+    } catch (error) {
+      alert(`❌ Failed: ${error.message}`);
+    } finally {
+      setProcessingWithdrawalId(null);
+    }
   };
 
   const rejectWithdrawal = async (withdrawalId, sellerId, amount) => {
     const reason = prompt('Rejection reason:');
     if (!reason?.trim()) { alert('Please provide a reason'); return; }
     if (!confirm(`Reject ₦${amount.toLocaleString()}?`)) return;
+
     try {
       setProcessingWithdrawalId(withdrawalId);
-      await updateDoc(doc(db, 'withdrawals', withdrawalId), { status: 'rejected', processedAt: serverTimestamp(), adminNote: reason, processedBy: user.email });
-      await updateDoc(doc(db, 'sellers', sellerId), { accountBalance: increment(amount), updatedAt: serverTimestamp() });
-      await addDoc(collection(db, 'notifications'), { userId: sellerId, type: 'withdrawal_rejected', title: 'Withdrawal Rejected ❌', message: `Your withdrawal of ₦${amount.toLocaleString()} was rejected. Funds returned. Reason: ${reason}`, createdAt: serverTimestamp(), read: false });
-      alert('✅ Rejected and funds refunded.'); await fetchWithdrawals();
-    } catch (error) { alert(`Failed: ${error.message}`); } finally { setProcessingWithdrawalId(null); }
+
+     
+      await updateDoc(doc(db, 'withdrawals', withdrawalId), {
+        status: 'rejected',
+        processedAt: serverTimestamp(),
+        adminNote: reason,
+        processedBy: user.email
+      });
+
+      await updateDoc(doc(db, 'sellers', sellerId), {
+        accountBalance: increment(amount),
+        updatedAt: serverTimestamp()
+      });
+
+      await addDoc(collection(db, 'notifications'), {
+        userId: sellerId,
+        type: 'withdrawal_rejected',
+        title: 'Withdrawal Rejected ❌',
+        message: `Your withdrawal of ₦${amount.toLocaleString()} was rejected. Funds returned. Reason: ${reason}`,
+        createdAt: serverTimestamp(),
+        read: false
+      });
+
+      alert('✅ Rejected and funds refunded.');
+      await fetchWithdrawals();
+    } catch (error) {
+      alert(`Failed: ${error.message}`);
+    } finally {
+      setProcessingWithdrawalId(null);
+    }
   };
 
   const updateSchoolApplicationStatus = async (schoolId, status) => {
@@ -1848,7 +1912,13 @@ export default function ComprehensiveAdminPanel() {
               const badgeCount = badgeKey ? stats[badgeKey] : 0;
               return (
                 <button key={id} className={`sidebar-item${activeSection === id ? ' active' : ''}`}
-                  onClick={() => { setActiveSection(id); setSearchTerm(''); }}>
+                  onClick={() => { 
+                    if (id === 'lan-bank-link') {
+                      window.open('/sys-panel/management-console/lan-bank-landingpage?from=admin', '_blank');
+                      return;
+                    }
+                    setActiveSection(id); setSearchTerm('');
+                  }}>
                   <Icon size={15} />
                   {label}
                   {badgeCount > 0 && <span className={`sidebar-badge${badgeType === 'warn' ? ' warn' : badgeType === 'danger' ? ' danger' : ''}`}>{badgeCount}</span>}
@@ -1874,7 +1944,7 @@ export default function ComprehensiveAdminPanel() {
           </div>
           <div className="topbar-right">
             <button onClick={fetchAllData} className="icon-btn" title="Refresh"><RefreshCw size={15} /></button>
-            <AdminNotificationBell setActiveSection={setActiveSection} />
+<AdminNotificationBell setActiveSection={setActiveSection} isAdmin={isAdmin} />
             <div className="avatar">{user.email?.[0]?.toUpperCase() || 'A'}</div>
           </div>
         </header>

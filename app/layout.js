@@ -22,15 +22,17 @@ const dancingScript = Dancing_Script({
 
 export const metadata = {
   title: "LAN Library | The Global Student Library",
-  description:
-    "The ultimate African EdTech marketplace for university textbooks, lecture materials, and academic research resources.",
-      keywords:
-    "learning, books, education, personal development, business books, technology books, online library, digital platform, knowledge access, universities library, documents",
+  description: "The ultimate African EdTech marketplace for university textbooks, lecture materials, and academic research resources.",
+  keywords: "learning, books, education, personal development, business books, technology books, online library, digital platform, knowledge access, universities library, documents",
+  icons: {
+    icon: "/lanlog.png",        
+    apple: "/lanlog.png",      
+  },
   openGraph: {
     title: "LAN Library | The Global Student Library",
-    description:
-      "The ultimate African EdTech marketplace for university textbooks, lecture materials, and academic research resources.",
-          type: "website",
+    description: "The ultimate African EdTech marketplace for university textbooks, lecture materials, and academic research resources.",
+    type: "website",
+    images: [{ url: "/lanlog.png" }],   
   },
 };
 
