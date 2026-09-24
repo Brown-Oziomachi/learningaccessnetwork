@@ -80,7 +80,6 @@ export default function ConfirmClient() {
             studyLevel: searchParams.get('studyLevel') || sessionStorage.getItem('studyLevel') || '',
             fieldOfStudy: searchParams.get('fieldOfStudy') || sessionStorage.getItem('fieldOfStudy') || '',
             institution: searchParams.get('institution') || sessionStorage.getItem('institution') || '',
-            // ✅ ADD THESE:
             institutionSlug: searchParams.get('institutionSlug') || sessionStorage.getItem('institutionSlug') || '',
             department: searchParams.get('department') || sessionStorage.getItem('department') || '',
             lecturerTitle: searchParams.get('lecturerTitle') || sessionStorage.getItem('lecturerTitle') || '',
