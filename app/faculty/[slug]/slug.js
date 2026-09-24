@@ -83,7 +83,7 @@ Content that does well in one academic session tends to do even better the follo
 The <link slug="referral" text="referral programme" /> creates a further compounding effect. Faculty members who introduce colleagues to the platform earn referral commissions that stack on top of their document income. A senior professor who refers even five junior colleagues can generate significant monthly referral income with no additional effort beyond a single conversation or email.`,
             },
         ],
-        cta: { label: "Join Faculty Network", href: "/auth/signup" },
+        cta: { label: "Join Faculty Network", href: "/signup" },
         related: ["verify", "dashboard", "upload", "withdraw", "referral", "recharge"],
         tags: ["Africa", "Publishing", "Passive Income", "Academic"],
     },
@@ -154,7 +154,7 @@ LAN conducts periodic verification audits of the Faculty Directory, typically on
 Faculty members who retire or leave academic positions can retain their verified status for materials created during their academic career. Retired faculty are a valued part of the LAN Faculty Network — their archived course materials remain relevant to students for years after retirement, and LAN has specific credential pathways for emeritus and retired academics.`,
             },
         ],
-        cta: { label: "Apply for Verification", href: "/auth/signup" },
+        cta: { label: "Apply for Verification", href: "/signup" },
         related: ["network", "dashboard", "upload", "withdraw", "referral", "recharge"],
         tags: ["Trust", "Badge", "Credibility", "Africa"],
     },
@@ -233,7 +233,7 @@ From the faculty seller's perspective, course packs improve average transaction 
 Course packs are created from your Faculty Dashboard after your component documents are individually live. You define the bundle, set the bundle price, and publish. The bundle appears in search results alongside individual document listings, giving students multiple entry points into your catalogue.`,
             },
         ],
-        cta: { label: "Start Uploading", href: "/auth/signup" },
+        cta: { label: "Start Uploading", href: "/signup" },
         related: ["verify", "network", "dashboard", "withdraw", "referral", "recharge"],
         tags: ["PDF", "Pricing", "Metadata", "Africa"],
     },
@@ -714,7 +714,7 @@ function Nav() {
                     Faculty Hub
                 </Link>
                 <Link
-                    href="/auth/signup"
+                    href="/signup"
                     style={{
                         background: GOLD,
                         color: NAVY,
@@ -1060,7 +1060,7 @@ function GuidesFooter({ currentSlug }) {
                             Faculty Hub
                         </Link>
                         <Link
-                            href="/auth/signup"
+                            href="/signup"
                             style={{
                                 fontSize: 11,
                                 color: GOLD,

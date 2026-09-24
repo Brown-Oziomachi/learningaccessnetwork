@@ -42,7 +42,7 @@ export default function MyAccountClient() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (cu) => {
       if (cu) { await fetchUserData(cu.uid); }
-      else    { router.push("/auth/signin"); }
+      else    { router.push("/signin"); }
     });
     return () => unsubscribe();
   }, [router]);
@@ -127,7 +127,7 @@ export default function MyAccountClient() {
         <p style={{ fontSize: "13px", color: "#888", lineHeight: 1.7, marginBottom: "24px" }}>Check your network and try again.</p>
         <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
           <button onClick={() => window.location.reload()} style={{ padding: "10px 22px", background: NAVY, color: "#fff", border: "none", fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>Retry</button>
-          <button onClick={() => router.push("/auth/signin")} style={{ padding: "10px 22px", background: "transparent", color: NAVY, border: `0.5px solid ${NAVY}`, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>Sign Out</button>
+          <button onClick={() => router.push("/signin")} style={{ padding: "10px 22px", background: "transparent", color: NAVY, border: `0.5px solid ${NAVY}`, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>Sign Out</button>
         </div>
       </div>
     </div>

@@ -947,7 +947,7 @@ export default function SellerAccountClient() {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) { await fetchUserData(currentUser.uid); }
-            else { router.push('/auth/signin'); }
+            else { router.push('/signin'); }
         });
         return () => unsubscribe();
     }, [router]);
@@ -958,7 +958,7 @@ export default function SellerAccountClient() {
             const userDoc = await getDoc(doc(db, "users", uid));
             if (userDoc.exists()) {
                 const userData = userDoc.data();
-                if (userData.isDeactivated === true) { await auth.signOut(); router.push("/auth/signin?reason=deactivated"); return; }
+                if (userData.isDeactivated === true) { await auth.signOut(); router.push("/signin?reason=deactivated"); return; }
                 const isPendingLecturer = userData.lecturerVerificationStatus === 'pending' || userData.lecturerVerificationStatus === 'rejected';
                 if (!userData.isSeller && !isPendingLecturer) { router.push('/my-account'); return; }
                 if (userData.isSeller && window.location.pathname === '/my-account') { router.push('/my-account/seller-account'); return; }
@@ -1189,7 +1189,7 @@ export default function SellerAccountClient() {
             setDeactivating(true); setDeactivateError("");
             await updateDoc(doc(db, "users", user.uid), { isDeactivated: true, deactivatedAt: serverTimestamp() });
             await updateDoc(doc(db, "sellers", user.uid), { isDeactivated: true, deactivatedAt: serverTimestamp() });
-            await auth.signOut(); router.push("/auth/signin");
+            await auth.signOut(); router.push("/signin");
         } catch (err) { setDeactivateError("Failed to deactivate account. Please try again."); setDeactivating(false); }
     };
 
@@ -1290,7 +1290,7 @@ export default function SellerAccountClient() {
                                             : user?.lecturerVerificationStatus === 'rejected' ? 'Rejected'
                                                 : isFacultyUser ? 'Verified Faculty'
                                                     : seller?.isVerifiedSeller ? 'Verified Seller'
-                                                        : 'Seller'}
+                                                        : 'LAN Seller'}
                                     </span>
                                 </div>
                             </div>

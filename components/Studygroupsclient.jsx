@@ -244,10 +244,10 @@ export default function StudyGroupsClient() {
   /* ── auth ── */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { router.push("/auth/signin"); return; }
+      if (!u) { router.push("/signin"); return; }
       try {
         const snap = await getDoc(doc(db, "users", u.uid));
-        if (!snap.exists()) { router.push("/auth/signin"); return; }
+        if (!snap.exists()) { router.push("/signin"); return; }
         const data = snap.data();
         setUser({
           uid: u.uid,

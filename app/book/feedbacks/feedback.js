@@ -78,7 +78,7 @@ export default function BookFeedbacksClient() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (cu) => {
       if (cu) setUser(cu);
-      else router.push("/auth/signin");
+      else router.push("/signin");
     });
     return () => unsub();
   }, [router]);

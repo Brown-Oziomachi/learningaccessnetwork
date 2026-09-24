@@ -1571,7 +1571,7 @@ export default function AcademicBountyBoardClient() {
       if (cu) {
         setUser(cu);
         try { const snap = await getDoc(doc(db, "users", cu.uid)); if (snap.exists()) setUserProfile(snap.data()); } catch { }
-      } else { router.push("/auth/signin"); }
+      } else { router.push("/signin"); }
       setAuthLoading(false);
     });
     return () => unsub();

@@ -60,7 +60,7 @@ export default function BecomeSellerClient() {
 
         useEffect(() => {
             const unsub = onAuthStateChanged(auth, async (cu) => {
-                if (!cu) { router.push("/auth/signin"); return; }
+                if (!cu) { router.push("/signin"); return; }
                 await fetchUserData(cu.uid); 
             });
             return () => unsub();

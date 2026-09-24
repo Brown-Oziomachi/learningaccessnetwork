@@ -559,7 +559,7 @@ export default function FacultyAnalyticsPage() {
     const { fmt } = useCurrency();
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (cu) => {
-            if (!cu) { router.push("/auth/signin"); return; }
+            if (!cu) { router.push("/signin"); return; }
             try {
                 const userDoc = await getDoc(doc(db, "users", cu.uid));
                 if (!userDoc.exists()) { router.push("/my-account"); return; }

@@ -263,7 +263,7 @@ const RESOURCE_TYPES = [
   "Lab Report", "Assignment", "Project", "Thesis", "Summary", "Slides",
 ];
 
-const YEARS = Array.from({ length: 8 }, (_, i) => String(2024 - i));
+const YEARS = Array.from({ length: 8 }, (_, i) => String(2026 - i));
 
 function FilterPanel({ filters, onChange, onClose, resultCount }) {
   const [local, setLocal] = useState(filters);

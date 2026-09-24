@@ -527,7 +527,7 @@ export default function AdminOfficeCheckInPage() {
           The Office Check-In page is restricted to LAN administrators. Sign in with an admin account to continue.
         </p>
         <div style={{ display: "flex", gap: "10px", flexDirection: "column" }}>
-          <a href="/auth/signin" style={{ background: "#3b82f6", color: "#fff", padding: "12px 24px", borderRadius: "8px", textDecoration: "none", fontSize: "13px", fontWeight: 600, display: "block" }}>Sign In as Admin</a>
+          <a href="/signin" style={{ background: "#3b82f6", color: "#fff", padding: "12px 24px", borderRadius: "8px", textDecoration: "none", fontSize: "13px", fontWeight: 600, display: "block" }}>Sign In as Admin</a>
           <a href="/home" style={{ background: "transparent", color: "#64748b", padding: "10px 24px", borderRadius: "8px", textDecoration: "none", fontSize: "13px", border: "1px solid rgba(255,255,255,0.07)", display: "block" }}>Go Home</a>
         </div>
       </div>

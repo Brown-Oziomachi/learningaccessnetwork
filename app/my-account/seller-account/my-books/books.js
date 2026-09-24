@@ -77,7 +77,7 @@ export default function MyPostedBooksClient() {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) { await fetchUserAndBooks(currentUser.uid); }
-            else { router.push('/auth/signin'); }
+            else { router.push('/signin'); }
         });
         return () => unsubscribe();
     }, [router]);

@@ -97,6 +97,13 @@ const NAV_CATS = [
 ];
 
 const SAVED_MENU_ITEMS = [
+   {
+    icon: Bookmark,
+    label: "Documentation",
+    description: "Read the full documents about LAN Library",
+    href: "/docs",
+    color: GOLD,
+  },
   {
     icon: Bookmark,
     label: "Saved Books",
@@ -106,8 +113,8 @@ const SAVED_MENU_ITEMS = [
   },
   {
     icon: ShoppingBag,
-    label: "Explore Sellers",
-    description: "Browse document from sellers",
+    label: "LAN Sellers",
+    description: "Browse document from LAN sellers",
     href: "/lan-sellers",
     color: GOLD,
   },
@@ -127,14 +134,14 @@ const SAVED_MENU_ITEMS = [
   },
   {
     icon: Copy,
-    label: "Your Public Link",
+    label: "Profile Link",
     description: "Showcase your profile",
     href: "/my-account/seller-account/share-profile",
     color: GOLD,
   },
   {
     icon: Sparkle,
-    label: "Ask AI",
+    label: "Ask AI(Educo)",
     description: "Get summaries & Book concept",
     href: "/ai-chat",
     color: GOLD,
@@ -143,6 +150,13 @@ const SAVED_MENU_ITEMS = [
 ];
 
 const MORE_TOOLS_ITEMS = [
+  {
+    icon: HelpCircle,
+    label: "Affiliate",
+    description: "Affiliate developer suite",
+    href: "/aff/developer/console",
+    color: GOLD,
+  },
   {
     icon: HelpCircle,
     label: "Help Center",
@@ -164,7 +178,7 @@ const MORE_TOOLS_ITEMS = [
     href: "/open-access",
     color: GOLD,
   },
-   {
+  {
     icon: Video,
     label: "Watch More Videos",
     description: "Step-by-Step Tutorials",
@@ -323,7 +337,7 @@ export default function Navbar() {
 
   const HandleClick = () => {
     if (!user) {
-      router.push("/auth/signin");
+      router.push("/signin");
       return;
     }
     router.push(isSeller ? "/upload-document" : "/become-seller");
@@ -331,7 +345,7 @@ export default function Navbar() {
 
   const handleMyAccountClick = async () => {
     if (!user) {
-      router.push("/auth/signin");
+      router.push("/signin");
       return;
     }
     try {

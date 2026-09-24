@@ -114,7 +114,7 @@ export default function ContactClient() {
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, (u) => {
             if (u) setUser(u);
-            else router.push('/auth/signin');
+            else router.push('/signin');
             setCheckingAuth(false);
         });
         return () => unsub();

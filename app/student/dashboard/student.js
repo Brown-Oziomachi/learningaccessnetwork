@@ -609,7 +609,7 @@ export default function StudentDashboardClient() {
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (u) => {
             if (u) await fetchAll(u.uid);
-            else router.push('/auth/signin');
+            else router.push('/signin');
         });
         return () => unsub();
     }, [router]);
@@ -618,7 +618,7 @@ export default function StudentDashboardClient() {
         try {
             setLoading(true);
             const userDoc = await getDoc(doc(db, 'users', uid));
-            if (!userDoc.exists()) { router.push('/auth/signin'); return; }
+            if (!userDoc.exists()) { router.push('/signin'); return; }
             const ud = userDoc.data();
             setUser({ uid, ...ud });
 
@@ -1828,7 +1828,7 @@ export default function StudentDashboardClient() {
                             }
                         </div>
 
-                        <button onClick={() => { auth.signOut(); router.push('/auth/signin'); }}
+                        <button onClick={() => { auth.signOut(); router.push('/signin'); }}
                             style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 9, padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 12, fontWeight: 700, fontFamily: "'Space Grotesk',sans-serif" }}>
                             <LogOut size={14} /> Sign Out
                         </button>

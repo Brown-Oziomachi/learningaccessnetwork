@@ -217,12 +217,12 @@ export default function MakeMoneyPage() {
                             >
                                 <Upload size={14} /> Become a Seller
                             </Link>
-                            <a href="#how-it-works"
+                            <a href="/writers-mindset"
                                 style={{ display:"inline-flex", alignItems:"center", gap:"8px", padding:"14px 32px", border:"0.5px solid rgba(255,255,255,0.2)", color: CREAM, fontSize:"13px", fontWeight:700, fontFamily:"'Lato',sans-serif", letterSpacing:"0.06em", textDecoration:"none", transition:"background 0.18s" }}
                                 onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.07)"}
                                 onMouseLeave={e => e.currentTarget.style.background="transparent"}
                             >
-                                How it works <ArrowRight size={13} />
+                                Learn How to Write <ArrowRight size={13} />
                             </a>
                         </div>
 
@@ -426,12 +426,12 @@ export default function MakeMoneyPage() {
                             >
                                 <Upload size={14} /> Become a Seller
                             </Link>
-                            <Link href="/documents"
+                            <Link href="/writers-mindset"
                                 style={{ display:"flex", alignItems:"center", gap:"8px", padding:"12px 28px", border:`0.5px solid ${NAVY}`, color: NAVY, fontSize:"13px", fontWeight:700, fontFamily:"'Lato',sans-serif", textDecoration:"none", letterSpacing:"0.04em", transition:"background 0.15s" }}
                                 onMouseEnter={e => e.currentTarget.style.background="rgba(13,34,68,0.05)"}
                                 onMouseLeave={e => e.currentTarget.style.background="transparent"}
                             >
-                                <BookOpen size={14} /> Browse Library
+                                <BookOpen size={14} /> Learn How to Write
                             </Link>
                         </div>
                     </div>
@@ -461,12 +461,12 @@ export default function MakeMoneyPage() {
                         >
                             <Upload size={14} /> Become a Seller
                         </Link>
-                        <Link href="/documents"
+                        <Link href="/writers-mindset"
                             style={{ display:"inline-flex", alignItems:"center", gap:"8px", padding:"14px 28px", border:"0.5px solid rgba(255,255,255,0.2)", color: CREAM, fontSize:"13px", fontWeight:700, textDecoration:"none", fontFamily:"'Lato',sans-serif", letterSpacing:"0.04em", transition:"background 0.18s" }}
                             onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.07)"}
                             onMouseLeave={e => e.currentTarget.style.background="transparent"}
                         >
-                            <BookOpen size={14} /> Browse Library
+                            <BookOpen size={14} /> Learn How to Write
                         </Link>
                     </div>
                 </section>

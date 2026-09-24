@@ -36,7 +36,7 @@ export default function BuyPhysicalClient() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, u => {
       if (u) setUser(u);
-      else router.push("/auth/signin");
+      else router.push("/signin");
     });
     return () => unsub();
   }, []);

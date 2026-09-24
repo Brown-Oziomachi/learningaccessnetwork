@@ -210,7 +210,7 @@ function BookCard({ book, isPurchased, view, user, router }) {
         if (!user) {
             e.preventDefault();
             router.push(
-                `/auth/signup?redirect=${encodeURIComponent(window.location.pathname)}`
+                `/signup?redirect=${encodeURIComponent(window.location.pathname)}`
             );
         }
     };
@@ -645,7 +645,7 @@ const [resolvedUid, setResolvedUid] = useState(null);
     const toggleFollow = async () => {
         if (!user) {
             router.push(
-                `/auth/signup?redirect=${encodeURIComponent(window.location.pathname)}`
+                `/signup?redirect=${encodeURIComponent(window.location.pathname)}`
             );
             return;
         }
@@ -1100,7 +1100,7 @@ const [resolvedUid, setResolvedUid] = useState(null);
                     </div>
                     <div style={{ flexShrink: 0, alignSelf: "center" }}>
                         <Link
-                            href="/auth/signup"
+                            href="/signup"
                             style={{
                                 display: "inline-flex",
                                 alignItems: "center",

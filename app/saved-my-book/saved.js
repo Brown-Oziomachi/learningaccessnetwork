@@ -40,7 +40,7 @@ export default function SavedBooksClient() {
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (cu) => {
             if (cu) { setUser(cu); await fetchSavedBooks(cu.uid); }
-            else router.push('/auth/signin');
+            else router.push('/signin');
         });
         return () => unsub();
     }, [router]);

@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { auth, db } from "@/lib/firebaseConfig";
 import { collection, getDocs } from "firebase/firestore";
-import NetworkModal from "@/components/NetworkModal";
 
 /* ─── design tokens (matches home + report pages) ─────────────── */
 const NAVY = "#0d2244";
@@ -208,7 +207,7 @@ const FOOTER_COLUMNS = [
       { label: "How to Buy", href: "/students/how-to-buy" },
       { label: "Past Questions", href: "/students/past-questions" },
       { label: "Study Groups", href: "/students/study-groups" },
-      { label: "Bookmark documents", href: "/students/wishlist" },
+      { label: "Bookmark", href: "/students/wishlist" },
       { label: "Student Network", href: "/students/network" },
 
     ],
@@ -221,6 +220,7 @@ const FOOTER_COLUMNS = [
       { label: "LAN Wallet", href: "/seller/lan-wallet" },
       { label: "Withdraw Earnings", href: "/seller/withdraw-earnings" },
       { label: "Referral Programme", href: "/seller/referral" },
+      { label: "Affiliate Programme", href: "/seller/api-integration" },
       { label: "Seller Dashboard", href: "/seller/seller-dashboard" },
       { label: "Recharge Services", href: "/seller/recharge-services" },
       { label: "Growing Your Followers", href: "/seller/grow-followers" },
@@ -245,10 +245,12 @@ const FOOTER_COLUMNS = [
     heading: "Company",
     links: [
       { label: "About LAN", href: "/about/lan" },
+      { label: "Ask Educo", href: "/signin" },
       { label: "LAN Shift", href: "/seller/lan-shift" },
       { label: "Help Centre", href: "/lan/net/help-center" },
       { label: "Documentation", href: "/docs" },
       { label: "Invite a Friend", href: "/ref/invite-friends" },
+      { label: "Affiliate", href: "/aff/developer/console" },
       { label: "Social Impact", href: "/social-impart" },
       { label: "Privacy Policy", href: "/lan/privacy-policy" },
       { label: "Terms of Service", href: "/lan/terms-of-service" },
@@ -388,7 +390,7 @@ function NetworkCardsSection() {
     fontWeight: "400",
     fontFamily: "'Lato', sans-serif"
   }}>
-    Think of the entire LAN platform as a large <strong>Academic Airport</strong>, where these three networks are the different groups of people making it run:
+    Think of the entire LAN platform as a large <span>Academic Airport</span>, where these three networks are the different groups of people making it run:
   </p>
   
   <p style={{
@@ -544,7 +546,6 @@ export default function LandingPage() {
   const [showVideo, setShowVideo] = useState(false);
   const currentYear = new Date().getFullYear();
   const [showPresentation, setShowPresentation] = useState(false);
-  const [showNetworkModal, setShowNetworkModal] = useState(false);
   const heroImages = ["/lanstu.png"];
 
   /* auth guard */
@@ -688,9 +689,9 @@ export default function LandingPage() {
         </p>
         <p className="anim-up-3" style={{ fontSize: 17, color: "rgba(245,240,232,0.7)", maxWidth: 560, lineHeight: 1.8, fontWeight: 300, margin: "0 0 44px" }}>
             Join an ecosystem of thousands of members across Africa.{" "}
-            <button onClick={() => setShowNetworkModal(true)} style={{ color: GOLDD, fontWeight: 100, textDecoration: "underline", textUnderlineOffset: 9, background: "none", border: "none", cursor: "pointer", fontSize: 17 }}>
-                Learn more
-            </button>
+            <a href="/writers-mindset" style={{ color: GOLDD, fontWeight: 100, textDecoration: "underline", textUnderlineOffset: 9, background: "none", border: "none", cursor: "pointer", fontSize: 17 }}>
+                Learn how to write
+            </a>
         </p>
 
         <div className="anim-up-4" style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
@@ -1010,7 +1011,7 @@ export default function LandingPage() {
                       "Upload your course materials",
                       "Set pricing — free or paid",
                       "Students discover & purchase",
-                      "Earnings paid monthly",
+                      "Withdraw anytime",
                     ].map((step, i) => (
                       <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         <div style={{ width: 22, height: 22, background: GOLD, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -1285,9 +1286,9 @@ export default function LandingPage() {
             <button className="btn-primary" onClick={goSignIn} style={{ fontSize: 14, padding: "16px 32px" }}>
               <Upload size={15} /> Start Selling Now
             </button>
-            <button className="btn-ghost" onClick={goSignIn} style={{ fontSize: 14, padding: "12px 32px" }}>
-              <Search size={15} /> Browse Books
-            </button>
+            <a href="/writers-mindset" className="btn-ghost" style={{ fontSize: 14, padding: "12px 32px" }}>
+              <Search size={15} /> Learn How to Write
+            </a>
           </div>
         </section>
 
@@ -1387,7 +1388,6 @@ export default function LandingPage() {
     )
   }
       </div >
-      {showNetworkModal && <NetworkModal onClose={() => setShowNetworkModal(false)} />}
     </>
   );
 }

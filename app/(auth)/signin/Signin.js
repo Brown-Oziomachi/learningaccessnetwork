@@ -4,9 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AlertCircle, CheckCircle, Sparkles } from "lucide-react";
-import GoogleSignInButton from "@/components/GoogleSignInButton";
 import { useAuth } from "@/hooks/useAuth";
 import { handleEmailPasswordSignIn } from "@/lib/auth/authHelpers";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 const NAVY = "#0d2244";
 const GOLD = "#b8963e";
@@ -213,7 +213,7 @@ export default function SignInClient() {
                   <p style={{ fontSize: 12, color: "#991b1b" }}>Your Network is Bad</p>
                 </div>
               )}
-
+              {/* <GoogleSignInButton /> */}
               <div style={{ color: "#999" }} className="divider"><span style={{color: "#777"}}>Continue with email</span></div>
 
               <input className="lan-input" type="email" placeholder="Email address"

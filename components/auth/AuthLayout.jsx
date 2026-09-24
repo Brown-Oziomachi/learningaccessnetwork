@@ -7,7 +7,7 @@ import Link from "next/link";
 export default function AuthLayout({
   children,
   showBack = true,
-  backPath = "/auth/signin",
+  backPath = "/signin",
   showLanguageSelector = false,
   showFindAccount = false,
 }) {
@@ -42,7 +42,7 @@ export default function AuthLayout({
 
       {showFindAccount && (
         <div className="py-8 px-6">
-          <Link href="/auth/find-my-account">
+          <Link href="/find-my-account">
             <button className="text-blue-950 hover:underline font-medium cursor-pointer">
               Find my account
             </button>

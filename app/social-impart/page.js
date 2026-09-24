@@ -49,13 +49,13 @@ function Nav() {
                 LAN <span style={{ color: GOLD }}>Library</span>
             </Link>
             <div style={{ display: "flex", gap: "28px", alignItems: "center" }} className="lan-nav-links">
-                {[["/#how-it-works", "How It Works"], ["/#earnings", "Impact"], ["/#tiers", "Our Work"], ["/#faq", "FAQ"]].map(([href, label]) => (
+                {[["/learn/make-money", "How It Works"], ["/#earnings", "Impact"], ["/#tiers", "Our Work"], ["/lan/faqs", "FAQ"]].map(([href, label]) => (
                     <a key={href} href={href} style={{ color: "rgba(255,255,255,.65)", fontSize: "13px", fontWeight: 700, textDecoration: "none", letterSpacing: ".06em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", transition: "color .2s" }}
                         onMouseEnter={e => e.currentTarget.style.color = GOLD}
                         onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,.65)"}
                     >{label}</a>
                 ))}
-                <Link href="/auth/signup" style={{ background: GOLD, color: NAVY, padding: "10px 24px", fontSize: "12px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato',sans-serif" }}>Join LAN</Link>
+                <Link href="/signup" style={{ background: GOLD, color: NAVY, padding: "10px 24px", fontSize: "12px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato',sans-serif" }}>Join LAN</Link>
             </div>
             <style>{`@media(max-width:768px){.lan-nav-links{display:none!important;}}`}</style>
         </nav>
@@ -122,7 +122,7 @@ function Hero() {
                 </p>
 
                 <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
-                    <Link href="/auth/signup" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "14px 28px", background: GOLD, color: NAVY, fontSize: "12px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato',sans-serif" }}>
+                    <Link href="/signup" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "14px 28px", background: GOLD, color: NAVY, fontSize: "12px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato',sans-serif" }}>
                         🚀 Join the Movement
                     </Link>
                     <a href="#mission" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "14px 22px", background: "rgba(255,255,255,.06)", color: "rgba(245,240,232,.8)", fontSize: "12px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", border: "1px solid rgba(255,255,255,.15)", textDecoration: "none", fontFamily: "'Lato',sans-serif" }}>
@@ -488,7 +488,7 @@ function CTAFooter() {
                 Whether you are a student, a lecturer, or a creator — there is a place for you on LAN. Join the movement that is rewriting what African education looks like.
             </p>
             <div style={{ display: "flex", gap: "14px", justifyContent: "center", flexWrap: "wrap" }}>
-                <Link href="/auth/signup" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "16px 36px", background: GOLD, color: NAVY, fontSize: "13px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato',sans-serif" }}>
+                <Link href="/signup" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "16px 36px", background: GOLD, color: NAVY, fontSize: "13px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato',sans-serif" }}>
                     🎓 Join as a Student
                 </Link>
                 <Link href="/seller/network" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "16px 28px", background: "rgba(255,255,255,.06)", color: "rgba(245,240,232,.8)", fontSize: "13px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", border: "1px solid rgba(255,255,255,.15)", textDecoration: "none", fontFamily: "'Lato',sans-serif" }}>

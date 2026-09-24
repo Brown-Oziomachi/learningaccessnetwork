@@ -586,7 +586,7 @@ export default function ShareProfilePage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (cu) => {
       if (!cu) {
-        router.push("/auth/signin");
+        router.push("/signin");
         return;
       }
       try {

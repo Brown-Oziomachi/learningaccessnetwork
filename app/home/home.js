@@ -115,9 +115,9 @@ export default function HomeClient() {
     const topAd = useAds("Gold", 10);   // ← ADD THIS
 
 
-    const topAdIds = new Set(topAd.map(a => a.adId));
+    const topAdIds = new Set(goldAds.slice(0, 4).map(a => a.adId));
     const gridGoldAds = goldAds.filter(a => !topAdIds.has(a.adId));
-    const gridSilverAds = silverAds.filter(a => !topAdIds.has(a.adId));
+    const gridSilverAds = silverAds;
 
     const filteredCategories = categories.filter(c =>
         c.name.toLowerCase().includes(browseSearch.toLowerCase()) ||
@@ -296,7 +296,7 @@ export default function HomeClient() {
     }, []);
 
     const HandleClick = () => {
-        if (!user) { router.push("/auth/signin"); return; }
+        if (!user) { router.push("/signin"); return; }
         router.push(isSeller ? "/upload-document" : "/become-seller");
     };
 
@@ -491,7 +491,7 @@ export default function HomeClient() {
                 alt="LAN Library student"
                 style={{
                     position: "absolute",
-                    right: "-20px",
+                    right: "-150px",
                     bottom: 0,
                     height: "115%",
                     width: "auto",
@@ -510,10 +510,6 @@ export default function HomeClient() {
                 zIndex: 1,
                 width: "clamp(180px, 18vw, 260px)",
                 aspectRatio: "9/18",
-                background: "#0a1628",
-                borderRadius: "36px",
-                border: "2px solid rgba(184,150,62,0.45)",
-                boxShadow: "0 40px 100px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
                 overflow: "hidden",
                 marginRight: "120px",
                 marginBottom: "20px",
@@ -524,10 +520,7 @@ export default function HomeClient() {
                     position: "absolute", top: "12px", left: "50%",
                     transform: "translateX(-50%)",
                     width: "60px", height: "9px",
-                    background: "#0a1628",
-                    borderRadius: "999px",
                     zIndex: 10,
-                    border: "1.5px solid rgba(184,150,62,0.25)",
                 }} />
 
                 {/* Screen image — your /lanstu.png inside the phone */}
@@ -560,24 +553,10 @@ export default function HomeClient() {
                     borderRadius: "0 0 34px 34px",
                     zIndex: 2,
                 }}>
-                    <p style={{
-                        fontFamily: "'Lato',sans-serif", fontSize: "8px", fontWeight: 700,
-                        letterSpacing: "0.18em", textTransform: "uppercase",
-                        color: GOLD, margin: 0, textAlign: "center",
-                    }}>
-                        Africa's Academic EdTech Marketplace
-                    </p>
+                    
                 </div>
-
-                {/* Gold corner accents */}
-                <div style={{ position: "absolute", top: 8, left: 8, width: "16px", height: "16px", borderTop: `1.5px solid ${GOLD}`, borderLeft: `1.5px solid ${GOLD}`, borderRadius: "2px 0 0 0", zIndex: 5 }} />
-                <div style={{ position: "absolute", top: 8, right: 8, width: "16px", height: "16px", borderTop: `1.5px solid ${GOLD}`, borderRight: `1.5px solid ${GOLD}`, borderRadius: "0 2px 0 0", zIndex: 5 }} />
-                <div style={{ position: "absolute", bottom: 8, left: 8, width: "16px", height: "16px", borderBottom: `1.5px solid ${GOLD}`, borderLeft: `1.5px solid ${GOLD}`, borderRadius: "0 0 0 2px", zIndex: 5 }} />
-                <div style={{ position: "absolute", bottom: 8, right: 8, width: "16px", height: "16px", borderBottom: `1.5px solid ${GOLD}`, borderRight: `1.5px solid ${GOLD}`, borderRadius: "0 0 2px 0", zIndex: 5 }} />
             </div>
-
         </div>
-
     </div>
 
     {/* ── Stats strip ── */}
@@ -607,7 +586,7 @@ export default function HomeClient() {
 
 </section>
                 {/* ── TOP FEATURED AD ── */}
-                {topAd.length > 0 && (
+                {goldAds.length > 0 && (
                     <div style={{ background: CREAM, borderBottom: "0.5px solid #e5ddd0", padding: "24px" }}>
                         <style>{`
             .top-ads-grid {
@@ -644,7 +623,7 @@ export default function HomeClient() {
                         </p>
 
                         <div className="top-ads-grid">
-                            {topAd.slice(0, 4).map((ad, idx) => (
+                            {goldAds.slice(0, 4).map((ad, idx) => (
                                 <a
                                     key={ad.adId || idx}
                                     href={ad.adLink || "#"}
@@ -950,7 +929,7 @@ export default function HomeClient() {
                 Fresh uploads from students and educators across Africa
             </p>
         </div>
-        <Link href="/docs"
+        <Link href="/documents"
             style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 700, color: NAVY, textDecoration: "none", letterSpacing: "0.04em", border: "0.5px solid #e5ddd0", padding: "9px 16px", whiteSpace: "nowrap" }}>
             All Documents <ArrowRight size={13} />
         </Link>
@@ -969,12 +948,23 @@ export default function HomeClient() {
     ) : (
         <>
             {/* ── Row 1: paid books 0-4 (5 books before any ads) ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "20px", marginBottom: "24px" }}>
-                {allBooks.filter(b => b.price > 0).slice(0, 5).map(book => {
-                    const soldCount = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
-                    const topSold = allBooks.slice(0, 12).reduce((m, b) => Math.max(m, bookSalesCount[b.id] || 0), 0);
-                    const isTrending = soldCount > 0 && soldCount === topSold;
-                    const owned = isPurchased(book.id);
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "20px", marginBottom: "24px" }}>
+                                        {allBooks
+                                            .filter(b => {
+                                                // Safe numeric coercion: handles numbers, numeric strings, and strips currency flags
+                                                const cleanPrice = Number(String(b.price).replace(/[^0-9.]/g, ''));
+                                                return cleanPrice > 0;
+                                            })
+                                            .slice(0, 5)
+                                            .map(book => {
+                                                // Use fallback IDs consistently across your handlers
+                                                const targetId = book.id || book.firestoreId;
+                                                const soldCount = bookSalesCount[targetId] || 0;
+
+                                                // Optimization: Avoid running a .reduce loop inside your map loop if possible
+                                                const topSold = allBooks.slice(0, 12).reduce((m, b) => Math.max(m, bookSalesCount[b.id] || bookSalesCount[b.firestoreId] || 0), 0);
+                                                const isTrending = soldCount > 0 && soldCount === topSold;
+                                                const owned = isPurchased(targetId);
                     return (
                         <Link key={book.id} href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block", background: "#fff" }}>
                             <div style={{ position: "relative" }}>

@@ -181,7 +181,7 @@ export default function RequestPrintPermissionClient() {
                 setUser(cu);
                 setFormData({ email: cu.email || "", phone: "", name: cu.displayName || "" });
             } else {
-                router.push("/auth/signin");
+                router.push("/signin");
             }
         });
         return () => unsub();

@@ -465,7 +465,7 @@ export default function SellerRepository() {
   /* ── Auth ── */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { router.push("/auth/signin"); return; }
+      if (!u) { router.push("/signin"); return; }
       const uDoc = await getDoc(doc(db, "users", u.uid));
       if (uDoc.exists()) setUser({ uid: u.uid, ...uDoc.data() });
     });

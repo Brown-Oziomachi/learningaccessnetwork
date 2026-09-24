@@ -173,7 +173,7 @@ export default function EmailClient() {
                                     <Link href="/lan/customer-care" className="lan-error-link">Contact Support →</Link>
                                 )}
                                 {accountExists && (
-                                    <Link href={`/auth/signin?email=${encodeURIComponent(email)}`} className="lan-error-link" style={{ color:NAVY }}>
+                                    <Link href={`/signin?email=${encodeURIComponent(email)}`} className="lan-error-link" style={{ color:NAVY }}>
                                         Sign in instead →
                                     </Link>
                                 )}

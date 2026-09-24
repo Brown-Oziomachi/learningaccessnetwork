@@ -275,7 +275,7 @@ function Nav({ onSearch }) {
                     <span>Search</span>
                     <span style={{ fontSize: "9px", background: "rgba(248,248,255,.08)", padding: "1px 6px", fontFamily: "monospace" }}>ctrl+K</span>
                 </button>
-                <Link href="/auth/signup" style={{ background: LIME, color: VOID, padding: "9px 20px", fontSize: "11px", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", clipPath: "polygon(0 0, 94% 0, 100% 100%, 6% 100%)", transition: "background .15s" }}
+                <Link href="/signup" style={{ background: LIME, color: VOID, padding: "9px 20px", fontSize: "11px", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", clipPath: "polygon(0 0, 94% 0, 100% 100%, 6% 100%)", transition: "background .15s" }}
                     onMouseEnter={e => e.currentTarget.style.background = LIMEL}
                     onMouseLeave={e => e.currentTarget.style.background = LIME}>
                     Get Started
@@ -1309,7 +1309,7 @@ export default function LANDocsClient() {
                                     Create your free account in 2 minutes. Start browsing 128,000+ documents immediately.
                                 </p>
                                 <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
-                                    <Link href="/auth/signup" style={{ padding: "14px 32px", background: LIME, color: VOID, fontSize: "11px", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", clipPath: "polygon(0 0, 95% 0, 100% 100%, 5% 100%)", transition: "background .15s" }}
+                                    <Link href="/signup" style={{ padding: "14px 32px", background: LIME, color: VOID, fontSize: "11px", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", clipPath: "polygon(0 0, 95% 0, 100% 100%, 5% 100%)", transition: "background .15s" }}
                                         onMouseEnter={e => e.currentTarget.style.background = LIMEL}
                                         onMouseLeave={e => e.currentTarget.style.background = LIME}>
                                         Create Free Account

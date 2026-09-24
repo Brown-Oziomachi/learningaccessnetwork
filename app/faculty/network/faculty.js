@@ -46,7 +46,7 @@ function Nav() {
                         onMouseLeave={e => { e.currentTarget.style.color = INK; e.currentTarget.style.borderBottomColor = "transparent"; }}
                     >{label}</a>
                 ))}
-                <Link href="/auth/signup" style={{
+                <Link href="/signup" style={{
                     background: INK, color: IVORY, padding: "11px 26px",
                     fontSize: "11px", fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase",
                     textDecoration: "none", fontFamily: "'Montserrat',sans-serif", display: "inline-block",
@@ -135,7 +135,7 @@ function Hero() {
                 </p>
 
                 <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
-                    <Link href="/auth/signup" style={{
+                    <Link href="/signup" style={{
                         padding: "14px 32px", background: TEAL, color: "#fff",
                         fontSize: "11px", fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase",
                         textDecoration: "none", fontFamily: "'Montserrat',sans-serif", transition: "background .18s",
@@ -671,7 +671,7 @@ function CTAFooter() {
                     Join 3,200+ verified academics already earning from their expertise. Faculty verification takes under 48 hours — and it's completely free.
                 </p>
                 <div style={{ display: "flex", gap: "14px", justifyContent: "center", flexWrap: "wrap" }}>
-                    <Link href="/auth/signup" style={{
+                    <Link href="/signup" style={{
                         padding: "15px 36px", background: TEAL, color: "#fff",
                         fontSize: "12px", fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase",
                         textDecoration: "none", fontFamily: "'Montserrat',sans-serif", transition: "background .18s",

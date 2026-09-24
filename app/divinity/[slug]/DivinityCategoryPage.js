@@ -345,7 +345,7 @@ export default function DivinityCategoryClient() {
                                 </h2>
                             </div>
 
-                            <a href={user ? "/upload-document" : "/auth/signin"} target="_blank" rel="noopener noreferrer"
+                            <a href={user ? "/upload-document" : "ignin"} target="_blank" rel="noopener noreferrer"
                                 style={{
                                     display: "inline-flex", alignItems: "center", gap: 8,
                                     padding: "11px 22px", background: NAVY, color: "#fff",
@@ -419,7 +419,7 @@ export default function DivinityCategoryClient() {
                                 </p>
                                 {!searchQuery && (
 
-                                    <a href={user ? "/upload-document" : "/auth/signin"} target="_blank" rel="noopener noreferrer"
+                                    <a href={user ? "/upload-document" : "/signin"} target="_blank" rel="noopener noreferrer"
                                         style={{
                                             padding: "10px 28px", background: NAVY, color: "#fff",
                                             fontFamily: "'Lato',sans-serif", fontSize: 11, fontWeight: 700,

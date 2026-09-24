@@ -476,6 +476,7 @@ export default function WritersMindsetPage() {
               title="The Psychology of Creation"
               subtitle="Why writing is not a skill problem — it is a psychology problem"
             />
+            {/* <img src="/comm.png" style={{ maxWidth: "0 auto", margin: "0 auto", padding: "80px 24px 120px" }} /> */}
 
             <P className="drop-cap">
               What separates those who finish their book from those who don't has almost nothing to do with grammar, vocabulary, or even natural talent. The separating factor is entirely psychological. The successful author has built an internal architecture — a set of beliefs, habits, and coping mechanisms — that allows them to continue producing even when the work feels terrible, the motivation has evaporated, and the inner voice insists they stop.

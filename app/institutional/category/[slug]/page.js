@@ -99,7 +99,7 @@ export default function InstitutionalCategoryPage() {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             if (currentUser) setUser(currentUser);
-            else router.push('/auth/signin');
+            else router.push('/signin');
         });
         return () => unsubscribe();
     }, [router]);

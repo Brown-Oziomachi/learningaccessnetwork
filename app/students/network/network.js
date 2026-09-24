@@ -47,7 +47,7 @@ function Nav() {
                         onMouseLeave={e => e.currentTarget.style.color = MUTED}
                     >{label}</a>
                 ))}
-                <Link href="/auth/signup" style={{
+                <Link href="/signup" style={{
                     background: LIME, color: VOID, padding: "10px 22px",
                     fontSize: "11px", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase",
                     textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", display: "inline-block",
@@ -167,7 +167,7 @@ function Hero() {
             onMouseEnter={e => e.currentTarget.style.background = LIMEL}
             onMouseLeave={e => e.currentTarget.style.background = LIME}
           >Browse 128K+ Docs</Link>
-          <Link href="/auth/signup" style={{
+          <Link href="/signup" style={{
             padding: "14px 26px", background: "transparent", color: WHITE,
             fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
             border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
@@ -708,7 +708,7 @@ function CTAFooter() {
                     Create your free account in 2 minutes. Start browsing 128,000+ documents immediately — no payment required to explore.
                 </p>
                 <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
-                    <Link href="/auth/signup" style={{
+                    <Link href="/signup" style={{
                         padding: "16px 36px", background: LIME, color: VOID,
                         fontSize: "12px", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase",
                         textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", transition: "background .15s",

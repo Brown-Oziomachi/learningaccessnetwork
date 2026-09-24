@@ -439,7 +439,7 @@ export default function CategoryPage() {
 
     /* ── auth ── */
     useEffect(() => {
-        const unsub = onAuthStateChanged(auth, cu => { cu ? setUser(cu) : router.push('/auth/signin'); });
+        const unsub = onAuthStateChanged(auth, cu => { cu ? setUser(cu) : router.push('/signin'); });
         return () => unsub();
     }, [router]);
 

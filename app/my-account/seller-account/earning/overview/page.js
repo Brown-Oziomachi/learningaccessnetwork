@@ -298,7 +298,7 @@ export default function EarningsOverview() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       if (u) setUid(u.uid);
-      else router.push("/auth/signin");
+      else router.push("/signin");
     });
     return unsub;
   }, [router]);

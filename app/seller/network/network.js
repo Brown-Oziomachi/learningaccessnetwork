@@ -47,7 +47,7 @@ function Nav() {
                         onMouseLeave={e => e.currentTarget.style.color = MUTED}
                     >{label}</a>
                 ))}
-                <Link href="/auth/signup" style={{
+                <Link href="/signup" style={{
                     background: LIME, color: VOID, padding: "10px 22px",
                     fontSize: "11px", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase",
                     textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", display: "inline-block",
@@ -153,7 +153,7 @@ function Hero() {
                 </p>
 
                 <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "48px" }}>
-                    <Link href="/auth/signup" style={{
+                    <Link href="/signup" style={{
                         padding: "14px 30px", background: LIME, color: VOID,
                         fontSize: "12px", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase",
                         textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif",
@@ -595,7 +595,7 @@ function AnalyticsDashboard() {
                                 </div>
                             </div>
                         ))}
-                        <Link href="/auth/signup" style={{
+                        <Link href="/signup" style={{
                             display: "inline-flex", alignItems: "center", gap: "8px",
                             marginTop: "12px", padding: "13px 28px", background: PURPLE, color: WHITE,
                             fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
@@ -926,7 +926,7 @@ function CTAFooter() {
                     Create your free seller account in 3 minutes. Upload your first document and start earning from what you already know.
                 </p>
                 <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
-                    <Link href="/auth/signup" style={{
+                    <Link href="/signup" style={{
                         padding: "16px 36px", background: LIME, color: VOID,
                         fontSize: "12px", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase",
                         textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", transition: "background .15s",

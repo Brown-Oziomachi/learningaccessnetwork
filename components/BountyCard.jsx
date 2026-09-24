@@ -1506,7 +1506,7 @@ return (
               <p
                 style={{
                   fontSize: 11,
-                  color: "#666",
+                  color: NAVY,
                   fontFamily: "'Lato',sans-serif",
                   lineHeight: 1.65,
                   margin: 0,

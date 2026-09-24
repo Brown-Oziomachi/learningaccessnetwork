@@ -85,7 +85,7 @@ Gold sellers receive priority review processing for new uploads, eligibility for
 Tier progression is automatic — there is no application process. The platform continuously evaluates your account metrics and upgrades your tier as you meet the thresholds. Your tier is displayed on your public profile, serving as a quality signal to buyers about your track record on the platform.`,
             },
         ],
-        cta: { label: "Join Seller Network", href: "/auth/signup" },
+        cta: { label: "Join Seller Network", href: "/signup" },
         related: [
             "upload-document",
             "seller-dashboard",
@@ -171,7 +171,7 @@ Documents can be unpublished temporarily without being permanently deleted. This
 The most productive catalogue management activity is adding new documents consistently. Even two or three new documents per month compounds significantly over a year — a seller who adds three documents monthly has 36 additional earning assets after one year, each accumulating its own purchase history, reviews, and search ranking. The income growth from a consistently expanding catalogue is non-linear: each new document has a lower marginal cost than the previous one, but contributes equally to the income base.`,
             },
         ],
-        cta: { label: "Start Uploading", href: "/auth/signup" },
+        cta: { label: "Start Uploading", href: "/signup" },
         related: [
             "seller-network",
             "seller-dashboard",
@@ -247,7 +247,7 @@ Recharge Services transactions debit your wallet immediately and process the uti
 For sellers whose monthly document income covers their regular utility costs, using Recharge Services to pay those bills directly eliminates the need to withdraw that portion of their income — saving the withdrawal processing time and, for Bronze-tier sellers, the small withdrawal fee. Many established sellers use a hybrid approach: withdrawing their net savings to their bank account at the end of the month while using their wallet for recurring utility payments throughout the month.`,
             },
         ],
-        cta: { label: "Go to Wallet", href: "/home/wallet" },
+        cta: { label: "Go to Wallet", href: "/my-account/seller-acount" },
         related: [
             "withdraw-earnings",
             "seller-dashboard",
@@ -323,7 +323,7 @@ Mobile data through Recharge Services is available at wholesale SME rates — ty
 A practical example: a seller who earns the equivalent of USD 30 per month in document income might spend USD 8 of that on data, USD 4 on airtime, and USD 5 on electricity through Recharge Services — handling USD 17 of their monthly utility costs from their wallet — and withdraw the remaining USD 13 to their bank account. Compared to withdrawing the full USD 30 and then purchasing utilities separately, this approach saves the withdrawal fee on USD 17 of spending and often saves 30 to 40% on the data cost specifically.`,
             },
         ],
-        cta: { label: "Go to Wallet", href: "/home/wallet" },
+        cta: { label: "Go to Wallet", href: "/my-account/seller-account" },
         related: [
             "lan-wallet",
             "seller-dashboard",
@@ -477,7 +477,7 @@ Account health indicators surface any situations requiring your attention — a 
 The dashboard is available as a mobile-responsive web interface accessible from any smartphone browser without requiring the LAN app to be installed. Sellers who monitor their dashboard regularly — particularly during active examination periods when document demand is highest — consistently outperform those who check in infrequently, because they can respond to performance signals faster and take advantage of peak demand windows with timely price adjustments and new uploads.`,
             },
         ],
-        cta: { label: "Access Your Dashboard", href: "/home/seller-dashboard" },
+        cta: { label: "Access Your Dashboard", href: "/my-account/seller-account" },
         related: [
             "upload-document",
             "lan-wallet",
@@ -559,7 +559,7 @@ For Nigerian sellers, all four major mobile networks (MTN, Airtel, Glo, 9mobile)
 If your country or provider is not yet listed, the most effective way to accelerate its addition is to contact LAN Support through your <link slug="seller-dashboard" text="dashboard" /> and express your interest. Provider additions are prioritised based on demonstrated seller demand — multiple requests for the same provider or country significantly accelerate the timeline for that addition. The support team can also advise on the current timeline for specific provider additions you are waiting for.`,
             },
         ],
-        cta: { label: "Go to Recharge", href: "/home/recharge" },
+        cta: { label: "Go to Recharge", href: "/recharge" },
         related: [
             "withdraw-earnings",
             "lan-wallet",
@@ -621,7 +621,7 @@ The most effective strategy is to utilize your public profile link, which compil
 When you share your link on Facebook or other social media channels, always give people a clear reason to take action. Treat it like content creation: make a post telling your students, 'I have just structured the entire semester's study guides and past question breakdowns. Hit the Follow button on my LAN Library profile page so you never miss an update. You will get an instant email and dashboard notification the moment I upload the next set of course materials or exam prep files.' This simple call to action turns temporary social media followers into permanent LAN Library followers, creating a lasting digital asset that pays you directly.`,
             },
         ],
-        cta: { label: "View Sharing Dashboard", href: "/home/grow-followers" },
+        cta: { label: "View Sharing Dashboard", href: "/my-account/seller-account/share-profile" },
         related: [
             "seller-dashboard",
             "upload-document",
@@ -631,6 +631,134 @@ When you share your link on Facebook or other social media channels, always give
         ],
         tags: ["Audience Growth", "Passive Income", "Social Media Strategy", "Marketing Automation"],
     },
+
+    "api-integration": {
+        badge: "Developer API Gateway",
+        badgeIcon: "🔌",
+        category: "AFFILIATE SUITE",
+        readTime: "12 min read",
+        title: "LAN Library Affiliate API Integration Guide",
+        subtitle:
+            "Stream live book catalogs directly onto your own application ecosystem. Learn how to fetch data packages and display automated tracking links that reward you instantly.",
+        hero: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=1400&q=80",
+        intro: `For developers, digital creators, and affiliate platforms, the LAN Library Developer API transforms static book referrals into a dynamic, programmatic content stream. By querying our official gateway endpoint, you can fetch live book records from our catalog in real-time, matching specific categories or volume limitations.
+
+The best part? You do not need to worry about manually constructing tracking links or cookies. Every single record returned through your authenticated API handshake comes pre-packaged with a customized, unique purchase URL tied explicitly to your Developer ID. When your website visitors click those links and finalize a transaction, our ledger locks the commission coordinates directly into your affiliate wallet balance.`,
+        sections: [
+            {
+                heading: "The Golden Rule: Protecting Your Private API Key",
+                body: `Your LAN Library API token is your financial signature—it connects every data request directly to your developer account and affiliate wallet. Because of this, you must never pass your raw API key directly from a client-side environment (such as a standard frontend fetch, a public GitHub repository, or vanilla client scripts).
+
+If your key is exposed on the frontend, any visitor can open their browser's Developer Tools, view the Network tab, and steal your key string. This leaves your integration vulnerable to malicious rate-limiting, data scraping, or stream hijacking. To fully protect your earnings and platform, you must always store your credentials safely on your server as an environment variable and route your catalog traffic through a secure server-side proxy route.`,
+            },
+            {
+                heading: "Step 1: Setting Up Your Secure Server Route (The Proxy)",
+                body: `To safely communicate with the LAN Library server gateway, you will create an internal server route inside your website's application file structure. This backend file acts as a secure intermediary: your browser code will talk to this route, and this route will securely append your hidden API token before executing a server-to-server fetch with LAN Library.
+
+Create a new file in your project structure exactly at: 'app/api/lan-books/route.js' and add the following proxy engine code:
+
+\`\`\`javascript
+import { NextResponse } from 'next/server';
+
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const category = searchParams.get('category') || 'all';
+  const limit    = searchParams.get('limit')    || '12';
+
+  const lanParams = new URLSearchParams({ limit });
+  if (category !== 'all') lanParams.set('category', category);
+
+  try {
+    // Perform a secure, server-to-server handshake
+    const response = await fetch(\`https://www.lanlibrary.com/api/v1/books?\${lanParams}\`, {
+      method: 'GET',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.LAN_API_KEY || '' // Safely read from your server environment
+      },
+      next: { revalidate: 60 } // Optional: Caches the data for 60 seconds to enhance speed
+    });
+
+    if (!response.ok) {
+      return NextResponse.json({ success: false, error: 'Upstream connection error' }, { status: response.status });
+    }
+
+    const payload = await response.json();
+    return NextResponse.json({ success: true, data: payload.data });
+
+  } catch (error) {
+    return NextResponse.json({ success: false, error: 'Internal server error proxying data' }, { status: 500 });
+  }
+}
+\`\`\``,
+            },
+            {
+                heading: "Step 2: Building Your Frontend Catalog Page Layout",
+                body: `With your backend proxy secure, you can now construct your client-facing page interface safely. Create your frontend presentation page file exactly at 'app/books/page.jsx' using the functional integration template below to fetch and manage the real-time data stream:
+
+\`\`\`javascript
+'use client';
+import { useEffect, useState } from 'react';
+
+export default function BooksCatalogPage() {
+  const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Hits YOUR local secure server endpoint, protecting your key from public exposure
+    fetch('/api/lan-books?limit=12')
+      .then((res) => res.json())
+      .then((payload) => {
+        if (payload.success) setBooks(payload.data || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p style={{ padding: '20px', fontFamily: 'sans-serif' }}>Streaming active catalog items...</p>;
+  
+  // Your UI layout rendering map logic goes here inside the component return block
+}
+\`\`\`
+
+### Line-by-Line Code Breakdown & Architectural Logic
+
+* **'use client';** Informs Next.js that this component runs entirely within the user's web browser, which is mandatory for managing client-side React hooks ('useState' and 'useEffect').
+
+* **import { useEffect, useState } from 'react';** Loads the foundational hooks. 'useState' allocates reactive memory blocks to store your downloaded data, while 'useEffect' manages asynchronous execution windows.
+
+* **const [books, setBooks] = useState([]);** Configures an independent state cell initialized as an empty array to hold your book data cleanly.
+
+* **const [loading, setLoading] = useState(true);** A system guard boolean that allows you to gracefully present a loading message before network transactions wrap up.
+
+* **useEffect(() => { ... }, []);** An isolated lifecycle block that fires exactly once when a visitor loads your page, acting as an optimal trigger to source the data streams automatically.
+
+* **fetch('/api/lan-books?limit=12')** Instructs the browser to transmit an HTTP request to your internal backend proxy configuration instead of targeting external endpoints directly, isolating your authorization keys completely.
+
+* **.then((res) => res.json())** Intercepts the raw data payload from your backend proxy and cleanly converts it into a queryable JavaScript JSON object tree.
+
+* **.then((payload) => { ... })** If successful, it replaces the empty initialization array with live book catalog data and updates the loading metrics to instantly change your layout visibility.
+
+* **.catch(() => setLoading(false));** A network safety net that catches connectivity issues and drops the loading screen gracefully so the app interface doesn't freeze.`,
+            },
+            {
+                heading: "Parsing the Payload: Activating Affiliate Commission Tracking",
+                body: `When your frontend template receives data arrays from your server proxy, you don't need to write custom logic to track user sessions or parse query cookies. The incoming JSON layout provides all necessary monetization handles instantly.
+
+Every single book item object inside the returning dataset array contains a key string called 'affiliatePurchaseUrl'. This property contains the complete direct path to the document view on our store, automatically compiled with your precise affiliate developer parameters. 
+
+When configuring your map templates or clickable grid nodes, always assign your purchase, view, or download link paths directly to this pre-built 'affiliatePurchaseUrl' value. When an operational visitor jumps from your site using that tokened hyperlink, our core system automatically records the inbound transfer reference and accurately wires the commission percentage straight to your developer balance ledger upon checkout.`,
+            },
+        ],
+        cta: { label: "Go to Developer Console", href: "/aff/developer/console" },
+        related: [
+            "seller-dashboard",
+            "lan-wallet",
+            "referral",
+            "grow-followers"
+        ],
+        tags: ["API Integration", "Developer Tools", "Affiliate Revenue", "Coding Guide", "Secure Proxy Routing"],
+},
 
     "lan-shift": {
         badge: "The LAN Shift",
@@ -674,10 +802,10 @@ By hosting over 70 distinct document types—including lab reports, architectura
                 heading: "Peer-to-Peer Knowledge Sharing & Viral Distribution",
                 body: `The LAN Shift doesn't happen in isolation; it expands exponentially through the power of collective African communities. We have integrated smart social tools that allow students to share high-value documents seamlessly across university WhatsApp groups, student Telegram channels, and campus forums.
 
-When you discover a game-changing study guide or an exam breakdown that makes an impossible course easy to understand, sharing it isn't just helpful—it is incentivized. By utilizing your personalized links from the <link slug="referral-programme" text="Referral Programme" />, you can blast these vital resources to your class networks. You are simultaneously democratizing access to education for your peers while building a passive commission stream for yourself. On LAN, every shared document is a step closer to collective academic freedom.`,
+When you discover a game-changing study guide or an exam breakdown that makes an impossible course easy to understand, sharing it isn't just helpful—it is incentivized. By utilizing your personalized links from the <link slug="referral" text="Referral Programme" />, you can blast these vital resources to your class networks. You are simultaneously democratizing access to education for your peers while building a passive commission stream for yourself. On LAN, every shared document is a step closer to collective academic freedom.`,
             },
         ],
-        cta: { label: "Explore the Marketplace", href: "/marketplace" },
+        cta: { label: "Explore the Marketplace", href: "/documents" },
         related: [
             "referral-programme",
             "seller-network",
@@ -752,7 +880,7 @@ Top-performing referrers in the Seller Network generate the equivalent of USD 80
 Your referral income stacks with every other income stream on the platform. Document sales, referral commissions, and Bounty rewards all flow to the same <link slug="lan-wallet" text="LAN Wallet" /> and are equally available for <link slug="withdraw-earnings" text="withdrawal" /> or <link slug="recharge-services" text="Recharge Services" /> spending. There is no administrative separation between income types — your wallet is your wallet, and every source of income contributes to the same balance.`,
             },
         ],
-        cta: { label: "Get Your Referral Link", href: "/ref/invite-friends" },
+        cta: { label: "Get Your Referral Link", href: "/ref/invite-friends"},
         related: [
             "seller-network",
             "withdraw-earnings",
@@ -813,6 +941,12 @@ const RELATED_META = {
         icon: "👥",
         desc: "Unlock an automated sales pipeline.",
     },
+     "api-integration": {
+        label: "Pattnering with LAN Library via API",
+        icon: "🤝",
+        desc: "Featuring LAN API via your domain",
+    },
+
 };
 
 /* ─── Parse inline link syntax ─────────────────────────────── */
@@ -942,7 +1076,7 @@ function Nav() {
                     Seller Hub
                 </Link>
                 <Link
-                    href="/auth/signup"
+                    href="/signup"
                     style={{
                         background: GOLD,
                         color: NAVY,
@@ -1281,7 +1415,7 @@ function GuidesFooter({ currentSlug }) {
                             Seller Hub
                         </Link>
                         <Link
-                            href="/auth/signup"
+                            href="/signup"
                             style={{
                                 fontSize: 11,
                                 color: GOLD,
@@ -1754,12 +1888,11 @@ export default function SellerSlugClient() {
                                         lineHeight: 1.6,
                                     }}
                                 >
-                                    Join thousands of sellers already generating passive income
-                                    from their academic content across Africa.
+                                    {page.subtitle}
                                 </div>
                             </div>
                             <Link
-                                href="/my-account/seller-account"
+                                href={page.cta.href}
                                 style={{
                                     display: "inline-flex",
                                     alignItems: "center",

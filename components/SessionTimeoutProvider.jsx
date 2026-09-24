@@ -6,7 +6,7 @@ import { useSessionTimeout } from "@/lib/useSessionTimeout";
 export function SessionTimeoutProvider({
   isAuthenticated,
   timeoutMs = 1_800_000,
-  redirectPath = "/auth/signin",
+  redirectPath = "/signin",
   onTimeout,
   showToast,
   children,

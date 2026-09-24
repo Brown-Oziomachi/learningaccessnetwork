@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { handleGoogleSignIn } from "@/lib/auth/authHelpers";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { auth } from "@/lib/firebaseConfig";
+import { verifyUserAccountStatus } from "@/lib/auth/authHelpers";
 
 export default function GoogleSignInButton() {
   const router = useRouter();
@@ -8,33 +10,36 @@ export default function GoogleSignInButton() {
 
   const handleGoogleAuth = async () => {
     setLoading(true);
-
     try {
-      const result = await handleGoogleSignIn();
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
 
-      if (result.success) {
-        router.push("/home");
-      } else {
-        const errorCode = result.error?.code || result.error;
+      if (result?.user) {
+        const verification = await verifyUserAccountStatus(result.user);
 
-        if (errorCode === "auth/account-suspended") {
-          alert(
-            "Your account has been suspended. Please contact support at support@lanlibrary.com"
-          );
-        } else if (errorCode === "auth/account-pending") {
-          alert(
-            "Your account is under review. Please contact support at support@lanlibrary.com"
-          );
-        } else if (errorCode === "auth/popup-closed-by-user") {
-          // User closed the popup, don't show error
-          console.log("Sign in cancelled by user");
+        if (verification.success) {
+          router.push("/home");
         } else {
-          alert("Failed to sign in with Google. Please try again.");
+          const errorCode = verification.error?.code;
+          if (errorCode === "auth/user-not-found") {
+            alert("No existing account found. Redirecting to sign up...");
+            router.push("/signup");
+          } else if (errorCode === "auth/account-suspended") {
+            alert(
+              "Your account has been suspended. Contact support@lanlibrary.com",
+            );
+          } else if (errorCode === "auth/account-deactivated") {
+            alert(
+              "This account has been deactivated. Contact support to restore access.",
+            );
+          } else {
+            alert("Sign in verification failed.");
+          }
         }
       }
     } catch (error) {
-      console.error("Google sign in error:", error);
-      alert("Failed to sign in with Google");
+      console.error("Google sign-in error:", error);
+      alert("Google sign-in failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -64,7 +69,7 @@ export default function GoogleSignInButton() {
           d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
         />
       </svg>
-      <span>{loading ? "Signing in..." : "Continue with Google"}</span>
+      <span>{loading ? "Processing..." : "Continue with Google"}</span>
     </button>
   );
 }

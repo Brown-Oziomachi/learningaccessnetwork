@@ -623,7 +623,7 @@ function ChatSidebar({ isOpen, onClose, chatSessions, currentSessionId, onSelect
                 <div className="hero-bg" style={{ padding: "18px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <BookMarked size={14} style={{ color: GOLD }} />
-                        <span className="lan-serif" style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>LAN AI Chats</span>
+                        <span className="lan-serif" style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>Chat Educo AI</span>
                     </div>
                     <button onClick={onClose} style={{ background: "rgba(255,255,255,.1)", border: "0.5px solid rgba(255,255,255,.15)", color: "rgba(255,255,255,.7)", width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} className="lg-hidden">
                         <X size={12} />
@@ -919,7 +919,7 @@ export default function AiChatContentClient() {
                         {showWelcome && messages.length === 0 && (
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 40, paddingBottom: 20 }}>
                                 <div style={{ width: 64, height: 64, border: `1.5px solid ${GOLD}`, transform: "rotate(45deg)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
-                                    <BookMarked size={26} style={{ color: NAVY, transform: "rotate(-45deg)" }} />
+                                    <BookMarked size={26}  />
                                 </div>
                                 <h1 className="lan-serif" style={{ fontSize: "clamp(22px,4vw,38px)", fontWeight: 700, color: NAVY, textAlign: "center", marginBottom: 10 }}>
                                     What do you want to know?
@@ -928,7 +928,7 @@ export default function AiChatContentClient() {
                                     <div style={{ width: 7, height: 7, background: GOLD, transform: "rotate(45deg)", flexShrink: 0 }} />
                                 </div>
                                 <p style={{ fontSize: 14, color: "#888", textAlign: "center", marginBottom: 32, fontWeight: 300, lineHeight: 1.75 }}>
-                                    Ask anything about{" "}
+                                   I am <span className="lan-serif" style={{ color: NAVY, fontWeight: 700 }}>Educo</span> ask me anything about{" "}
                                     <span className="lan-serif" style={{ color: NAVY, fontWeight: 700 }}>{bookTitle}</span>
                                 </p>
                                 <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1005,7 +1005,7 @@ export default function AiChatContentClient() {
                             onFocusCapture={e => e.currentTarget.style.borderColor=GOLD}
                             onBlurCapture={e => e.currentTarget.style.borderColor="#d9d0c0"}>
                             <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                                placeholder={`Ask anything about "${bookTitle}"…`} rows={1}
+                                placeholder={`Ask Educo about "${bookTitle}"…`} rows={1}
                                 className="lan-input"
                                 style={{ flex:1, border:"none", outline:"none", resize:"none", maxHeight:140, padding:"2px 0" }} />
                             <button type="submit" disabled={loading || !input.trim()} className="send-btn"
@@ -1017,7 +1017,7 @@ export default function AiChatContentClient() {
                         </form>
 
                         <p style={{ textAlign:"center", fontSize:9, fontWeight:700, letterSpacing:".14em", textTransform:"uppercase", color:"#bbb", fontFamily:"'Lato',sans-serif", marginTop:10 }}>
-                            LAN Library AI · Ask questions, get summaries, explore key concepts
+                            Educo AI · Ask questions, get summaries, explore key concepts
                         </p>
                     </footer>
 

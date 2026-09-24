@@ -32,9 +32,8 @@ const FOOTER_COLUMNS = [
       { label: "How to Buy", href: "/students/how-to-buy" },
       { label: "Past Questions", href: "/students/past-questions" },
       { label: "Study Groups", href: "/students/study-groups" },
-      { label: "Saved", href: "/students/wishlist" },
+      { label: "Bookmark", href: "/students/wishlist" },
       { label: "Student Network", href: "/students/network" },
-      { label: "Growing Your Followers", href: "/seller/grow-followers" },
     ],
   },
   {
@@ -45,6 +44,7 @@ const FOOTER_COLUMNS = [
       { label: "LAN Wallet", href: "/seller/lan-wallet" },
       { label: "Withdraw Earnings", href: "/seller/withdraw-earnings" },
       { label: "Referral Programme", href: "/seller/referral" },
+      { label: "Affiliate Programme", href: "/seller/api-integration" },
       { label: "Seller Dashboard", href: "/seller/seller-dashboard" },
       { label: "Recharge Services", href: "/seller/recharge-services" },
       { label: "Growing Your Followers", href: "/seller/grow-followers" },
@@ -64,15 +64,17 @@ const FOOTER_COLUMNS = [
     ],
   },
   {
-    heading: "Quick Links",
+    heading: "Company",
     links: [
       { label: "About LAN", href: "/about/lan" },
+      { label: "Contact Us", href: "/contact/lan/4/enquiry" },
+      { label: "Ask Educo", href: "/ai-chat" },
       { label: "Free Documents & Open Access", href: "/students/open-access" },
       { label: "LAN Shift", href: "/seller/lan-shift" },
-      { label: "Contact Us", href: "/contact/lan/4/enquiry" },
       { label: "Help Centre", href: "/lan/net/help-center" },
       { label: "Documentation", href: "/docs" },
       { label: "Invite a Friend", href: "/ref/invite-friends" },
+      { label: "Affiliate", href: "/aff/developer/console" },
       { label: "Social Impact", href: "/social-impart" },
       { label: "Privacy Policy", href: "/lan/privacy-policy" },
       { label: "Terms of Service", href: "/lan/terms-of-service" },
@@ -131,7 +133,7 @@ export default function Footer() {
 
   const handleUploadClick = () => {
     if (!user) {
-      router.push("/auth/signin");
+      router.push("/signin");
       return;
     }
     if (isSeller) router.push("/upload-document");

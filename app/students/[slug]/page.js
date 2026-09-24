@@ -25,7 +25,7 @@ const PAGES = {
         subtitle:
             "Powered by LAN AI — your personal academic assistant that reads your textbooks, explains concepts, and helps you prepare for exams.",
         hero: "https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=1400&q=80",
-        intro: `The LAN AI Tutor is not a generic chatbot. It is a document-aware assistant that reads the specific books and study materials in your library and answers questions about their exact content — chapter summaries, concept explanations, exam-focused breakdowns, and detailed walkthroughs of difficult passages.
+        intro: `The LAN AI Tutor known as Educo is not a generic chatbot. It is a document-aware assistant that reads the specific books and study materials in your library and answers questions about their exact content — chapter summaries, concept explanations, exam-focused breakdowns, and detailed walkthroughs of difficult passages.
 
 Every student on LAN gets access to AI Tutor sessions. Whether you are wrestling with a thermodynamics derivation at 2am, trying to understand a legal principle before a morning tutorial, or looking for a concise summary of a 400-page text before an exam, LAN AI Tutor is built for that moment.`,
         sections: [
@@ -522,19 +522,13 @@ function Nav() {
                 LAN <span style={{ color: GOLD }}>Library</span>
             </Link>
             <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                <Link href="/documents" style={{ color: "rgba(255,255,255,.55)", fontSize: 11, fontWeight: 700, textDecoration: "none", letterSpacing: ".09em", textTransform: "uppercase", fontFamily: "'Lato', sans-serif" }}>
-                    Browse
-                </Link>
+               
                 <button onClick={() => router.back()} style={{ background: "rgba(255,255,255,.08)", border: "0.5px solid rgba(255,255,255,.15)", color: "rgba(255,255,255,.7)", padding: "8px 16px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'Lato', sans-serif", letterSpacing: ".06em", textTransform: "uppercase", transition: "all .15s" }}
                     onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,.14)"; e.currentTarget.style.color = "#fff"; }}
                     onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,.08)"; e.currentTarget.style.color = "rgba(255,255,255,.7)"; }}>
                     ← Back
                 </button>
-                <Link href="/dashboard" style={{ background: GOLD, color: NAVY, padding: "9px 20px", fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato', sans-serif", transition: "background .15s" }}
-                    onMouseEnter={e => e.currentTarget.style.background = GOLDD}
-                    onMouseLeave={e => e.currentTarget.style.background = GOLD}>
-                    Dashboard
-                </Link>
+              
             </div>
         </nav>
     );

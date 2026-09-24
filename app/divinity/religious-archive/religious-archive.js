@@ -551,7 +551,7 @@ export default function ReligiousArchiveClient() {
                                 </h2>
                             </div>
                             <button
-                                onClick={() => user ? setShowUpload(true) : router.push("/auth/signin")}
+                                onClick={() => user ? setShowUpload(true) : router.push("/gnin")}
                                 style={{
                                     display: "inline-flex", alignItems: "center", gap: 8,
                                     padding: "11px 22px", background: NAVY, color: "#fff",
@@ -635,7 +635,7 @@ export default function ReligiousArchiveClient() {
                                     Be the first to contribute to this tradition's archive
                                 </p>
                                 <button
-                                    onClick={() => user ? setShowUpload(true) : router.push("/auth/signin")}
+                                    onClick={() => user ? setShowUpload(true) : router.push("/signin")}
                                     style={{
                                         padding: "10px 28px", background: NAVY, color: "#fff",
                                         fontFamily: "'Lato',sans-serif", fontSize: 11, fontWeight: 700,
@@ -746,7 +746,7 @@ export default function ReligiousArchiveClient() {
 
                         <div style={{ display: "flex", flexDirection: "column", gap: 10, flexShrink: 0 }}>
                             <button
-                                onClick={() => user ? setShowUpload(true) : router.push("/auth/signin")}
+                                onClick={() => user ? setShowUpload(true) : router.push("/signin")}
                                 style={{
                                     display: "flex", alignItems: "center", gap: 8,
                                     padding: "12px 24px", background: NAVY, color: "#fff",
@@ -802,7 +802,7 @@ export default function ReligiousArchiveClient() {
                             <BookOpen size={14} /> Browse Sacred Texts
                         </Link>
                         <button
-                            onClick={() => user ? setShowUpload(true) : router.push("/auth/signin")}
+                            onClick={() => user ? setShowUpload(true) : router.push("/signin")}
                             style={{
                                 display: "inline-flex", alignItems: "center", gap: 8,
                                 padding: "14px 28px", border: "0.5px solid rgba(255,255,255,0.25)",

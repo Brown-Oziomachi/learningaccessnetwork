@@ -1,51 +1,7 @@
-/**
- * BOOK PREVIEW PAGE PATCHES
- * ──────────────────────────────────────────────────────────────────────────
- * Drop these three things into your existing app/book/preview/page.js
- *
- * 1. FrozenBanner  — shows when isGloballyFrozen === true (overrides everything)
- * 2. LicenseButton — the "Get Hard-Copy License" button with all gate checks
- * 3. Updated fetchBook logic additions (add to your existing fetchBook useEffect)
- * ──────────────────────────────────────────────────────────────────────────
- */
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PATCH 1 — Add to state declarations at top of BookPreviewPage component
-// ═══════════════════════════════════════════════════════════════════════════
-/*
-  const [isPrintLicensingEnabled, setIsPrintLicensingEnabled] = useState(false);
-  const [isGloballyFrozen, setIsGloballyFrozen] = useState(false);
-*/
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PATCH 2 — Add inside your existing fetchBook useEffect, after setBook(...)
-//           This reads the two licensing fields off the already-fetched doc.
-// ═══════════════════════════════════════════════════════════════════════════
-/*
-  // Inside your existing fetchBook try block, after `setBook({ ...bookData, ... })`:
-  setIsPrintLicensingEnabled(bookData?.isPrintLicensingEnabled === true);
-  setIsGloballyFrozen(bookData?.isGloballyFrozen === true);
-*/
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PATCH 3 — Replace your existing handleRequestLicenseClick and the button
-//           in the options modal with these components.
-// ═══════════════════════════════════════════════════════════════════════════
 
 import { AlertTriangle, Snowflake, Printer } from "lucide-react";
 
-/* ── NAVY / GOLD pulled from your existing palette constants ─────────── */
-// const NAVY = "#0d2244";
-// const GOLD = "#b8963e";
-
-/**
- * FrozenBanner
- * Place this ABOVE the PdfViewer in both the desktop sidebar and the mobile
- * book-info card. When rendered, it overrides every other call-to-action.
- *
- * Usage:
- *   {isGloballyFrozen && <FrozenBanner />}
- */
 export function FrozenBanner() {
   return (
     <div
@@ -104,27 +60,6 @@ export function FrozenBanner() {
   );
 }
 
-/**
- * LicenseButton
- * The "Get Hard-Copy License" button with full gate logic.
- *
- * Props:
- *   book                   — the book object from state
- *   isGloballyFrozen       — boolean from state
- *   isPrintLicensingEnabled — boolean from state
- *   router                 — from useRouter()
- *   cleanBookId            — string (bookId without 'firestore-' prefix)
- *   style                  — optional extra styles for the wrapper div
- *
- * Usage (replace your existing hardcopy button in the options modal and sidebar):
- *   <LicenseButton
- *     book={book}
- *     isGloballyFrozen={isGloballyFrozen}
- *     isPrintLicensingEnabled={isPrintLicensingEnabled}
- *     router={router}
- *     cleanBookId={cleanId}
- *   />
- */
 export function LicenseButton({
   book,
   isGloballyFrozen,
@@ -246,23 +181,6 @@ export function LicenseButton({
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PATCH 4 — In your existing PdfViewer component, wrap the entire return
-//           with a frozen gate at the very top. If frozen, nothing renders
-//           except the frozen banner.
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * FrozenPdfGate
- * Wrap your PdfViewer or place this just above it.
- * If frozen, renders only the banner and hides all book content.
- *
- * Usage:
- *   {isGloballyFrozen
- *     ? <FrozenPdfGate />
- *     : <PdfViewer heightClass="400px" fullHeight="900px" />
- *   }
- */
 export function FrozenPdfGate() {
   const NAVY = "#0d2244";
   const GOLD = "#b8963e";
@@ -353,25 +271,6 @@ export function FrozenPdfGate() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PATCH 5 — LAN Lecturers section: ensure each lecturer card links to
-//           their seller profile. Your existing code may already have this;
-//           verify the href pattern below matches your route structure.
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * SellerProfileLink
- * Wrap each lecturer card's name/avatar with this component.
- * Replaces any plain <span> or non-linked element.
- *
- * Usage (in the mobile and desktop lecturer lists):
- *   <SellerProfileLink sellerId={lec.sellerId} sellerName={lec.sellerName}>
- *     <img src={...} ... />
- *   </SellerProfileLink>
- *
- * Note: your existing code already uses Link for the desktop sidebar.
- * For mobile, replace any non-linked wrappers with this component.
- */
 import Link from "next/link";
 
 export function SellerProfileLink({

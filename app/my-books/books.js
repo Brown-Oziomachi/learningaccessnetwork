@@ -323,7 +323,7 @@ export default function MyBooksClient() {
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (u) => {
             if (u) { setUser(u); await fetchPurchasedBooks(u.uid); }
-            else router.push('/auth/signin');
+            else router.push('/signin');
         });
         return () => unsub();
     }, [router]);

@@ -474,7 +474,7 @@ export default function AdvertiseClient() {
     /* ── Auth + Smart auto-fill ── */
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async cu => {
-            if (!cu) { setCheckingAuth(false); router.replace("/auth/signin?redirect=/advertise"); return; }
+            if (!cu) { setCheckingAuth(false); router.replace("/signin?redirect=/advertise"); return; }
             setUser(cu);
             try {
                 const snap = await getDoc(doc(db, "users", cu.uid));

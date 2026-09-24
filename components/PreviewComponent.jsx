@@ -487,7 +487,7 @@ try {
 
   const handleFollowOwner = async (e) => {
     e.preventDefault();
-    if (!user) { router.push("/auth/signin"); return; }
+    if (!user) { router.push("/signin"); return; }
     const ownerId = bookOwnerProfile?.uid;
     if (!ownerId || followLoadingIds.has(ownerId)) return;
     setFollowLoadingIds((prev) => new Set([...prev, ownerId]));
@@ -515,18 +515,18 @@ try {
         await checkSellerStatus(cu.uid);
         await checkPurchaseStatus(cu.uid);
         await checkSavedStatus(cu.uid);
-      } else { router.push("/auth/signin"); }
+      } else { router.push("/signin"); }
     });
     return () => unsub();
   }, [router]);
 
   const HandleClick = () => {
-    if (!user) { router.push("/auth/signin"); return; }
+    if (!user) { router.push("/signin"); return; }
     router.push(isSeller ? "/upload-document" : "/become-seller");
   };
 
   const handleMyAccountClick = async () => {
-    if (!user) { router.push("/auth/signin"); return; }
+    if (!user) { router.push("/signin"); return; }
     try {
       const snap = await getDoc(doc(db, "users", user.uid));
       if (!snap.exists()) { router.push("/role-selection"); return; }
@@ -1171,7 +1171,7 @@ const sold =
               <div style={{ padding: "12px" }}>
                 {[
                   { label: "My Account", onClick: () => { setShowNavMenu(false); handleMyAccountClick(); } },
-                  { label: "Ask AI", href: "/ai-chat" },
+                  { label: "Ask Educo", href: "/ai-chat" },
                   { label: "My Books", href: "/my-books" },
                   { label: "Saved Books", href: "/saved-my-book" },
                   { label: "Help & Support", href: "/lan/net/help-center" },
@@ -1231,7 +1231,7 @@ const sold =
                     { icon: <Bookmark size={18} style={isSaved ? { fill: NAVY, color: NAVY } : {}} />, label: isSaved ? "Saved" : "Save", onClick: handleSaveForLater },
                     { icon: <Share2 size={18} />, label: "Share", onClick: handleShare },
                     { icon: <ThumbsUp size={18} />, label: positiveRatingPercent !== null ? `${positiveRatingPercent}%` : "Rate", onClick: () => setShowFeedbackModal(true) },
-                    { icon: <Sparkles size={18} style={{ color: "#a78bfa" }} />, label: "Ask AI", onClick: () => router.push(`/ai-chat?bookId=${bookId}&bookTitle=${encodeURIComponent(book?.title || "")}`) },
+                    { icon: <Sparkles size={18} style={{ color: "#a78bfa" }} />, label: "Ask Educo", onClick: () => router.push(`/ai-chat?bookId=${bookId}&bookTitle=${encodeURIComponent(book?.title || "")}`) },
                   ].map(({ icon, label, onClick }) => <button key={label} className="action-btn" onClick={onClick}>{icon}<span>{label}</span></button>)}
                 </div>
 
