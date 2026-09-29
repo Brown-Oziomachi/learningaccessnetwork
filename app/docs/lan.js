@@ -578,6 +578,15 @@ export default function LANDocsClient() {
                                 { icon: "🤖", tag: "AI TUTOR", title: "Document-Aware AI Assistant", body: "Powered by LAN — ask questions about your specific purchased books. Summaries, concept breakdowns, exam prep, worked examples.", accent: PURPLEL },
                             ].map(c => <FCard key={c.title} {...c} />)}
                         </div>
+                        <Link href="/about/lan" style={{
+                            padding: "14px 46px", background: LIME, color: NAVY,
+                            fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                            border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
+                            fontFamily: "'Space Grotesk',sans-serif", textAlign: "center"
+                        }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = PURPLEL; e.currentTarget.style.color = PURPLEL; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,248,255,.2)"; e.currentTarget.style.color = WHITE; }}
+                        >Read More</Link>
                     </section>
 
                     {/* ══ SECTION: VISION ══ */}
@@ -595,7 +604,7 @@ export default function LANDocsClient() {
                                 </p>
                                 <Callout icon="✦" label="The LAN Promise">
                                     Every student deserves access to the best study materials. Every educator deserves to earn from their expertise. Every document has real value — and that value should flow to the person who created it.
-                                  <br/> <br/> LAN pictured a great school of technology where young men and young women could be taught how to succeed in life by developing the ability to THINK in practical rather than in theoretical terms
+                                    <br /> <br /> LAN pictured a great school of technology where young men and young women could be taught how to succeed in life by developing the ability to THINK in practical rather than in theoretical terms
                                 </Callout>
                             </div>
                             <div>
@@ -616,8 +625,18 @@ export default function LANDocsClient() {
                                     </div>
                                 ))}
                             </div>
+                            
                         </div>
                         <style>{`@media(max-width:768px){ .lan-2col{ grid-template-columns:1fr !important; } }`}</style>
+                         <Link href="/social-impart" style={{
+                        padding: "14px 26px", background: PURPLED, color: WHITE,
+                        fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                        border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
+                        fontFamily: "'Space Grotesk',sans-serif", 
+                    }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = PURPLEL; e.currentTarget.style.color = PURPLEL; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,248,255,.2)"; e.currentTarget.style.color = WHITE; }}
+                        >Read More</Link>
                     </section>
 
                     {/* ══ SECTION: WHO BENEFITS ══ */}
@@ -670,7 +689,7 @@ export default function LANDocsClient() {
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "48px", alignItems: "start" }} className="lan-2col">
                             <div>
                                 <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "20px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                                    The LAN AI Tutor is not a generic chatbot. It is a <strong style={{ color: WHITE }}>document-aware assistant</strong> that reads the specific books in your library and answers questions about their exact content.
+                                    The LAN AI Tutor (Educo) is not a generic chatbot. It is a <strong style={{ color: WHITE }}>document-aware assistant</strong> that reads the specific books in your library and answers questions about their exact content.
                                     Every student on LAN gets access to AI Tutor sessions. Whether you are wrestling with a thermodynamics derivation at 2am, trying to understand a legal principle before a morning tutorial, or looking for a concise summary of a 400-page text before an exam, LAN AI Tutor is built for that moment
                                 </p>
                                 <Label>How AI Tutor Works with Your Library</Label>
@@ -679,13 +698,13 @@ export default function LANDocsClient() {
                                     When you open an AI Tutor session linked to a book in your library, the AI loads the document content and uses it as the primary reference for every answer. Ask it to explain a passage, and it pulls the exact section. Ask for a summary, and it synthesises the author's own words. Ask a question not directly in the text, and it reasons from the material to give you the most accurate answer possible.
                                 </p>
                                 <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "28px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                                This document-aware approach is what separates LAN AI Tutor from generic AI assistants. The AI does not guess or hallucinate generic answers — it reasons from your specific study material. The result is answers that match the terminology, framework, and examples your lecturer and textbook actually use, which is precisely what exam performance depends on.
+                                    This document-aware approach is what separates LAN AI Tutor from generic AI assistants. The AI does not guess or hallucinate generic answers — it reasons from your specific study material. The result is answers that match the terminology, framework, and examples your lecturer and textbook actually use, which is precisely what exam performance depends on.
                                 </p>
                                 <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "28px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                              To start a session, go to your Library tab, select a book, and tap "Ask AI Tutor." Alternatively, open AI Tutor from the navigation and choose a book from your collection. Your session history is saved so you can continue where you left off across devices.
+                                    To start a session, go to your Library tab, select a book, and tap "Ask AI Tutor." Alternatively, open AI Tutor from the navigation and choose a book from your collection. Your session history is saved so you can continue where you left off across devices.
                                 </p>
                                 <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "28px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                                    Ask it to explain a passage and it pulls the exact section. Ask for a summary and it synthesises the author's own words. Ask an exam question and it reasons from your specific study material — matching the terminology your lecturer and textbook actually use. 
+                                    Ask it to explain a passage and it pulls the exact section. Ask for a summary and it synthesises the author's own words. Ask an exam question and it reasons from your specific study material — matching the terminology your lecturer and textbook actually use.
                                 </p>
 
                                 {[
@@ -728,13 +747,17 @@ export default function LANDocsClient() {
                                         </div>
                                     </div>
                                 </div>
-                                <Link href="/ai-chat" style={{ display: "block", marginTop: "12px", padding: "13px 24px", background: PURPLE, color: WHITE, fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", textAlign: "center", transition: "background .15s" }}
-                                    onMouseEnter={e => e.currentTarget.style.background = PURPLED}
-                                    onMouseLeave={e => e.currentTarget.style.background = PURPLE}>
-                                    Start AI Tutor Session →
-                                </Link>
                             </div>
                         </div>
+                        <Link href="/students/ai-tutor" style={{
+                                padding: "14px 46px", background: LIME, color: NAVY,
+                                fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                                border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
+                                fontFamily: "'Space Grotesk',sans-serif", textAlign: "center"
+                            }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = PURPLEL; e.currentTarget.style.color = PURPLEL; }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,248,255,.2)"; e.currentTarget.style.color = WHITE; }}
+                            >Read More</Link>
                     </section>
 
                     {/* ══ SECTION: BOUNTY BOARD ══ */}
@@ -751,8 +774,8 @@ export default function LANDocsClient() {
                                     The Bounty Board lets you earn cash by creating materials students specifically request. Find bounties that match your expertise, complete them, and get paid instantly.
                                 </p>
                                 <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "28px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                                The LAN Library Bounty Board is a community-powered marketplace that connects students who need specific study materials with authors and lecturers who can create them — with automatic, transparent payouts for everyone involved. 
-                               The process runs in three stages: a student posts a request and funds it, an author fulfils the request by uploading the asset, and the platform automatically splits and releases the payment.
+                                    The LAN Library Bounty Board is a community-powered marketplace that connects students who need specific study materials with authors and lecturers who can create them — with automatic, transparent payouts for everyone involved.
+                                    The process runs in three stages: a student posts a request and funds it, an author fulfils the request by uploading the asset, and the platform automatically splits and releases the payment.
                                 </p>
                                 <div style={{ position: "relative" }}>
                                     <div style={{ position: "absolute", left: "22px", top: "28px", bottom: "28px", width: "2px", background: "rgba(124,58,237,.2)" }} />
@@ -801,12 +824,22 @@ export default function LANDocsClient() {
                                         </div>
                                     </div>
                                 ))}
-                                <Link href="/academic/bounty/board" style={{ display: "block", padding: "14px", textAlign: "center", fontSize: "11px", color: PURPLEL, fontWeight: 600, fontFamily: "'Space Grotesk',sans-serif", textDecoration: "none", borderTop: "1px solid rgba(124,58,237,.15)", background: "rgba(124,58,237,.05)", transition: "background .12s" }}
+                                <button href="/academic/bounty/board" style={{ display: "block", padding: "14px", textAlign: "center", fontSize: "11px", color: PURPLEL, fontWeight: 600, fontFamily: "'Space Grotesk',sans-serif", textDecoration: "none", borderTop: "1px solid rgba(124,58,237,.15)", background: "rgba(124,58,237,.05)", transition: "background .12s", justifyContent: 'center', alignContent: "center", }}
                                     onMouseEnter={e => e.currentTarget.style.background = "rgba(124,58,237,.12)"}
                                     onMouseLeave={e => e.currentTarget.style.background = "rgba(124,58,237,.05)"}>
                                     View all 2,400+ active bounties →
-                                </Link>
+                                </button>
                             </div>
+                         <Link href="/lan/net/help-center/article/bounty-board-for-buyers" style={{
+                        padding: "14px 26px", background: PURPLED, color: WHITE,
+                        fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                        border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
+                        fontFamily: "'Space Grotesk',sans-serif", textAlign: "center", 
+                    }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = PURPLEL; e.currentTarget.style.color = PURPLEL; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,248,255,.2)"; e.currentTarget.style.color = WHITE; }}
+                    >Read More</Link>
+                            
                         </div>
                     </section>
 
@@ -856,10 +889,10 @@ export default function LANDocsClient() {
                                     <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: MUTED, fontFamily: "'Space Grotesk',sans-serif", marginBottom: "12px" }}>Average Top Seller / Month</div>
                                     <p style={{ fontSize: "12px", color: MUTED, lineHeight: 1.75, fontFamily: "'Space Grotesk',sans-serif", margin: 0 }}>Top sellers maintain catalogues of 100+ documents, engage actively with the Bounty Board, and generate consistent passive income throughout the academic year.</p>
                                 </div>
-                                <Link href="/become-seller" style={{ display: "block", marginTop: "12px", padding: "14px 24px", background: LIME, color: VOID, fontSize: "11px", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", textAlign: "center", clipPath: "polygon(0 0, 96% 0, 100% 100%, 4% 100%)", transition: "background .15s" }}
+                                <Link href="/seller/lan-wallet" style={{ display: "block", marginTop: "12px", padding: "14px 24px", background: LIME, color: VOID, fontSize: "11px", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", textAlign: "center", clipPath: "polygon(0 0, 96% 0, 100% 100%, 4% 100%)", transition: "background .15s" }}
                                     onMouseEnter={e => e.currentTarget.style.background = LIMEL}
                                     onMouseLeave={e => e.currentTarget.style.background = LIME}>
-                                    Start Selling Now →
+                                    PAYMENTS GUIDE →
                                 </Link>
                             </div>
                         </div>
@@ -868,49 +901,65 @@ export default function LANDocsClient() {
                     <section id="dashboard" style={{ padding: "80px 64px", borderBottom: "1px solid rgba(248,248,255,.06)" }} className="lan-section-pad">
                         <Label>LAN Seller</Label>
                         <SectionH>Seller<br /><span style={{ color: LIME }}> Dashboard.</span></SectionH>
-                         <Callout icon="✦" label="What is Verified Faculty?">
-                            Real-time earnings, per-document analytics, catalogue management, and full financial control — all from one screen.                        
-                            </Callout>
+                        <Callout icon="✦" label="What is Verified Faculty?">
+                            Real-time earnings, per-document analytics, catalogue management, and full financial control — all from one screen.
+                        </Callout>
                         <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, maxWidth: "680px", marginBottom: "20px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                            The LAN Seller Dashboard is your complete command centre for managing your document business on the platform. Every sale, every document view, every referral conversion, every withdrawal, and every item in your catalogue is tracked, displayed, and actionable from a single interface that updates in real time.                       
-                             </p>
-                               <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, maxWidth: "680px", marginBottom: "40px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                            The sellers who generate the highest consistent income on LAN are not always those with the best content — they are those who understand their performance data and act on it. The dashboard is what makes that possible.                             
-                            </p>
-                             <Callout icon="✦" label="Earnings Overview: Reading Your Numbers">
-                            </Callout>
-                              <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, maxWidth: "680px", marginBottom: "10px", fontFamily: "'Space Grotesk',sans-serif" }}>
+                            The LAN Seller Dashboard is your complete command centre for managing your document business on the platform. Every sale, every document view, every referral conversion, every withdrawal, and every item in your catalogue is tracked, displayed, and actionable from a single interface that updates in real time.
+                        </p>
+                        <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, maxWidth: "680px", marginBottom: "40px", fontFamily: "'Space Grotesk',sans-serif" }}>
+                            The sellers who generate the highest consistent income on LAN are not always those with the best content — they are those who understand their performance data and act on it. The dashboard is what makes that possible.
+                        </p>
+                        <Callout icon="✦" label="Earnings Overview: Reading Your Numbers">
+                        </Callout>
+                        <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, maxWidth: "680px", marginBottom: "10px", fontFamily: "'Space Grotesk',sans-serif" }}>
                             The earnings overview panel is the first thing you see when you open your Seller Dashboard. At the summary level, it shows your total lifetime earnings, your current month earnings with a trend line by day, your available wallet balance ready for withdrawal, and your projected month-end earnings based on current-month trajectory.
                             Beneath the summary panel, a revenue chart breaks down earnings by document, by buyer institution or location, and by time period. You can switch between weekly, monthly, quarterly, and annual views. The chart answers the questions sellers ask most often: which documents are generating the most revenue, where buyers are coming from geographically, and whether income is trending up or plateauing.
-                            Every sale generates an immediate credit entry in your transaction ledger — the document title, the buyer's approximate region, the transaction amount, and your 80% payout are all recorded and visible. The ledger can be filtered and exported, making it straightforward to reconcile your LAN income with your broader personal financial records.                         
-                               </p>
-                                <p style={{ fontSize: "15px", color: LIMEL, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                                    <a href="/seller/seller-dashboard" target="_bank">Read more </a>
-                                </p>
-                        </section>
+                            Every sale generates an immediate credit entry in your transaction ledger — the document title, the buyer's approximate region, the transaction amount, and your 80% payout are all recorded and visible. The ledger can be filtered and exported, making it straightforward to reconcile your LAN income with your broader personal financial records.
+                        </p>
+                        
+                         <Link href="/seller/seller-dashboard" style={{
+                        padding: "14px 26px", background: LIME, color: VOID,
+                        fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                        border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
+                        fontFamily: "'Space Grotesk',sans-serif", 
+                    }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = PURPLEL; e.currentTarget.style.color = PURPLEL; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,248,255,.2)"; e.currentTarget.style.color = WHITE; }}
+                    >Read More</Link>
+                    </section>
 
-                     <section id="withdraw" style={{ padding: "80px 64px", borderBottom: "1px solid rgba(248,248,255,.06)" }} className="lan-section-pad">
+                    <section id="withdraw" style={{ padding: "80px 64px", borderBottom: "1px solid rgba(248,248,255,.06)" }} className="lan-section-pad">
                         <Label>Withdraw Your Earnings</Label>
                         <SectionH>Your money.<br /><span style={{ color: LIME }}>Your account.</span></SectionH>
-                         <Callout icon="✦" label="What is Verified Faculty?">
+                        <Callout icon="✦" label="What is Verified Faculty?">
                             Your money. Your account. Bank transfers and mobile money across Africa — processed within 24 hours.
                         </Callout>
 
                         <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, maxWidth: "680px", marginBottom: "40px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                        The LAN withdrawal system was built to serve the financial reality of African sellers — not the assumption of a single banking system. A seller in Lagos withdrawing to a Nigerian bank account, a seller in Accra using MTN Mobile Money, a seller in Nairobi transferring to M-Pesa, a seller in Johannesburg receiving funds at a South African commercial bank: all of these are first-class, equally supported withdrawal experiences on LAN.                        </p>
+                            The LAN withdrawal system was built to serve the financial reality of African sellers — not the assumption of a single banking system. A seller in Lagos withdrawing to a Nigerian bank account, a seller in Accra using MTN Mobile Money, a seller in Nairobi transferring to M-Pesa, a seller in Johannesburg receiving funds at a South African commercial bank: all of these are first-class, equally supported withdrawal experiences on LAN.                        </p>
                         <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, maxWidth: "680px", marginBottom: "40px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                        The money in your wallet is yours, and moving it to wherever you need it should be fast, transparent, and as close to fee-free as your seller tier allows.
+                            The money in your wallet is yours, and moving it to wherever you need it should be fast, transparent, and as close to fee-free as your seller tier allows.
                         </p>
                         <Label>How to Initiate a Withdrawal</Label>
-                         <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, maxWidth: "680px", marginBottom: "15px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                        Withdrawals are initiated from the Wallet section of your Seller Dashboard. The process is designed to complete in under 60 seconds once you have a bank account or mobile money number linked.
-                        Open your dashboard and navigate to Wallet, then select Withdraw Earnings. Enter the amount you want to withdraw — the minimum is the equivalent of USD 2.50 in your local currency. Confirm your linked account details on the preview screen, then authenticate the withdrawal with your 4-digit Transfer PIN. You receive an immediate in-app notification confirming the request, and a second notification when the transfer is complete.
-                        If you have not yet linked a bank account or mobile money number, you will be prompted to add one before your first withdrawal. You can link up to three accounts and specify which one receives each withdrawal. Switching between linked accounts is available on the withdrawal confirmation screen without requiring a settings change. 
+                        <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, maxWidth: "680px", marginBottom: "15px", fontFamily: "'Space Grotesk',sans-serif" }}>
+                            Withdrawals are initiated from the Wallet section of your Seller Dashboard. The process is designed to complete in under 60 seconds once you have a bank account or mobile money number linked.
+                            Open your dashboard and navigate to Wallet, then select Withdraw Earnings. Enter the amount you want to withdraw — the minimum is the equivalent of USD 2.50 in your local currency. Confirm your linked account details on the preview screen, then authenticate the withdrawal with your 4-digit Transfer PIN. You receive an immediate in-app notification confirming the request, and a second notification when the transfer is complete.
+                            If you have not yet linked a bank account or mobile money number, you will be prompted to add one before your first withdrawal. You can link up to three accounts and specify which one receives each withdrawal. Switching between linked accounts is available on the withdrawal confirmation screen without requiring a settings change.
                         </p>
-                        <p style={{ fontSize: "15px", color: LIMEL, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                                    <a href="/seller/recharge-services" target="_bank">Read more </a>
-                                </p>
-                        </section>
+                        <Label>Supported Withdrawal Methods Across Africa</Label>
+
+                        <Link href="/seller/withdraw-earnings" style={{
+                        padding: "14px 46px", background: PURPLED, color: WHITE,
+                        fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                        border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
+                        fontFamily: "'Space Grotesk',sans-serif", margin: "34px"
+                    }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = PURPLEL; e.currentTarget.style.color = PURPLEL; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,248,255,.2)"; e.currentTarget.style.color = WHITE; }}
+                    >Read More</Link>
+                        
+                    </section>
 
 
                     {/* ══ SECTION: FACULTY ══ */}
@@ -920,10 +969,10 @@ export default function LANDocsClient() {
 
                         <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, maxWidth: "680px", marginBottom: "32px", fontFamily: "'Space Grotesk',sans-serif" }}>
                             LAN recognises that many of its sellers are not just content creators — they are <strong style={{ color: WHITE }}>qualified professionals, academics, and licensed practitioners</strong> whose credentials add real credibility to the documents they publish. Sellers with professional titles receive a <strong style={{ color: PURPLEL }}>Verified Faculty</strong> badge instead of the standard Verified Seller label.
-                       
-                                <p style={{ fontSize: "15px", color: LIMEL, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                                    <a href="/faculty/verify" target="_bank">Read full content... </a>
-                                </p>
+
+                            <p style={{ fontSize: "15px", color: LIMEL, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
+                                <a href="/faculty/verify" target="_bank">Read full content... </a>
+                            </p>
                         </p>
                         <Callout icon="✦" label="What is Verified Faculty?">
                             When a seller's profile carries a recognised professional title — Dr., Prof., Engr., Lecturer, Barr., or Pharm. — their account is automatically designated <strong style={{ color: WHITE }}>Verified Faculty</strong>. This signals to buyers that the content comes from a credentialed source, increasing trust and conversion.
@@ -957,6 +1006,15 @@ export default function LANDocsClient() {
                                 { icon: "🌍", tag: "REACH", title: "Continent-Wide Distribution", body: "Your materials reach students across 20+ African countries simultaneously. One upload, continent-wide impact.", accent: "#f59e0b" },
                             ].map(c => <FCard key={c.title} {...c} />)}
                         </div>
+                        <Link href="/faculty/verify" style={{
+                        padding: "14px 46px", background: "#f59e0b", color: NAVY,
+                        fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                        border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
+                        fontFamily: "'Space Grotesk',sans-serif", margin: "34px"
+                    }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = PURPLEL; e.currentTarget.style.color = PURPLEL; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,248,255,.2)"; e.currentTarget.style.color = WHITE; }}
+                    >Read More</Link>
                     </section>
 
 
@@ -964,18 +1022,16 @@ export default function LANDocsClient() {
                     <section id="wallet" style={{ padding: "80px 64px", borderBottom: "1px solid rgba(248,248,255,.06)" }} className="lan-section-pad">
                         <Label>LAN Wallet & Payments</Label>
                         <SectionH>Recharge <br /><span style={{ color: LIME }}>Services.</span></SectionH>
-                          <Callout icon="" label="Convert your document earnings into everyday utilities — airtime, data, electricity, and cable TV — directly from your wallet, across Africa."></Callout>
+                        <Callout icon="" label="Convert your document earnings into everyday utilities — airtime, data, electricity, and cable TV — directly from your wallet, across Africa."></Callout>
 
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "48px" }} className="lan-2col">
                             <div>
                                 <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                                    For sellers who want to extract maximum value from their earnings without the friction of multiple transfers, Recharge Services is the most direct path from document sale to real-world value.  
-                                    </p>                              
-                                     <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                                    LAN Recharge Services turns your wallet into a direct payment channel for the utilities you use every day. Instead of withdrawing your document income to a bank account and then separately purchasing airtime or paying your electricity bill, Recharge Services lets you do both in a single platform — at rates that are often more competitive than retail alternatives.                                </p>
-                                  <p style={{ fontSize: "15px", color: LIMEL, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                                    <a href="/seller/recharge-services" target="_bank">Read more </a>
+                                    For sellers who want to extract maximum value from their earnings without the friction of multiple transfers, Recharge Services is the most direct path from document sale to real-world value.
                                 </p>
+                                <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
+                                    LAN Recharge Services turns your wallet into a direct payment channel for the utilities you use every day. Instead of withdrawing your document income to a bank account and then separately purchasing airtime or paying your electricity bill, Recharge Services lets you do both in a single platform — at rates that are often more competitive than retail alternatives.                                </p>
+                              
                                 {[
                                     { icon: "⚡", title: "Instant Earnings Credits", body: "Sale confirmed → wallet credited within seconds. Track every transaction in real time with a full transaction ledger." },
                                     { icon: "🏦", title: "Withdraw to Any African Bank", body: "All major Nigerian banks, MTN MoMo, M-Pesa, AirtelTigo Money, and more. Processed within 24 hours on business days." },
@@ -1022,97 +1078,119 @@ export default function LANDocsClient() {
                                     ))}
                                 </div>
                             </div>
+                            <Link href="/seller/recharge-services" style={{
+                                padding: "14px 46px", background: PURPLE, color: NAVY,
+                                fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                                border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
+                                fontFamily: "'Space Grotesk',sans-serif", textAlign: "center"
+                            }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = PURPLEL; e.currentTarget.style.color = PURPLEL; }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,248,255,.2)"; e.currentTarget.style.color = WHITE; }}
+                            >Read More</Link>
                         </div>
                     </section>
 
-                        <section id="earning hub" style={{ padding: "80px 64px", background: DARK, borderBottom: "1px solid rgba(248,248,255,.06)" }} className="lan-section-pad">
+                    <section id="earning hub" style={{ padding: "80px 64px", background: DARK, borderBottom: "1px solid rgba(248,248,255,.06)" }} className="lan-section-pad">
                         <Label>SELLER GUIDE</Label>
                         <SectionH>Your <br /><span style={{ color: LIME }}>LAN Wallet.</span></SectionH>
-                              <Callout icon="" label="Your earnings hub · Africa.">
-                        Your earnings hub — where every sale lands instantly, ready to withdraw, spend, or transfer across Africa.                        </Callout>
+                        <Callout icon="" label="Your earnings hub · Africa.">
+                            Your earnings hub — where every sale lands instantly, ready to withdraw, spend, or transfer across Africa.                        </Callout>
                         <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                            The LAN Wallet is the financial core of your seller account. Every naira, cedi, shilling, or rand equivalent you earn from document sales lands here immediately. Every referral commission is credited here. Every Bounty reward is deposited here. And from here, you can move your money out in any direction that suits you — bank transfer, mobile money, or direct utility payment through Recharge Services.                        
-                              </p>
-                           <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
+                            The LAN Wallet is the financial core of your seller account. Every naira, cedi, shilling, or rand equivalent you earn from document sales lands here immediately. Every referral commission is credited here. Every Bounty reward is deposited here. And from here, you can move your money out in any direction that suits you — bank transfer, mobile money, or direct utility payment through Recharge Services.
+                        </p>
+                        <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
                             Understanding how the wallet works — how earnings are credited, what the available balance means, how transfers and spending work — is the foundation of managing your seller income effectively.
-                          </p>
-                          <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                                               Every time a student purchases one of your documents, 80% of the transaction amount is credited to your LAN Wallet immediately. There is no processing delay, no weekly payment cycle, no end-of-month settlement. The credit happens within seconds of the buyer's payment being confirmed.
-`
+                        </p>
+                        <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
+                            Every time a student purchases one of your documents, 80% of the transaction amount is credited to your LAN Wallet immediately. There is no processing delay, no weekly payment cycle, no end-of-month settlement. The credit happens within seconds of the buyer's payment being confirmed.
+                            `
                             Your wallet displays two balance figures at all times: your total balance and your available balance. For most sellers at most times, these figures are identical. The distinction matters only in the rare case of an active buyer dispute — if a student initiates a dispute about a purchase, the corresponding amount is temporarily held from your available balance while the dispute is reviewed. Once resolved, the funds are either returned to your available balance or refunded to the buyer, depending on the dispute outcome. Disputes are uncommon and the resolution process is typically completed within 48 hours.
 
-                        Your wallet also records earnings from the referral programme — commissions for students you referred who made purchases, and commissions for sellers you referred who made their first sales. These referral credits are logged separately in your transaction ledger so you can always see exactly how much of your wallet balance came from document sales versus referral commissions versus any other income stream                          
+                            Your wallet also records earnings from the referral programme — commissions for students you referred who made purchases, and commissions for sellers you referred who made their first sales. These referral credits are logged separately in your transaction ledger so you can always see exactly how much of your wallet balance came from document sales versus referral commissions versus any other income stream
                         </p>
-                          <p style={{ fontSize: "15px", color: LIMEL, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                            <a href="/seller/lan-wallet" target="_bank">Read more </a>
-                        </p>
-                        </section>
+                        <Link href="/seller/lan-wallet" style={{
+                            padding: "14px 46px", background: LIME, color: NAVY,
+                            fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                            border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
+                            fontFamily: "'Space Grotesk',sans-serif", textAlign: "center"
+                        }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = PURPLEL; e.currentTarget.style.color = PURPLEL; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,248,255,.2)"; e.currentTarget.style.color = WHITE; }}
+                        >Read More</Link>
+                    </section>
 
-                       <section id="network" style={{ padding: "80px 64px", background: DARK, borderBottom: "1px solid rgba(248,248,255,.06)" }} className="lan-section-pad">
+                    <section id="network" style={{ padding: "80px 64px", background: DARK, borderBottom: "1px solid rgba(248,248,255,.06)" }} className="lan-section-pad">
                         <Label>SELLER GUIDE</Label>
                         <SectionH>LAN<br /><span style={{ color: LIME }}>Seller Network.</span></SectionH>
-                              <Callout icon="" label="Academic Document Marketplace · Africa.">
+                        <Callout icon="" label="Academic Document Marketplace · Africa.">
                             Africa's largest academic document marketplace — open to every student, graduate, tutor, and knowledge creator who has something valuable to share.
                         </Callout>
 
-                         <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
+                        <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
                             The LAN Seller Network is the broadest participation tier on the platform — open to anyone across Africa who has created academic content worth sharing. You do not need to be a professor.
                             You do not need an institutional affiliation. If you have notes, summaries, guides, past papers, study materials, or any academic content that other students would find useful, you can sell it on LAN.
-                         </p>
-                          <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                            Thousands of sellers across Nigeria, Ghana, Kenya, South Africa, Uganda, Tanzania, Rwanda, and a growing number of African countries are already generating consistent income from content they created as students, tutors, or independent educators. The Seller Network is the entry point for all of them — and for you.                         
-                          </p>
+                        </p>
+                        <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
+                            Thousands of sellers across Nigeria, Ghana, Kenya, South Africa, Uganda, Tanzania, Rwanda, and a growing number of African countries are already generating consistent income from content they created as students, tutors, or independent educators. The Seller Network is the entry point for all of them — and for you.
+                        </p>
                         <Label>What Is the LAN Seller Network?</Label>
-                            <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
+                        <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
                             The LAN Seller Network is a verified community of document sellers serving the African student population. Unlike faculty-exclusive platforms, the Seller Network is intentionally broad: it accommodates final-year students selling their best notes, private tutors sharing structured study materials, professional exam coaches selling certification guides, independent educators creating original learning content, and graduates who accumulated exceptional academic resources during their studies.
                             What unites every member of the Seller Network is a commitment to quality and authenticity. LAN's review team examines every document before it goes live — checking that the content is original, accurate, relevant to the course or topic it claims to cover, and formatted in a way that serves students well. This quality filter is what makes LAN the most trusted academic document marketplace in Africa, and it is what allows sellers on the platform to charge meaningful prices and generate consistent income.
-                            Every seller receives a public profile page, a personal document catalogue, a real-time earnings wallet, and access to the full suite of seller tools including analytics, pricing controls, and the referral programme. The network is the infrastructure that makes all of it work together.                        
-                            </p>
+                            Every seller receives a public profile page, a personal document catalogue, a real-time earnings wallet, and access to the full suite of seller tools including analytics, pricing controls, and the referral programme. The network is the infrastructure that makes all of it work together.
+                        </p>
                         <Label>Who Can Sell on LAN?</Label>
                         <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
                             The Seller Network is open to any individual who has created original academic content and wants to monetise it. There are no educational prerequisites, no institutional affiliations required, and no minimum number of documents to list. What matters is that your content is original, accurate, and genuinely useful to the students who will buy it.
                             Current students at African universities and polytechnics are among the most active sellers on the platform. A final-year student who has developed exceptional notes over four years of study has accumulated substantial intellectual assets. Those notes, past papers, and summary guides do not lose value at graduation — they continue to serve incoming cohorts of students for years.
                             Private tutors and academic coaches form another major segment of the Seller Network. If you teach A-level mathematics, JAMB preparation, WAEC revision, professional accounting examinations, or any other structured academic topic, your teaching materials have commercial value on LAN. Students actively seek preparation materials from known coaches and tutors — your reputation in your local tutoring market translates directly into demand for your documents on the platform.
-                            Independent content creators who produce original study guides, examination preparation packs, or subject-specific reference materials are equally welcome. If you have created something genuinely useful for African students, the Seller Network is built for you.                         
-                            </p>
-                            <Label>How Earnings Work for Sellers</Label>
+                            Independent content creators who produce original study guides, examination preparation packs, or subject-specific reference materials are equally welcome. If you have created something genuinely useful for African students, the Seller Network is built for you.
+                        </p>
+                        <Label>How Earnings Work for Sellers</Label>
                         <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
                             Sellers earn 80% of every transaction. The remaining 20% covers platform operations, payment processing infrastructure, student discovery tools, and the review team that maintains quality standards. There are no listing fees, no monthly subscriptions, and no minimum sales requirements to keep your account active.
                             Every sale credits your LAN wallet immediately. There is no weekly payment cycle or holding period. When a student buys your document at any hour of any day, your wallet balance increases within seconds. Withdrawal to your bank account or mobile money wallet is available at any time, with processing completed within 24 hours on business days across all supported African markets.
                             Our top sellers — a mix of prolific note-takers, professional tutors, and dedicated content creators — maintain catalogues of 30 to 150 documents and earn the equivalent of USD 300 to USD 1,500 per month in passive document sales. The key differentiator between modest and high income is almost always catalogue size and metadata quality, not content quality alone. A large, well-tagged catalogue in high-demand course categories generates income around the clock without any ongoing effort.
-                            </p>
-                            <Label>How the Seller Network Supports Your Growth</Label>
+                        </p>
+                        <Label>How the Seller Network Supports Your Growth</Label>
                         <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
                             Joining the Seller Network is not just creating an account and uploading documents. It is joining a platform infrastructure designed to actively grow your income over time without requiring ongoing active effort from you.
                             LAN's search algorithm continuously surfaces your documents to students searching for relevant course materials. As your documents accumulate purchase history and buyer reviews, they rank progressively higher in search results — creating a compounding effect where early sales generate visibility that drives further sales. A document you upload today may take a few weeks to build its search ranking, but once established, it will continue generating income for years.
                             Your Seller Dashboard provides the analytics to understand what is working and what is not: which documents convert well, which courses are generating the most search traffic, where your buyers are located geographically, and what price points maximise your revenue. This data lets you make informed decisions about what to upload next and how to optimise your existing catalogue.
                             The referral programme creates an additional income layer that many sellers underutilise. Every student you refer who makes a purchase, and every seller you introduce who lists and sells documents, generates an automatic commission credited to your wallet. For sellers with large social networks or active academic communities around them, referral income can meaningfully supplement document sales income.                          </p>
-                            <Label>Seller Tiers and What They Unlock</Label>
-                             <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
+                        <Label>Seller Tiers and What They Unlock</Label>
+                        <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
                             The Seller Network has four progressive tiers — Bronze, Silver, Gold, and Platinum — determined by your cumulative earnings, document catalogue quality, buyer review ratings, and account standing. Each tier upgrade unlocks tangible benefits that compound your earning potential.
                             Bronze is the entry tier for all new sellers. Bronze sellers have access to all core platform features — uploading, pricing, analytics, referrals, and withdrawals with a small flat fee. As your catalogue grows and sales accumulate, you progress automatically to Silver, which eliminates withdrawal fees and increases your document upload priority in the review queue.
                             Gold sellers receive priority review processing for new uploads, eligibility for Promoted Listings at discounted rates, and access to the platform's seasonal marketing campaigns that surface featured sellers to students during peak demand periods. Platinum sellers — the top tier of the Seller Network — receive dedicated account management, maximum priority across all platform systems, and invitation to LAN's exclusive content partnership programmes.
-                            Tier progression is automatic — there is no application process. The platform continuously evaluates your account metrics and upgrades your tier as you meet the thresholds. Your tier is displayed on your public profile, serving as a quality signal to buyers about your track record on the platform.                          
-                            </p>
-                        </section>
+                            Tier progression is automatic — there is no application process. The platform continuously evaluates your account metrics and upgrades your tier as you meet the thresholds. Your tier is displayed on your public profile, serving as a quality signal to buyers about your track record on the platform.
+                        </p>
+                        <Link href="/seller/network" style={{
+                            padding: "14px 46px", background: LIME, color: NAVY,
+                            fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                            border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
+                            fontFamily: "'Space Grotesk',sans-serif", textAlign: "center"
+                        }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = PURPLEL; e.currentTarget.style.color = PURPLEL; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,248,255,.2)"; e.currentTarget.style.color = WHITE; }}
+                        >Read More</Link>
+                    </section>
 
                     {/* ══ SECTION: REFERRAL ══ */}
                     <section id="referral" style={{ padding: "80px 64px", background: DARK, borderBottom: "1px solid rgba(248,248,255,.06)" }} className="lan-section-pad">
                         <Label>Referral Programme</Label>
                         <SectionH>Earn Commissions<br /><span style={{ color: LIME }}>for Every Referral.</span></SectionH>
                         <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                            The LAN Referral Programme turns your social network into a passive income stream that runs alongside your document sales. Every student you refer who makes a purchase, every seller you introduce who uploads and sells, and every faculty member you bring to the platform who verifies and sells — all generate automatic commissions credited to your wallet with no action required after the initial introduction.                         
-                             </p>
-                            <Label>How the Referral System Works</Label>
-                              <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                        Every LAN account is assigned a unique referral link and referral code at the moment of account creation. Your referral link is a standard URL. When someone visits that link and creates a new LAN account, they are permanently attributed to you in the referral system.
-                        The attribution is durable — it does not expire and cannot be overwritten. A student you referred six months ago who finally makes their first purchase today generates your referral commission today. A seller you referred who uploads their first document and makes their first sale three weeks after joining generates your commission at the moment of that first sale.
-                        Share your referral link through any channel that reaches people who might benefit from LAN: WhatsApp groups, student Telegram channels, academic Facebook pages, university subreddits, email threads, in-person conversations, or your social media profiles. The link works identically regardless of sharing channel, and there is no limit on how many people can use it.                             
+                            The LAN Referral Programme turns your social network into a passive income stream that runs alongside your document sales. Every student you refer who makes a purchase, every seller you introduce who uploads and sells, and every faculty member you bring to the platform who verifies and sells — all generate automatic commissions credited to your wallet with no action required after the initial introduction.
+                        </p>
+                        <Label>How the Referral System Works</Label>
+                        <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
+                            Every LAN account is assigned a unique referral link and referral code at the moment of account creation. Your referral link is a standard URL. When someone visits that link and creates a new LAN account, they are permanently attributed to you in the referral system.
+                            The attribution is durable — it does not expire and cannot be overwritten. A student you referred six months ago who finally makes their first purchase today generates your referral commission today. A seller you referred who uploads their first document and makes their first sale three weeks after joining generates your commission at the moment of that first sale.
+                            Share your referral link through any channel that reaches people who might benefit from LAN: WhatsApp groups, student Telegram channels, academic Facebook pages, university subreddits, email threads, in-person conversations, or your social media profiles. The link works identically regardless of sharing channel, and there is no limit on how many people can use it.
                         </p>
                         
-                        <p style={{ fontSize: "15px", color: LIMEL, lineHeight: 1.9, marginBottom: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                            <a href="/seller/referral" target="_bank">Read more </a>
-                        </p>
+                       
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: "16px", marginBottom: "32px" }}>
                             {[
                                 { icon: "🎓", title: "Refer a Student Buyer", reward: "~₦500", body: "Referred student makes their first document purchase. Commission credits to your wallet automatically.", accent: PURPLE },
@@ -1133,6 +1211,16 @@ export default function LANDocsClient() {
                         <Callout icon="🔗" label="No Cap. No Expiry.">
                             There is no maximum on referral earnings and no expiry on your referral link. Top referrers in the Seller Network generate ₦80,000–₦250,000 per month in referral commissions alone — entirely separate from document and bounty income.
                         </Callout>
+
+                        <Link href="/seller/referral" style={{
+                            padding: "14px 46px", background: LIME, color: NAVY,
+                            fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                            border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
+                            fontFamily: "'Space Grotesk',sans-serif", textAlign: "center"
+                        }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = PURPLEL; e.currentTarget.style.color = PURPLEL; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,248,255,.2)"; e.currentTarget.style.color = WHITE; }}
+                        >Read More</Link>
                     </section>
 
                     {/* ══ SECTION: COMMUNITY ══ */}
@@ -1191,6 +1279,15 @@ export default function LANDocsClient() {
                                 </Link>
                             </div>
                         </div>
+                        <Link href="/students/study-groups" style={{
+                            padding: "14px 46px", background: LIME, color: NAVY,
+                            fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                            border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
+                            fontFamily: "'Space Grotesk',sans-serif", textAlign: "center"
+                        }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = PURPLEL; e.currentTarget.style.color = PURPLEL; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,248,255,.2)"; e.currentTarget.style.color = WHITE; }}
+                        >Read More</Link>
                     </section>
 
                     {/* ══ SECTION: SECURITY ══ */}
@@ -1230,8 +1327,18 @@ export default function LANDocsClient() {
 
                         <Callout icon="✦" label="The L.A.N Promise">
                             The Learning Access Network is more than a platform — it's a community dedicated to <strong style={{ color: WHITE }}>raising leaders and building people</strong>. By providing access to valuable resources and fostering a culture of continuous learning, L.A.N empowers individuals to reach their full potential and make a positive impact in their communities.
-                        <br/><br/> LAN pictured a great school of technology where young men and young women could be taught how to succeed in life by developing the ability to THINK in practical rather than in theoretical terms
+                            <br /><br /> LAN pictured a great school of technology where young men and young women could be taught how to succeed in life by developing the ability to THINK in practical rather than in theoretical terms
                         </Callout>
+
+                        <Link href="/seller/lan-shift" style={{
+                            padding: "14px 46px", background: LIME, color: NAVY,
+                            fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                            border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
+                            fontFamily: "'Space Grotesk',sans-serif", textAlign: "center"
+                        }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = PURPLEL; e.currentTarget.style.color = PURPLEL; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,248,255,.2)"; e.currentTarget.style.color = WHITE; }}
+                        >Read More</Link>
                     </section>
 
                     {/* ══ SECTION: FUTURE ══ */}
@@ -1279,8 +1386,8 @@ export default function LANDocsClient() {
                                 { bg: DARK2, accent: PURPLEL, tag: "🎓 Student Network", title: "Browse 128,000+ Documents", body: "The full student experience — past questions, AI tutor, bounty board, study groups, and your personal academic library.", href: "/students/network" },
                                 { bg: NAVY, accent: GOLD, tag: "📚 Seller Network", title: "Become a Seller", body: "Upload your materials, earn 80% of every sale, build a passive income from what you already know.", href: "/seller/network" },
                                 { bg: "#0d1a10", accent: LIME, tag: "🏛️ Faculty Network", title: "Verified Faculty Publishing", body: "Lecturers and professors publishing course materials — verified credentials, continent-wide reach.", href: "/faculty/network" },
-                                { bg: "#1a0d0d", accent: "#f59e0b", tag: "🎯 Bounty Board", title: "Request Any Document", body: "Post a bounty with a reward. Verified sellers fulfil your specific document request in 24–72 hours.", href: "/academic/bounty/board" },
-                                { bg: DARK2, accent: PURPLEL, tag: "🤖 AI Tutor", title: "Start an AI Study Session", body: "Claude-powered AI that reads your specific purchased books and answers questions about their content.", href: "/ai-chat" },
+                                { bg: "#1a0d0d", accent: "#f59e0b", tag: "🎯 Bounty Board", title: "Request Any Document", body: "Post a bounty with a reward. Verified sellers fulfil your specific document request in 24–72 hours.", href: "/lan/net/help-center/article/bounty-board-for-buyers" },
+                                { bg: DARK2, accent: PURPLEL, tag: "🤖 AI Tutor", title: "Start an AI Study Session", body: "Claude-powered AI that reads your specific purchased books and answers questions about their content.", href: "/students/ai-tutor" },
                                 { bg: DARK, accent: "#06b6d4", tag: "📖 Help Centre", title: "Get Platform Support", body: "Step-by-step guides for buying, selling, payments, account management, and everything else on LAN.", href: "/lan/net/help-center" },
                             ].map(n => (
                                 <Link key={n.tag} href={n.href} style={{ display: "block", padding: "28px", background: n.bg, textDecoration: "none", border: "1px solid rgba(248,248,255,.06)", transition: "transform .15s, border-color .15s" }}

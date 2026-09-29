@@ -147,7 +147,7 @@ export default function SignInClient() {
               [LAN <span style={{ color: GOLD, fontStyle: "italic" }}>Library</span>]
             </span>
           </Link>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>The Global Student Library 📚</span>
+          <Link href="/lan/net/help-center" style={{ fontSize: 15, color: GOLD,  }}>Help Center 📚</Link>
         </header>
 
         {/* ── Body: two-column (stacks on mobile) ── */}
@@ -155,11 +155,11 @@ export default function SignInClient() {
 
           {/* LEFT — navy editorial panel */}
           <div className="hero-bg signin-left">
-
             <div className="anim-up" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(184,150,62,0.14)", border: "1px solid rgba(184,150,62,0.3)", borderRadius: 999, padding: "6px 14px", marginBottom: 24, width: "fit-content" }}>
               <Sparkles size={12} color={GOLD} />
               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: GOLDD }}>Africa's #1 Student Library</span>
             </div>
+            {/* <img src="/stud.png"  /> */}
 
             <h1 className="lan-serif anim-up2" style={{ fontSize: "clamp(32px,4vw,52px)", fontWeight: 900, color: "#fff", lineHeight: 1.05, letterSpacing: -1, marginBottom: 18 }}>
               Welcome back,<br />
@@ -213,7 +213,7 @@ export default function SignInClient() {
                   <p style={{ fontSize: 12, color: "#991b1b" }}>Your Network is Bad</p>
                 </div>
               )}
-              {/* <GoogleSignInButton /> */}
+              <GoogleSignInButton />
               <div style={{ color: "#999" }} className="divider"><span style={{color: "#777"}}>Continue with email</span></div>
 
               <input className="lan-input" type="email" placeholder="Email address"

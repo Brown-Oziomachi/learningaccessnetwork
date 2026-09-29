@@ -135,7 +135,7 @@ function Hero() {
                 </p>
 
                 <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
-                    <Link href="/signup" style={{
+                    <Link href="/faculty/verify" style={{
                         padding: "14px 32px", background: TEAL, color: "#fff",
                         fontSize: "11px", fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase",
                         textDecoration: "none", fontFamily: "'Montserrat',sans-serif", transition: "background .18s",
@@ -272,6 +272,14 @@ function WhyJoin() {
                         <p style={{ fontSize: "13px", color: "rgba(26,26,46,.55)", lineHeight: 1.85, fontFamily: "'Montserrat',sans-serif" }}>{r.body}</p>
                     </div>
                 ))}
+             <Link href="/social-impart" style={{
+                        padding: "14px 32px", background: TEAL, color: "#fff",
+                        fontSize: "11px", fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase",
+                        textDecoration: "none", fontFamily: "'Montserrat',sans-serif", transition: "background .18s", textAlign: "center"
+                    }}
+                        onMouseEnter={e => e.currentTarget.style.background = TEALD}
+                        onMouseLeave={e => e.currentTarget.style.background = TEAL}
+                    >Learn More</Link>
             </div>
             <style>{`@media(max-width:900px){ .lan-why-grid{ grid-template-columns: repeat(3,85vw) !important; } }`}</style>
         </section>
@@ -287,7 +295,7 @@ function HowItWorks() {
         { icon: "📂", title: "Upload Your Course Materials", body: "Upload lecture notes, tutorial questions, course outlines, past exams you set, textbooks you authored, or any academic content you created. Set a price, assign course codes, tag your university and department — and submit." },
         { icon: "🌐", title: "Reach Students Across Africa", body: "Your documents are indexed in LAN's search engine, surfaced in departmental feeds, and featured in course-specific recommendations. Students from 200+ universities browse and purchase materials from verified faculty every day." },
         { icon: "💳", title: "Earn 80% of Every Sale", body: "Eighty percent of every transaction goes directly to your LAN wallet. Sales from students at any institution, any time of day, with no effort from you after upload. Monthly earnings for active faculty sellers average ₦120,000 – ₦400,000." },
-        { icon: "🏦", title: "Withdraw Anytime", body: "Your wallet balance is withdrawable to any Nigerian bank account at any time. Minimum ₦1,000. Funds arrive within 24 hours. Faculty sellers at Silver tier and above have zero withdrawal fees." },
+        { icon: "🏦", title: "Withdraw Anytime", body: "Your wallet balance is withdrawable to your bank account at any time. Minimum ₦1,000. Funds arrive within 24 hours. Faculty sellers at Silver tier and above have zero withdrawal fees." },
     ];
     return (
         <section style={{ background: INK, padding: "88px 48px" }}>
@@ -325,6 +333,14 @@ function HowItWorks() {
                         </div>
                     ))}
                 </div>
+                 <Link href="/faculty/withdraw" style={{
+                        padding: "14px 32px", background: TEAL, color: "#fff",
+                        fontSize: "11px", fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase",
+                        textDecoration: "none", fontFamily: "'Montserrat',sans-serif", transition: "background .18s",
+                    }}
+                        onMouseEnter={e => e.currentTarget.style.background = TEALD}
+                        onMouseLeave={e => e.currentTarget.style.background = TEAL}
+                    >Learn More</Link>
             </div>
         </section>
     );
@@ -335,7 +351,7 @@ function HowItWorks() {
 ═══════════════════════════════════════════════════════════════ */
 function Earnings() {
     const streams = [
-        { icon: "📄", title: "Lecture Notes & Course Outlines", body: "Your most scalable asset. A well-tagged set of lecture notes for a popular 200-level course at a major Nigerian university can generate hundreds of sales per semester. Upload once, collect indefinitely.", range: "₦800 – ₦3,500 per sale" },
+        { icon: "📄", title: "Lecture Notes & Course Outlines", body: "Your most scalable asset. A well-tagged set of lecture notes for a popular 200-level course at a major African university can generate hundreds of sales per semester. Upload once, collect indefinitely.", range: "₦800 – ₦3,500 per sale" },
         { icon: "📋", title: "Past Examination Questions", body: "If you set exams for your department, those papers — once they are no longer active — are high-demand items on LAN. Students pay premium prices for lecturers' own past questions because they trust they reflect exam style accurately.", range: "₦500 – ₦2,000 per download" },
         { icon: "📖", title: "Textbooks & Course Readers", body: "Full-length academic texts, departmental readers, and course reference books you have authored or co-authored generate the highest per-unit price on LAN. Faculty-authored textbooks routinely command ₦5,000–₦15,000 per download.", range: "₦5,000 – ₦15,000 per book" },
         { icon: "🎯", title: "High-Value Bounty Fulfilments", body: "Faculty sellers have access to an exclusive tier of high-value Bounty Board requests — requests that only a verified academic can credibly fulfil. These include institution-specific curriculum summaries, course alignment documents, and professional study guides.", range: "₦5,000 – ₦500,000 per bounty" },
@@ -400,6 +416,14 @@ function Earnings() {
                             Lecturers with catalogues of 50+ documents across multiple courses and cohorts build compounding passive income that grows each semester without additional uploads.
                         </p>
                     </div>
+                    <Link href="/faculty/upload" style={{
+                        padding: "14px 32px", background: TEAL, color: "#fff",
+                        fontSize: "11px", fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase",
+                        textDecoration: "none", fontFamily: "'Montserrat',sans-serif", transition: "background .18s", textAlign: "center" 
+                    }}
+                        onMouseEnter={e => e.currentTarget.style.background = TEALD}
+                        onMouseLeave={e => e.currentTarget.style.background = TEAL}
+                    >Learn More</Link>
                 </div>
             </div>
             <style>{`
@@ -470,6 +494,14 @@ function Tiers() {
                             </ul>
                         </div>
                     ))}
+                 <Link href="/faculty/grow-followers" style={{
+                        padding: "14px 32px", background: TEAL, color: "#fff",
+                        fontSize: "11px", fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase",
+                        textDecoration: "none", fontFamily: "'Montserrat',sans-serif", transition: "background .18s", textAlign: "center"
+                    }}
+                        onMouseEnter={e => e.currentTarget.style.background = TEALD}
+                        onMouseLeave={e => e.currentTarget.style.background = TEAL}
+                    >Learn More</Link>
                 </div>
             </div>
         </section>
@@ -514,6 +546,14 @@ function Tools() {
                         </div>
                     ))}
                 </div>
+                 <Link href="/seller/lan-shift" style={{
+                        padding: "14px 32px", background: TEAL, color: "#fff",
+                        fontSize: "11px", fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase",
+                        textDecoration: "none", fontFamily: "'Montserrat',sans-serif", transition: "background .18s",
+                    }}
+                        onMouseEnter={e => e.currentTarget.style.background = TEALD}
+                        onMouseLeave={e => e.currentTarget.style.background = TEAL}
+                    >Learn More</Link>
             </div>
         </section>
     );

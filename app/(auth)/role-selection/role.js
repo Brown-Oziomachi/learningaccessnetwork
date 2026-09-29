@@ -292,9 +292,16 @@ router.push(`/create-account${buildQuery({ role: "seller" })}`);
         {/* ══════════════════ STEP: LANDING ══════════════════ */}
         {step === "landing" && (
           <div style={{ padding: "72px 24px" }}>
-            <div style={{ maxWidth: "820px", margin: "0 auto" }}>
-
+            <div style={{ maxWidth: "820px", margin: "0 auto", gap: "10px" }}>
               {/* Eyebrow */}
+              <div  style={{
+                    marginTop: "6px", display: "inline-flex", alignItems: "center", gap: "6px",
+                    background: NAVY, border: "1px solid rgba(22,163,74,.2)",
+                    padding: "4px 10px", marginBottom: "6px", fontWeight: 500, textTransform: "uppercase", fontSize: "12px"
+                  }}>
+                <a href="/user-agreement=lib">User Agreement</a>
+                <ArrowRight size={14}/>
+                </div>
               <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(184,150,62,.12)", border: "1px solid rgba(184,150,62,.28)", padding: "7px 16px", marginBottom: "24px" }}>
                 <Sparkles size={12} style={{ color: GOLD }} />
                 <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: GOLDD }}>Join Africa's #1 Student Library</span>
@@ -637,7 +644,7 @@ router.push(`/create-account${buildQuery({ role: "seller" })}`);
               </h1>
               <p style={{ fontSize: "14px", color: "#888", fontWeight: 300, marginBottom: "8px", lineHeight: 1.7 }}>
                 Join LAN Library as a verified faculty member. Your uploaded materials will carry a&nbsp;
-                <strong style={{ color: "#7c3aed" }}>Verified Faculty</strong> badge — building trust with students instantly.
+                <strong style={{ color: "#7c3aed" }}>Verified Faculty</strong> badge — building trust with students across Africa.
               </p>
 
               <div className="rs-divider"><div className="rs-diamond" /></div>

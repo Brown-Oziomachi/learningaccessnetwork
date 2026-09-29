@@ -275,6 +275,15 @@ export default function HomeClient() {
         purchasedBookIds.has(id) || purchasedBookIds.has(`firestore-${id}`) ||
         purchasedBookIds.has(String(id).replace("firestore-", ""));
 
+      useEffect(() => {
+            const unsub = onAuthStateChanged(auth, (u) => {
+                if (u) setUser(u);
+                else router.push('/signin');
+                setCheckingAuth(false);
+            });
+            return () => unsub();
+        }, [router]);
+    
     /* auth */
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async cu => {

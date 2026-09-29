@@ -388,12 +388,12 @@ export default function AboutClient() {
                     </p>
 
                     <div className="hero-btns" style={{ ...v, ...t('0.45s') }}>
-                        <Link href="/documents" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '15px 30px', background: '#c8922a', color: '#0d1f35', fontWeight: 700, fontSize: 13, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: 4, transition: 'background 0.2s' }}
+                        <Link href="/lan/net/help-center/article/what-is-lan-library" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '15px 30px', background: '#c8922a', color: '#0d1f35', fontWeight: 700, fontSize: 13, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: 4, transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = '#e8b24a'}
                             onMouseLeave={e => e.currentTarget.style.background = '#c8922a'}>
-                            Browse Library <ArrowRight size={15} />
+                            Learn More <ArrowRight size={15} />
                         </Link>
-                        <Link href="/upload-document" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '15px 30px', border: '1px solid rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.8)', fontWeight: 500, fontSize: 13, borderRadius: 4, transition: 'all 0.2s' }}
+                        <Link href="/seller/upload-document" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '15px 30px', border: '1px solid rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.8)', fontWeight: 500, fontSize: 13, borderRadius: 4, transition: 'all 0.2s' }}
                             onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.7)'; e.currentTarget.style.color = '#fff'; }}
                             onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}>
                             Upload & Earn
@@ -652,13 +652,13 @@ export default function AboutClient() {
                                 Join thousands of students and sellers building Africa's academic knowledge economy — one document at a time. Your next upload could fund your semester. Your next download could change your result.
                             </p>
                             <div className="cta-btns">
-                                <Link href="/documents"
+                                <Link href="/lan/net/help-center/article/what-is-lan-library"
                                     style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '15px 30px', background: '#c8922a', color: '#0d1f35', fontWeight: 700, fontSize: 13, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: 4, transition: 'background 0.2s' }}
                                     onMouseEnter={e => e.currentTarget.style.background = '#e8b24a'}
                                     onMouseLeave={e => e.currentTarget.style.background = '#c8922a'}>
-                                    Browse Library <ArrowRight size={15} />
+                                    Learn More <ArrowRight size={15} />
                                 </Link>
-                                <Link href="/ref/invite-friends"
+                                <Link href="/seller/referral"
                                     style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '15px 30px', border: '1px solid rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.8)', fontWeight: 500, fontSize: 13, borderRadius: 4, transition: 'all 0.2s' }}
                                     onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.7)'; e.currentTarget.style.color = '#fff'; }}
                                     onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}>

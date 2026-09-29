@@ -142,10 +142,11 @@ function Hero() {
           color: WHITE, lineHeight: .95, letterSpacing: "-.04em",
           marginBottom: "32px",
         }}>
-          Study<br />
+          Learn<br />
           Smarter<span style={{ color: LIME }}>.</span><br />
-          <span style={{ color: PURPLE }}>Earn</span><br />
-          More<span style={{ color: LIME }}>.</span>
+          <span style={{ color: PURPLE }}>Connect</span><br />
+        <span style={{ color: PURPLE }}> Deeper</span>
+        <span style={{ color: LIME }}>.</span>
         </h1>
 
         <p style={{
@@ -158,7 +159,7 @@ function Hero() {
         </p>
 
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "48px" }}>
-          <Link href="/documents" style={{
+          <Link href="/students/open-access" style={{
             padding: "14px 30px", background: LIME, color: VOID,
             fontSize: "12px", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase",
             textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif",
@@ -166,8 +167,8 @@ function Hero() {
           }}
             onMouseEnter={e => e.currentTarget.style.background = LIMEL}
             onMouseLeave={e => e.currentTarget.style.background = LIME}
-          >Browse 128K+ Docs</Link>
-          <Link href="/signup" style={{
+          >FREE DOCUMENTS GUIDE</Link>
+          <Link href="/lan/net/help-center/article/creating-your-account" style={{
             padding: "14px 26px", background: "transparent", color: WHITE,
             fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
             border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
@@ -316,7 +317,7 @@ function BountyBoard() {
                                 </div>
                             </div>
                         ))}
-                        <Link href="/academic/bounty/board" style={{
+                        <Link href="/lan/net/help-center/article/bounty-board" style={{
                             display: "inline-flex", alignItems: "center", gap: "8px",
                             marginTop: "12px", padding: "13px 28px", background: PURPLE, color: WHITE,
                             fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
@@ -325,7 +326,7 @@ function BountyBoard() {
                         }}
                             onMouseEnter={e => e.currentTarget.style.background = PURPLED}
                             onMouseLeave={e => e.currentTarget.style.background = PURPLE}
-                        >View Live Bounties →</Link>
+                        >Learn More →</Link>
                     </div>
                     {/* Right: live bounty board */}
                     <div>
@@ -379,9 +380,9 @@ function HowItWorks() {
     const steps = [
         { num: "1", icon: "✉️", title: "Create Your Free Account", body: "Sign up with your student email in under 2 minutes. No credit card. No subscription fee. Your LAN account is free forever — you only pay when you choose to purchase documents." },
         { num: "2", icon: "🔍", title: "Search, Filter, Find", body: "Use our search engine to find documents by course code, university, department, year, or content type. Advanced filters help you find exactly what you need — not just something similar." },
-        { num: "3", icon: "💳", title: "Buy With Confidence", body: "Purchase with any Nigerian payment method — card, bank transfer, USSD, or your LAN wallet. Every purchase is covered by our buyer guarantee: full refund if the document doesn't match its description." },
+        { num: "3", icon: "💳", title: "Buy With Confidence", body: "Purchase with any available payment method — card, bank transfer, USSD, or your LAN wallet. Every purchase is covered by our buyer guarantee: full refund if the document doesn't match its description." },
         { num: "4", icon: "📱", title: "Access Anywhere, Always", body: "Downloaded documents are available in your account forever. Read on web, on mobile, or download PDFs for offline access. No expiry, no access window — your library belongs to you." },
-        { num: "5", icon: "📤", title: "Start Selling (Optional)", body: "Have materials you're not using? Upload them, set a price, and earn 80% of every sale. Turn your existing notes and past questions into a passive income stream with zero upfront cost." },
+        { num: "5", icon: "📤", title: "Start Selling (Become a LAN Seller)", body: "Have materials you're not using? Upload them, set a price, and earn 80% of every sale. Turn your existing notes and past questions into a passive income stream with zero upfront cost." },
     ];
     return (
         <section style={{ background: DARK2, padding: "88px 40px" }}>
@@ -422,6 +423,16 @@ function HowItWorks() {
                         </div>
                     ))}
                 </div>
+                 <Link href="/students/how-to-buy" style={{
+                            display: "inline-flex", alignItems: "center", gap: "8px",
+                            marginTop: "12px", padding: "13px 28px", background: PURPLE, color: WHITE,
+                            fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
+                            textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif",
+                            transition: "background .15s",
+                        }}
+                            onMouseEnter={e => e.currentTarget.style.background = PURPLED}
+                            onMouseLeave={e => e.currentTarget.style.background = PURPLE}
+                        >Learn More →</Link>
             </div>
             <style>{`@media(max-width:768px){ .lan-step-line{ display:none !important; } }`}</style>
         </section>
@@ -440,16 +451,16 @@ function StudentEarnings() {
                     <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".2em", textTransform: "uppercase", color: PURPLEL, fontFamily: "'Space Grotesk',sans-serif" }}>Earn on LAN</p>
                 </div>
                 <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: "clamp(28px,4vw,52px)", fontWeight: 800, color: WHITE, lineHeight: 1.0, marginBottom: "20px", letterSpacing: "-.03em" }}>
-                    Students Who Earn<br /><span style={{ color: LIME }}>₦200,000+/Month</span>
+                    Students Who Earn<br /><span style={{ color: LIME }}>₦400,000+/Month</span>
                 </h2>
                 <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, maxWidth: "560px", marginBottom: "52px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                    You don't need to just buy on LAN. Thousands of students across Nigeria monetise their notes, past questions, and course materials while still in school.
+                    You don't need to just buy on LAN. Thousands of students across Africa monetise their notes, past questions, and course materials while still in school.
                 </p>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }} className="lan-earn-grid">
                     {[
                         { icon: "📄", accent: PURPLE, title: "Upload Documents", body: "Your lecture notes, past questions, textbooks — every academic document you have is worth something to a student at another school. Upload, price, and earn 80% of every sale." },
-                        { icon: "🎯", accent: LIME, limeText: true, title: "Fulfil Bounties", body: "Browse the Bounty Board daily. Claim high-reward requests you can fill. Get paid instantly from escrow when the student confirms receipt. Top bounty hunters earn ₦50,000+ per week." },
+                        { icon: "🎯", accent: LIME, limeText: true, title: "Fulfil Bounties", body: "Browse the Bounty Board daily. Claim high-reward requests you can fill. Get paid instantly from escrow when the student confirms receipt. Top bounty hunters earn ₦100,000+ per week." },
                         { icon: "🔗", accent: "#06b6d4", title: "Refer & Earn", body: "Share your unique referral link. Earn commissions every time someone you refer makes a purchase or upload. Build passive income stacked on top of your document earnings." },
                     ].map(s => (
                         <div key={s.title}
@@ -470,7 +481,7 @@ function StudentEarnings() {
                 {/* Revenue callout */}
                 <div style={{ marginTop: "28px", background: "linear-gradient(135deg, rgba(124,58,237,.15) 0%, rgba(163,230,53,.1) 100%)", border: "1px solid rgba(124,58,237,.3)", padding: "32px 36px", display: "flex", gap: "28px", alignItems: "center", flexWrap: "wrap" }}>
                     <div>
-                        <div style={{ fontFamily: "'Syne',sans-serif", fontSize: "clamp(36px,5vw,56px)", fontWeight: 800, color: LIME, letterSpacing: "-.03em" }}>₦200,000</div>
+                        <div style={{ fontFamily: "'Syne',sans-serif", fontSize: "clamp(36px,5vw,56px)", fontWeight: 800, color: LIME, letterSpacing: "-.03em" }}>₦400,000</div>
                         <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: MUTED, fontFamily: "'Space Grotesk',sans-serif" }}>Average Top Student Earner / Month</div>
                     </div>
                     <div style={{ width: "1px", height: "60px", background: "rgba(163,230,53,.2)" }} />
@@ -480,6 +491,15 @@ function StudentEarnings() {
                         </p>
                     </div>
                 </div>
+                   <Link href="/lan/net/help-center/article/seller-account-overview" style={{
+                            display: "inline-flex", alignItems: "center", gap: "8px",
+                            marginTop: "12px", padding: "13px 28px", background: PURPLE, color: WHITE,
+                            fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
+                            textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", transition: "background .15s",
+                        }}
+                            onMouseEnter={e => e.currentTarget.style.background = PURPLED}
+                            onMouseLeave={e => e.currentTarget.style.background = PURPLE}
+                        >Learn More →</Link>
             </div>
             <style>{`@media(max-width:768px){ .lan-earn-grid{ grid-template-columns:1fr !important; } }`}</style>
         </section>
@@ -552,6 +572,16 @@ function Community() {
                         </div>
                     </div>
                 </div>
+                 <Link href="/students/study-groups" style={{
+                            display: "inline-flex", alignItems: "center", gap: "8px",
+                            marginTop: "12px", padding: "13px 28px", background: PURPLE, color: WHITE,
+                            fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
+                            textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif",
+                            transition: "background .15s",
+                        }}
+                            onMouseEnter={e => e.currentTarget.style.background = PURPLED}
+                            onMouseLeave={e => e.currentTarget.style.background = PURPLE}
+                        >Learn More →</Link>
             </div>
             <style>{`@media(max-width:900px){ .lan-community-grid{ grid-template-columns:1fr !important; } }`}</style>
         </section>
@@ -699,7 +729,7 @@ function CTAFooter() {
             <div style={{ position: "relative", zIndex: 2 }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(163,230,53,.1)", border: "1px solid rgba(163,230,53,.25)", padding: "7px 18px", marginBottom: "28px" }}>
                     <span style={{ width: "6px", height: "6px", background: LIME, borderRadius: "50%", display: "inline-block", animation: "pulse 1.5s ease-in-out infinite" }} />
-                    <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: LIME, fontFamily: "'Space Grotesk',sans-serif" }}>Free Forever · Join 40,000+ Students</span>
+                    <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: LIME, fontFamily: "'Space Grotesk',sans-serif" }}>Free Forever · Join 40,000,000+ Students</span>
                 </div>
                 <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: "clamp(36px,6vw,72px)", fontWeight: 800, color: WHITE, lineHeight: .95, marginBottom: "20px", letterSpacing: "-.04em" }}>
                     Your Degree.<br />Your <span style={{ color: LIME }}>Library.</span><br />Your <span style={{ color: PURPLEL }}>Income.</span>
@@ -708,7 +738,7 @@ function CTAFooter() {
                     Create your free account in 2 minutes. Start browsing 128,000+ documents immediately — no payment required to explore.
                 </p>
                 <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
-                    <Link href="/signup" style={{
+                    <Link href="/lan/net/help-center/article/creating-your-account" style={{
                         padding: "16px 36px", background: LIME, color: VOID,
                         fontSize: "12px", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase",
                         textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", transition: "background .15s",
@@ -717,7 +747,7 @@ function CTAFooter() {
                         onMouseEnter={e => e.currentTarget.style.background = LIMEL}
                         onMouseLeave={e => e.currentTarget.style.background = LIME}
                     >Create Free Account</Link>
-                    <Link href="/documents" style={{
+                    <Link href="/students/open-access" style={{
                         padding: "16px 28px", background: "transparent", color: WHITE,
                         fontSize: "12px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
                         border: "1px solid rgba(248,248,255,.15)", textDecoration: "none",
@@ -725,7 +755,7 @@ function CTAFooter() {
                     }}
                         onMouseEnter={e => { e.currentTarget.style.background = "rgba(124,58,237,.15)"; e.currentTarget.style.borderColor = PURPLEL; }}
                         onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(248,248,255,.15)"; }}
-                    >Browse Documents First</Link>
+                    >Browse Free Documents</Link>
                 </div>
                 <p style={{ fontSize: "11px", color: "rgba(248,248,255,.2)", marginTop: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>No credit card. No subscription. Completely free to explore.</p>
             </div>

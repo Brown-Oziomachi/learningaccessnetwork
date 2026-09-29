@@ -149,11 +149,11 @@ function Hero() {
                 }}>
                     LAN's Seller Network is Africa's most powerful academic publishing platform.
                     Turn your notes, past questions, and expertise into a passive income stream
-                    that pays you while you sleep — reaching 40,000+ active students across 200+ universities.
+                    that pays you while you sleep — reaching 4,000,000+ active students across 200+ universities.
                 </p>
 
                 <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "48px" }}>
-                    <Link href="/signup" style={{
+                    <Link href="/seller/seller-dashboard" style={{
                         padding: "14px 30px", background: LIME, color: VOID,
                         fontSize: "12px", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase",
                         textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif",
@@ -163,7 +163,7 @@ function Hero() {
                         onMouseEnter={e => e.currentTarget.style.background = LIMEL}
                         onMouseLeave={e => e.currentTarget.style.background = LIME}
                     >🚀 Start Selling — Free</Link>
-                    <a href="#how-it-works" style={{
+                    <a href="/learn/make-money" style={{
                         padding: "14px 26px", background: "transparent", color: WHITE,
                         fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
                         border: "1px solid rgba(248,248,255,.2)", textDecoration: "none",
@@ -320,6 +320,15 @@ function HowItWorks() {
                         </div>
                     ))}
                 </div>
+                <Link href="/seller/withdraw-earnings" style={{
+                            display: "inline-flex", alignItems: "center", gap: "8px",
+                            marginTop: "12px", padding: "13px 28px", background: PURPLE, color: WHITE,
+                            fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
+                            textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", transition: "background .15s",
+                        }}
+                            onMouseEnter={e => e.currentTarget.style.background = PURPLED}
+                            onMouseLeave={e => e.currentTarget.style.background = PURPLE}
+                        >Learn More →</Link>
             </div>
             <style>{`@media(max-width:768px){ .lan-step-line{ display:none !important; } }`}</style>
         </section>
@@ -397,6 +406,15 @@ function CompoundingModel() {
                                 </div>
                             </div>
                         </div>
+                    <Link href="/seller/upload-document" style={{
+                            display: "inline-flex", alignItems: "center", gap: "8px",
+                            marginTop: "12px", padding: "13px 28px", background: PURPLE, color: WHITE,
+                            fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
+                            textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", transition: "background .15s",
+                        }}
+                            onMouseEnter={e => e.currentTarget.style.background = PURPLED}
+                            onMouseLeave={e => e.currentTarget.style.background = PURPLE}
+                        >Learn More →</Link>
                     </div>
                 </div>
             </div>
@@ -497,6 +515,15 @@ function EarningsEngine() {
                         </div>
                     </div>
                 </div>
+                        <Link href="/seller/upload-document" style={{
+                            display: "inline-flex", alignItems: "center", gap: "8px",
+                            marginTop: "12px", padding: "13px 28px", background: PURPLE, color: WHITE,
+                            fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
+                            textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", transition: "background .15s",
+                        }}
+                            onMouseEnter={e => e.currentTarget.style.background = PURPLED}
+                            onMouseLeave={e => e.currentTarget.style.background = PURPLE}
+                        >Learn More →</Link>
             </div>
             <style>{`@media(max-width:768px){ .lan-breakdown-grid{ grid-template-columns:1fr !important; } }`}</style>
         </section>
@@ -510,7 +537,46 @@ function AnalyticsDashboard() {
     return (
         <section style={{ background: VOID, padding: "88px 40px" }}>
             <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
+                
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "56px", alignItems: "start" }} className="lan-analytics-grid">
+                   
+                    {/* Right: text */}
+                    <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "10px" }}>
+                            <div style={{ width: "4px", height: "28px", background: `linear-gradient(180deg, ${PURPLE}, ${LIME})` }} />
+                            <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".2em", textTransform: "uppercase", color: PURPLEL, fontFamily: "'Space Grotesk',sans-serif" }}>The Analytics Advantage</p>
+                        </div>
+                        <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: "clamp(28px,4vw,48px)", fontWeight: 800, color: WHITE, lineHeight: 1.0, marginBottom: "20px", letterSpacing: "-.03em" }}>
+                            Know What<br /><span style={{ color: LIME }}>Students Need Before They Ask.</span>
+                        </h2>
+                        <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "28px", fontFamily: "'Space Grotesk',sans-serif" }}>
+                            Your Seller Dashboard doesn't just show you what you've earned — it shows you what the market is actively searching for, so you can create materials that match real, live demand.
+                        </p>
+                        {[
+                            ["📊", "Real-Time Search Intelligence", "See exactly what course codes, universities, and document types students are searching for right now. Create what the market needs before your competitors do."],
+                            ["💸", "Instant Earnings Notifications", "Every sale triggers an immediate in-app and email notification. You always know the exact moment money lands in your wallet — no delays, no guessing."],
+                            ["📈", "Document Performance Analytics", "See which documents earn the most, which are trending this semester, and which underperform — so you can price, promote, and optimise your catalogue."],
+                            ["🎯", "Bounty Board Alerts", "Set custom alerts for new bounties in your subject area or university. Get notified the moment a high-reward request is posted that matches what you can fulfil."],
+                        ].map(([ico, title, body]) => (
+                            <div key={title} style={{ display: "flex", gap: "14px", marginBottom: "18px", alignItems: "flex-start" }}>
+                                <div style={{ fontSize: "20px", width: "36px", textAlign: "center", flexShrink: 0 }}>{ico}</div>
+                                <div>
+                                    <div style={{ fontSize: "13px", fontWeight: 700, color: WHITE, marginBottom: "2px", fontFamily: "'Space Grotesk',sans-serif" }}>{title}</div>
+                                    <div style={{ fontSize: "12px", color: MUTED, fontFamily: "'Space Grotesk',sans-serif", lineHeight: 1.7 }}>{body}</div>
+                                </div>
+                            </div>
+                        ))}
+                        <Link href="/seller/seller-dashboard" style={{
+                            display: "inline-flex", alignItems: "center", gap: "8px",
+                            marginTop: "12px", padding: "13px 28px", background: PURPLE, color: WHITE,
+                            fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
+                            textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", transition: "background .15s",
+                        }}
+                            onMouseEnter={e => e.currentTarget.style.background = PURPLED}
+                            onMouseLeave={e => e.currentTarget.style.background = PURPLE}
+                        >Learn More →</Link>
+                    </div>
+                   
                     {/* Left: mock dashboard */}
                     <div>
                         <div style={{ background: DARK, border: "1px solid rgba(124,58,237,.3)", overflow: "hidden" }}>
@@ -569,42 +635,7 @@ function AnalyticsDashboard() {
                         </div>
                     </div>
 
-                    {/* Right: text */}
-                    <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "10px" }}>
-                            <div style={{ width: "4px", height: "28px", background: `linear-gradient(180deg, ${PURPLE}, ${LIME})` }} />
-                            <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".2em", textTransform: "uppercase", color: PURPLEL, fontFamily: "'Space Grotesk',sans-serif" }}>The Analytics Advantage</p>
-                        </div>
-                        <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: "clamp(28px,4vw,48px)", fontWeight: 800, color: WHITE, lineHeight: 1.0, marginBottom: "20px", letterSpacing: "-.03em" }}>
-                            Know What<br /><span style={{ color: LIME }}>Students Need Before They Ask.</span>
-                        </h2>
-                        <p style={{ fontSize: "15px", color: MUTED, lineHeight: 1.9, marginBottom: "28px", fontFamily: "'Space Grotesk',sans-serif" }}>
-                            Your Seller Dashboard doesn't just show you what you've earned — it shows you what the market is actively searching for, so you can create materials that match real, live demand.
-                        </p>
-                        {[
-                            ["📊", "Real-Time Search Intelligence", "See exactly what course codes, universities, and document types students are searching for right now. Create what the market needs before your competitors do."],
-                            ["💸", "Instant Earnings Notifications", "Every sale triggers an immediate in-app and email notification. You always know the exact moment money lands in your wallet — no delays, no guessing."],
-                            ["📈", "Document Performance Analytics", "See which documents earn the most, which are trending this semester, and which underperform — so you can price, promote, and optimise your catalogue."],
-                            ["🎯", "Bounty Board Alerts", "Set custom alerts for new bounties in your subject area or university. Get notified the moment a high-reward request is posted that matches what you can fulfil."],
-                        ].map(([ico, title, body]) => (
-                            <div key={title} style={{ display: "flex", gap: "14px", marginBottom: "18px", alignItems: "flex-start" }}>
-                                <div style={{ fontSize: "20px", width: "36px", textAlign: "center", flexShrink: 0 }}>{ico}</div>
-                                <div>
-                                    <div style={{ fontSize: "13px", fontWeight: 700, color: WHITE, marginBottom: "2px", fontFamily: "'Space Grotesk',sans-serif" }}>{title}</div>
-                                    <div style={{ fontSize: "12px", color: MUTED, fontFamily: "'Space Grotesk',sans-serif", lineHeight: 1.7 }}>{body}</div>
-                                </div>
-                            </div>
-                        ))}
-                        <Link href="/signup" style={{
-                            display: "inline-flex", alignItems: "center", gap: "8px",
-                            marginTop: "12px", padding: "13px 28px", background: PURPLE, color: WHITE,
-                            fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
-                            textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", transition: "background .15s",
-                        }}
-                            onMouseEnter={e => e.currentTarget.style.background = PURPLED}
-                            onMouseLeave={e => e.currentTarget.style.background = PURPLE}
-                        >Access Your Dashboard →</Link>
-                    </div>
+                   
                 </div>
             </div>
             <style>{`
@@ -655,7 +686,7 @@ function BountyBoard() {
                                 </div>
                             </div>
                         ))}
-                        <Link href="/academic/bounty/board" style={{
+                        <Link href="/lan/net/help-center/article/bounty-board-for-authors" style={{
                             display: "inline-flex", alignItems: "center", gap: "8px",
                             marginTop: "12px", padding: "13px 28px", background: PURPLE, color: WHITE,
                             fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
@@ -663,7 +694,7 @@ function BountyBoard() {
                         }}
                             onMouseEnter={e => e.currentTarget.style.background = PURPLED}
                             onMouseLeave={e => e.currentTarget.style.background = PURPLE}
-                        >View Live Bounties →</Link>
+                        >Learn More →</Link>
                     </div>
                     <div>
                         <div style={{ background: DARK2, border: "1px solid rgba(124,58,237,.3)", overflow: "hidden" }}>
@@ -769,6 +800,15 @@ function Tiers() {
                         </div>
                     ))}
                 </div>
+                    <Link href="/seller/grow-followers" style={{
+                            display: "inline-flex", alignItems: "center", gap: "8px",
+                            marginTop: "12px", padding: "13px 28px", background: PURPLE, color: WHITE,
+                            fontSize: "11px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
+                            textDecoration: "none", fontFamily: "'Space Grotesk',sans-serif", transition: "background .15s",
+                        }}
+                            onMouseEnter={e => e.currentTarget.style.background = PURPLED}
+                            onMouseLeave={e => e.currentTarget.style.background = PURPLE}
+                        >Learn More →</Link>
             </div>
         </section>
     );
@@ -917,7 +957,7 @@ function CTAFooter() {
             <div style={{ position: "relative", zIndex: 2 }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(163,230,53,.1)", border: "1px solid rgba(163,230,53,.25)", padding: "7px 18px", marginBottom: "28px" }}>
                     <span style={{ width: "6px", height: "6px", background: LIME, borderRadius: "50%", display: "inline-block", animation: "pulse 1.5s ease-in-out infinite" }} />
-                    <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: LIME, fontFamily: "'Space Grotesk',sans-serif" }}>Free Forever · Join 2,400+ Verified Sellers</span>
+                    <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: LIME, fontFamily: "'Space Grotesk',sans-serif" }}>Free Forever · Join 2.4Million + Verified Sellers</span>
                 </div>
                 <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: "clamp(36px,6vw,72px)", fontWeight: 800, color: WHITE, lineHeight: .95, marginBottom: "20px", letterSpacing: "-.04em" }}>
                     Your Knowledge.<br />Your <span style={{ color: LIME }}>Catalogue.</span><br />Your <span style={{ color: PURPLEL }}>Income.</span>
@@ -935,7 +975,7 @@ function CTAFooter() {
                         onMouseEnter={e => e.currentTarget.style.background = LIMEL}
                         onMouseLeave={e => e.currentTarget.style.background = LIME}
                     >🚀 Create Seller Account — Free</Link>
-                    <Link href="/documents" style={{
+                    <Link href="/writers-mindset" style={{
                         padding: "16px 28px", background: "transparent", color: WHITE,
                         fontSize: "12px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
                         border: "1px solid rgba(248,248,255,.15)", textDecoration: "none",
@@ -943,7 +983,7 @@ function CTAFooter() {
                     }}
                         onMouseEnter={e => { e.currentTarget.style.background = "rgba(124,58,237,.15)"; e.currentTarget.style.borderColor = PURPLEL; }}
                         onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(248,248,255,.15)"; }}
-                    >Browse Documents First</Link>
+                    >Learn How to Write</Link>
                 </div>
                 <p style={{ fontSize: "11px", color: "rgba(248,248,255,.2)", marginTop: "24px", fontFamily: "'Space Grotesk',sans-serif" }}>No credit card. No subscription. No listing fees. LAN earns only when you earn.</p>
             </div>

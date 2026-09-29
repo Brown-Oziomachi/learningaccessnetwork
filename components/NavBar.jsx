@@ -1166,7 +1166,7 @@ export default function Navbar() {
                 fontFamily: "'Lato',sans-serif",
               }}
             >
-              What is LAN?
+              Documentation
             </Link>
             <div
               style={{

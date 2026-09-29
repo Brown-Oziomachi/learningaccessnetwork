@@ -57,7 +57,8 @@ export const articlesP1 = {
       {
         type: 'steps',
         items: [
-          'Click "Sign In" then "Create new account"',
+          'Click "Create Account" then "Create new account"',
+          'Select how you want to use LAN Library(Student, Seller, Faculty)',
           'Enter your first name and surname',
           'Provide your date of birth',
           'Enter your email address',

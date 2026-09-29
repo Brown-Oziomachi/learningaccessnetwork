@@ -97,7 +97,7 @@ Open Access on LAN Library is our answer to that reality. It is a growing collec
         sections: [
             {
                 heading: "What Open Access Means on LAN Library",
-                body: `When a seller, faculty member, or student uploads a document and marks it as Free, that document is immediately added to the Open Access collection. Any visitor to LAN Library — whether they have an account or not, whether their wallet is empty or full — can open and read that document without paying a single naira.
+                body: `When a seller, faculty member, or student uploads a document and marks it as Free, that document is immediately added to the Open Access collection. Any visitor to LAN Library — whether their wallet is empty or full — can open and read that document without paying a single naira.
 
 Open Access documents appear with a green 🔓 FREE badge across every page of the platform — in search results, on category pages, on the home feed, and inside the dedicated Open Access Hub at /open-access. They are indistinguishable from paid documents in quality and presentation; the only difference is that the price is zero.
 
@@ -245,7 +245,7 @@ You can also browse by lecturer profile. If your course is taught by a lecturer 
             },
             {
                 heading: "Evaluating a Document Before You Buy",
-                body: `Every document listing on LAN shows you a preview before you commit to buying. The preview displays enough of the document — typically the first 10 to 15 pages — for you to assess the writing quality, how the content is organised, whether it matches the syllabus section you need, and whether the formatting is clean and readable.
+                body: `Every document listing on LAN shows you a preview before you commit to buying. The preview displays enough of the document — typically the first 1 to 2 pages — for you to assess the writing quality, how the content is organised, whether it matches the syllabus section you need, and whether the formatting is clean and readable.
 
 In addition to the preview, every listing shows the seller's rating, the number of reviews from previous buyers, the total number of purchases, and when the document was uploaded. A document with 40 purchases and a 4.8-star rating from buyers who left written reviews is a strong signal of reliable quality. A recently uploaded document with no reviews yet may still be excellent — it simply has not accumulated purchase history yet.
 

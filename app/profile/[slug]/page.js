@@ -7,7 +7,6 @@
 
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
-import Navbar from "@/components/NavBar";
 import Link from "next/link";
 import ClientProfileContent from "../profile";
 
@@ -173,7 +172,6 @@ export default async function ProfilePage({ params }) {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f5f1ea" }}>
-      <Navbar />
       <ClientProfileContent sellerSlug={slug} />
     </div>
   );

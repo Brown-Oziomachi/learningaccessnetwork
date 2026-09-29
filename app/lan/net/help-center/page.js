@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { Search, ArrowRight, FileText, Star, Sparkles, GraduationCap, BookOpen } from "lucide-react";
 import Link from "next/link";
-import Navbar from "@/components/NavBar";
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY  = "#0d2244";
@@ -153,7 +152,6 @@ export default function HelpCenterPage() {
             `}</style>
 
             <div className="hc-root" style={{ minHeight:"100vh" }}>
-                <Navbar />
 
                 {/* ══ HEADER ══ */}
                 <section className="hc-header" style={{ padding:"72px 24px 60px" }}>

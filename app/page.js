@@ -220,7 +220,7 @@ const FOOTER_COLUMNS = [
       { label: "LAN Wallet", href: "/seller/lan-wallet" },
       { label: "Withdraw Earnings", href: "/seller/withdraw-earnings" },
       { label: "Referral Programme", href: "/seller/referral" },
-      { label: "Affiliate Programme", href: "/seller/api-integration" },
+      // { label: "Affiliate Programme", href: "/seller/api-integration" },
       { label: "Seller Dashboard", href: "/seller/seller-dashboard" },
       { label: "Recharge Services", href: "/seller/recharge-services" },
       { label: "Growing Your Followers", href: "/seller/grow-followers" },
@@ -245,12 +245,12 @@ const FOOTER_COLUMNS = [
     heading: "Company",
     links: [
       { label: "About LAN", href: "/about/lan" },
-      { label: "Ask Educo", href: "/signin" },
+      { label: "Ask Educo", href: "/students/ai-tutor" },
       { label: "LAN Shift", href: "/seller/lan-shift" },
       { label: "Help Centre", href: "/lan/net/help-center" },
       { label: "Documentation", href: "/docs" },
       { label: "Invite a Friend", href: "/ref/invite-friends" },
-      { label: "Affiliate", href: "/aff/developer/console" },
+      // { label: "Affiliate", href: "/aff/developer/console" },
       { label: "Social Impact", href: "/social-impart" },
       { label: "Privacy Policy", href: "/lan/privacy-policy" },
       { label: "Terms of Service", href: "/lan/terms-of-service" },
@@ -268,7 +268,7 @@ const NETWORKS = [
     image: "/stud2.png",           // swap to your real asset
     fallback: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800",
     tag: "🎓 Student Network",
-    tagColor: "#7c3aed",
+    tagColor: "#fff",
     tagBg: "rgba(124,58,237,.15)",
     tagBorder: "rgba(124,58,237,.35)",
     title: "Learn Smarter,\nConnect Deeper",
@@ -284,7 +284,7 @@ const NETWORKS = [
     image: "/LAN seller.png",
     fallback: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800",
     tag: "📚 Seller Network",
-    tagColor: "#b8963e",
+    tagColor: "#fff",
     tagBg: "rgba(184,150,62,.15)",
     tagBorder: "rgba(184,150,62,.35)",
     title: "Turn Knowledge\nInto Income",
@@ -300,7 +300,7 @@ const NETWORKS = [
     image: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=800",
     fallback: "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800",
     tag: "🏛️ Faculty Network",
-    tagColor: "#0f7173",
+    tagColor: "#fff",
     tagBg: "rgba(15,113,115,.15)",
     tagBorder: "rgba(15,113,115,.35)",
     title: "Publish Beyond\nYour Classroom",
@@ -336,7 +336,7 @@ const TESTIMONIALS = [
   // Verified Sellers
 
   {
-    name: "Tunde Bakare",
+    name: "Sunday Anointed",
     role: "Verified Seller",
     text: "LAN gave me a platform to monetise years of study materials. My balance keeps growing while I sleep.",
   },
@@ -380,40 +380,18 @@ function NetworkCardsSection() {
             Three Networks.{" "}
             <span style={{ color: GOLD, fontStyle: "italic" }}>One Platform.</span>
           </h2>
+          <h3 style={{
+            maxWidth: "540px", margin: "0 auto 16px auto", color: GOLD,  }}>Join an ecosystem of thousands of members across Africa. Whether you are collaborating in the Student Network, earning in the Seller Network, or publishing verified resources in the Faculty Network, you can share strategies, request feedback, and grow together in LAN community hub</h3>
       <div style={{ textAlign: "center", padding: "20px 0" }}>
   <p style={{
     fontSize: "16px", 
-    color: "#555555", 
     maxWidth: "540px",
-    margin: "0 auto 16px auto", 
+    margin: "0 auto 1px auto", 
     lineHeight: "1.6", 
-    fontWeight: "400",
-    fontFamily: "'Lato', sans-serif"
+    fontWeight: "500",
+    fontFamily: "'Lato', sans-serif",
   }}>
     Think of the entire LAN platform as a large <span>Academic Airport</span>, where these three networks are the different groups of people making it run:
-  </p>
-  
-  <p style={{
-    fontSize: "15px", 
-    color: NAVY, 
-    maxWidth: "460px",
-    margin: "0 auto 30px auto", 
-    lineHeight: "1.8", 
-    fontWeight: "300",
-    fontFamily: "'Lato', sans-serif"
-  }}>
-    A student in the 
-    <a href="/students/network" style={{ color: NAVY, textDecoration: "underline", fontWeight: "700", marginLeft: "4px", marginRight: "4px" }}>
-      Student Network
-    </a> 
-    buys a document created by a graduate in the 
-    <a href="/seller/network" style={{ color: NAVY, textDecoration: "underline", fontWeight: "700", marginLeft: "4px", marginRight: "4px" }}>
-      Seller Network
-    </a>, 
-    which might be vetted or supplemented by resources from a professor in the 
-    <a href="/faculty/network" style={{ color: NAVY, textDecoration: "underline", fontWeight: "700", marginLeft: "4px" }}>
-      Faculty Network
-    </a>.         
   </p>
 </div>
         </div>
@@ -638,14 +616,20 @@ export default function LandingPage() {
       <div className="lan-landing">
 
         {/* ══════ HEADER ══════ */}
-        <header className="hero-bg" style={{ position: "sticky", top: 0, zIndex: 50, borderBottom: "0.5px solid rgba(184,150,62,0.18)" }}>
+        <header className="hero-bg" style={{ position: "sticky", top: 0, zIndex: 50, borderBottom: "0.5px solid rgba(184,150,62,0.18)",  }}>
           <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 72 }}>
             {/* wordmark */}
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <img src="/lanlog.png" alt="LAN" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", border: `1px solid rgba(184,150,62,0.3)` }} />
               <div>
+                  
+                <div style={{ justifyContent: "space-between", display: "flex", flexWrap: "wrap", gap: 12, }}>
+                <div>
                 <div className="lan-serif" style={{ fontSize: 22, fontWeight: 900, color: "#fff", lineHeight: 1 }}>LAN Library</div>
                 <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", fontFamily: "'Lato',sans-serif" }}>The Global Student Library</div>
+                </div>
+                 {/* <Link href="/lan/net/help-center" style={{ fontSize: 13, color: GOLD,  }}>Help Center 📚</Link> */}
+                </div>
               </div>
             </div>
           </div>
@@ -678,7 +662,7 @@ export default function LandingPage() {
         <h1 className="lan-serif anim-up-2" style={{ fontSize: "clamp(44px,8vw,88px)", fontWeight: 900, color: "#fff", lineHeight: 1.02, letterSpacing: "-2px", margin: "0 0 12px" }}>
             Share the wealth
         </h1>
-        <h1 className="lan-serif anim-up-2" style={{ fontSize: "clamp(44px,8vw,88px)", fontWeight: 900, color: GOLD, fontStyle: "italic", lineHeight: 1.02, letterSpacing: "-2px", margin: "0 0 28px" }}>
+        <h1 className="lan-serif anim-up-2" style={{ fontSize: "clamp(44px,8vw,78px)", fontWeight: 900, color: GOLD, fontStyle: "italic", lineHeight: 1.02, letterSpacing: "-2px", margin: "0 0 28px" }}>
             [of knowledge].
         </h1>
 
@@ -689,7 +673,7 @@ export default function LandingPage() {
         </p>
         <p className="anim-up-3" style={{ fontSize: 17, color: "rgba(245,240,232,0.7)", maxWidth: 560, lineHeight: 1.8, fontWeight: 300, margin: "0 0 44px" }}>
             Join an ecosystem of thousands of members across Africa.{" "}
-            <a href="/writers-mindset" style={{ color: GOLDD, fontWeight: 100, textDecoration: "underline", textUnderlineOffset: 9, background: "none", border: "none", cursor: "pointer", fontSize: 17 }}>
+            <a href="/writers-mindset" style={{ color: GOLDD, fontWeight: 100, textDecoration: "underline", textUnderlineOffset: 9, background: "none", border: "none", cursor: "pointer", fontSize: 17 }} target="_blank">
                 Learn how to write
             </a>
         </p>
@@ -698,7 +682,7 @@ export default function LandingPage() {
             <button className="btn-primary" onClick={goSignIn}>
                 Create Account <ArrowRight size={14} />
             </button>
-            <a style={{ color: GOLD, background: NAVY }} href="/docs" className="btn-ghost font-extrabold">
+            <a style={{ color: GOLD, background: NAVY }} href="/docs" className="btn-ghost font-extrabold" target="_blank">
                 Documentation
             </a>
         </div>
@@ -827,7 +811,7 @@ export default function LandingPage() {
                 <img src="/LAN seller.png" alt="Seller earning on LAN Library"
                   style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }} />
                 <div style={{ position: "absolute", bottom: 1, left: 1, background: "#16a34a", padding: "12px 18px", display: "flex", flexDirection: "column", gap: 3 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)", fontFamily: "'Lato',sans-serif" }}>Sellers Earning Now</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)", fontFamily: "'Lato',sans-serif" }}>LAN Sellers Earning Now</span>
                   <span style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", fontFamily: "'Lato',sans-serif" }}>Uploading content · Processing transactions</span>
                 </div>
               </div>
@@ -946,14 +930,13 @@ export default function LandingPage() {
                   >
                     <GraduationCap size={15} /> Join Faculty Podium
                   </button>
-                  <button
-                    onClick={goSignIn}
+                  <a href="/faculty/network"
                     style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", background: "transparent", color: NAVY, fontSize: 13, fontWeight: 700, fontFamily: "'Lato',sans-serif", letterSpacing: ".06em", textTransform: "uppercase", border: "0.5px solid #e5ddd0", cursor: "pointer", transition: "background .18s" }}
                     onMouseEnter={e => e.currentTarget.style.background = CREAM}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                   >
-                    <Upload size={15} /> Upload Materials
-                  </button>
+                    <Upload size={15} /> Explore Network
+                  </a>
                 </div>
               </div>
 

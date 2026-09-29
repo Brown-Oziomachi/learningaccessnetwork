@@ -741,7 +741,7 @@ export const updatedCoreArticles = {
           'They\'ll upload the completed material',
           'You get a notification to review it',
           'You have 48 hours to confirm or reject',
-          'If confirmed, the author instantly receives 80% of the bounty (you keep 20%)',
+          'If confirmed, the author instantly receives 80% of the bounty (LAN keep 20%)',
           'Material is added to the library for you',
         ],
       },

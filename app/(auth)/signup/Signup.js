@@ -83,8 +83,8 @@ export default function SignUpClient() {
                             [LAN <span style={{ color: GOLD, fontStyle: "italic" }}>Library</span>]
                         </span>
                     </Link>
-                    <Link href="/signin" style={{ color: GOLD, textDecoration: "none", fontSize: 12, fontWeight: 700, display: "flex", gap: 6, alignItems: "center" }}>
-                        <ArrowLeft size={14} /> Back
+                    <Link href="/lan/net/help-center" style={{ color: GOLD, textDecoration: "none", fontSize: 12, fontWeight: 700, display: "flex", gap: 6, alignItems: "center" }}>
+                        <ArrowLeft size={14} /> Help Center
                     </Link>
                 </header>
 
