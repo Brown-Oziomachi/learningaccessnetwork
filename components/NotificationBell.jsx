@@ -19,8 +19,10 @@ import {
   Sparkles,
   Star,
   Eye,
-  Users,
-  Flag, // ← add these three
+   Users,
+  Flag, 
+  ShieldCheck,
+  BadgeCheck,
 } from "lucide-react";
 import {
   collection,
@@ -289,6 +291,32 @@ function StockPill({ current, total }) {
         {current} / {total} left
       </span>
     </div>
+  );
+}
+
+function OfficialPill() {
+  return (
+    <span
+      style={{
+        alignSelf: "flex-start",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "3px",
+        background: "#fefce8",
+        border: "0.5px solid #facc15",
+        color: NAVY,
+        padding: "1px 6px",
+        borderRadius: "999px",
+        fontSize: "9px",
+        fontWeight: 800,
+        letterSpacing: "0.08em",
+        fontFamily: "'Lato',sans-serif",
+      }}
+    >
+      <ShieldCheck size={10} style={{ color: "#ca8a04" }} />
+      OFFICIAL
+      <BadgeCheck size={11} style={{ color: "#2563eb" }} />
+    </span>
   );
 }
 
@@ -839,161 +867,216 @@ next.add(n._globalId);
                 }
                 lastWasPhysical = isPhysical;
 
-                const row = (
-                  <div
-                    key={n.id}
-                    className="nb-row"
-                    onClick={() => handleClick(n)}
-                    style={{ background: n.read ? "#fff" : cfg.bg }}
-                  >
-                    {!n.read && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          left: 0,
-                          top: 0,
-                          bottom: 0,
-                          width: "3px",
-                          background: cfg.barColor,
-                        }}
-                      />
-                    )}
-                    <div
-                      style={{
-                        width: "34px",
-                        height: "34px",
-                        flexShrink: 0,
-                        border: `0.5px solid ${cfg.border}`,
-                        background: n.read ? CREAM : cfg.bg,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Icon size={15} style={{ color: cfg.iconColor }} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          justifyContent: "space-between",
-                          gap: "8px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "3px",
-                            minWidth: 0,
-                          }}
-                        >
-                          <p
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: n.read ? "#888" : NAVY,
-                              margin: 0,
-                              fontFamily: "'Lato',sans-serif",
-                              lineHeight: 1.4,
-                            }}
-                          >
-                            {n.title}
-                          </p>
-                          {cfg.label && (
-                            <span
-                              className="nb-type-badge"
-                              style={{
-                                alignSelf: "flex-start",
-                                background: cfg.bg,
-                                color: cfg.iconColor,
-                                border: `0.5px solid ${cfg.border}`,
-                              }}
-                            >
-                              {cfg.label}
-                            </span>
-                          )}
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            flexShrink: 0,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "10px",
-                              color: "#bbb",
-                              fontFamily: "'Lato',sans-serif",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {formatTime(n.createdAt)}
-                          </span>
-                          <button
-                            className="nb-del"
-                            onClick={(e) => deleteNotification(e, n)}
-                            title="Dismiss"
-                          >
-                            <Trash2 size={11} />
-                          </button>
-                        </div>
-                      </div>
-                      {n.message && (
-                        <p
-                          style={{
-                            fontSize: "11px",
-                            color: n.read ? "#aaa" : "#666",
-                            margin: "4px 0 0",
-                            fontFamily: "'Lato',sans-serif",
-                            lineHeight: 1.5,
-                            display: "-webkit-box",
-                            WebkitLineClamp: 3,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {n.message}
-                        </p>
-                      )}
-                      {n.type === "physical_low_stock" &&
-                        n.currentStock !== undefined && (
-                          <StockPill
-                            current={n.currentStock}
-                            total={n.totalConsignment}
-                          />
-                        )}
-                      {n.type === "physical_sale" && n.amount && (
-                        <div
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            background: "#f0fdf4",
-                            border: "0.5px solid rgba(22,163,74,0.3)",
-                            padding: "2px 8px",
-                            marginTop: "5px",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "10px",
-                              fontWeight: 700,
-                              color: "#16a34a",
-                              fontFamily: "'Lato',sans-serif",
-                            }}
-                          >
-                            +₦{Number(n.amount).toLocaleString()} added to
-                            balance
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
+                                const isOfficial = n.fromOfficial === true;
+
+                                const row = (
+                                  <div
+                                    key={n.id}
+                                    className="nb-row"
+                                    onClick={() => handleClick(n)}
+                                    style={{
+                                      background: isOfficial
+                                        ? "linear-gradient(to right, #fefce8, #ffffff)"
+                                        : n.read
+                                          ? "#fff"
+                                          : cfg.bg,
+                                    }}
+                                  >
+                                    {(!n.read || isOfficial) && (
+                                      <div
+                                        style={{
+                                          position: "absolute",
+                                          left: 0,
+                                          top: 0,
+                                          bottom: 0,
+                                          width: "3px",
+                                          background: isOfficial
+                                            ? "#facc15"
+                                            : cfg.barColor,
+                                        }}
+                                      />
+                                    )}
+                                    <div
+                                      style={{
+                                        width: "34px",
+                                        height: "34px",
+                                        flexShrink: 0,
+                                        border: isOfficial
+                                          ? "1.5px solid #facc15"
+                                          : `0.5px solid ${cfg.border}`,
+                                        background: isOfficial
+                                          ? "#fff"
+                                          : n.read
+                                            ? CREAM
+                                            : cfg.bg,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        overflow: "hidden",
+                                        borderRadius: isOfficial ? "50%" : 0,
+                                      }}
+                                    >
+                                      {isOfficial ? (
+                                        <img
+                                          src="/lanlog.png"
+                                          alt="LAN Library official"
+                                          style={{
+                                            width: "100%",
+                                            height: "100%",
+                                            objectFit: "cover",
+                                          }}
+                                        />
+                                      ) : (
+                                        <Icon
+                                          size={15}
+                                          style={{ color: cfg.iconColor }}
+                                        />
+                                      )}
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "flex-start",
+                                          justifyContent: "space-between",
+                                          gap: "8px",
+                                        }}
+                                      >
+                                        <div
+                                          style={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: "3px",
+                                            minWidth: 0,
+                                          }}
+                                        >
+                                          <p
+                                            style={{
+                                              fontSize: "12px",
+                                              fontWeight: 700,
+                                              color: n.read ? "#888" : NAVY,
+                                              margin: 0,
+                                              fontFamily: "'Lato',sans-serif",
+                                              lineHeight: 1.4,
+                                            }}
+                                          >
+                                            {n.title}
+                                          </p>
+                                          {isOfficial && <OfficialPill />}
+                                          {cfg.label && !isOfficial && (
+                                            <span
+                                              className="nb-type-badge"
+                                              style={{
+                                                alignSelf: "flex-start",
+                                                background: cfg.bg,
+                                                color: cfg.iconColor,
+                                                border: `0.5px solid ${cfg.border}`,
+                                              }}
+                                            >
+                                              {cfg.label}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "4px",
+                                            flexShrink: 0,
+                                          }}
+                                        >
+                                          <span
+                                            style={{
+                                              fontSize: "10px",
+                                              color: "#bbb",
+                                              fontFamily: "'Lato',sans-serif",
+                                              whiteSpace: "nowrap",
+                                            }}
+                                          >
+                                            {formatTime(n.createdAt)}
+                                          </span>
+                                          <button
+                                            className="nb-del"
+                                            onClick={(e) =>
+                                              deleteNotification(e, n)
+                                            }
+                                            title="Dismiss"
+                                          >
+                                            <Trash2 size={11} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                      {n.message && (
+                                        <p
+                                          style={{
+                                            fontSize: "11px",
+                                            color: n.read ? "#aaa" : "#666",
+                                            margin: "4px 0 0",
+                                            fontFamily: "'Lato',sans-serif",
+                                            lineHeight: 1.5,
+                                            display: "-webkit-box",
+                                            WebkitLineClamp: 3,
+                                            WebkitBoxOrient: "vertical",
+                                            overflow: "hidden",
+                                          }}
+                                        >
+                                          {n.message}
+                                        </p>
+                                      )}
+                                      {isOfficial && (
+                                        <p
+                                          style={{
+                                            fontSize: "9px",
+                                            color: "#a16207",
+                                            margin: "5px 0 0",
+                                            fontFamily: "'Lato',sans-serif",
+                                            fontWeight: 700,
+                                            letterSpacing: "0.05em",
+                                          }}
+                                        >
+                                          System • Announcements Only
+                                        </p>
+                                      )}
+                                      {n.type === "physical_low_stock" &&
+                                        n.currentStock !== undefined && (
+                                          <StockPill
+                                            current={n.currentStock}
+                                            total={n.totalConsignment}
+                                          />
+                                        )}
+                                      {n.type === "physical_sale" &&
+                                        n.amount && (
+                                          <div
+                                            style={{
+                                              display: "inline-flex",
+                                              alignItems: "center",
+                                              gap: "4px",
+                                              background: "#f0fdf4",
+                                              border:
+                                                "0.5px solid rgba(22,163,74,0.3)",
+                                              padding: "2px 8px",
+                                              marginTop: "5px",
+                                            }}
+                                          >
+                                            <span
+                                              style={{
+                                                fontSize: "10px",
+                                                fontWeight: 700,
+                                                color: "#16a34a",
+                                                fontFamily: "'Lato',sans-serif",
+                                              }}
+                                            >
+                                              +₦
+                                              {Number(
+                                                n.amount,
+                                              ).toLocaleString()}{" "}
+                                              added to balance
+                                            </span>
+                                          </div>
+                                        )}
+                                    </div>
+                                  </div>
+                                );
 
                 return sectionHeader ? [sectionHeader, row] : row;
               })

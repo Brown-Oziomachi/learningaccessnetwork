@@ -1,6 +1,13 @@
 // app/api/flutterwave/create-subaccount/route.js
 
 import { NextResponse } from 'next/server';
+import { getCountry } from '@/lib/africanCountries';
+
+const toE164 = (phone, dial) => {
+    if (!phone) return phone;
+    const p = phone.replace(/\s+/g, '');
+    return p.startsWith('+') ? p : p.replace(/^0/, dial);
+};
 
 export async function POST(req) {
     try {
@@ -13,15 +20,15 @@ export async function POST(req) {
 
         console.log('🔑 Key being used:', process.env.FLUTTERWAVE_SECRET_KEY?.substring(0, 20) + '...');
         
-        const payload = {
-            account_bank: body.bankCode,
+        const country = getCountry(body.country);
+        const payload = {            account_bank: body.bankCode,
             account_number: body.accountNumber,
             business_name: body.businessName || `${body.firstName} ${body.surname}`,
             business_email: body.email,
             business_contact: `${body.firstName} ${body.surname}`,
-            business_contact_mobile: body.phoneNumber?.replace(/^0/, '+234'),
-            business_mobile: body.phoneNumber?.replace(/^0/, '+234'),
-            country: "NG",
+            business_contact_mobile: toE164(body.phoneNumber, country.dial),
+            business_mobile: toE164(body.phoneNumber, country.dial),
+            country: country.code,
             split_type: "percentage",
             split_value: 0.8,
         };

@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc, writeBatch, serverTimestamp, addDoc, collection } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { AFRICAN_COUNTRIES } from "@/lib/africanCountries";
+import { isReservedName, RESERVED_MESSAGE } from "@/lib/reservedIdentity";
 
 export default function BecomeSellerClient() {
     const [user, setUser] = useState(null);
@@ -19,7 +21,7 @@ export default function BecomeSellerClient() {
     const [formData, setFormData] = useState({
         firstName: "", surname: "", email: "", phoneNumber: "",
         title: "", bankName: "", bankCode: "", accountNumber: "",
-        accountName: "", isCustomBank: false, businessName: "",
+        accountName: "", isCustomBank: false, country: "NG", businessName: "",
         businessDescription: "", university: "", department: "",
         agreeToTerms: false,
     });
@@ -54,6 +56,32 @@ export default function BecomeSellerClient() {
         { name: "Opay Bank", code: "999992" },
 
     ];
+
+    const [banks, setBanks] = useState([]);
+    const [banksLoading, setBanksLoading] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        const loadBanks = async () => {
+            setBanksLoading(true);
+            try {
+                const res = await fetch(`/api/flutterwave/banks?country=${formData.country}`);
+                const json = await res.json();
+                if (!json.success) throw new Error(json.error);
+                if (!cancelled) setBanks(json.banks);
+            } catch {
+                if (!cancelled) {
+                    // Fall back to the hardcoded list for Nigeria; otherwise user can use "Other"
+                    setBanks(formData.country === "NG" ? nigerianBanks : []);
+                    showToast("Could not load the bank list. You can enter your bank manually.", "error");
+                }
+            } finally {
+                if (!cancelled) setBanksLoading(false);
+            }
+        };
+        loadBanks();
+        return () => { cancelled = true; };
+    }, [formData.country]);
 
     const isAcademic = ["Dr.", "Prof.", "Engr.", "Pharm.", "Barr.", "Lecturer"].includes(formData.title);
     const set = (key, val) => setFormData(p => ({ ...p, [key]: val }));
@@ -105,10 +133,11 @@ export default function BecomeSellerClient() {
     const validateForm = () => {
         const e = {};
         if (!formData.phoneNumber) e.phoneNumber = "Phone number is required";
+        if (isReservedName(formData.businessName)) e.businessName = RESERVED_MESSAGE;
         if (!formData.bankName) e.bankName = "Please select a bank";
         if (formData.isCustomBank && !formData.bankCode) e.bankCode = "Bank code is required";
         if (!formData.accountNumber) e.accountNumber = "Account number is required";
-        if (formData.accountNumber && formData.accountNumber.length !== 10) e.accountNumber = "Must be 10 digits";
+        if (formData.accountNumber && formData.country === "NG" && formData.accountNumber.length !== 10) e.accountNumber = "Must be 10 digits";
         if (!formData.accountName) e.accountName = "Account name is required";
         if (!formData.agreeToTerms) e.agreeToTerms = "You must agree to the terms";
         setErrors(e);
@@ -126,6 +155,7 @@ export default function BecomeSellerClient() {
                     uid: user.uid, email: formData.email,
                     firstName: formData.firstName, surname: formData.surname,
                     phoneNumber: formData.phoneNumber, bankCode: formData.bankCode,
+                    country: formData.country,
                     accountNumber: formData.accountNumber,
                     businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
                 }),
@@ -149,6 +179,7 @@ export default function BecomeSellerClient() {
                 booksSold: 0,
                 totalWithdrawn: 0,
                 bankDetails: {
+                    country: formData.country,
                     bankName: formData.bankName,
                     bankCode: formData.bankCode,
                     accountNumber: formData.accountNumber,
@@ -326,22 +357,37 @@ export default function BecomeSellerClient() {
                             </div>
                             <div className="lsb-grid2" style={{ marginTop: 16 }}>
                                 <div className="lsb-field lsb-span2">
+                                    <label className="lsb-label">Country <span className="lsb-req">*</span></label>
+                                    <select
+                                        value={formData.country}
+                                        onChange={e => setFormData(p => ({
+                                            ...p, country: e.target.value,
+                                            bankName: "", bankCode: "", accountNumber: "", isCustomBank: false,
+                                        }))}
+                                        className="lsb-input lsb-select"
+                                    >
+                                        {AFRICAN_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="lsb-field lsb-span2">
                                     <label className="lsb-label">Bank Name <span className="lsb-req">*</span></label>
                                     <select
                                         value={formData.isCustomBank ? "other" : formData.bankName}
+                                        disabled={banksLoading}
                                         onChange={e => {
                                             const v = e.target.value;
                                             if (v === "other") {
                                                 setFormData(p => ({ ...p, bankName: "", bankCode: "", isCustomBank: true }));
                                             } else {
-                                                const b = nigerianBanks.find(b => b.name === v);
+                                                const b = banks.find(b => b.name === v);
                                                 setFormData(p => ({ ...p, bankName: v, bankCode: b?.code || "", isCustomBank: false }));
                                             }
                                         }}
                                         className={`lsb-input lsb-select${errors.bankName ? " lsb-input-err" : ""}`}
                                     >
-                                        <option value="">— Select your bank —</option>
-                                        {nigerianBanks.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                                        <option value="">{banksLoading ? "Loading banks…" : "— Select your bank —"}</option>
+                                        {banks.map(b => <option key={`${b.code}-${b.name}`} value={b.name}>{b.name}</option>)}
                                         <option value="other">🏦 Other Bank (Not Listed)</option>
                                     </select>
                                     {errors.bankName && <p className="lsb-err-msg">{errors.bankName}</p>}
@@ -366,7 +412,7 @@ export default function BecomeSellerClient() {
                                                 value={formData.bankCode}
                                                 onChange={e => set("bankCode", e.target.value.replace(/\D/g, ""))}
                                                 placeholder="e.g. 044"
-                                                maxLength={3}
+                                                maxLength={10}
                                                 className={`lsb-input${errors.bankCode ? " lsb-input-err" : ""}`}
                                             />
                                             {errors.bankCode && <p className="lsb-err-msg">{errors.bankCode}</p>}
@@ -386,7 +432,7 @@ export default function BecomeSellerClient() {
                                     <label className="lsb-label">Account Number <span className="lsb-req">*</span></label>
                                     <input
                                         type="text"
-                                        maxLength={10}
+                                        maxLength={formData.country === "NG" ? 10 : 20}
                                         value={formData.accountNumber}
                                         onChange={e => set("accountNumber", e.target.value.replace(/\D/g, ""))}
                                         placeholder="0123456789"
@@ -424,8 +470,9 @@ export default function BecomeSellerClient() {
                                     value={formData.businessName}
                                     onChange={e => set("businessName", e.target.value)}
                                     placeholder={`${formData.firstName} ${formData.surname}`.trim() || "Your store name"}
-                                    className="lsb-input"
+                                    className={`lsb-input${errors.businessName ? " lsb-input-err" : ""}`}
                                 />
+                                {errors.businessName && <p className="lsb-err-msg">{errors.businessName}</p>}
                             </div>
                             <div className="lsb-field">
                                 <label className="lsb-label">Store Description</label>
