@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, ArrowRight, Sparkles, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { validateEmail } from '@/lib/auth/authValidation';
+import { isReservedEmail, isReservedName, RESERVED_MESSAGE } from '@/lib/reservedIdentity';
 
 const NAVY  = '#0d2244';
 const GOLD  = '#b8963e';
@@ -123,6 +124,17 @@ export default function EmailClient() {
     const handleNext = async () => {
         setLoading(true); setErrors({}); setAccountExists(false);
         try {
+            const fullName = `${formData.firstName || ''} ${formData.surname || ''}`;
+            if (
+                isReservedEmail(email) ||
+                isReservedName(fullName) ||
+                isReservedName(formData.firstName) ||
+                isReservedName(formData.surname)
+            ) {
+                setErrors({ email: RESERVED_MESSAGE });
+                setLoading(false); return;
+            }
+
             const validation = await validateEmail(email);
             if (!validation.isValid) {
                 setErrors(validation.errors);

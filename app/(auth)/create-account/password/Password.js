@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { validatePassword } from '@/lib/auth/authValidation';
 import { Eye, EyeOff, ShieldCheck, ArrowRight, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
+import { isReservedEmail, isReservedName, RESERVED_MESSAGE } from '@/lib/reservedIdentity';
 
 const NAVY  = '#0d2244';
 const GOLD  = '#b8963e';
@@ -177,6 +178,17 @@ export default function PasswordClient() {
     const strengthColor = ['', '#dc2626', '#f59e0b', GOLD, '#16a34a'];
 
     const handleNext = () => {
+        const fullName = `${formData.firstName || ''} ${formData.surname || ''}`;
+        if (
+            isReservedEmail(formData.email) ||
+            isReservedName(fullName) ||
+            isReservedName(formData.firstName) ||
+            isReservedName(formData.surname)
+        ) {
+            setErrors({ password: RESERVED_MESSAGE });
+            return;
+        }
+
         const validation = validatePassword(password);
         if (!validation.isValid) { setErrors(validation.errors); return; }
 

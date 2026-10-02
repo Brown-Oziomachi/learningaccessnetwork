@@ -90,7 +90,7 @@ const steps = [
 ];
 
 const benefits = [
-    "Earn 85% of every sale — highest in the industry",
+    "Earn 80% of every sale — highest in the industry",
     "No upfront costs or hidden fees",
     "Instant payment processing",
     "Reach thousands of students and professionals",

@@ -27,6 +27,15 @@ const GOLDD = "#d4aa5a";
 const CREAM = "#f5f0e8";
 const BG = "#f5f1ea";
 
+const formatMoney = (value) => {
+  const safe = Number(value ?? 0);
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    maximumFractionDigits: 0,
+  }).format(safe);
+};
+
 /* ─── Stock health thresholds ────────────────────────────────── */
 const stockStatus = (current, total) => {
   if (total === 0) return { label: "No Stock", color: "#aaa", bg: "#f5f5f5" };
@@ -149,7 +158,7 @@ function NotificationBell({ userId }) {
 }
 
 /* ─── Banking Ledger Table ───────────────────────────────────── */
-function LedgerTable({ sales, loading }) {
+function LedgerTable({ sales, loading, fmt }) {
   if (loading) return (
     <div style={{ textAlign: "center", padding: "32px 0" }}>
       <div style={{ width: "28px", height: "28px", border: `2px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto" }} />
@@ -259,7 +268,7 @@ function LedgerTable({ sales, loading }) {
 }
 
 /* ─── Asset Ledger Drawer ────────────────────────────────────── */
-function LedgerDrawer({ asset, userId, onClose }) {
+function LedgerDrawer({ asset, userId, onClose, fmt }) {
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -451,6 +460,7 @@ function LedgerDrawer({ asset, userId, onClose }) {
 ════════════════════════════════════════════════════════════════ */
 export default function SellerRepository() {
   const [user, setUser] = useState(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [assets, setAssets] = useState([]);
   const [allSales, setAllSales] = useState([]); // all sales for this seller
   const [loading, setLoading] = useState(true);
@@ -461,13 +471,23 @@ export default function SellerRepository() {
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [showConsign, setShowConsign] = useState(false);  // ← ADD THIS
   const router = useRouter();
-  const { fmt } = useCurrency();
+  const { fmt: contextFmt } = useCurrency();
+  const fmt = contextFmt || formatMoney;
   /* ── Auth ── */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { router.push("/signin"); return; }
-      const uDoc = await getDoc(doc(db, "users", u.uid));
-      if (uDoc.exists()) setUser({ uid: u.uid, ...uDoc.data() });
+      if (!u) {
+        setCheckingAuth(false);
+        router.push("/signin");
+        return;
+      }
+
+      try {
+        const uDoc = await getDoc(doc(db, "users", u.uid));
+        if (uDoc.exists()) setUser({ uid: u.uid, ...uDoc.data() });
+      } finally {
+        setCheckingAuth(false);
+      }
     });
     return () => unsub();
   }, [router]);
@@ -532,11 +552,11 @@ export default function SellerRepository() {
     ? allSales.filter(s => !ledgerSearch || s.studentName?.toLowerCase().includes(ledgerSearch) || s.assetId?.toLowerCase().includes(ledgerSearch) || s.bookTitle?.toLowerCase().includes(ledgerSearch))
     : [];
 
-  if (loading) return (
+  if (checkingAuth || loading) return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: BG }}>
       <div style={{ textAlign: "center" }}>
         <div style={{ width: "56px", height: "56px", border: `3px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px" }} />
-        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "18px", color: NAVY }}>Loading your repository…</p>
+        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "18px", color: NAVY }}>{checkingAuth ? "Checking your account…" : "Loading your repository…"}</p>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     </div>
@@ -766,7 +786,7 @@ export default function SellerRepository() {
                   <span style={{ fontSize: "10px", color: "#4ade80", fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>Live</span>
                 </div>
               </div>
-              <LedgerTable sales={displayedSales} loading={salesLoading} />
+              <LedgerTable sales={displayedSales} loading={salesLoading} fmt={fmt} />
             </div>
           )}
 
@@ -779,6 +799,7 @@ export default function SellerRepository() {
           asset={selectedAsset}
           userId={user?.uid}
           onClose={() => setSelectedAsset(null)}
+          fmt={fmt}
         />
       )}
 

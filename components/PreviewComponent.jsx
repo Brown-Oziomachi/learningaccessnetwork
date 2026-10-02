@@ -831,8 +831,6 @@ const addSale = (rawId) => {
     return (
       <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "20px" }}>
         <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>Uploaded By</p>
-        <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: "15px", fontWeight: 700, color: NAVY, margin: "0 0 14px" }}>Book Author / Uploader</h3>
-
         <div style={{ padding: "14px", border: "0.5px solid #f0ebe0", background: CREAM }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
             {/* Avatar */}

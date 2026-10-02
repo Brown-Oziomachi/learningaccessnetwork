@@ -146,6 +146,11 @@ export default function BecomeSellerClient() {
 
     const handleSubmit = async () => {
         if (!validateForm()) return;
+        if (!user?.uid) {
+            showToast("Your session is not ready yet. Please refresh and try again.", "error");
+            return;
+        }
+
         setSubmitting(true);
         try {
             const flwRes = await fetch("/api/flutterwave/create-subaccount", {
@@ -157,23 +162,26 @@ export default function BecomeSellerClient() {
                     phoneNumber: formData.phoneNumber, bankCode: formData.bankCode,
                     country: formData.country,
                     accountNumber: formData.accountNumber,
+                    accountName: formData.accountName,
                     businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
                 }),
             });
             const flwData = await flwRes.json();
-            if (!flwData.success) throw new Error(flwData.error || "Failed to create subaccount.");
+            if (!flwRes.ok || !flwData.success) throw new Error(flwData.error || "Failed to create subaccount.");
             const flutterwaveSubaccountId = flwData.subaccount_id;
 
             const batch = writeBatch(db);
+            const userRef = doc(db, "users", user.uid);
+            const sellerRef = doc(db, "sellers", user.uid);
 
-            batch.update(doc(db, "users", user.uid), {
+            batch.set(userRef, {
                 isSeller: true,
                 phoneNumber: formData.phoneNumber,
                 flutterwaveSubaccountId,
                 updatedAt: serverTimestamp(),
-            });
+            }, { merge: true });
 
-            batch.set(doc(db, "sellers", user.uid), {
+            batch.set(sellerRef, {
                 accountBalance: 0,
                 totalEarnings: 0,
                 booksSold: 0,
@@ -199,7 +207,7 @@ export default function BecomeSellerClient() {
                 updatedAt: serverTimestamp(),
                 status: "active",
                 flutterwaveSubaccountId,
-            });
+            }, { merge: true });
 
             await batch.commit();
 

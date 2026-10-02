@@ -127,14 +127,17 @@ export default function MyPostedBooksClient() {
         bookSalesCount[book.id] || bookSalesCount[book.firestoreId] ||
         bookSalesCount[`firestore-${book.id}`] || bookSalesCount[`firestore-${book.firestoreId}`] || 0;
     const getBookTotalSales = (book) =>
-        fmt(getBookSalesCount(book) * (Number(book.price) || 0));
+        getBookSalesCount(book) * (Number(book.price) || 0);
 
-    const calculateStats = () => ({
-        totalRevenue: fmt(postedBooks.reduce((sum, b) => sum + getBookTotalSales(b), 0)),
-        totalCopiesSold: postedBooks.reduce((sum, b) => sum + getBookSalesCount(b), 0),
-        approved: postedBooks.filter(b => b.status === 'approved').length,
-        pending: postedBooks.filter(b => b.status === 'pending').length,
-    });
+    const calculateStats = () => {
+        const totalRevenueValue = postedBooks.reduce((sum, b) => sum + getBookTotalSales(b), 0);
+        return {
+            totalRevenue: fmt(totalRevenueValue),
+            totalCopiesSold: postedBooks.reduce((sum, b) => sum + getBookSalesCount(b), 0),
+            approved: postedBooks.filter(b => b.status === 'approved').length,
+            pending: postedBooks.filter(b => b.status === 'pending').length,
+        };
+    };
     const stats = calculateStats();
 
     useEffect(() => {

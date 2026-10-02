@@ -44,7 +44,7 @@ const FOOTER_COLUMNS = [
       { label: "LAN Wallet", href: "/seller/lan-wallet" },
       { label: "Withdraw Earnings", href: "/seller/withdraw-earnings" },
       { label: "Referral Programme", href: "/seller/referral" },
-      { label: "Affiliate Programme", href: "/seller/api-integration" },
+      // { label: "Affiliate Programme", href: "/seller/api-integration" },
       { label: "Seller Dashboard", href: "/seller/seller-dashboard" },
       { label: "Recharge Services", href: "/seller/recharge-services" },
       { label: "Growing Your Followers", href: "/seller/grow-followers" },

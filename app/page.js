@@ -202,13 +202,13 @@ const FOOTER_COLUMNS = [
   {
     heading: "For Students",
     links: [
+      { label: "Student Network", href: "/students/network" },
       { label: "AI Tutor", href: "/students/ai-tutor" },
       { label: "My Library", href: "/students/my-library" },
       { label: "How to Buy", href: "/students/how-to-buy" },
       { label: "Past Questions", href: "/students/past-questions" },
       { label: "Study Groups", href: "/students/study-groups" },
       { label: "Bookmark", href: "/students/wishlist" },
-      { label: "Student Network", href: "/students/network" },
 
     ],
   },
@@ -1262,7 +1262,7 @@ export default function LandingPage() {
             Ready to <span style={{ color: GOLD, fontStyle: "italic" }}>Start Earning?</span>
           </h2>
           <p style={{ fontSize: 15, color: "rgba(255,255,255,0.5)", maxWidth: 500, margin: "0 auto 44px", lineHeight: 1.8, fontWeight: 300, fontFamily: "'Lato',sans-serif" }}>
-            Join thousands of sellers making money with their knowledge. Get 85% revenue share on every sale.
+            Join thousands of sellers making money with their knowledge. Get 80% revenue share on every sale.
           </p>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center", marginBottom: 56 }}>

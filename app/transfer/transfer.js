@@ -9,8 +9,7 @@ import Navbar from "@/components/NavBar";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   doc, getDoc, collection, query, where,
-  getDocs, runTransaction, serverTimestamp,
-  increment, orderBy, limit, updateDoc,
+  getDocs, serverTimestamp, orderBy, limit, updateDoc,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebaseConfig";
 import TransferReceipt, { TransferReceiptModal } from "@/components/Transferreceipt";
@@ -303,15 +302,24 @@ function PinConfirmModal({ onVerify, onClose }) {
   const [attempts, setAttempts] = useState(0);
   const MAX = 3;
 
-  const verify = (p) => {
+  const [checking, setChecking] = useState(false);
+
+  const verify = async (p) => {
     const target = p || pin;
-    if (target.length < 4) return;
-    const ok = onVerify(target);
-    if (!ok) {
+    if (target.length < 4 || checking) return;
+    setChecking(true);
+    const result = await onVerify(target);
+    setChecking(false);
+    if (result.ok) return;
+    if (result.pinError) {
       const next = attempts + 1;
       setAttempts(next);
       setPin("");
-      setError(next >= MAX ? "Too many incorrect attempts. Please close and try again." : `Incorrect PIN. ${MAX - next} attempt${MAX - next === 1 ? "" : "s"} remaining.`);
+      setError(
+        next >= MAX
+          ? "Too many incorrect attempts. Please close and try again."
+          : `${result.error} ${MAX - next} attempt${MAX - next === 1 ? "" : "s"} remaining.`
+      );
     }
   };
 
@@ -354,7 +362,7 @@ function PinConfirmModal({ onVerify, onClose }) {
             {masked ? "Show PIN" : "Hide PIN"}
           </button>
           {!locked && (
-            <button onClick={() => verify(pin)} disabled={pin.length < 4} style={{ ...navyBtn(pin.length < 4), marginTop: "16px" }}>
+            <button onClick={() => verify(pin)} disabled={pin.length < 4 || checking} style={{ ...navyBtn(pin.length < 4 || checking), marginTop: "16px" }}>
               Confirm
             </button>
           )}
@@ -376,7 +384,6 @@ export default function TransferClient() {
 
   const [hasPin, setHasPin]         = useState(null);
   const [showPinModal, setShowPinModal] = useState(false);
-  const [pinAction, setPinAction]   = useState(null);
 
   const [recipientAccount, setRecipientAccount] = useState("");
   const [amount, setAmount]         = useState("");
@@ -409,7 +416,7 @@ export default function TransferClient() {
           } else {
             setSeller({ uid: firebaseUser.uid, ...data });
           }
-          setHasPin(!!data.transferPin);
+          setHasPin(!!data.hasPin);
         }
         await loadRecentTransfers(firebaseUser.uid);
       } catch (err) { console.error(err); }
@@ -431,21 +438,17 @@ export default function TransferClient() {
   };
 
   const handleSavePin = async (pin) => {
-    await updateDoc(doc(db, "sellers", seller.uid), { transferPin: pin, updatedAt: serverTimestamp() });
-    setSeller((prev) => ({ ...prev, transferPin: pin }));
+    const idToken = await auth.currentUser.getIdToken();
+    const res = await fetch("/api/set-pin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ pin }),
+    });
+    const j = await res.json();
+    if (!j.success) throw new Error(j.error || "Failed to save PIN.");
+    setSeller((prev) => ({ ...prev, hasPin: true }));
     setHasPin(true);
   };
-
-  const handleVerifyPin = (enteredPin) => {
-    if (enteredPin === seller?.transferPin) {
-      setShowPinModal(false);
-      if (pinAction) { pinAction(); setPinAction(null); }
-      return true;
-    }
-    return false;
-  };
-
-  const requirePin = (action) => { setPinAction(() => action); setShowPinModal(true); };
 
   const handleLookup = async () => {
     const clean = recipientAccount.replace(/-/g, "").toUpperCase();
@@ -462,48 +465,34 @@ export default function TransferClient() {
   };
 
   const TRANSFER_FEE = 50;
-  const LAN_PLATFORM_UID = "LAN_LIBRARY_PLATFORM";
 
-  const handleTransfer = async () => {
-    const amt = Number(amount);
-    const totalDeducted = amt + TRANSFER_FEE;
-    if (!amt || amt < 100) { setTransferError("Minimum transfer is ₦100"); return; }
-    if (totalDeducted > (seller?.accountBalance || 0)) { setTransferError(`Insufficient balance. You need ₦${totalDeducted.toLocaleString()} (₦${amt.toLocaleString()} + ₦50 fee)`); return; }
-    if (!recipientInfo) { setTransferError("Please look up a valid recipient first"); return; }
+  const handleTransfer = async (pin) => {
     setTransferring(true); setTransferError("");
     try {
-      const senderRef    = doc(db, "sellers", seller.uid);
-      const recipientRef = doc(db, "sellers", recipientInfo.id);
-      const platformRef  = doc(db, "sellers", LAN_PLATFORM_UID);
-      await runTransaction(db, async (transaction) => {
-        const senderSnap = await transaction.get(senderRef);
-        if (senderSnap.data().accountBalance < totalDeducted) throw new Error("Insufficient balance.");
-        transaction.update(senderRef, { accountBalance: increment(-totalDeducted), updatedAt: serverTimestamp() });
-        transaction.update(recipientRef, { accountBalance: increment(amt), updatedAt: serverTimestamp() });
-        transaction.set(platformRef, { accountBalance: increment(TRANSFER_FEE), totalFeesCollected: increment(TRANSFER_FEE), updatedAt: serverTimestamp() }, { merge: true });
-        const transferRef = doc(collection(db, "transfers"));
-        transaction.set(transferRef, {
-          senderId: seller.uid,
-          senderName: seller.businessInfo?.businessName || seller.bankDetails?.accountName || "Unknown",
-          senderAccountNumber: seller.accountNumber || "",
-          recipientId: recipientInfo.id,
-          recipientName: recipientInfo.businessInfo?.businessName || recipientInfo.bankDetails?.accountName || recipientInfo.sellerName || "Unknown",
-          recipientAccountNumber: recipientInfo.accountNumber || "",
-          amount: amt, fee: TRANSFER_FEE, totalDeducted: amt + TRANSFER_FEE,
-          note: note || "", createdAt: serverTimestamp(), status: "completed",
-        });
-        const feeRef = doc(collection(db, "platformFees"));
-        transaction.set(feeRef, {
-          transferId: transferRef.id, senderId: seller.uid,
-          senderName: seller.businessInfo?.businessName || seller.bankDetails?.accountName || "Unknown",
-          fee: TRANSFER_FEE, transferAmount: amt, createdAt: serverTimestamp(), disbursedToFlutterwave: false,
-        });
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch("/api/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ recipientId: recipientInfo.id, amount: Number(amount), note, pin }),
       });
-      setSeller((prev) => ({ ...prev, accountBalance: (prev.accountBalance || 0) - totalDeducted }));
+      const j = await res.json();
+      if (!j.success) throw new Error(j.error || "Transfer failed.");
+      setSeller((p) => ({ ...p, accountBalance: (p.accountBalance || 0) - (Number(amount) + TRANSFER_FEE) }));
       await loadRecentTransfers(seller.uid);
       setStep(3);
-    } catch (err) { setTransferError(err.message || "Transfer failed. Please try again."); }
-    finally { setTransferring(false); }
+      return { ok: true };
+    } catch (e) {
+      setTransferError(e.message);
+      return { ok: false, error: e.message, pinError: /pin/i.test(e.message) };
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  const handleVerifyPin = async (pin) => {
+    const result = await handleTransfer(pin);
+    if (result.ok || !result.pinError) setShowPinModal(false);
+    return result;
   };
 
   const handleCopyAccount = async () => {
@@ -856,8 +845,7 @@ export default function TransferClient() {
                         </div>
                       )}
 
-                      <button onClick={() => requirePin(handleTransfer)} disabled={transferring} style={navyBtn(transferring)}>
-                        {transferring
+                      <button onClick={() => setShowPinModal(true)} disabled={transferring} style={navyBtn(transferring)}>                        {transferring
                           ? <><div style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> Processing…</>
                           : <><Lock size={14} /> Confirm with PIN</>
                         }
@@ -876,7 +864,7 @@ export default function TransferClient() {
         </main>
 
         {showPinModal && (
-          <PinConfirmModal onVerify={handleVerifyPin} onClose={() => { setShowPinModal(false); setPinAction(null); }} />
+          <PinConfirmModal onVerify={handleVerifyPin} onClose={() => setShowPinModal(false)} />
         )}
         {selectedTransfer && (
           <TransferReceiptModal transfer={selectedTransfer} onClose={() => setSelectedTransfer(null)} />

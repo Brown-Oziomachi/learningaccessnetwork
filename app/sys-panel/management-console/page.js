@@ -33,7 +33,7 @@ const globalStyles = `
     --sidebar-bg: #111c2e;
     --sidebar-width: 220px;
     --card-bg: #162033;
-    --card-border: rgba(255,255,255,0.07)
+        --card-border: rgba(255,255,255,0.07);
     --surface: #1a2740;
     --surface2: #1f2f47;
     --accent: #3b82f6;
@@ -1043,7 +1043,7 @@ function LANMembersSection({ users, fetchUsers, openModal, updateUserStatus, get
   );
 }
 
-function BountyEscrowSection({ user }) {
+function BountyEscrowSection({ user, onBadgeCount }) {
   const [bounties, setBounties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -1412,6 +1412,8 @@ export default function ComprehensiveAdminPanel() {
   const [contactMessages, setContactMessages] = useState([]);
   const [promotions, setPromotions] = useState([]);
   const [bounties, setBounties] = useState([]);
+  const [loadErrors, setLoadErrors] = useState([]);
+  const [disputedBountyCount, setDisputedBountyCount] = useState(0);
   const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
 
   useEffect(() => {
@@ -1428,6 +1430,13 @@ export default function ComprehensiveAdminPanel() {
   setPromotions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   };
   
+  const fetchBounties = async () => {
+    const snap = await getDocs(query(collection(db, 'bounties'), orderBy('createdAt', 'desc')));
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    setBounties(data);
+    setDisputedBountyCount(data.filter(b => b.status === 'disputed').length);
+  };
+
   const fetchSellers = async () => {
     try {
       const s = await getDocs(query(collection(db, 'users'), where('isSeller', '==', true)));
@@ -1448,13 +1457,10 @@ export default function ComprehensiveAdminPanel() {
       setCheckingAdmin(true);
       const userDocRef = doc(db, 'users', currentUser.uid);
       const userDoc = await getDoc(userDocRef);
+      console.log('[admin check]', { uid: currentUser.uid, docExists: userDoc.exists(), isAdmin: userDoc.exists() ? userDoc.data().isAdmin : undefined });
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        if (userData.role === 'admin' || userData.isAdmin === true) { setIsAdmin(true); await fetchAllData(); return; }
-      }
-      if (ADMIN_EMAILS.includes(currentUser.email)) {
-        await updateDoc(doc(db, 'users', currentUser.uid), { isAdmin: true, role: 'admin', adminAccessGranted: serverTimestamp() });
-        setIsAdmin(true); await fetchAllData(); return;
+        if (userData.isAdmin === true) { setIsAdmin(true); await fetchAllData(); return; }
       }
       setIsAdmin(false);
     } catch (error) { console.error(error); setIsAdmin(false); } finally { setCheckingAdmin(false); }
@@ -1471,14 +1477,26 @@ export default function ComprehensiveAdminPanel() {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      await Promise.all([
-        fetchAdvertisements(), fetchSupportTickets(), fetchBookReports(),
-        fetchTransactions(), fetchUsers(), fetchWithdrawals(),
-        fetchSchoolApplications(), fetchSchoolDocuments(),
-        fetchFeedbacks(), fetchArticleFeedbacks(),
-        fetchPhysicalOrders(), fetchSellers(), fetchContactMessages(),
-        fetchPromotions(),
-      ]);
+      const jobs = {
+        advertMyBook: fetchAdvertisements, supportTickets: fetchSupportTickets,
+        bookReports: fetchBookReports, transactions: fetchTransactions,
+        users: fetchUsers, withdrawals: fetchWithdrawals,
+        schoolApplications: fetchSchoolApplications, schoolDocuments: fetchSchoolDocuments,
+        bookFeedbacks: fetchFeedbacks, articleFeedback: fetchArticleFeedbacks,
+        physicalOrders: fetchPhysicalOrders, sellers: fetchSellers,
+        contactMessages: fetchContactMessages, promotions: fetchPromotions,
+        bounties: fetchBounties,
+      };
+      const names = Object.keys(jobs);
+      const results = await Promise.allSettled(names.map((n) => jobs[n]()));
+      const failed = [];
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') {
+          console.error(`[admin] ${names[i]} failed:`, r.reason);
+          failed.push(names[i]);
+        }
+      });
+      setLoadErrors(failed);
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
@@ -1834,8 +1852,16 @@ export default function ComprehensiveAdminPanel() {
     }
   };
 
+  const deleteFeedback = async (id) => {
+    if (!confirm('Delete this feedback?')) return;
+    try {
+      await deleteDoc(doc(db, 'bookFeedbacks', id));
+      setFeedbacks(prev => prev.filter(f => f.id !== id));
+    } catch (e) { alert(e.message); }
+  };
+
   const openModal = (type, item) => { setModalType(type); setSelectedItem(item); setShowModal(true); };
-  const closeModal = () => { setShowModal(false); setModalType(''); setSelectedItem(null); setReplyMessage(''); setPdfUrl(''); };
+    const closeModal = () => { setShowModal(false); setModalType(''); setSelectedItem(null); setReplyMessage(''); setPdfUrl(''); };
 
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
@@ -1863,7 +1889,7 @@ export default function ComprehensiveAdminPanel() {
     openContactMessages: contactMessages?.filter(m => m.status === 'open').length || 0,
     pendingFaculty: users?.filter(u => u.lecturerVerificationStatus === 'pending').length || 0,
     pendingPromotions: promotions?.filter(p => p.status === 'pending').length || 0,
-    pendingBountyEscrow: bounties?.filter(b => b.status === 'disputed').length || 0,
+    pendingBountyEscrow: disputedBountyCount,
     pendingSellerReports: 0, 
   };
 
@@ -1951,6 +1977,11 @@ export default function ComprehensiveAdminPanel() {
 
         {/* Page Content */}
         <div className="page-content">
+          {loadErrors.length > 0 && (
+            <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#f87171' }}>
+              Could not load: {loadErrors.join(', ')}. Open the browser console for the exact error (usually missing permissions or a missing index).
+            </div>
+          )}
 
           {/* ── OVERVIEW ──────────────────────────────────────────────── */}
           {activeSection === 'overview' && (
@@ -2194,7 +2225,7 @@ export default function ComprehensiveAdminPanel() {
                   <div className="section-sub">Track all locked, released, and refunded bounty funds</div>
                 </div>
               </div>
-              <BountyEscrowSection user={user} onBadgeCount={(n) => setStats(s => ({ ...s, pendingBountyEscrow: n }))} />
+<BountyEscrowSection user={user} onBadgeCount={setDisputedBountyCount} />
             </div>
           )}
           

@@ -2,7 +2,7 @@
 import {
     DollarSign, TrendingUp, ShoppingBag, Download, Book, Globe, Settings,
     X, Camera, Save, AlertCircle, ChevronRight, User, Building, Users,
-    ArrowUpRight, ArrowDownLeft, Sparkles, Package, Zap, Receipt
+    ArrowUpRight, ArrowDownLeft, Sparkles, Package, Zap, Receipt, Pencil
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -20,6 +20,7 @@ import PrintLicensingControl from "./print-licence-control/page";
 import BountyApprovalModal from "@/components/BountyApprovalModal";
 import BountyDashboardCard from "./Bounty-cashboard-card/page";
 import { createPortal } from "react-dom";
+import { AFRICAN_COUNTRIES } from "@/lib/africanCountries";
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -126,6 +127,16 @@ function CurrencyPickerModal({ currentCurrency, onSelect, onClose }) {
 }
 
 const FACULTY_TITLES = ["Dr.", "Prof.", "Mr.", "Mrs.", "Ms.", "Engr.", "Pharm.", "Barr.", "Lecturer"];
+
+// Accepts "NG", "Nigeria", "Nigeria " etc. and returns a country code
+const toCountryCode = (c) => {
+    if (!c) return "NG";
+    const t = String(c).trim();
+    const byCode = AFRICAN_COUNTRIES.find(x => x.code === t.toUpperCase());
+    if (byCode) return byCode.code;
+    const byName = AFRICAN_COUNTRIES.find(x => x.name.toLowerCase() === t.toLowerCase());
+    return byName ? byName.code : "NG";
+};
 
 const nigerianBanks = [
     { name: "Access Bank", code: "044" }, { name: "Citibank", code: "023" },
@@ -907,8 +918,34 @@ export default function SellerAccountClient() {
     const [showExportModal, setShowExportModal] = useState(false);
     const [sellerBooks, setSellerBooks] = useState([]);
     const [showBankModal, setShowBankModal] = useState(false);
-    const [bankFormData, setBankFormData] = useState({ accountName: "", accountNumber: "", bankName: "", bankCode: "" });
+    const [bankFormData, setBankFormData] = useState({ accountName: "", accountNumber: "", bankName: "", bankCode: "", country: "NG" });
     const [savingBank, setSavingBank] = useState(false);
+    const [banks, setBanks] = useState([]);
+    const [banksLoading, setBanksLoading] = useState(false);
+    const [bankCustom, setBankCustom] = useState(false);
+    const bankCountry = bankFormData.country || "NG";
+    const [bio, setBio] = useState("");
+    const [bioDraft, setBioDraft] = useState("");
+    const [editingBio, setEditingBio] = useState(false);
+    const [savingBio, setSavingBio] = useState(false);
+    useEffect(() => {
+        if (!showBankModal) return;
+        let cancelled = false;
+        (async () => {
+            setBanksLoading(true);
+            try {
+                const res = await fetch(`/api/flutterwave/banks?country=${bankCountry}`);
+                const json = await res.json();
+                if (!json.success) throw new Error(json.error);
+                if (!cancelled) setBanks(json.banks);
+            } catch {
+                if (!cancelled) setBanks(bankCountry === "NG" ? nigerianBanks : []);
+            } finally {
+                if (!cancelled) setBanksLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [showBankModal, bankCountry]);
 
     // ── NEW: tier modal state ──
     const [showSellerTierModal, setShowSellerTierModal] = useState(false);
@@ -968,6 +1005,7 @@ export default function SellerAccountClient() {
                     const sellerData = sellerDoc.data();
                     bankDetails = sellerData.bankDetails || null;
                     setSeller({ uid, ...sellerData });
+                    setBio(sellerData.businessInfo?.businessDescription || "");
                     setAccountBalance(sellerData.accountBalance || 0);
                     setTotalEarnings(sellerData.totalEarnings || 0);
                     setBooksSold(sellerData.booksSold || 0);
@@ -1066,13 +1104,16 @@ export default function SellerAccountClient() {
 
     const handleSaveBank = async () => {
         if (!bankFormData.accountName || !bankFormData.accountNumber || !bankFormData.bankName) { alert("Please fill in all required fields"); return; }
+        if (bankCustom && !bankFormData.bankCode) { alert("Please enter your bank code"); return; }
+        if (bankCountry === "NG" && bankFormData.accountNumber.length !== 10) { alert("Nigerian account numbers must be 10 digits"); return; }
+        const bankPayload = { ...bankFormData, country: bankCountry };
         try {
             setSavingBank(true);
-            await updateDoc(doc(db, "sellers", user.uid), { bankDetails: bankFormData, updatedAt: serverTimestamp() });
-            await updateDoc(doc(db, "users", user.uid), { bankDetails: bankFormData });
-            setUser(prev => ({ ...prev, bankDetails: bankFormData }));
+            await updateDoc(doc(db, "sellers", user.uid), { bankDetails: bankPayload, updatedAt: serverTimestamp() });
+            await updateDoc(doc(db, "users", user.uid), { bankDetails: bankPayload });
+            setUser(prev => ({ ...prev, bankDetails: bankPayload }));
             try {
-                const res = await fetch('/api/flutterwave/create-subaccount', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: user.uid, email: user.email, firstName: user.firstName, surname: user.surname, phoneNumber: user.phoneNumber || user.phone || '00000000000', bankCode: bankFormData.bankCode, accountNumber: bankFormData.accountNumber, businessName: `${user.firstName} ${user.surname}` }) });
+                const res = await fetch('/api/flutterwave/create-subaccount', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: user.uid, email: user.email, firstName: user.firstName, surname: user.surname, phoneNumber: user.phoneNumber || user.phone || '00000000000', bankCode: bankFormData.bankCode, country: bankCountry, accountNumber: bankFormData.accountNumber, businessName: `${user.firstName} ${user.surname}` }) });
                 const flwData = await res.json();
                 if (flwData.success) { await updateDoc(doc(db, "users", user.uid), { flutterwaveSubaccountId: flwData.subaccount_id }); await updateDoc(doc(db, "sellers", user.uid), { flutterwaveSubaccountId: flwData.subaccount_id }); }
             } catch { }
@@ -1090,6 +1131,28 @@ export default function SellerAccountClient() {
         }).catch(err => alert('Failed to update image: ' + err.message)).finally(() => setUploading(false));
     };
 
+    const handleSaveBio = async () => {
+    try {
+        setSavingBio(true);
+        const clean = bioDraft.trim();
+        // Dot notation updates only this field, so businessName stays intact
+        await updateDoc(doc(db, "sellers", user.uid), {
+            "businessInfo.businessDescription": clean,
+            updatedAt: serverTimestamp(),
+        });
+        setBio(clean);
+        setSeller(prev => ({
+            ...prev,
+            businessInfo: { ...(prev?.businessInfo || {}), businessDescription: clean },
+        }));
+        setEditingBio(false);
+    } catch (error) {
+        alert("Failed to update bio: " + error.message);
+    } finally {
+        setSavingBio(false);
+    }
+    };
+    
     const handleSave = async () => {
         try {
             const updatePayload = {
@@ -1611,7 +1674,14 @@ export default function SellerAccountClient() {
                             <div style={{ background: BG, flex: 1, overflowY: 'auto', padding: '12px' }}>
                                 {[
                                     { label: 'My Profile', icon: <User size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setIsEditing(true); } },
-                                    { label: 'Bank Details', icon: <Building size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setShowBankModal(true); if (user?.bankDetails) setBankFormData({ accountName: user.bankDetails.accountName || "", accountNumber: user.bankDetails.accountNumber || "", bankName: user.bankDetails.bankName || "", bankCode: user.bankDetails.bankCode || "" }); } },
+                                    {
+                                        label: 'Bank Details', icon: <Building size={18} style={{ color: NAVY }} />, onClick: () => {
+                                            setShowProfileModal(false);
+                                            setShowBankModal(true);
+                                            setBankCustom(false);
+                                            if (user?.bankDetails) setBankFormData({ accountName: user.bankDetails.accountName || "", accountNumber: user.bankDetails.accountNumber || "", bankName: user.bankDetails.bankName || "", bankCode: user.bankDetails.bankCode || "", country: toCountryCode(user.bankDetails.country) });
+                                        }
+                                    },
                                     { label: 'Transaction History', icon: <TrendingUp size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setShowTransactionHistory(true); } },
                                     { label: 'Earnings Overview', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>, onClick: () => { setShowProfileModal(false); router.push('/my-account/seller-account/earning/overview'); } },
                                     { label: 'Physical Repository', icon: <Package size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); router.push('/my-account/seller-account/repository'); } },
@@ -1839,6 +1909,52 @@ export default function SellerAccountClient() {
                                         </label>
                                     </div>
                                     {uploading && <p style={{ fontSize: '11px', color: GOLD, marginTop: '8px', fontFamily: "'Lato',sans-serif" }}>Uploading photo…</p>}
+
+                                    {/* ── Bio ── */}
+<div style={{ maxWidth: 420, margin: '16px auto 0', textAlign: 'left' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, margin: 0, fontFamily: "'Lato',sans-serif" }}>Bio</p>
+        {!editingBio && (
+            <button
+                onClick={() => { setBioDraft(bio); setEditingBio(true); }}
+                aria-label="Edit bio"
+                title="Edit bio"
+                style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, border: '0.5px solid #e5ddd0', cursor: 'pointer', color: NAVY }}>
+                <Pencil size={12} />
+            </button>
+        )}
+    </div>
+
+    {editingBio ? (
+        <>
+            <textarea
+                value={bioDraft}
+                onChange={e => setBioDraft(e.target.value)}
+                maxLength={300}
+                rows={4}
+                placeholder="Tell buyers what kinds of documents and materials you share…"
+                style={{ width: '100%', border: `0.5px solid ${GOLD}`, padding: '10px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", resize: 'vertical', lineHeight: 1.6 }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                <span style={{ fontSize: 10, color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{bioDraft.length}/300</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setEditingBio(false)} disabled={savingBio}
+                        style={{ background: '#f5f5f5', color: '#666', padding: '7px 14px', border: '0.5px solid #e5ddd0', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
+                        Cancel
+                    </button>
+                    <button onClick={handleSaveBio} disabled={savingBio}
+                        style={{ background: NAVY, color: '#fff', padding: '7px 14px', border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", opacity: savingBio ? 0.6 : 1 }}>
+                        {savingBio ? 'Saving…' : 'Save Bio'}
+                    </button>
+                </div>
+            </div>
+        </>
+    ) : (
+        <p style={{ fontSize: '13px', color: bio ? '#555' : '#aaa', margin: 0, lineHeight: 1.65, fontFamily: "'Lato',sans-serif", fontStyle: bio ? 'normal' : 'italic', background: CREAM, border: '0.5px solid #f0ebe0', padding: '10px 12px', wordBreak: 'break-word' }}>
+            {bio || "No bio yet. Tap the pen to add one."}
+        </p>
+    )}
+</div>
                                 </div>
                                 <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '10px', fontFamily: "'Lato',sans-serif" }}>Personal Details</p>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
@@ -1900,7 +2016,15 @@ export default function SellerAccountClient() {
                                         ))}
                                     </div>
                                 )}
-                                {[{ label: 'Account Name', key: 'accountName', type: 'text', placeholder: 'Enter account holder name' }, { label: 'Account Number', key: 'accountNumber', type: 'text', placeholder: 'Enter account number', maxLength: 10 }].map(({ label, key, type, placeholder, maxLength }) => (
+                                <div style={{ marginBottom: '14px' }}>
+                                    <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Country <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <select value={bankCountry}
+                                        onChange={e => { setBankCustom(false); setBankFormData({ ...bankFormData, country: e.target.value, bankName: "", bankCode: "", accountNumber: "" }); }}
+                                        style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '10px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", background: '#fff' }}>
+                                        {AFRICAN_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                                {[{ label: 'Account Name', key: 'accountName', type: 'text', placeholder: 'Enter account holder name' }, { label: 'Account Number', key: 'accountNumber', type: 'text', placeholder: 'Enter account number', maxLength: bankCountry === "NG" ? 10 : 20 }].map(({ label, key, type, placeholder, maxLength }) => (
                                     <div key={key} style={{ marginBottom: '14px' }}>
                                         <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>{label} <span style={{ color: '#ef4444' }}>*</span></label>
                                         <input type={type} value={bankFormData[key]} onChange={e => setBankFormData({ ...bankFormData, [key]: e.target.value })} placeholder={placeholder} maxLength={maxLength}
@@ -1909,15 +2033,37 @@ export default function SellerAccountClient() {
                                 ))}
                                 <div style={{ marginBottom: '14px' }}>
                                     <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Bank Name <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <select value={bankFormData.bankName} onChange={e => { const b = nigerianBanks.find(x => x.name === e.target.value); setBankFormData({ ...bankFormData, bankName: e.target.value, bankCode: b ? b.code : "" }); }}
+                                    <select
+                                        value={bankCustom ? "other" : bankFormData.bankName}
+                                        disabled={banksLoading}
+                                        onChange={e => {
+                                            const v = e.target.value;
+                                            if (v === "other") {
+                                                setBankCustom(true);
+                                                setBankFormData({ ...bankFormData, bankName: "", bankCode: "" });
+                                            } else {
+                                                setBankCustom(false);
+                                                const b = banks.find(x => x.name === v);
+                                                setBankFormData({ ...bankFormData, bankName: v, bankCode: b ? b.code : "" });
+                                            }
+                                        }}
                                         style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '10px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", background: '#fff' }}>
-                                        <option value="">Select your bank</option>
-                                        {nigerianBanks.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                                        <option value="">{banksLoading ? "Loading banks…" : "Select your bank"}</option>
+                                        {banks.map(b => <option key={`${b.code}-${b.name}`} value={b.name}>{b.name}</option>)}
+                                        <option value="other">Other bank (not listed)</option>
                                     </select>
+                                    {bankCustom && (
+                                        <input type="text" value={bankFormData.bankName}
+                                            onChange={e => setBankFormData({ ...bankFormData, bankName: e.target.value })}
+                                            placeholder="Enter bank name"
+                                            style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '10px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", marginTop: '8px' }} />
+                                    )}
                                 </div>
                                 <div style={{ marginBottom: '18px' }}>
                                     <label style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Bank Code</label>
-                                    <input type="text" value={bankFormData.bankCode} readOnly placeholder="Auto-filled"
+                                    <input type="text" value={bankFormData.bankCode} readOnly={!bankCustom}
+                                        onChange={e => setBankFormData({ ...bankFormData, bankCode: e.target.value.replace(/\D/g, "") })}
+                                        placeholder={bankCustom ? "Enter bank code" : "Auto-filled"}
                                         style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '10px 12px', fontSize: '13px', color: '#aaa', background: '#f9f9f9', fontFamily: "'Lato',sans-serif", cursor: 'not-allowed' }} />
                                     <p style={{ fontSize: '10px', color: '#aaa', marginTop: '4px', fontFamily: "'Lato',sans-serif" }}>✓ Auto-filled when you select a bank</p>
                                 </div>

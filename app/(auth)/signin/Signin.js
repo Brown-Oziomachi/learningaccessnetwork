@@ -243,7 +243,7 @@ export default function SignInClient() {
 
               <div className="divider"><span>or</span></div>
 
-              <Link href="/signup" className="btn-outline" style={{ marginBottom: 0 }}>Create new account</Link>
+              <Link href="/signup" className="btn-outline" style={{ marginBottom: 0 }} disabled={loading}>Create new account</Link>
 
               <p style={{ fontSize: 11, color: "#777", textAlign: "center", marginTop: 20 }}>Learning Access Network &nbsp;·&nbsp;  Africa's Academic EdTech Marketplace.</p>
             </div>

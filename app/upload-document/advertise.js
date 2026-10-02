@@ -424,6 +424,7 @@ export default function AdvertiseClient() {
     const [showDriveWarn, setShowDriveWarn] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [selectedCoverImage, setSelectedCoverImage] = useState(null);
+    const [triedStep3, setTriedStep3] = useState(false);
     const { fmt } = useCurrency();
     /* ── Exchange rates (mirrors payment page) ── */
     const [exchangeRates, setExchangeRates] = useState(FALLBACK_RATES);
@@ -441,8 +442,10 @@ export default function AdvertiseClient() {
         theologicalCategory: "", doctrine: "",
         // commercial
         isbn: "", genre: "", edition: "",
-        // Paid
+               // Paid
         accessType: "paid",
+        negotiationChoice: "",      
+        maxDiscountPercent: 20,
     });
 
     const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -556,14 +559,22 @@ export default function AdvertiseClient() {
             const hasPages = !!form.pages;
             if (!hasFile || !hasPages) return false;
             if (form.accessType === "paid" && (!form.price || Number(form.price) <= 0)) return false;
+            if (form.accessType === "paid" && !form.negotiationChoice) return false;
             return true;
         }
     };
 
     /* ── Submit ── */
     const handleSubmit = async () => {
-        if (!canProceed()) { alert("Please fill all required fields."); return; }
-        try {
+        if (!canProceed()) {
+            setTriedStep3(true);
+            if (form.accessType === "paid" && !form.negotiationChoice) {
+                alert("Please choose whether this document is Negotiable or Fixed price.");
+            } else {
+                alert("Please fill all required fields.");
+            }
+            return;
+        }        try {
             setLoading(true);
             let pdfUrl = form.driveLink;
             if (selectedFile) { pdfUrl = await uploadPDF(selectedFile); if (!pdfUrl) { setLoading(false); return; } }
@@ -615,6 +626,11 @@ export default function AdvertiseClient() {
                 createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
                 isFree: form.accessType === "free",
                 price: form.accessType === "free" ? 0 : Number(form.price),
+                isNegotiable: form.accessType !== "free" && form.negotiationChoice === "negotiable",
+                maxDiscountPercent:
+                    form.accessType !== "free" && form.negotiationChoice === "negotiable"
+                        ? Number(form.maxDiscountPercent)
+                        : null,
             });
 
             alert("Submitted! We'll review within 24–48 hours.");
@@ -1218,6 +1234,77 @@ export default function AdvertiseClient() {
                                         </div>
                                     </div>
 
+                                    {/* ── Negotiation choice (REQUIRED for paid documents) ── */}
+                                    {form.accessType !== "free" && (
+                                        <div>
+                                            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#6b7280", marginBottom: 10 }}>
+                                                {intent === "academic" ? "Student discounts" : "Price negotiation"} <span style={{ color: "#ea580c" }}>*</span>
+                                            </p>
+
+                                            <div style={{
+                                                display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
+                                                padding: 2, borderRadius: 14,
+                                                border: triedStep3 && !form.negotiationChoice ? "2px solid #ef4444" : "2px solid transparent",
+                                            }}>
+                                                {[
+                                                    { value: "negotiable", title: "🤝 Negotiable", desc: "Buyers can send one offer. You accept, reject, or send a final price.", color: "#b8963e" },
+                                                    { value: "fixed", title: "🔒 Fixed price", desc: "Buyers pay the listed price. No offers.", color: "#1a3a5c" },
+                                                ].map(opt => {
+                                                    const on = form.negotiationChoice === opt.value;
+                                                    return (
+                                                        <button key={opt.value} type="button"
+                                                            onClick={() => set("negotiationChoice", opt.value)}
+                                                            style={{
+                                                                textAlign: "left", padding: "14px", cursor: "pointer", borderRadius: 12,
+                                                                border: `2px solid ${on ? opt.color : "#e5e7eb"}`,
+                                                                background: on ? `${opt.color}14` : "#fff",
+                                                                transition: "all 0.18s",
+                                                            }}>
+                                                            <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 14, fontWeight: 700, color: on ? opt.color : "#374151" }}>
+                                                                {opt.title}
+                                                                {on && <Check size={15} />}
+                                                            </span>
+                                                            <span style={{ display: "block", fontSize: 11.5, color: "#9ca3af", marginTop: 4, lineHeight: 1.5 }}>{opt.desc}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {triedStep3 && !form.negotiationChoice && (
+                                                <p style={{ fontSize: 12, color: "#dc2626", margin: "8px 0 0", display: "flex", alignItems: "center", gap: 4 }}>
+                                                    <AlertCircle size={12} /> Choose Negotiable or Fixed price to continue.
+                                                </p>
+                                            )}
+
+                                            {form.negotiationChoice === "negotiable" && (
+                                                <div style={{ marginTop: 12, padding: "14px 16px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12 }}>
+                                                    <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#92400e", margin: "0 0 8px" }}>
+                                                        Biggest discount a buyer can ask for
+                                                    </p>
+                                                    <div style={{ display: "flex", gap: 6 }}>
+                                                        {[10, 20, 30, 40].map(p => (
+                                                            <button key={p} type="button" onClick={() => set("maxDiscountPercent", p)}
+                                                                style={{
+                                                                    flex: 1, padding: "8px 0", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 8,
+                                                                    border: `2px solid ${form.maxDiscountPercent === p ? "#b8963e" : "#e5e7eb"}`,
+                                                                    background: form.maxDiscountPercent === p ? "#b8963e" : "#fff",
+                                                                    color: form.maxDiscountPercent === p ? "#fff" : "#374151",
+                                                                }}>
+                                                                {p}%
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    <p style={{ fontSize: 11.5, color: "#92400e", margin: "10px 0 0", lineHeight: 1.6 }}>
+                                                        {Number(form.price) > 0
+                                                            ? <>Lowest offer you will ever see: <strong>{fmt(Math.ceil(Number(form.price) * (1 - form.maxDiscountPercent / 100)))}</strong>. </>
+                                                            : null}
+                                                        Nothing changes without your approval, and any final price you send stays locked to that buyer for 24 hours.
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    
                                     {/* ══════════════════════════════════════════════════════
                                         MULTI-CURRENCY PRICE PREVIEW GRID
                                         Shown only when access type is "paid"

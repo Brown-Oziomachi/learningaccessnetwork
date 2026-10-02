@@ -150,13 +150,13 @@ const SAVED_MENU_ITEMS = [
 ];
 
 const MORE_TOOLS_ITEMS = [
-  {
-    icon: HelpCircle,
-    label: "Affiliate",
-    description: "Affiliate developer suite",
-    href: "/aff/developer/console",
-    color: GOLD,
-  },
+  // {
+  //   icon: HelpCircle,
+  //   label: "Affiliate",
+  //   description: "Affiliate developer suite",
+  //   href: "/aff/developer/console",
+  //   color: GOLD,
+  // },
   {
     icon: HelpCircle,
     label: "Help Center",

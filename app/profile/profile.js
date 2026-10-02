@@ -42,6 +42,7 @@ import {
     ShoppingBag,
     Lock,
     Sparkles,
+    Quote,
 
 } from "lucide-react";
 
@@ -100,6 +101,17 @@ const getCountryDisplay = (country) => {
     const key = country.toLowerCase().trim();
     const flag = COUNTRY_FLAGS[key] || "";
     return `${country}${flag ? " " + flag : ""}`;
+};
+
+const formatCount = (n) => {
+    const num = Number(n) || 0;
+    if (num < 1000) return String(num);
+    if (num < 1000000) {
+        const k = Math.floor(num / 100) / 10; // floor, so 1999 shows 1.9k, not 2k
+        return `${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}k`;
+    }
+    const m = Math.floor(num / 100000) / 10;
+    return `${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)}M`;
 };
 
 /* ─── Global Styles ────────────────────────────────────── */
@@ -701,16 +713,17 @@ const [resolvedUid, setResolvedUid] = useState(null);
 
         const fetchSellerData = async () => {
             try {
-                let sellerName = "",          // start EMPTY, not "Unknown"
+                let sellerName = "",
                     sellerTitle = "",
                     sellerDept = "",
                     sellerUni = "",
-                    sellerCountry = "";
+                    sellerCountry = "",
+                    sellerBio = "";
 
                 const sd = await getDoc(doc(db, "sellers", resolvedUid));
                 if (sd.exists()) {
                     const d = sd.data();
-                    // Only use sellers doc name if it's not a stale "Unknown"
+                    sellerBio = (d.businessInfo?.businessDescription || "").trim();
                     const rawName = d.sellerName || d.displayName || "";
                     sellerName = rawName === "Unknown" ? "" : rawName;
                     sellerTitle = d.title || d.sellerTitle || "";
@@ -813,6 +826,7 @@ const [resolvedUid, setResolvedUid] = useState(null);
                     sellerDept,
                     sellerUni,
                     sellerCountry,
+                    sellerBio,
                 });
                 setSellerBooks(books);
                 setFiltered(books);
@@ -980,7 +994,7 @@ const [resolvedUid, setResolvedUid] = useState(null);
             <div style={{ display: "flex", flexDirection: "column" }}>
                 {[
                     { label: "Total Materials", value: sellerBooks.length, Icon: BookOpen },
-                    { label: "Followers", value: followerCount, Icon: Users },
+                    { label: "Followers", value: formatCount(followerCount), Icon: Users },
                 ].map(({ label, value, Icon }) => (
                     <div
                         key={label}
@@ -1349,7 +1363,7 @@ const [resolvedUid, setResolvedUid] = useState(null);
                             }}
                         >
                             {seller
-                                ? `${sellerBooks.length} materials · ${followerCount} followers`
+                                ? `${sellerBooks.length} materials · ${formatCount(followerCount)} followers`
                                 : "Loading…"}                        </p>
                     </div>
                 </div>
@@ -1524,8 +1538,55 @@ const [resolvedUid, setResolvedUid] = useState(null);
                                     margin: "0 0 12px",
                                 }}
                             >
-                                {sellerBooks.length} materials · {followerCount} followers
+                                {sellerBooks.length} materials · {formatCount(followerCount)} followers
                             </p>
+
+                            {seller.sellerBio && (
+    <div style={{ maxWidth: "520px", margin: "0 0 14px", display: "flex", gap: "10px" }}>
+        <div style={{ width: "2px", background: GOLD, flexShrink: 0, opacity: 0.7 }} />
+        <div style={{ minWidth: 0 }}>
+            <p
+                style={{
+                    fontSize: "13px",
+                    lineHeight: 1.65,
+                    color: "rgba(245,240,232,.82)",
+                    fontFamily: "'Lato',sans-serif",
+                    fontWeight: 300,
+                    fontStyle: "italic",
+                    margin: 0,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                    wordBreak: "break-word",
+                }}
+            >
+                {seller.sellerBio}
+            </p>
+            {seller.sellerBio.length > 110 && (
+                <button
+                    onClick={() => setActiveTab("about")}
+                    style={{
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        marginTop: "4px",
+                        cursor: "pointer",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        letterSpacing: ".1em",
+                        textTransform: "uppercase",
+                        color: GOLDD,
+                        fontFamily: "'Lato',sans-serif",
+                    }}
+                >
+                    Read more →
+                </button>
+            )}
+        </div>
+    </div>
+                            )}
+                            
                             {/* Follow button — sits under name for clean flow */}
                             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                 <button
@@ -1572,7 +1633,7 @@ const [resolvedUid, setResolvedUid] = useState(null);
                     >
                         {[
                             { val: sellerBooks.length, label: "Materials" },
-                            { val: followerCount, label: "Followers" },
+                            { val: formatCount(followerCount), label: "Followers" },
                         ].map(({ val, label }) => (
                             <div
                                 key={label}
@@ -1887,6 +1948,56 @@ const [resolvedUid, setResolvedUid] = useState(null);
                 {/* ── ABOUT TAB ── */}
                 {activeTab === "about" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                        {seller.sellerBio && (
+                            <div
+                                style={{
+                                    background: "#fff",
+                                    border: "0.5px solid #e5ddd0",
+                                    borderLeft: `3px solid ${GOLD}`,
+                                    padding: "24px 20px",
+                                    position: "relative",
+                                    overflow: "hidden",
+                                }}
+                            >
+                                <Quote
+                                    size={64}
+                                    style={{
+                                        position: "absolute",
+                                        top: "8px",
+                                        right: "12px",
+                                        color: "rgba(184,150,62,.08)",
+                                        pointerEvents: "none",
+                                    }}
+                                />
+                                <p
+                                    style={{
+                                        fontSize: "10px",
+                                        fontWeight: 700,
+                                        letterSpacing: ".18em",
+                                        textTransform: "uppercase",
+                                        color: GOLD,
+                                        marginBottom: "12px",
+                                        fontFamily: "'Lato',sans-serif",
+                                    }}
+                                >
+                                    Bio
+                                </p>
+                                <p
+                                    className="lan-serif"
+                                    style={{
+                                        fontSize: "15px",
+                                        lineHeight: 1.8,
+                                        color: NAVY,
+                                        margin: 0,
+                                        whiteSpace: "pre-line",
+                                        wordBreak: "break-word",
+                                        position: "relative",
+                                    }}
+                                >
+                                    {seller.sellerBio}
+                                </p>
+                            </div>
+                        )}
                         {/* Detailed about rows */}
                         <div
                             style={{
@@ -2037,7 +2148,7 @@ const [resolvedUid, setResolvedUid] = useState(null);
                                         value: sellerBooks.length,
                                         Icon: BookOpen,
                                     },
-                                    { label: "Followers", value: followerCount, Icon: Users },
+                                    { label: "Followers", value: formatCount(followerCount), Icon: Users },
                                 ].map(({ label, value, Icon }) => (
                                     <div
                                         key={label}
