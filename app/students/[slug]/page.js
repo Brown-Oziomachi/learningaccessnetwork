@@ -161,6 +161,7 @@ Start with one document. That is enough.`,
         tags: ["Open Access", "Free", "Documents", "Education", "Africa"],
     },
 
+
     "my-library": {
         badge: "My Library",
         badgeIcon: "📚",
@@ -449,6 +450,97 @@ Once you purchase a Wishlist item, it moves from your Saved tab to your Library.
         related: ["my-library", "how-to-buy", "past-questions", "ai-tutor", "study-groups"],
         tags: ["Wishlist", "Saved", "Planning", "Buying"],
     },
+
+        negotiation: {
+        badge: "Negotiation",
+        badgeIcon: "🤝",
+        category: "PRICING & OFFERS",
+        readTime: "8 min read",
+        title: "Negotiating Prices on LAN: A Guide for Students, Sellers and Faculty",
+        subtitle:
+            "Ask for a better price, answer offers in a few taps, and see why negotiable documents are easier to sell.",
+        hero: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1400&q=80",
+        intro: `Price is the first thing every student looks at, and the thing most sellers would rather not argue about. LAN's negotiation feature gives both sides a structured, polite way to deal with it. A buyer asks for a better price. The seller or lecturer answers: accept, decline, or reply with one final price. There is no chat box and no back-and-forth haggling.
+
+It works on documents whose uploader has switched negotiation on. Those documents show a gold "Price is negotiable" strip on their preview page, or a green "Student discount" strip when the uploader is faculty. Every other document stays at a fixed price. This guide explains how negotiation works for students, sellers and faculty, and why turning it on is one of the simplest things a seller can do to sell more.`,
+        sections: [
+            {
+                heading: "What Negotiable Means on LAN",
+                body: `A negotiable document has a listed price, exactly like any other, plus a maximum discount that the uploader is willing to give. A seller who lists a document at ₦10,000 with a 30% maximum discount is saying that offers anywhere down to ₦7,000 are worth considering. The system never accepts an offer below that floor, so the seller is protected from the start.
+
+The listed price does not change when someone negotiates. Other buyers still see the full price. Only the student who asked can receive a lower price, and only if the seller agrees to it.
+
+There are two wordings. When a document is uploaded by faculty as academic material, negotiation appears as a student discount: the student asks for a percentage off and the lecturer approves it, reduces it, or declines. Documents from other sellers appear as negotiable: the buyer makes one offer and the seller responds. The mechanics are the same, but the student-discount wording keeps lecturers from ever looking like they are haggling with their own students.
+
+Negotiation is not available on free documents, on your own documents, on documents you already own, or on documents an admin has frozen.`,
+            },
+            {
+                heading: "For Students: How to Ask for a Better Price",
+                body: `Open the preview page of any document. If it is negotiable, you will see the strip above the document preview. It tells you the maximum discount the uploader allows.
+
+Tap "Make an offer" (or "Request discount" on a faculty document) and choose an amount. You can only choose amounts between the lowest price the uploader accepts and the listed price, so you will never send an offer that is rejected automatically for being too low. Send it, and the uploader is notified straight away.
+
+Then you wait. The card on the preview page updates by itself when the uploader replies, and you also get a notification. If they accept, your price is locked and the same card changes to "Pay" with your agreed amount. If they reply with a different final price, you can accept it or pass on it. If they decline, the document stays at its listed price.
+
+A few tips that help. Ask for a realistic amount. An offer near the middle of the allowed range is more likely to be accepted than one right at the floor. You can have one open request per document at a time, and you can withdraw a request while you are waiting for a reply. If you are declined, you can ask again after 24 hours.`,
+            },
+            {
+                heading: "The Clocks: What Happens After You Ask",
+                body: `Every step has a time limit, so no request hangs around forever. The uploader has 48 hours to answer a request. If they reply with a final price, you have 24 hours to accept or decline it. Once a price is agreed, it is locked to you for 24 hours, and you pay from the same card on the document's preview page. If a clock runs out, the request expires on its own and the document simply returns to its normal price.
+
+After a decline, there is a 24-hour wait before the same student can ask again on that document. This keeps negotiation respectful for sellers and stops repeated pestering.
+
+Because the uploader gets exactly one reply, whether that is accept, decline or a final price, a request finishes quickly instead of dragging through a long exchange. Most students find that a few taps and a short wait is all it takes.`,
+            },
+            {
+                heading: "For Sellers: Turning Negotiation On",
+                body: `Open My Account, go to Seller Account, then My Uploaded Documents, and tap Edit on any document. Find the Pricing Mode section and choose Negotiable, then pick the maximum discount you are happy to give, anywhere from 1% to 50%, and save. Like any price edit, the change takes effect immediately and needs no review. You can also set this when you first upload a document.
+
+Choose the maximum discount by working backwards from the lowest price you could live with. Take a document listed at ₦10,000 with a 30% maximum. The floor is ₦7,000, and after LAN's 20% fee you would keep ₦5,600 at that floor. At 10% off, the sale is ₦9,000 and you keep ₦7,200. Pick a maximum where even the floor still feels like a good sale to you, because buyers are allowed to ask for it.
+
+When an offer arrives, you get a notification, and it appears in the negotiation inbox on your seller dashboard. You have three choices. Accept, and the price is locked for that buyer for 24 hours. Decline, and the document stays at its listed price. Or reply with a final price, picking from suggested amounts between their offer and your list price, and the buyer then has 24 hours to say yes or no. Replying with a final price is often the best choice when an offer is a bit too low, because it keeps the sale alive without going below what you want.`,
+            },
+            {
+                heading: "For Faculty: Student Discounts",
+                body: `Lecturers often sell notes, past papers and reading packs to their own students. A student discount fits that relationship better than a price negotiation. Students ask for a percentage off instead of naming a price, and the wording on both sides says "lecturer" and "student", so it reads as a discount a lecturer chooses to give, not a price being haggled down.
+
+Set it up the same way as sellers do: Edit the document, open Pricing Mode, choose Student discount, and set the maximum percentage. Many faculty members choose a generous maximum on introductory material and keep advanced or specialist documents at a fixed price.
+
+Student discounts combine well with Open Access. A faculty member can make an introductory document free so every student can read it, keep their full course pack at a fixed or discountable price, and let students who cannot afford the full price ask for a discount.`,
+            },
+            {
+                heading: "Why Negotiable Documents Sell Faster",
+                body: `Price is usually the biggest reason a student leaves a document page without buying. When the price is fixed and feels high, the only options are to pay or to walk away, and most students walk away. A negotiable strip changes that. It tells the student that there is a way forward, and it turns a likely "no" into an action they can take right now.
+
+It also turns a vague maybe into a real lead. A student who would have bookmarked the document and forgotten it has now sent you a specific number. They have already decided what they are prepared to pay, and all that is left for you is to say yes, or to counter. That is a much warmer position than waiting for a browser to come back.
+
+A small discount is also worth far more than no sale at all. Selling a ₦10,000 document at ₦8,000 earns you ₦6,400. A sale you never make earns you nothing, and the buyer is gone. And because only the student who asked gets the lower price, your listed price stays intact for everyone else.
+
+Every extra sale also builds your reputation. More purchases mean more reviews, and reviews help the next student decide. Replying quickly makes a real difference during exam season, when students want materials immediately, and a seller who answers within hours often closes deals that a slower seller loses.
+
+None of this is a guarantee. Negotiation helps most on documents that are priced a little above what a student expected to pay. A clear description, a good preview and a fair price still matter most. But a document that can respond to a budget removes one of the main reasons for not buying.`,
+            },
+            {
+                heading: "Switching Back to a Fixed Price",
+                body: `You can switch a document back to a fixed price at any time. Go to My Uploaded Documents, tap Edit, open Pricing Mode, choose Fixed price and save. The negotiation strip disappears for new buyers straight away, and your listed price and the rest of your listing are unchanged.
+
+Requests that are already open are not cancelled. You can still answer them, and any price you have already agreed stays locked for that buyer for the 24-hour window. Switching modes affects only new requests.
+
+You can switch back and forth as often as you like. Many sellers turn negotiation on during busy periods such as exam season, then go back to a fixed price afterwards. If you want a document hidden entirely instead, use Unpublish, which removes it from search and purchase without deleting it.`,
+            },
+            {
+                heading: "Fair Play: How the Rules Protect Everyone",
+                body: `The limits are enforced by the system, not by trust. A buyer cannot send an offer below the floor the seller set. Nobody can negotiate on their own document. A price can only be agreed by the person whose turn it is, and agreed prices belong only to the buyer who asked for them.
+
+Because there is no free-text chat, there is nothing to argue about or misread. Every step is a clear choice with a clear outcome, and every step is time-limited, so neither side is left waiting indefinitely.
+
+Whether you are a student looking for a better price, a seller hoping to close more sales, or a lecturer who wants students to be able to afford your material, negotiation is designed to make the process simple, fair and fast.`,
+            },
+        ],
+        cta: { label: "Browse Documents", href: "/documents" },
+        related: ["how-to-buy", "my-library", "past-questions", "wishlist", "open-access"],
+        tags: ["Negotiation", "Pricing", "Discounts", "Sellers", "Faculty"],
+    },
 };
 
 /* ─── Related meta ─────────────────────────────────────────── */
@@ -458,6 +550,7 @@ const RELATED_META = {
     "how-to-buy": { label: "How to Buy", icon: "🛒", desc: "Find, evaluate, and pay for documents" },
     "past-questions": { label: "Past Questions", icon: "📝", desc: "Exam papers across hundreds of courses" },
     "study-groups": { label: "Study Groups", icon: "👥", desc: "Collaborate with peers across Africa" },
+    negotiation: { label: "Negotiation", icon: "🤝", desc: "Ask for discounts, set limits, sell faster" },
     wishlist: { label: "Wishlist", icon: "❤", desc: "Save and plan your purchases" },
 };
 

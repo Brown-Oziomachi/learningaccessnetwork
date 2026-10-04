@@ -44,7 +44,7 @@ import {
   MapPin,
   Star,
   Unlock,
-  Printer, Lock, AlertCircle,
+  Printer, Lock, AlertCircle, Shield, Store,
 } from "lucide-react";
 import Link from "next/link";
 import { fetchBookDetails } from "@/utils/bookUtils";
@@ -83,7 +83,6 @@ const isSellerBook = (book) =>
 /* ─── LicenseButton ─────────────────────────────────────────────── */
 function LicenseButton({ book, isGloballyFrozen, isPrintLicensingEnabled, router, cleanBookId, style = {} }) {
   const isDisabled = isGloballyFrozen || !isPrintLicensingEnabled;
-  const [negSettings, setNegSettings] = useState(null);
   const disabledReason = isGloballyFrozen
     ? "This document is currently frozen."
     : !isPrintLicensingEnabled
@@ -168,10 +167,12 @@ export default function BookPreviewPage({ bookDetails }) {
   const [showOAModal, setShowOAModal] = useState(false);
   const [pdfPageCount, setPdfPageCount] = useState(null);
   const [calculatingPages, setCalculatingPages] = useState(false);
-  const [sellerSoldCount, setSellerSoldCount] = useState(null);
+const [sellerSoldCount, setSellerSoldCount] = useState(null);
+  const [negSettings, setNegSettings] = useState(null);   
   
   /* ── CHANGE 1: Book owner profile state ── */
   const [bookOwnerProfile, setBookOwnerProfile] = useState(null);
+  const [ownerFollowers, setOwnerFollowers] = useState(0);
   const [loadingOwnerProfile, setLoadingOwnerProfile] = useState(false);
 
   /* ── Suggested books split: free + paid ── */
@@ -306,98 +307,60 @@ export default function BookPreviewPage({ bookDetails }) {
   }, [book]);
 
   /* ── CHANGE 2: Fetch book owner profile when book loads ── */
-  useEffect(() => {
-    if (!book) return;
-    const ownerUid = book.userId || book.sellerId || null;
-   if (!ownerUid) { setBookOwnerProfile(null); return; }
+ useEffect(() => {
+  if (!book) return;
+  const ownerUid = book.userId || book.sellerId || null;
+  if (!ownerUid) { setBookOwnerProfile(null); return; }
 
-    const fetchOwnerProfile = async () => {
-      setLoadingOwnerProfile(true);
-      try {
-        /* Check users collection first */
-        const userSnap = await getDoc(doc(db, "users", ownerUid));
-        if (userSnap.exists()) {
-          const ud = userSnap.data();
-const makeSlug = (...parts) =>
-  parts
-    .filter(Boolean)
-    .join(" ")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-") || null;
-// Try stored slug first (matches SellersClient logic), then generate
-let storedSlug = null;
-try {
-  const sellerDocSnap = await getDoc(doc(db, "sellers", ownerUid));
-  if (sellerDocSnap.exists()) storedSlug = sellerDocSnap.data().slug || null;
-} catch {
-  /* ignore */
-}
-             const titleVal = ud.title || ud.lecturerTitle || "";
-              const computedSlug =
-                makeSlug(titleVal, ud.firstName, ud.surname) ||
-                makeSlug(ud.firstName, ud.surname);
-              setBookOwnerProfile({
-                uid: ownerUid,
-                name:
-                  ud.firstName && ud.surname
-                    ? `${ud.firstName} ${ud.surname}`
-                    : ud.displayName || book.sellerName || "Unknown",
-                photoURL: ud.photoURL || ud.profileImage || null,
-                institution: ud.institution || ud.university || "",
-                title: titleVal,
-                uploadedBooks: 0,
-                slug: storedSlug || computedSlug,
-                source: "users",
-              });
-              try {
-                const salesSnap = await getDoc(doc(db, "sellers", ownerUid));
-                if (salesSnap.exists()) {
-                  const sd = salesSnap.data();
-                  if (typeof sd.booksSold === "number" && sd.booksSold > 0) {
-                    setSellerSoldCount(sd.booksSold);
-                  }
-                }
-              } catch { /* non-fatal */ }
-              return;
-        }
-        /* Fallback: check sellers collection */
-        const sellerSnap = await getDoc(doc(db, "sellers", ownerUid));
-        if (sellerSnap.exists()) {
-          const sd = sellerSnap.data();
-          const makeSlugS = (...parts) =>
-            parts.filter(Boolean).join(" ").trim().toLowerCase()
-              .replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-") || null;
-          const sellerSlug = sd.slug || makeSlugS(sd.title || "", sd.firstName || "", sd.surname || "") || null;
-          setBookOwnerProfile({
-            uid: ownerUid,
-            name:
-              sd.sellerName || sd.displayName || book.sellerName || "Unknown",
-            photoURL: sd.photoURL || sd.photoBase64 || null,
-            institution: sd.institution || sd.university || "",
-            title: sd.title || "",
-            uploadedBooks: sd.uploadedBooks || 0,
-            slug: sellerSlug,
-            sellerId: ownerUid,
-            source: "sellers",
-          });
-          /* booksSold already on sd — no extra fetch needed */
-          if (typeof sd.booksSold === "number" && sd.booksSold > 0) {
-            setSellerSoldCount(sd.booksSold);
-          }
-          return;
-        }
-        /* Neither collection has them — show nothing */
-        setBookOwnerProfile(null);
-      } catch { setBookOwnerProfile(null); }
-      finally { setLoadingOwnerProfile(false); }
-    };
+  const makeSlug = (...parts) =>
+    parts.filter(Boolean).join(" ").trim().toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-") || null;
 
-    fetchOwnerProfile();
-  }, [book]);
+  const fetchOwnerProfile = async () => {
+    setLoadingOwnerProfile(true);
+    try {
+      const [userSnap, sellerSnap, followsSnap] = await Promise.all([
+        getDoc(doc(db, "users", ownerUid)).catch(() => null),
+        getDoc(doc(db, "sellers", ownerUid)).catch(() => null),
+        getDocs(query(collection(db, "follows"), where("lecturerId", "==", ownerUid))).catch(() => null),
+      ]);
+      const u = userSnap?.exists() ? userSnap.data() : null;
+      const s = sellerSnap?.exists() ? sellerSnap.data() : null;
+      if (!u && !s) { setBookOwnerProfile(null); return; }
 
+      const title = s?.sellerTitle || s?.title || u?.title || u?.lecturerTitle || "";
+      const name =
+        u?.firstName && u?.surname ? `${u.firstName} ${u.surname}`
+        : u?.displayName || s?.sellerName || book.sellerName || "Unknown";
+
+      setBookOwnerProfile({
+        uid: ownerUid,
+        name,
+        title,
+        photoURL: u?.photoURL || u?.photoBase64 || s?.photoURL || s?.photoBase64 || null,
+        institution: u?.institution || u?.university || s?.university || "",
+        location: s?.businessInfo?.state || s?.businessInfo?.country || u?.state || u?.country || "",
+        shop: s?.businessInfo?.businessName || "",
+        bio: s?.businessInfo?.businessDescription || u?.bio || "",
+        verified:
+          s?.isVerifiedSeller === true || u?.isVerifiedSeller === true ||
+          u?.isVerified === true || u?.lecturerVerificationStatus === "approved",
+        booksSold: s?.booksSold || 0,
+        slug: s?.slug || makeSlug(title, u?.firstName, u?.surname) || makeSlug(u?.firstName, u?.surname),
+      });
+      setOwnerFollowers(followsSnap ? followsSnap.size : 0);
+      if (typeof s?.booksSold === "number" && s.booksSold > 0) setSellerSoldCount(s.booksSold);
+    } catch (err) {
+      console.error("owner profile error:", err);
+      setBookOwnerProfile(null);
+    } finally {
+      setLoadingOwnerProfile(false);
+    }
+  };
+
+  fetchOwnerProfile();
+ }, [book]);
+  
   useEffect(() => {
     if (!book?.bountyId || !user?.uid) { setUserBountyRole(null); return; }
     const checkBountyRole = async () => {
@@ -490,27 +453,28 @@ try {
   };
 
   const handleFollowOwner = async (e) => {
-    e.preventDefault();
-    if (!user) { router.push("/signin"); return; }
-    const ownerId = bookOwnerProfile?.uid;
-    if (!ownerId || followLoadingIds.has(ownerId)) return;
-    setFollowLoadingIds((prev) => new Set([...prev, ownerId]));
-    const followRef = doc(db, "follows", `${user.uid}_${ownerId}`);
-    const sellerRef = doc(db, "sellers", ownerId);
-    try {
-      if (followingIds.has(ownerId)) {
-        await deleteDoc(followRef);
-        try { await updateDoc(sellerRef, { followersCount: increment(-1) }); } catch { }
-        setFollowingIds((prev) => { const n = new Set(prev); n.delete(ownerId); return n; });
-      } else {
-        await setDoc(followRef, { followerId: user.uid, lecturerId: ownerId, lecturerName: bookOwnerProfile?.name || "", createdAt: serverTimestamp() });
-        try { await updateDoc(sellerRef, { followersCount: increment(1) }); } catch { await setDoc(sellerRef, { followersCount: 1 }, { merge: true }); }
-        setFollowingIds((prev) => new Set([...prev, ownerId]));
-      }
-    } catch { } finally {
-      setFollowLoadingIds((prev) => { const n = new Set(prev); n.delete(ownerId); return n; });
+  e.preventDefault();
+  if (!user) { router.push("/signin"); return; }
+  const ownerId = bookOwnerProfile?.uid;
+  if (!ownerId || ownerId === user.uid || followLoadingIds.has(ownerId)) return;
+  setFollowLoadingIds((prev) => new Set([...prev, ownerId]));
+  const followRef = doc(db, "follows", `${user.uid}_${ownerId}`);
+  try {
+    if (followingIds.has(ownerId)) {
+      await deleteDoc(followRef);
+      setFollowingIds((prev) => { const n = new Set(prev); n.delete(ownerId); return n; });
+      setOwnerFollowers((n) => Math.max(0, n - 1));
+    } else {
+      await setDoc(followRef, { followerId: user.uid, lecturerId: ownerId, lecturerName: bookOwnerProfile?.name || "", createdAt: serverTimestamp() });
+      setFollowingIds((prev) => new Set([...prev, ownerId]));
+      setOwnerFollowers((n) => n + 1);
     }
-  };
+  } catch (err) {
+    console.error("follow error:", err);
+  } finally {
+    setFollowLoadingIds((prev) => { const n = new Set(prev); n.delete(ownerId); return n; });
+  }
+};
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (cu) => {
@@ -605,7 +569,7 @@ const addSale = (rawId) => {
             setNegSettings(getNegotiationSettings(raw));
           }
         }
-      } catch { } finally { setLoading(false); }
+            } catch (err) { console.error("fetchBook error:", err); } finally { setLoading(false); }
     };
     if (bookId) fetchBook();
   }, [bookId]);
@@ -808,90 +772,106 @@ const addSale = (rawId) => {
   };
 
   /* ── CHANGE 2: Book Owner Profile Panel (replaces LAN Lecturers) ── */
-  const BookOwnerPanel = () => {
-    if (loadingOwnerProfile) {
-      return (
-        <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#f0ebe0", flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ height: 10, background: "#f0ebe0", marginBottom: 6, width: "60%" }} />
-              <div style={{ height: 8, background: "#f7f0e8", width: "40%" }} />
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (!bookOwnerProfile) return null;
-
-    const ownerId = bookOwnerProfile.uid;
-    const isFollowing = followingIds.has(ownerId);
-    const isFollowLoading = followLoadingIds.has(ownerId);
-    const profileHref = bookOwnerProfile.source === "users" && bookOwnerProfile.slug
-      ? `/profile/${bookOwnerProfile.slug}`
-      : bookOwnerProfile.source === "sellers"
-      ? `/seller-profile?sellerId=${ownerId}`
-      : null;
-
+const BookOwnerPanel = () => {
+  if (loadingOwnerProfile) {
     return (
       <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "20px" }}>
-        <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>Uploaded By</p>
-        <div style={{ padding: "14px", border: "0.5px solid #f0ebe0", background: CREAM }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-            {/* Avatar */}
-            {profileHref ? (
-              <Link href={profileHref} style={{ width: 44, height: 44, borderRadius: "50%", background: NAVY, display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontSize: 14, fontWeight: 700, textDecoration: "none", flexShrink: 0, overflow: "hidden" }}>
-                {bookOwnerProfile.photoURL
-                  ? <img src={bookOwnerProfile.photoURL} alt={bookOwnerProfile.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.target.style.display = "none"; }} />
-                  : bookOwnerProfile.name?.charAt(0)?.toUpperCase() || "?"}
-              </Link>
-            ) : (
-              <div style={{ width: 44, height: 44, borderRadius: "50%", background: NAVY, display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontSize: 14, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
-                {bookOwnerProfile.photoURL
-                  ? <img src={bookOwnerProfile.photoURL} alt={bookOwnerProfile.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.target.style.display = "none"; }} />
-                  : bookOwnerProfile.name?.charAt(0)?.toUpperCase() || "?"}
-              </div>
-            )}
-
-            {/* Name + institution */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {profileHref ? (
-                <Link href={profileHref} style={{ textDecoration: "none" }}>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: "0 0 2px", fontFamily: "'Lato',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {bookOwnerProfile.title ? `${bookOwnerProfile.title} ` : ""}{bookOwnerProfile.name}
-                  </p>
-                </Link>
-              ) : (
-                <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: "0 0 2px", fontFamily: "'Lato',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {bookOwnerProfile.title ? `${bookOwnerProfile.title} ` : ""}{bookOwnerProfile.name}
-                </p>
-              )}
-              {bookOwnerProfile.institution && (
-                <p style={{ fontSize: 10, color: "#aaa", margin: 0, fontFamily: "'Lato',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bookOwnerProfile.institution}</p>
-              )}
-            </div>
-
-            {/* Follow button */}
-            <button
-              onClick={handleFollowOwner}
-              disabled={isFollowLoading}
-              style={{ fontSize: 9, fontWeight: 700, padding: "4px 10px", border: `0.5px solid ${isFollowing ? "#86efac" : GOLD}`, background: isFollowing ? "rgba(22,163,74,0.08)" : "#fff", color: isFollowing ? "#16a34a" : NAVY, cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.04em", transition: "all 0.18s", flexShrink: 0 }}
-            >
-              {isFollowLoading ? "…" : isFollowing ? "✓ Following" : "+ Follow"}
-            </button>
+        <div style={{ display: "flex", gap: 14, animation: "pulse2 1.5s infinite" }}>
+          <div style={{ width: 72, height: 72, borderRadius: 22, background: "#f0ebe0", flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ height: 12, background: "#f0ebe0", marginBottom: 8, width: "60%" }} />
+            <div style={{ height: 9, background: "#f7f0e8", width: "40%" }} />
           </div>
-
-          {/* Profile link */}
-          {profileHref && (
-            <Link href={profileHref} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: GOLD, textDecoration: "none", fontFamily: "'Lato',sans-serif" }}>
-              View full profile <ChevronRight size={12} />
-            </Link>
-          )}
         </div>
       </div>
     );
-  };
+  }
+  if (!bookOwnerProfile) return null;
+
+  const p = bookOwnerProfile;
+  const isFollowing = followingIds.has(p.uid);
+  const isFollowLoading = followLoadingIds.has(p.uid);
+  const isOwnBook = user?.uid === p.uid;
+  const profileHref = p.slug ? `/profile/${p.slug}` : `/seller-profile?sellerId=${p.uid}`;
+  const displayName = `${p.title ? p.title + " " : ""}${p.name}`;
+  const initials = (p.name || "?").trim().split(/\s+/).filter(Boolean)
+    .map((w, i, a) => (i === 0 || i === a.length - 1 ? w[0] : "")).join("").toUpperCase();
+
+  const subRow = { display: "flex", alignItems: "center", gap: 5, margin: "3px 0 0", fontSize: 12, color: "#888", fontFamily: "'Lato',sans-serif", minWidth: 0 };
+  const ell = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 };
+
+  return (
+    <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "20px" }}>
+      <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "0 0 12px", fontFamily: "'Lato',sans-serif" }}>
+        Uploaded By
+      </p>
+
+      <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+        {/* Avatar: initials sit behind the photo, so a broken image falls back cleanly */}
+        <Link href={profileHref} aria-label={`Open ${displayName}'s profile`}
+          style={{ position: "relative", width: 72, height: 72, flexShrink: 0, borderRadius: 22, overflow: "hidden", border: "1px solid #e5ddd0", background: NAVY, display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>
+          <span style={{ color: GOLD, fontSize: 24, fontWeight: 900, fontFamily: "'Playfair Display',serif" }}>{initials}</span>
+          {p.photoURL && (
+            <img src={p.photoURL} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }} />
+          )}
+        </Link>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+            <Link href={profileHref} style={{ textDecoration: "none", minWidth: 0 }}>
+              <span style={{ ...ell, display: "block", fontFamily: "'Playfair Display',serif", fontSize: 16, fontWeight: 700, color: NAVY, lineHeight: 1.25 }}>
+                {displayName}
+              </span>
+            </Link>
+            {p.verified && <Shield size={13} style={{ color: GOLD, flexShrink: 0 }} aria-label="Verified" />}
+          </div>
+
+          {p.institution && <p style={{ ...subRow, marginTop: 2 }}><span style={ell}>{p.institution}</span></p>}
+          {p.location && (
+            <p style={subRow}><MapPin size={11} style={{ color: GOLD, flexShrink: 0 }} /><span style={ell}>{p.location}</span></p>
+          )}
+          {p.shop && (
+            <p style={subRow}><Store size={11} style={{ color: GOLD, flexShrink: 0 }} /><span style={ell}>{p.shop}</span></p>
+          )}
+        </div>
+      </div>
+
+      {/* Short bio */}
+      {p.bio && (
+        <p style={{ fontSize: 12, color: "#666", lineHeight: 1.65, margin: "14px 0 0", fontFamily: "'Lato',sans-serif", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word" }}>
+          {p.bio}
+        </p>
+      )}
+
+      {/* Stats */}
+      <div style={{ display: "flex", gap: 8, margin: "14px 0 0" }}>
+        {[
+          { icon: <Users size={12} style={{ color: GOLD }} />, label: `${ownerFollowers} follower${ownerFollowers === 1 ? "" : "s"}` },
+          { icon: <ShoppingBag size={12} style={{ color: GOLD }} />, label: `${p.booksSold} sold` },
+        ].map(({ icon, label }) => (
+          <div key={label} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: CREAM, border: "0.5px solid #f0ebe0", padding: "8px 6px", fontSize: 11, fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>
+            {icon}{label}
+          </div>
+        ))}
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <Link href={profileHref}
+          style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, background: GOLD, color: NAVY, padding: "11px 8px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none", fontFamily: "'Lato',sans-serif", letterSpacing: "0.04em" }}>
+          View profile
+        </Link>
+        {!isOwnBook && (
+          <button onClick={handleFollowOwner} disabled={isFollowLoading}
+            style={{ flex: 1, padding: "11px 8px", borderRadius: 8, border: isFollowing ? "0.5px solid #86efac" : "none", background: isFollowing ? "rgba(22,163,74,0.08)" : "#ece6da", color: isFollowing ? "#16a34a" : NAVY, fontSize: 12, fontWeight: 700, cursor: isFollowLoading ? "wait" : "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.04em", transition: "background .15s" }}>
+            {isFollowLoading ? "…" : isFollowing ? "✓ Following" : "+ Follow"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
 
   const PhysicalStockBadge = () => {
     if (loadingPhysical) return (

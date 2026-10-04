@@ -34,6 +34,7 @@ const FOOTER_COLUMNS = [
       { label: "Study Groups", href: "/students/study-groups" },
       { label: "Bookmark", href: "/students/wishlist" },
       { label: "Student Network", href: "/students/network" },
+      { label: "Price Negotiation", href: "/students/negotiation" },
     ],
   },
   {
@@ -48,6 +49,7 @@ const FOOTER_COLUMNS = [
       { label: "Seller Dashboard", href: "/seller/seller-dashboard" },
       { label: "Recharge Services", href: "/seller/recharge-services" },
       { label: "Growing Your Followers", href: "/seller/grow-followers" },
+      { label: "Price Negotiation", href: "/students/negotiation" },
     ],
   },
   {

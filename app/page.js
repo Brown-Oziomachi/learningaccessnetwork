@@ -209,6 +209,7 @@ const FOOTER_COLUMNS = [
       { label: "Past Questions", href: "/students/past-questions" },
       { label: "Study Groups", href: "/students/study-groups" },
       { label: "Bookmark", href: "/students/wishlist" },
+      { label: "Price Negotiation", href: "/students/negotiation" },
 
     ],
   },

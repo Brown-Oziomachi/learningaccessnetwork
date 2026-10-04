@@ -43,10 +43,11 @@ export default function MyPostedBooksClient() {
     const priceRef = useRef(null);
 
     /* edit-modal form state */
-    const [editForm, setEditForm] = useState({
-        bookTitle: "", author: "", category: "", price: "",
-        description: "", message: "", driveFileId: ""
-    });
+   const [editForm, setEditForm] = useState({
+    bookTitle: "", author: "", category: "", price: "",
+    description: "", message: "", driveFileId: "",
+    isNegotiable: false, maxDiscountPercent: 20,
+});
     const [editSaveMsg, setEditSaveMsg] = useState("");
 
     const router = useRouter();
@@ -187,38 +188,51 @@ export default function MyPostedBooksClient() {
             bookTitle: book.bookTitle || "",
             author: book.author || "",
             category: book.category || "",
-            price: book.price || "",
+            price: String(book.price ?? ""),
             description: book.description || "",
             message: book.message || "",
             driveFileId: book.driveFileId || "",
+            isNegotiable: book.isNegotiable === true,
+            maxDiscountPercent: Number(book.maxDiscountPercent) || 20,
         });
         setEditSaveMsg("");
         setShowEditModal(true);
     };
 
     /* ── edit modal save ── */
-    const saveEditForm = async () => {
-        if (!selectedBook) return;
-        setSaving(true);
-        try {
-            const updates = {
-                bookTitle: editForm.bookTitle.trim(),
-                author: editForm.author.trim(),
-                category: editForm.category.trim(),
-                price: editForm.price.replace(/[^0-9.]/g, ""),
-                description: editForm.description.trim(),
-                message: editForm.message.trim(),
-                ...(editForm.driveFileId.trim() && { driveFileId: editForm.driveFileId.trim() }),
-            };
-            await updateDoc(doc(db, "advertMyBook", selectedBook.id), updates);
-            patchBook(selectedBook.id, updates);
-            setEditSaveMsg("Changes saved successfully!");
-            setTimeout(() => setEditSaveMsg(""), 3000);
-        } catch (err) {
-            console.error("Save failed:", err);
-            setEditSaveMsg("Failed to save. Please try again.");
-        } finally { setSaving(false); }
-    };
+  const saveEditForm = async () => {
+    if (!selectedBook) return;
+    const priceNum = Number(String(editForm.price).replace(/[^0-9.]/g, "")) || 0;
+    const pct = Math.round(Number(editForm.maxDiscountPercent) || 0);
+
+    if (editForm.isNegotiable) {
+        if (priceNum <= 0) { setEditSaveMsg("Failed: set a price above zero to allow negotiation."); return; }
+        if (pct < 1 || pct > 50) { setEditSaveMsg("Failed: maximum discount must be between 1% and 50%."); return; }
+    }
+
+    setSaving(true);
+    try {
+        const updates = {
+            bookTitle: editForm.bookTitle.trim(),
+            author: editForm.author.trim(),
+            category: editForm.category.trim(),
+            price: priceNum,
+            isNegotiable: editForm.isNegotiable && priceNum > 0,
+            maxDiscountPercent: pct >= 1 && pct <= 50 ? pct : 20,
+            description: editForm.description.trim(),
+            message: editForm.message.trim(),
+            ...(editForm.driveFileId.trim() && { driveFileId: editForm.driveFileId.trim() }),
+        };
+
+        await updateDoc(doc(db, "advertMyBook", selectedBook.id), updates);
+        patchBook(selectedBook.id, updates);
+        setEditSaveMsg("Changes saved successfully!");
+        setTimeout(() => setEditSaveMsg(""), 3000);
+    } catch (err) {
+        console.error("Save failed:", err);
+        setEditSaveMsg("Failed to save. Please try again.");
+    } finally { setSaving(false); }
+};
 
     /* ── delete ── */
     const handleDeleteBook = async () => {
@@ -249,6 +263,28 @@ export default function MyPostedBooksClient() {
         return 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
     };
 
+    const getPricingBadge = (book) => {
+    const price = Number(book.price) || 0;
+    if (book.isFree === true || price <= 0) return null;
+    const pct = Number(book.maxDiscountPercent) || 0;
+    if (book.isNegotiable === true && pct > 0)
+        return { on: true, text: book.intent === "academic" ? `Student discount · up to ${pct}%` : `Negotiable · up to ${pct}%` };
+    return { on: false, text: "Fixed price" };
+};
+
+const PricingBadge = ({ book }) => {
+    const b = getPricingBadge(book);
+    if (!b) return null;
+    return (
+        <button onClick={() => openEditModal(book)} title="Change pricing mode"
+            style={{ marginTop: 4, fontSize: 9, fontWeight: 700, padding: "3px 8px", cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.04em", whiteSpace: "nowrap",
+                border: `0.5px solid ${b.on ? "rgba(184,150,62,0.5)" : "#e5ddd0"}`,
+                background: b.on ? "rgba(184,150,62,0.12)" : "#f8f8f8", color: b.on ? GOLD : "#888" }}>
+            {b.on ? "🤝 " : "🏷 "}{b.text}
+        </button>
+    );
+    };
+    
     const getStatusConfig = (book) => {
         if (book.unpublished) return { label: 'Unpublished', bg: '#f8f8f8', color: '#6b7280', border: '#d1d5db' };
         switch (book.status) {
@@ -323,6 +359,8 @@ export default function MyPostedBooksClient() {
                         </Link>
                     </div>
 
+
+
                     {/* ── Info Banner ── */}
                     <div style={{ background: `rgba(184,150,62,0.07)`, border: `0.5px solid rgba(184,150,62,0.3)`, padding: '14px 18px', marginBottom: '20px', display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
                         {[
@@ -337,6 +375,10 @@ export default function MyPostedBooksClient() {
                         ))}
                     </div>
 
+{ icon: <TrendingUp size={13} style={{ color: GOLD }} />, text: (
+    <>Turn on negotiation so buyers can ask for a discount — negotiable documents tend to sell faster. Switch back to fixed price any time.{" "}
+    <Link href="/students/negotiation" style={{ color: GOLD, fontWeight: 700 }}>How it works →</Link></>
+) },
                     {/* ── Stats ── */}
                     <div className="anim-up" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '12px', marginBottom: '24px' }}>
                         <style>{`@media(min-width:640px){.stats-grid{grid-template-columns:repeat(4,1fr) !important;}}`}</style>
@@ -345,6 +387,7 @@ export default function MyPostedBooksClient() {
                             { label: 'Approved', val: stats.approved, icon: <CheckCircle size={18} style={{ color: GOLD }} /> },
                             { label: 'Copies Sold', val: stats.totalCopiesSold, icon: <ShoppingBag size={18} style={{ color: GOLD }} /> },
                             { label: 'Total Revenue', val: stats.totalRevenue, icon: <TrendingUp size={18} style={{ color: GOLD }} /> },
+                            
                         ].map(({ label, val, icon }, i) => (
                             <div key={i} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '20px' }}>
                                 <div style={{ width: '40px', height: '40px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px', background: CREAM }}>{icon}</div>
@@ -456,12 +499,15 @@ export default function MyPostedBooksClient() {
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
-                                                            onClick={() => { setEditingPriceId(book.id); setPriceInputVal(book.price); }}
-                                                            title="Click to edit price">
-                                                            <span style={{ fontSize: '13px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{fmt(Number(book.price) || 0)}</span>
-                                                            <Pencil size={11} style={{ color: GOLD, opacity: 0.7 }} />
-                                                        </div>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                                                                    onClick={() => { setEditingPriceId(book.id); setPriceInputVal(book.price); }}
+                                                                    title="Click to edit price">
+                                                                    <span style={{ fontSize: '13px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{fmt(Number(book.price) || 0)}</span>
+                                                                    <Pencil size={11} style={{ color: GOLD, opacity: 0.7 }} />
+                                                                </div>
+                                                                <PricingBadge book={book} />
+                                                            </div>
                                                     )}
                                                 </div>
 
@@ -645,6 +691,69 @@ export default function MyPostedBooksClient() {
                                     </div>
                                 </div>
 
+{/* Pricing mode */}
+{(() => {
+    const faculty = selectedBook.intent === "academic";
+    const priceNum = Number(String(editForm.price).replace(/[^0-9.]/g, "")) || 0;
+    const isFreeDoc = priceNum <= 0;
+    const pct = Number(editForm.maxDiscountPercent) || 0;
+    const floor = Math.ceil(priceNum * (1 - pct / 100));
+    const option = (active, title, text, onClick, disabled) => (
+        <button type="button" onClick={onClick} disabled={disabled}
+            style={{ textAlign: "left", padding: "14px", border: `1.5px solid ${active ? GOLD : "#e5ddd0"}`, background: active ? "rgba(184,150,62,0.08)" : "#fff", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1, fontFamily: "'Lato',sans-serif" }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>{title}</p>
+            <p style={{ fontSize: 11, color: "#888", margin: 0, lineHeight: 1.5 }}>{text}</p>
+        </button>
+    );
+    return (
+        <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "20px", marginBottom: "16px" }}>
+            <p style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "0 0 12px", fontFamily: "'Lato',sans-serif" }}>Pricing Mode</p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+                {option(!editForm.isNegotiable, "🏷 Fixed price", "Everyone pays the listed price.",
+                    () => setEditForm(f => ({ ...f, isNegotiable: false })), false)}
+                {option(editForm.isNegotiable && !isFreeDoc,
+                    faculty ? "🤝 Student discount" : "🤝 Negotiable",
+                    faculty ? "Students can ask you for a discount." : "Buyers can make you one offer.",
+                    () => setEditForm(f => ({ ...f, isNegotiable: true })), isFreeDoc)}
+            </div>
+
+            {isFreeDoc && (
+                <p style={{ fontSize: 11, color: "#a16207", margin: 0, fontFamily: "'Lato',sans-serif", lineHeight: 1.6 }}>
+                    Free documents can't be negotiated. Set a price above zero first.
+                </p>
+            )}
+
+            {editForm.isNegotiable && !isFreeDoc && (
+                <>
+                    <label className="form-label">Maximum discount you'll allow</label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                        {[10, 15, 20, 25, 30, 40, 50].map(p => (
+                            <button key={p} type="button" onClick={() => setEditForm(f => ({ ...f, maxDiscountPercent: p }))}
+                                style={{ padding: "6px 12px", fontSize: 12, fontWeight: 700, fontFamily: "'Lato',sans-serif", cursor: "pointer", border: `0.5px solid ${pct === p ? NAVY : "#e5ddd0"}`, background: pct === p ? NAVY : CREAM, color: pct === p ? "#fff" : NAVY }}>
+                                {p}%
+                            </button>
+                        ))}
+                        <input className="form-input" type="number" min="1" max="50" value={editForm.maxDiscountPercent}
+                            onChange={e => setEditForm(f => ({ ...f, maxDiscountPercent: e.target.value }))}
+                            style={{ width: 80, padding: "6px 10px" }} />
+                    </div>
+                    <div style={{ background: CREAM, border: "0.5px solid rgba(184,150,62,0.25)", padding: "10px 12px" }}>
+                        <p style={{ fontSize: 11, color: "#555", margin: 0, lineHeight: 1.65, fontFamily: "'Lato',sans-serif" }}>
+                            Buyers can ask for up to <strong>{pct}%</strong> off. The lowest price you would ever accept is <strong>{fmt(floor)}</strong>.
+                            At that price you keep about <strong>{fmt(Math.round(floor * 0.8))}</strong> after LAN's 20% fee.
+                        </p>
+                    </div>
+                </>
+            )}
+
+            <p style={{ fontSize: 10, color: "#aaa", margin: "12px 0 0", fontFamily: "'Lato',sans-serif", lineHeight: 1.6 }}>
+                Switching back to Fixed price hides the negotiation strip straight away. Requests already open stay answerable, and any price you already agreed stays locked for that buyer. Click Save Changes to apply.
+            </p>
+        </div>
+    );
+                                })()}
+                                
                                 {/* Core fields */}
                                 <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '20px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: GOLD, margin: 0, fontFamily: "'Lato',sans-serif" }}>Document Details</p>
@@ -667,7 +776,7 @@ export default function MyPostedBooksClient() {
                                     </div>
                                     <div>
                                         <label className="form-label">Summary / Message</label>
-                                        <textarea className="form-input" rows={4} value={editForm.tableOfContents} onChange={e => setEditForm(f => ({ ...f, tableOfContents: e.target.value }))}
+                                        <textarea className="form-input" rows={4} value={editForm.message} onChange={e => setEditForm(f => ({ ...f, message: e.target.value }))}
                                             style={{ resize: 'vertical', fontFamily: "'Lato',sans-serif" }} />
                                     </div>
                                 </div>
