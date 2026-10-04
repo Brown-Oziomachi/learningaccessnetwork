@@ -7,9 +7,9 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
-import { doc, getDoc, writeBatch, serverTimestamp, addDoc, collection } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, addDoc, collection } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { AFRICAN_COUNTRIES } from "@/lib/africanCountries";
+import { AFRICAN_COUNTRIES, getCountry } from "@/lib/africanCountries";
 import { isReservedName, RESERVED_MESSAGE } from "@/lib/reservedIdentity";
 
 export default function BecomeSellerClient() {
@@ -62,7 +62,12 @@ export default function BecomeSellerClient() {
 
     useEffect(() => {
         let cancelled = false;
-        const loadBanks = async () => {
+                const loadBanks = async () => {
+            // No Flutterwave bank list for this country: the seller uses "Other Bank" and types it in
+            if (!getCountry(formData.country)?.bankList) {
+                setBanks([]);
+                return;
+            }
             setBanksLoading(true);
             try {
                 const res = await fetch(`/api/flutterwave/banks?country=${formData.country}`);
@@ -153,77 +158,62 @@ export default function BecomeSellerClient() {
 
         setSubmitting(true);
         try {
+            const idToken = await auth.currentUser.getIdToken();
             const flwRes = await fetch("/api/flutterwave/create-subaccount", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${idToken}`,
+                },
                 body: JSON.stringify({
-                    uid: user.uid, email: formData.email,
+                    email: formData.email,
                     firstName: formData.firstName, surname: formData.surname,
-                    phoneNumber: formData.phoneNumber, bankCode: formData.bankCode,
-                    country: formData.country,
-                    accountNumber: formData.accountNumber,
-                    accountName: formData.accountName,
-                    businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
-                }),
-            });
-            const flwData = await flwRes.json();
-            if (!flwRes.ok || !flwData.success) throw new Error(flwData.error || "Failed to create subaccount.");
-            const flutterwaveSubaccountId = flwData.subaccount_id;
-
-            const batch = writeBatch(db);
-            const userRef = doc(db, "users", user.uid);
-            const sellerRef = doc(db, "sellers", user.uid);
-
-            batch.set(userRef, {
-                isSeller: true,
-                phoneNumber: formData.phoneNumber,
-                flutterwaveSubaccountId,
-                updatedAt: serverTimestamp(),
-            }, { merge: true });
-
-            batch.set(sellerRef, {
-                accountBalance: 0,
-                totalEarnings: 0,
-                booksSold: 0,
-                totalWithdrawn: 0,
-                bankDetails: {
+                    phoneNumber: formData.phoneNumber,
                     country: formData.country,
                     bankName: formData.bankName,
                     bankCode: formData.bankCode,
                     accountNumber: formData.accountNumber,
                     accountName: formData.accountName,
-                },
-                businessInfo: {
                     businessName: formData.businessName || `${formData.firstName} ${formData.surname}`,
                     businessDescription: formData.businessDescription,
-                },
-                sellerName: `${formData.firstName} ${formData.surname}`.trim(),
-                sellerId: user.uid,
-                sellerEmail: formData.email,
-                title: formData.title || "",
-                university: formData.university || "",
-                department: formData.department || "",
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                status: "active",
-                flutterwaveSubaccountId,
-            }, { merge: true });
-
-            await batch.commit();
+                    title: formData.title,
+                    university: formData.university,
+                    department: formData.department,
+                }),
+            });
+                      const rawText = await flwRes.text();
+            let flwData = null;
+            try { flwData = JSON.parse(rawText); } catch (e) {}
+            if (!flwData) {
+                console.error(
+                    "create-subaccount returned non-JSON:",
+                    "status", flwRes.status,
+                    "redirected", flwRes.redirected,
+                    "url", flwRes.url,
+                    "body", rawText.slice(0, 500)
+                );
+                throw new Error(`Registration failed (server status ${flwRes.status}). See the browser console.`);
+            }
+            if (!flwRes.ok || !flwData.success) throw new Error(flwData.error || "Failed to create subaccount.");
 
             // ✅ Fire notification separately — don't let it block or crash the flow
             addDoc(collection(db, "notifications"), {
                 userId: user.uid,
                 type: "welcome_seller",
                 title: "🛒 Welcome to LAN Library, Seller!",
-                message: `Hi ${formData.firstName}! Your seller account is now active. Upload documents and earn 80% on every sale. Minimum withdrawal is ₦1,000.`,
+                message: `Hi ${formData.firstName}! Your seller account is now active.${flwData.welcomeBonus ? ` A ₦${flwData.welcomeBonus} welcome bonus has been added to your balance.` : ""} Upload documents and earn 80% on every sale. Minimum withdrawal is ₦1,000.`,
                 link: "/my-account/seller-account",
                 createdAt: serverTimestamp(),
                 read: false,
             }).catch(err => console.error("Notification failed (non-blocking):", err));
 
             // ✅ Redirect immediately — don't wait for notification
-            showToast("Seller account created successfully! 🎉", "success");
+            showToast(
+                flwData.welcomeBonus
+                    ? `Seller account created! ₦${flwData.welcomeBonus} welcome bonus added to your balance. 🎉`
+                    : "Seller account created successfully! 🎉",
+                "success"
+            );
             setTimeout(() => router.push("/my-account/seller-account"), 1500);
 
         } catch (error) {
@@ -472,7 +462,7 @@ export default function BecomeSellerClient() {
                                 </h2>
                             </div>
                             <div className="lsb-field" style={{ marginBottom: 14 }}>
-                                <label className="lsb-label">Business / Store Name</label>
+                                <label className="lsb-label">Nick Name</label>
                                 <input
                                     type="text"
                                     value={formData.businessName}
@@ -483,11 +473,11 @@ export default function BecomeSellerClient() {
                                 {errors.businessName && <p className="lsb-err-msg">{errors.businessName}</p>}
                             </div>
                             <div className="lsb-field">
-                                <label className="lsb-label">Store Description</label>
+                                <label className="lsb-label">Biography</label>
                                 <textarea
                                     value={formData.businessDescription}
                                     onChange={e => set("businessDescription", e.target.value)}
-                                    placeholder="Tell buyers what kinds of books and materials you sell…"
+                                    placeholder="Tell buyers about yourself, your background, and the academic materials you share…"
                                     rows={3}
                                     className="lsb-input lsb-textarea"
                                 />

@@ -5,8 +5,18 @@ export async function POST(request) {
     try {
         const adminDb = getAdminDb();
 
+        const idToken = request.headers.get('authorization')?.replace('Bearer ', '');
+        if (!idToken) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        let userId;
+        try {
+            ({ uid: userId } = await admin.auth().verifyIdToken(idToken));
+        } catch {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const {
-            userId,
             bookId,
             bookTitle,
             email,

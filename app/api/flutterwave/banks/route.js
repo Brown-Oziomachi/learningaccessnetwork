@@ -1,7 +1,7 @@
 // app/api/flutterwave/banks/route.js
 import { NextResponse } from 'next/server';
 import { flwRequest } from '@/lib/flutterwaveToken';
-import { AFRICAN_COUNTRIES } from '@/lib/africanCountries';
+import { getCountry } from '@/lib/africanCountries';
 
 // In-memory cache per country so we don't hit Flutterwave on every page load
 const cache = new Map();
@@ -11,8 +11,15 @@ export async function GET(req) {
     try {
         const country = (new URL(req.url).searchParams.get('country') || 'NG').toUpperCase();
 
-        if (!AFRICAN_COUNTRIES.some((c) => c.code === country)) {
+        const countryInfo = getCountry(country);
+        if (!countryInfo) {
             return NextResponse.json({ success: false, error: 'Unsupported country' }, { status: 400 });
+        }
+        if (!countryInfo.bankList) {
+            return NextResponse.json(
+                { success: false, error: 'Bank list is not available for this country.' },
+                { status: 400 }
+            );
         }
 
         const hit = cache.get(country);
@@ -30,14 +37,23 @@ export async function GET(req) {
             );
         }
 
+        const seen = new Set();
         const banks = data.data
-            .map((b) => ({ name: b.name, code: String(b.code) }))
+            .filter((b) => b?.code && b?.name)
+            .map((b) => ({ name: String(b.name).trim(), code: String(b.code) }))
+            .filter((b) => {
+                const key = `${b.code}|${b.name}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
             .sort((a, b) => a.name.localeCompare(b.name));
 
-        cache.set(country, { banks, at: Date.now() });
+        // Don't cache an empty list for 6 hours; the next request should retry
+        if (banks.length > 0) cache.set(country, { banks, at: Date.now() });
         return NextResponse.json({ success: true, banks });
     } catch (error) {
         console.error('Banks route error:', error);
-        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+        return NextResponse.json({ success: false, error: 'Could not load banks' }, { status: 500 });
     }
 }

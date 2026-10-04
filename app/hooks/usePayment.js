@@ -186,7 +186,10 @@ export const usePayment = (book, formData, options = {}) => {
             // Standardized with network request time boundary limits
             const res = await fetchWithTimeout('/api/wallet-purchase', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${await currentUser.getIdToken()}`,
+                },
                 body: JSON.stringify({
                     userId: currentUser.uid,
                     bookId: book.id,
@@ -242,7 +245,10 @@ export const usePayment = (book, formData, options = {}) => {
 
             const res = await fetchWithTimeout('/api/wallet-withdraw', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${await currentUser.getIdToken()}`,
+                },
                 body: JSON.stringify({
                     userId: currentUser.uid,
                     amount: Number(amount),

@@ -55,6 +55,9 @@ import OpenAccessModal from "./Openaccessmodal";
 import GoogleAdComponent from "./GoogleAdComponent";
 import { FrozenPdfGate, SellerProfileLink } from "./book-preview- patches";
 import { useCurrency } from "@/app/context/CurrencyContext";
+import BookNegotiationCard from "@/components/negotiation/BookNegotiationCard";
+import { NegotiationHost } from "@/components/negotiation/NegotiationHost";
+import { getNegotiationSettings } from "@/lib/negotiation";
 
 /* ── palette ── */
 const NAVY = "#0d2244";
@@ -80,6 +83,7 @@ const isSellerBook = (book) =>
 /* ─── LicenseButton ─────────────────────────────────────────────── */
 function LicenseButton({ book, isGloballyFrozen, isPrintLicensingEnabled, router, cleanBookId, style = {} }) {
   const isDisabled = isGloballyFrozen || !isPrintLicensingEnabled;
+  const [negSettings, setNegSettings] = useState(null);
   const disabledReason = isGloballyFrozen
     ? "This document is currently frozen."
     : !isPrintLicensingEnabled
@@ -584,6 +588,7 @@ const addSale = (rawId) => {
         setBookFeedbackCount(0);
         setPdfPageCount(null);
         setCalculatingPages(false);
+        setNegSettings(null);
 
         const bookData = await fetchBookDetails(bookId);
         if (bookData) {
@@ -597,6 +602,7 @@ const addSale = (rawId) => {
             const raw = snap.data();
             setIsPrintLicensingEnabled(raw.isPrintLicensingEnabled === true);
             setIsGloballyFrozen(raw.isGloballyFrozen === true);
+            setNegSettings(getNegotiationSettings(raw));
           }
         }
       } catch { } finally { setLoading(false); }
@@ -1311,6 +1317,17 @@ const sold =
                 </div>
                 {/* {user && <StudyBuddyTracker bookId={bookId} userId={user.uid} userName={user.displayName || "Student"} userPhoto={user.photoURL || null} bookTitle={book?.title || ""} />} */}
                 <PhysicalStockBadge />
+                <BookNegotiationCard
+                book={book}
+                bookId={cleanBookId}
+                settings={negSettings}
+                user={user}
+                sellerName={bookOwnerProfile?.name || book?.sellerName}
+                fmt={fmt}
+                isPurchased={isPurchased}
+                isFrozen={isGloballyFrozen}
+                onPay={(n) => router.push(`/payment?bookId=${cleanBookId}&negotiationId=${n.id}`)}
+              />
                 {isGloballyFrozen ? <FrozenPdfGate /> : <PdfViewer heightClass="400px" fullHeight="900px" />}
                 <FeaturedAdsCarousel tier="Gold" maxAds={2} autoPlay={true} autoPlayMs={4000} style={{ marginTop: "1px" }} />
                 <FeaturedAdsCarousel tier="Silver" maxAds={2} autoPlay={true} autoPlayMs={4000} style={{ marginTop: "1px" }} />
@@ -1476,7 +1493,8 @@ const sold =
             </div>
           </div>
         </div>
-
+        
+          <NegotiationHost user={user} fmt={fmt} />
         {/* ══ MODALS ══ */}
         {showOverview && (
           <>

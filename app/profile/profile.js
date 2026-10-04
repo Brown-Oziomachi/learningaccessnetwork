@@ -43,8 +43,11 @@ import {
     Lock,
     Sparkles,
     Quote,
+    LayoutDashboard,
 
 } from "lucide-react";
+import FollowingModal from "./[slug]/FollowingModal";
+const DASHBOARD_HREF = "/my-account/seller-account/";
 
 /* ─── Design Tokens ─────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -552,6 +555,8 @@ export default function ClientProfileContent({ sellerSlug }) {
     const [purchasedBookIds, setPurchased] = useState(new Set());
     const [isFollowing, setFollowing] = useState(false);
     const [followerCount, setFollowers] = useState(0);
+    const [followingCount, setFollowingCount] = useState(0);
+    const [showFollowing, setShowFollowing] = useState(false);
     const [activeTab, setActiveTab] = useState("materials");
     const [view, setView] = useState("grid");
     const [followLoading, setFollowLoad] = useState(false);
@@ -559,8 +564,10 @@ export default function ClientProfileContent({ sellerSlug }) {
     const [user, setUser] = useState(null);
     const [userData, setUserData] = useState(null);
 const [resolvedUid, setResolvedUid] = useState(null);
-    const [slugResolving, setSlugResolving] = useState(true);
-    
+        const [slugResolving, setSlugResolving] = useState(true);
+
+    const isOwner = !!user && !!resolvedUid && user.uid === resolvedUid;
+
     /* ── Auth listener ── */
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, (u) => {
@@ -573,9 +580,12 @@ const [resolvedUid, setResolvedUid] = useState(null);
     /* ── Resolve slug to UID ── */
     useEffect(() => {
         const resolveSlug = async () => {
-            if (!sellerSlug) return;
-            try {
-                // 1. Try slug query first (most reliable)
+    if (!sellerSlug) return;
+    setSlugResolving(true);
+    setShowFollowing(false);
+    setActiveTab("materials");
+    try {
+        // 1. Try slug query first (most reliable)
                 try {
                     const q = query(
                         collection(db, "sellers"),
@@ -627,7 +637,7 @@ const [resolvedUid, setResolvedUid] = useState(null);
                 );
                 const snap = await getDocs(q);
                 setFollowers(snap.size);
-            } catch (err) {
+                       } catch (err) {
                 try {
                     const sd = await getDoc(doc(db, "sellers", resolvedUid));
                     if (sd.exists()) {
@@ -636,6 +646,15 @@ const [resolvedUid, setResolvedUid] = useState(null);
                 } catch {
                     setFollowers(0);
                 }
+            }
+
+            try {
+                const fq = await getDocs(
+                    query(collection(db, "follows"), where("followerId", "==", resolvedUid))
+                );
+                setFollowingCount(fq.docs.filter((d) => d.data().lecturerId !== resolvedUid).length);
+            } catch {
+                setFollowingCount(0);
             }
 
             if (user) {
@@ -668,9 +687,6 @@ const [resolvedUid, setResolvedUid] = useState(null);
         try {
             if (isFollowing) {
                 await deleteDoc(followRef);
-                try {
-                    await updateDoc(sellerRef, { followersCount: increment(-1) });
-                } catch { }
                 setFollowing(false);
                 setFollowers((p) => Math.max(0, p - 1));
             } else {
@@ -995,16 +1011,20 @@ const [resolvedUid, setResolvedUid] = useState(null);
                 {[
                     { label: "Total Materials", value: sellerBooks.length, Icon: BookOpen },
                     { label: "Followers", value: formatCount(followerCount), Icon: Users },
-                ].map(({ label, value, Icon }) => (
+                    { label: "Following", value: formatCount(followingCount), Icon: UserCheck, onClick: () => setShowFollowing(true) },
+                ].map(({ label, value, Icon, onClick }) => (
                     <div
                         key={label}
                         className="stat-row"
+                        onClick={onClick}
+                        role={onClick ? "button" : undefined}
                         style={{
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
                             padding: "10px 0",
                             gap: "8px",
+                            cursor: onClick ? "pointer" : "default",
                         }}
                     >
                         <div
@@ -1538,7 +1558,7 @@ const [resolvedUid, setResolvedUid] = useState(null);
                                     margin: "0 0 12px",
                                 }}
                             >
-                                {sellerBooks.length} materials · {formatCount(followerCount)} followers
+                                {sellerBooks.length} materials · {formatCount(followerCount)} followers · {formatCount(followingCount)} following
                             </p>
 
                             {seller.sellerBio && (
@@ -1563,7 +1583,7 @@ const [resolvedUid, setResolvedUid] = useState(null);
             >
                 {seller.sellerBio}
             </p>
-            {seller.sellerBio.length > 110 && (
+            {seller.sellerBio.length > 180 && (
                 <button
                     onClick={() => setActiveTab("about")}
                     style={{
@@ -1587,36 +1607,33 @@ const [resolvedUid, setResolvedUid] = useState(null);
     </div>
                             )}
                             
-                            {/* Follow button — sits under name for clean flow */}
+                            {/* Follow button / Owner dashboard */}
                             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                <button
-                                    onClick={toggleFollow}
-                                    disabled={followLoading}
-                                    className="follow-btn"
-                                    style={{
-                                        padding: "8px 18px",
-                                        fontSize: "11px",
-                                    }}
-                                >
-                                    {isFollowing ? (
-                                        <UserCheck size={12} />
-                                    ) : (
-                                        <UserPlus size={12} />
-                                    )}
-                                    {isFollowing ? "Following" : "Follow"}
-                                </button>
-                                {!user && authReady && (
-                                    <p
-                                        style={{
-                                            fontSize: "10px",
-                                            color: "rgba(184,150,62,.7)",
-                                            fontFamily: "'Lato',sans-serif",
-                                            letterSpacing: ".04em",
-                                            margin: 0,
-                                        }}
+                                {isOwner ? (
+                                    <Link
+                                        href={DASHBOARD_HREF}
+                                        className="follow-btn"
+                                        style={{ padding: "8px 18px", fontSize: "11px", textDecoration: "none" }}
                                     >
-                                        Sign in required
-                                    </p>
+                                        <LayoutDashboard size={12} /> Owner Dashboard
+                                    </Link>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={toggleFollow}
+                                            disabled={followLoading}
+                                            className="follow-btn"
+                                            style={{ padding: "8px 18px", fontSize: "11px" }}
+                                        >
+                                            {isFollowing ? <UserCheck size={12} /> : <UserPlus size={12} />}
+                                            {isFollowing ? "Following" : "Follow"}
+                                        </button>
+                                        {!user && authReady && (
+                                            <p style={{ fontSize: "10px", color: "rgba(184,150,62,.7)", fontFamily: "'Lato',sans-serif", letterSpacing: ".04em", margin: 0 }}>
+                                                Sign in required
+                                            </p>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>
@@ -1634,42 +1651,43 @@ const [resolvedUid, setResolvedUid] = useState(null);
                         {[
                             { val: sellerBooks.length, label: "Materials" },
                             { val: formatCount(followerCount), label: "Followers" },
-                        ].map(({ val, label }) => (
-                            <div
-                                key={label}
-                                style={{
-                                    padding: "16px 20px 0",
-                                    borderRight: "0.5px solid rgba(184,150,62,.1)",
-                                    textAlign: "left",
-                                }}
-                            >
-                                <div
-                                    className="lan-serif"
+                            { val: formatCount(followingCount), label: "Following", onClick: () => setShowFollowing(true) },
+                        ].map(({ val, label, onClick }) => {
+                            const Tag = onClick ? "button" : "div";
+                            return (
+                                <Tag
+                                    key={label}
+                                    onClick={onClick}
                                     style={{
-                                        fontSize: "22px",
-                                        fontWeight: 700,
-                                        color: "#fff",
+                                        padding: "16px 20px 0",
+                                        background: "none",
+                                        border: "none",
+                                        borderRight: "0.5px solid rgba(184,150,62,.1)",
+                                        textAlign: "left",
+                                        cursor: onClick ? "pointer" : "default",
+                                        font: "inherit",
                                     }}
                                 >
-                                    {val}
-                                </div>
-                                <div
-                                    style={{
-                                        fontSize: "10px",
-                                        fontWeight: 700,
-                                        letterSpacing: ".1em",
-                                        textTransform: "uppercase",
-                                        color: "rgba(184,150,62,.7)",
-                                        marginTop: "2px",
-                                        fontFamily: "'Lato',sans-serif",
-                                    }}
-                                >
-                                    {label}
-                                </div>
-                            </div>
-                        ))}
+                                    <div className="lan-serif" style={{ fontSize: "22px", fontWeight: 700, color: "#fff" }}>
+                                        {val}
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: "10px",
+                                            fontWeight: 700,
+                                            letterSpacing: ".1em",
+                                            textTransform: "uppercase",
+                                            color: onClick ? GOLDD : "rgba(184,150,62,.7)",
+                                            marginTop: "2px",
+                                            fontFamily: "'Lato',sans-serif",
+                                        }}
+                                    >
+                                        {label}{onClick ? " ›" : ""}
+                                    </div>
+                                </Tag>
+                            );
+                        })}
                     </div>
-
                     {/* Tabs */}
                     <div
                         className="sbar-none"
@@ -2142,25 +2160,29 @@ const [resolvedUid, setResolvedUid] = useState(null);
                                 Stats
                             </p>
                             <div style={{ display: "flex", flexDirection: "column" }}>
-                                {[
-                                    {
-                                        label: "Total Materials",
-                                        value: sellerBooks.length,
-                                        Icon: BookOpen,
-                                    },
-                                    { label: "Followers", value: formatCount(followerCount), Icon: Users },
-                                ].map(({ label, value, Icon }) => (
-                                    <div
-                                        key={label}
-                                        className="stat-row"
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "space-between",
-                                            padding: "10px 0",
-                                            gap: "8px",
-                                        }}
-                                    >
+                               {[
+                                        {
+                                            label: "Total Materials",
+                                            value: sellerBooks.length,
+                                            Icon: BookOpen,
+                                        },
+                                        { label: "Followers", value: formatCount(followerCount), Icon: Users },
+                                        { label: "Following", value: formatCount(followingCount), Icon: UserCheck, onClick: () => setShowFollowing(true) },
+                                    ].map(({ label, value, Icon, onClick }) => (
+                                        <div
+                                            key={label}
+                                            className="stat-row"
+                                            onClick={onClick}
+                                            role={onClick ? "button" : undefined}
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "space-between",
+                                                padding: "10px 0",
+                                                gap: "8px",
+                                                cursor: onClick ? "pointer" : "default",
+                                            }}
+                                        >
                                         <div
                                             style={{
                                                 display: "flex",
@@ -2200,11 +2222,21 @@ const [resolvedUid, setResolvedUid] = useState(null);
                             </div>
                         </div>
 
-                        {/* Guest banner */}
-                        <GuestBanner />
-                    </div>
-                )}
+                                        {/* Guest banner */}
+                <GuestBanner />
             </div>
-        </div>
-    );
+        )}
+    </div>
+
+    <FollowingModal
+        open={showFollowing}
+        onClose={() => setShowFollowing(false)}
+        profileUid={resolvedUid}
+        profileName={seller.sellerName}
+        isOwner={isOwner}
+        router={router}
+        onUnfollowed={() => setFollowingCount((c) => Math.max(0, c - 1))}
+    />
+</div>
+);
 }

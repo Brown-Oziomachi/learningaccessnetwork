@@ -21,6 +21,8 @@ import BountyApprovalModal from "@/components/BountyApprovalModal";
 import BountyDashboardCard from "./Bounty-cashboard-card/page";
 import { createPortal } from "react-dom";
 import { AFRICAN_COUNTRIES } from "@/lib/africanCountries";
+import { NegotiationHost, NegotiationInboxCard } from "@/components/negotiation/NegotiationHost";
+import { useNegotiationBadge } from "@/lib/negotiation";  
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -928,6 +930,8 @@ export default function SellerAccountClient() {
     const [bioDraft, setBioDraft] = useState("");
     const [editingBio, setEditingBio] = useState(false);
     const [savingBio, setSavingBio] = useState(false);
+    const negBadge = useNegotiationBadge(user?.uid);
+
     useEffect(() => {
         if (!showBankModal) return;
         let cancelled = false;
@@ -1102,23 +1106,35 @@ export default function SellerAccountClient() {
         } catch (error) { console.error("Error fetching seller transactions:", error); }
     };
 
-    const handleSaveBank = async () => {
+        const handleSaveBank = async () => {
         if (!bankFormData.accountName || !bankFormData.accountNumber || !bankFormData.bankName) { alert("Please fill in all required fields"); return; }
         if (bankCustom && !bankFormData.bankCode) { alert("Please enter your bank code"); return; }
         if (bankCountry === "NG" && bankFormData.accountNumber.length !== 10) { alert("Nigerian account numbers must be 10 digits"); return; }
-        const bankPayload = { ...bankFormData, country: bankCountry };
         try {
             setSavingBank(true);
-            await updateDoc(doc(db, "sellers", user.uid), { bankDetails: bankPayload, updatedAt: serverTimestamp() });
-            await updateDoc(doc(db, "users", user.uid), { bankDetails: bankPayload });
-            setUser(prev => ({ ...prev, bankDetails: bankPayload }));
-            try {
-                const res = await fetch('/api/flutterwave/create-subaccount', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: user.uid, email: user.email, firstName: user.firstName, surname: user.surname, phoneNumber: user.phoneNumber || user.phone || '00000000000', bankCode: bankFormData.bankCode, country: bankCountry, accountNumber: bankFormData.accountNumber, businessName: `${user.firstName} ${user.surname}` }) });
-                const flwData = await res.json();
-                if (flwData.success) { await updateDoc(doc(db, "users", user.uid), { flutterwaveSubaccountId: flwData.subaccount_id }); await updateDoc(doc(db, "sellers", user.uid), { flutterwaveSubaccountId: flwData.subaccount_id }); }
-            } catch { }
-            setShowBankModal(false); alert("Bank details updated successfully!");
-        } catch (error) { alert("Failed to save bank details: " + error.message); }
+            const idToken = await auth.currentUser.getIdToken();
+            const res = await fetch('/api/seller/bank-details', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({
+                    country: bankCountry,
+                    bankName: bankFormData.bankName,
+                    bankCode: bankFormData.bankCode,
+                    accountNumber: bankFormData.accountNumber,
+                    accountName: bankFormData.accountName,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || "Failed to save bank details.");
+
+            setUser(prev => ({ ...prev, bankDetails: data.bankDetails }));
+            setSeller(prev => ({ ...prev, bankDetails: data.bankDetails }));
+            setShowBankModal(false);
+            alert("Bank details updated successfully!");
+        } catch (error) { alert(error.message); }
         finally { setSavingBank(false); }
     };
 
@@ -1177,9 +1193,11 @@ export default function SellerAccountClient() {
         const amountToDeduct = parseFloat(withdrawAmount);
                 const res = await fetch('/api/wallet-withdraw', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${await auth.currentUser.getIdToken()}`,
+            },
             body: JSON.stringify({
-                userId: user.uid,
                 amount: amountToDeduct,
                 pin: pinValue.toString().trim(),
                 otp: currentOtp 
@@ -1238,8 +1256,7 @@ export default function SellerAccountClient() {
     if (amount < 1000) { setWithdrawalError("Minimum withdrawal amount is ₦1,000"); return; }
     if (amount > accountBalance) { setWithdrawalError(`Insufficient balance. Available: ₦${accountBalance.toLocaleString()}`); return; }
     if (!user?.bankDetails) { setWithdrawalError("Please add bank details first"); return; }
-    if (!seller?.transferPin && !seller?.transactionPin) {  setWithdrawalError("Please set up a transfer PIN first in the Settings/Transfer page.");  return; }
-    
+if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in the Settings/Transfer page."); return; }    
     setShowWithdrawModal(false);
     setPinValue("");
     setPinError("");
@@ -1462,6 +1479,7 @@ export default function SellerAccountClient() {
                                 />
                             )}
 
+                            <NegotiationInboxCard user={user} isFaculty={isFacultyUser} fmt={fmt} />
                             {/* VTU */}
                             <VTUQuickAccess />
 
@@ -2209,7 +2227,7 @@ export default function SellerAccountClient() {
                     <PinModal amount={withdrawAmount} bankDetails={user?.bankDetails} pinValue={pinValue} pinError={pinError}
                         onDigit={d => pinValue.length < 4 && setPinValue(p => p + d)}
                         onDelete={() => setPinValue(p => p.slice(0, -1))}
-                        onConfirm={handlePinConfirm}
+                        onConfirm={() => handlePinConfirm()}
                         onClose={() => { setShowPinModal(false); setPinValue(""); setPinError(""); }}
                     />
                 )}
@@ -2339,7 +2357,7 @@ export default function SellerAccountClient() {
                 )}
 
                 <ExportStudentsModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} sellerId={user?.uid} sellerBooks={sellerBooks} />
-
+                <NegotiationHost user={user} fmt={fmt} />
                 {/* Print License Ledger Modal */}
                 {showPrintLicenseLedger && (
                     <div className="modal-overlay" style={{ marginTop: "94px" }}>

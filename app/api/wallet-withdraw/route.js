@@ -2,19 +2,35 @@ import { getAdminDb, admin } from '@/lib/firebase-admin';
 import { NextResponse } from 'next/server';
 
 const WITHDRAWAL_THRESHOLD = 5000;
+const MIN_WITHDRAWAL = 1000;
 
 export async function POST(request) {
     try {
         const adminDb = getAdminDb();
-        const { userId, amount: rawAmount, pin, otp } = await request.json();
 
-        if (!userId || !rawAmount || !pin) {
+        const idToken = request.headers.get('authorization')?.replace('Bearer ', '');
+        if (!idToken) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        let userId;
+        try {
+            ({ uid: userId } = await admin.auth().verifyIdToken(idToken));
+        } catch {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { amount: rawAmount, pin, otp } = await request.json();
+
+        if (!rawAmount || !pin) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
         const amount = Math.floor(Number(rawAmount));
         if (isNaN(amount) || amount <= 0) {
             return NextResponse.json({ error: 'Invalid withdrawal amount' }, { status: 400 });
+        }
+        if (amount < MIN_WITHDRAWAL) {
+            return NextResponse.json({ error: 'Minimum withdrawal is ₦1,000' }, { status: 400 });
         }
 
         const sellerRef = adminDb.collection('sellers').doc(userId);
@@ -44,7 +60,7 @@ export async function POST(request) {
                     otpExpiry: Date.now() + 600000,
                 });
 
-                return { status: 'OTP_SENT', generatedOtp };
+                return { status: 'OTP_SENT', generatedOtp, sellerEmail: sellerData.sellerEmail };
             }
 
             if (otp) {
@@ -71,6 +87,7 @@ export async function POST(request) {
                 sellerId: userId,
                 userId: userId,
                 amount,
+                bankDetails: sellerData.bankDetails || null,
                 status: 'pending',
                 type: 'withdrawal',
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -81,7 +98,14 @@ export async function POST(request) {
 
         // 🔒 RESPONSE ALIGNMENT FIX: Handled with status mapping to interact seamlessly with frontend try-catch loops
         if (result.status === 'OTP_SENT') {
-            console.log(`[SECURITY] High-value verification OTP generated: ${result.generatedOtp}`);
+            if (result.sellerEmail) {
+                sendServerNotification({
+                    type: 'withdrawal_otp',
+                    to: result.sellerEmail,
+                    userId,
+                    data: { otp: result.generatedOtp, amount },
+                }).catch(e => console.error('Withdrawal OTP email failed:', e.message));
+            }
             return NextResponse.json({ status: 'OTP_SENT' }, { status: 400 });
         }
 
