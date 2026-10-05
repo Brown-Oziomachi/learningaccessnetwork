@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
@@ -261,7 +262,6 @@ export default function PaymentClient() {
     const bookId = rawBookId?.startsWith("firestore-") ? rawBookId : `firestore-${rawBookId}`;
 
     /* ── State ── */
-    const [book, setBook] = useState(null);
     const [sellerDetails, setSellerDetails] = useState(null);
     const [loading, setLoading] = useState(true);
     const [pageError, setPageError] = useState(null);
@@ -307,6 +307,19 @@ const [descExpanded, setDescExpanded] = useState(false);
         name: "",
     });
 
+    const negotiationId = searchParams.get("negotiationId");
+const [rawBook, setBook] = useState(null);
+const [negotiation, setNegotiation] = useState(null); // { id, price }
+const [negLoading, setNegLoading] = useState(!!negotiationId);
+const [negError, setNegError] = useState("");
+
+const book = useMemo(
+  () => rawBook && negotiation
+    ? { ...rawBook, price: negotiation.price, originalPrice: rawBook.price, negotiationId: negotiation.id }
+    : rawBook,
+  [rawBook, negotiation]
+    );
+    
     /* Payment hook */
     const {
         processing, paymentSuccess, setPaymentSuccess,
@@ -395,6 +408,33 @@ const [descExpanded, setDescExpanded] = useState(false);
         loadBook();
     }, [bookId]);
 
+    useEffect(() => {
+  if (!negotiationId || !rawBook) return;
+  const clean = (v) => String(v || "").replace("firestore-", "");
+  let handled = false;
+  const unsub = onAuthStateChanged(auth, async (u) => {
+    if (!u || handled) return;
+    handled = true;
+    try {
+      const snap = await getDoc(doc(db, "negotiations", negotiationId));
+      if (!snap.exists()) throw new Error("We couldn't find this offer.");
+      const n = snap.data();
+      if (n.status === "paid") throw new Error("This offer has already been paid for.");
+      if (n.status !== "accepted") throw new Error("The seller hasn't accepted this offer.");
+      if ((n.buyerId || n.buyerUid || n.userId) !== u.uid) throw new Error("This offer belongs to another account.");
+      if (clean(n.bookId) !== clean(bookId)) throw new Error("This offer is for a different document.");
+      const exp = n.expiresAt?.toMillis?.() ?? 0;
+      if (exp && exp < Date.now()) throw new Error("This offer has expired.");
+      const price = [n.agreedPrice, n.acceptedPrice, n.finalPrice, n.counterPrice, n.offerPrice, n.amount]
+        .map(Number).find((v) => v > 0);
+      if (!price) throw new Error("The agreed price is missing on this offer.");
+      setNegotiation({ id: snap.id, price });
+    } catch (e) { setNegError(e.message); }
+    finally { setNegLoading(false); }
+  });
+  return () => unsub();
+    }, [negotiationId, rawBook, bookId]);
+    
     /* ── Redirect on success ── */
     useEffect(() => {
         if (paymentSuccess) {
@@ -408,7 +448,7 @@ const [descExpanded, setDescExpanded] = useState(false);
     const handleInputChange = e => setFormData({ ...formData, [e.target.name]: e.target.value });
 
     const executePayment = (method) => {
-        const extraData = { studentRegNo: studentRegNo || null, department: studentDepartment || null };
+        const extraData = { studentRegNo: studentRegNo || null, department: studentDepartment || null, negotiationId: negotiation?.id || null };
         if (method === "flutterwave") {
             processFlutterwavePayment(extraData, selectedCountry.currency);
         } else if (method === "wallet") {
@@ -517,7 +557,7 @@ const [descExpanded, setDescExpanded] = useState(false);
     const goldBtn = { width: "100%", background: GOLD, color: NAVY, padding: "14px", border: "none", fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em" };
 
     /* ══ LOADING ══ */
-    if (loading) return (
+    if (loading || (negLoading && !alreadyPurchased && !pageError)) return (
         <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: BG }}>
             <GlobalStyles />
             <div style={{ textAlign: "center" }}>
@@ -556,6 +596,23 @@ const [descExpanded, setDescExpanded] = useState(false);
                         <button onClick={() => router.back()} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#aaa", fontSize: "12px", padding: "8px" }}>
                             ← Go Back
                         </button>
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+
+    if (negError) return (
+        <>
+            <GlobalStyles />
+            <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+                <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "40px 28px", maxWidth: 400, width: "100%", textAlign: "center" }}>
+                    <AlertCircle size={30} style={{ color: "#ef4444", margin: "0 auto 14px" }} />
+                    <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 19, fontWeight: 700, color: NAVY, margin: "0 0 8px" }}>Offer unavailable</p>
+                    <p style={{ fontSize: 13, color: "#666", margin: "0 0 22px", lineHeight: 1.6 }}>{negError}</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <button onClick={() => router.push(`/book/preview?id=${bookId.replace("firestore-", "")}`)} style={navyBtn}>BACK TO DOCUMENT</button>
+                        <button onClick={() => router.replace(`/payment?bookId=${bookId.replace("firestore-", "")}`)} style={{ background: "transparent", border: "none", color: "#aaa", fontSize: 11, cursor: "pointer", padding: 8 }}>Pay full price instead</button>
                     </div>
                 </div>
             </div>
@@ -661,7 +718,11 @@ const [descExpanded, setDescExpanded] = useState(false);
                                 <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: GOLD, margin: "0 0 4px" }}>{book.category || "Document"}</p>
                                 <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: "17px", fontWeight: 700, color: NAVY, margin: "0 0 4px", lineHeight: 1.3 }}>{book.title}</h2>
                                 <p style={{ fontSize: "12px", color: "#888", margin: "0 0 10px" }}>by {book.author}</p>
-                                <p style={{ fontSize: "20px", fontWeight: 700, color: NAVY, fontFamily: "'Playfair Display',serif", margin: 0 }}>₦{book.price?.toLocaleString()}</p>
+                                <p style={{ fontSize: "20px", fontWeight: 700, color: NAVY, fontFamily: "'Playfair Display',serif", margin: 0 }}>
+                                    {book.originalPrice && <span style={{ textDecoration: "line-through", color: "#aaa", fontSize: 13, marginRight: 8 }}>₦{book.originalPrice.toLocaleString()}</span>}
+                                    ₦{book.price?.toLocaleString()}
+                                    {book.originalPrice && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, background: "#16a34a", color: "#fff", padding: "2px 7px", verticalAlign: "middle" }}>NEGOTIATED</span>}
+                                </p>
                             </div>
                         </div>
                       {book.description && (

@@ -1,11 +1,11 @@
-const admin = require('firebase-admin');
-const serviceAccount = require("./serviceAccountKey.json");
+import { initializeApp, credential as _credential, storage } from 'firebase-admin';
+import serviceAccount from "./serviceAccountKey.json";
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+initializeApp({
+  credential: _credential.cert(serviceAccount)
 });
 
-admin.storage().getBuckets().then(x => {
+storage().getBuckets().then(x => {
   console.log("ACTUAL BUCKET NAMES FOUND:");
   x[0].forEach(b => console.log("👉 " + b.name));
 }).catch(err => console.error(err));

@@ -166,8 +166,8 @@ export default function MyPostedBooksClient() {
         const trimmed = priceInputVal.replace(/[^0-9.]/g, "");
         if (!trimmed || isNaN(Number(trimmed))) { setEditingPriceId(null); return; }
         try {
-            await updateDoc(doc(db, "advertMyBook", book.id), { price: trimmed });
-            patchBook(book.id, { price: trimmed });
+            await updateDoc(doc(db, "advertMyBook", book.id), { price: Number(trimmed) });
+            patchBook(book.id, { price: Number(trimmed) });
         } catch (err) { console.error("Price update failed:", err); }
         setEditingPriceId(null);
     };
@@ -343,7 +343,7 @@ const PricingBadge = ({ book }) => {
                 <Navbar />
 
                 <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 16px' }}>
-
+            
                     {/* ── Header ── */}
                     <div style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '20px 24px', marginBottom: '24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                         <div>
@@ -367,6 +367,15 @@ const PricingBadge = ({ book }) => {
                             { icon: <DollarSign size={13} style={{ color: GOLD }} />, text: "Set your own price — no minimum or maximum. Change it anytime, no re-review needed." },
                             { icon: <Edit3 size={13} style={{ color: GOLD }} />, text: "Edit title, description, price, or cover image anytime — no review process required." },
                             { icon: <EyeOff size={13} style={{ color: GOLD }} />, text: "Unpublish a document to hide it from search & purchase without deleting it." },
+                            {
+                                icon: <TrendingUp size={13} style={{ color: GOLD }} />,
+                                text: (
+                                    <>
+                                        Turn on negotiation so buyers can ask for a discount — negotiable documents tend to sell faster. Switch back to fixed price any time.{" "}
+                                        <Link href="/students/negotiation" style={{ color: GOLD, fontWeight: 700 }}>How it works →</Link>
+                                    </>
+                                ),
+                            },
                         ].map(({ icon, text }, i) => (
                             <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flex: '1 1 220px' }}>
                                 <div style={{ marginTop: '1px', flexShrink: 0 }}>{icon}</div>
@@ -375,10 +384,7 @@ const PricingBadge = ({ book }) => {
                         ))}
                     </div>
 
-{ icon: <TrendingUp size={13} style={{ color: GOLD }} />, text: (
-    <>Turn on negotiation so buyers can ask for a discount — negotiable documents tend to sell faster. Switch back to fixed price any time.{" "}
-    <Link href="/students/negotiation" style={{ color: GOLD, fontWeight: 700 }}>How it works →</Link></>
-) },
+                    
                     {/* ── Stats ── */}
                     <div className="anim-up" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '12px', marginBottom: '24px' }}>
                         <style>{`@media(min-width:640px){.stats-grid{grid-template-columns:repeat(4,1fr) !important;}}`}</style>
@@ -578,64 +584,65 @@ const PricingBadge = ({ book }) => {
                                 </div>
                             </div>
 
-                            {/* Mobile Cards */}
-                            <div className="mobile-cards" style={{ display: 'block' }}>
-                                <style>{`@media(min-width:768px){.mobile-cards{display:none !important;}}`}</style>
-                                {filteredBooks.map(book => {
-                                    const salesCount = getBookSalesCount(book);
-                                    const totalSales = getBookTotalSales(book);
-                                    const statusCfg = getStatusConfig(book);
-                                    return (
-                                        <div key={book.id} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '16px', marginBottom: '8px', opacity: book.unpublished ? 0.65 : 1 }}>
-                                            <div style={{ display: 'flex', gap: '14px', marginBottom: '14px' }}>
-                                                <img src={getThumbnailUrl(book)} alt={book.bookTitle}
-                                                    style={{ width: '64px', height: '88px', objectFit: 'cover', border: '0.5px solid #e5ddd0', flexShrink: 0 }}
-                                                    onError={e => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }} />
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
-                                                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '15px', fontWeight: 700, color: NAVY, margin: 0, lineHeight: 1.3 }}>{book.bookTitle}</p>
-                                                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 8px', background: statusCfg.bg, color: statusCfg.color, border: `0.5px solid ${statusCfg.border}`, fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{statusCfg.label}</span>
-                                                    </div>
-                                                    <p style={{ fontSize: '12px', color: '#aaa', margin: '0 0 10px', fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                                                        {[['Price', fmt(Number(book.price) || 0)], ['Category', book.category], ['Copies Sold', salesCount], ['Revenue', fmt(totalSales)]].map(([k, v]) => (
-                                                            <div key={k}>
-                                                                <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#bbb', margin: '0 0 1px', fontFamily: "'Lato',sans-serif" }}>{k}</p>
-                                                                <p style={{ fontSize: '12px', fontWeight: 700, color: k === 'Revenue' ? GOLD : NAVY, margin: 0, fontFamily: "'Lato',sans-serif", textTransform: 'capitalize' }}>{v}</p>
-                                                            </div>
-                                                        ))}
+                                {/* Mobile Cards */}
+                                <div className="mobile-cards" style={{ display: 'block' }}>
+                                    <style>{`@media(min-width:768px){.mobile-cards{display:none !important;}}`}</style>
+                                    {filteredBooks.map(book => {
+                                        const salesCount = getBookSalesCount(book);
+                                        const totalSales = getBookTotalSales(book);
+                                        const statusCfg = getStatusConfig(book);
+                                        return (
+                                            <div key={book.id} style={{ background: '#fff', border: '0.5px solid #e5ddd0', padding: '16px', marginBottom: '8px', opacity: book.unpublished ? 0.65 : 1 }}>
+                                                <div style={{ display: 'flex', gap: '14px', marginBottom: '14px' }}>
+                                                    <img src={getThumbnailUrl(book)} alt={book.bookTitle}
+                                                        style={{ width: '64px', height: '88px', objectFit: 'cover', border: '0.5px solid #e5ddd0', flexShrink: 0 }}
+                                                        onError={e => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }} />
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
+                                                            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: '15px', fontWeight: 700, color: NAVY, margin: 0, lineHeight: 1.3 }}>{book.bookTitle}</p>
+                                                            <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 8px', background: statusCfg.bg, color: statusCfg.color, border: `0.5px solid ${statusCfg.border}`, fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{statusCfg.label}</span>
+                                                        </div>
+                                                        <p style={{ fontSize: '12px', color: '#aaa', margin: '0 0 10px', fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                                                            {[['Price', fmt(Number(book.price) || 0)], ['Category', book.category], ['Copies Sold', salesCount], ['Revenue', fmt(totalSales)]].map(([k, v]) => (
+                                                                <div key={k}>
+                                                                    <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#bbb', margin: '0 0 1px', fontFamily: "'Lato',sans-serif" }}>{k}</p>
+                                                                    <p style={{ fontSize: '12px', fontWeight: 700, color: k === 'Revenue' ? GOLD : NAVY, margin: 0, fontFamily: "'Lato',sans-serif", textTransform: 'capitalize' }}>{v}</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <PricingBadge book={book} />   {/* ← NEW */}
                                                     </div>
                                                 </div>
-                                            </div>
 
-                                            {/* Mobile Action Row */}
-                                            <div style={{ display: 'flex', gap: '6px', paddingTop: '12px', borderTop: '0.5px solid #f0ebe0', flexWrap: 'wrap' }}>
-                                                <button onClick={() => { setSelectedBook(book); setShowDetailsModal(true); }}
-                                                    style={{ flex: 1, minWidth: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '9px', border: '0.5px solid #e5ddd0', background: CREAM, fontSize: '11px', fontWeight: 700, color: NAVY, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
-                                                    <Eye size={13} /> View
-                                                </button>
-                                                <button onClick={() => openEditModal(book)}
-                                                    style={{ flex: 1, minWidth: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '9px', border: `0.5px solid rgba(184,150,62,0.4)`, background: `rgba(184,150,62,0.08)`, fontSize: '11px', fontWeight: 700, color: GOLD, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
-                                                    <Edit3 size={13} /> Edit
-                                                </button>
-                                                <Link href={`/book/preview?id=${book.id}`} style={{ flex: 1 }}>
-                                                    <button style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '9px', border: '0.5px solid #86efac', background: '#f0fdf4', fontSize: '11px', fontWeight: 700, color: '#16a34a', cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
-                                                        <BookOpen size={13} /> Open
+                                                {/* Mobile Action Row */}
+                                                <div style={{ display: 'flex', gap: '6px', paddingTop: '12px', borderTop: '0.5px solid #f0ebe0', flexWrap: 'wrap' }}>
+                                                    <button onClick={() => { setSelectedBook(book); setShowDetailsModal(true); }}
+                                                        style={{ flex: 1, minWidth: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '9px', border: '0.5px solid #e5ddd0', background: CREAM, fontSize: '11px', fontWeight: 700, color: NAVY, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
+                                                        <Eye size={13} /> View
                                                     </button>
-                                                </Link>
-                                                <button onClick={() => toggleUnpublish(book)}
-                                                    style={{ padding: '9px 12px', border: `0.5px solid ${book.unpublished ? '#86efac' : '#fde68a'}`, background: book.unpublished ? '#f0fdf4' : '#fffbeb', fontSize: '11px', fontWeight: 700, color: book.unpublished ? '#16a34a' : '#d97706', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    {book.unpublished ? <RotateCcw size={13} /> : <EyeOff size={13} />}
-                                                </button>
-                                                <button onClick={() => { setSelectedBook(book); setShowDeleteModal(true); }}
-                                                    style={{ padding: '9px 12px', border: '0.5px solid #fecaca', background: '#fef2f2', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    <Trash2 size={13} style={{ color: '#dc2626' }} />
-                                                </button>
+                                                    <button onClick={() => openEditModal(book)}
+                                                        style={{ flex: 1, minWidth: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '9px', border: `0.5px solid rgba(184,150,62,0.4)`, background: `rgba(184,150,62,0.08)`, fontSize: '11px', fontWeight: 700, color: GOLD, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
+                                                        <Edit3 size={13} /> Edit
+                                                    </button>
+                                                    <Link href={`/book/preview?id=${book.id}`} style={{ flex: 1 }}>
+                                                        <button style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '9px', border: '0.5px solid #86efac', background: '#f0fdf4', fontSize: '11px', fontWeight: 700, color: '#16a34a', cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
+                                                            <BookOpen size={13} /> Open
+                                                        </button>
+                                                    </Link>
+                                                    <button onClick={() => toggleUnpublish(book)}
+                                                        style={{ padding: '9px 12px', border: `0.5px solid ${book.unpublished ? '#86efac' : '#fde68a'}`, background: book.unpublished ? '#f0fdf4' : '#fffbeb', fontSize: '11px', fontWeight: 700, color: book.unpublished ? '#16a34a' : '#d97706', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                        {book.unpublished ? <RotateCcw size={13} /> : <EyeOff size={13} />}
+                                                    </button>
+                                                    <button onClick={() => { setSelectedBook(book); setShowDeleteModal(true); }}
+                                                        style={{ padding: '9px 12px', border: '0.5px solid #fecaca', background: '#fef2f2', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                        <Trash2 size={13} style={{ color: '#dc2626' }} />
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                        );
+                                    })}
+                                </div>
                         </>
                     )}
                 </div>
