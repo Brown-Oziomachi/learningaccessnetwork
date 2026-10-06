@@ -4,28 +4,26 @@ import { db, auth } from '@/lib/firebaseConfig';
 import { doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 📊 Fallback African Exchange Matrix (NGN base)
+// Fallback exchange matrix (NGN base): same currencies as PaymentClient
 // ─────────────────────────────────────────────────────────────────────────────
+// CHANGED: was only NGN/GHS/KES/UGX. Any other currency (ZAR, XOF, XAF, EGP...)
+// silently fell back to a 1.0 multiplier, so a buyer was charged e.g. R1500 for a ₦1500 book.
 const FALLBACK_EXCHANGE_MATRIX = {
-    NGN: 1.0,
-    GHS: 0.010,
-    KES: 0.11,
-    UGX: 2.85
+    NGN: 1, GHS: 0.010, KES: 0.11, UGX: 2.85,
+    TZS: 2.62, RWF: 1.38, ZMW: 0.028, MWK: 1.77,
+    EGP: 0.051, MAD: 0.105, ZAR: 0.019,
+    XOF: 6.56, XAF: 6.56,
 };
 
-// 🌐 Fetch live rates from exchangerate-api
+// Fetch live rates
+// CHANGED: keep ALL live rates, not just 3 of them
 const fetchLiveExchangeRates = async () => {
     try {
         const res = await fetch('https://open.er-api.com/v6/latest/NGN');
         if (!res.ok) throw new Error('Rate fetch failed');
         const data = await res.json();
         if (data?.rates) {
-            return {
-                NGN: 1.0,
-                GHS: data.rates.GHS || FALLBACK_EXCHANGE_MATRIX.GHS,
-                KES: data.rates.KES || FALLBACK_EXCHANGE_MATRIX.KES,
-                UGX: data.rates.UGX || FALLBACK_EXCHANGE_MATRIX.UGX,
-            };
+            return { ...FALLBACK_EXCHANGE_MATRIX, ...data.rates, NGN: 1 };
         }
         return FALLBACK_EXCHANGE_MATRIX;
     } catch {
@@ -97,14 +95,23 @@ export const usePayment = (book, formData, options = {}) => {
             setError({ message: "Payment gateway is still loading. Please try again." });
             return;
         }
+        // NEW: don't charge a foreign currency before live rates are in
+        if (targetCurrency !== 'NGN' && !ratesLoaded) {
+            setError({ message: "Fetching exchange rates. Please try again in a moment." });
+            return;
+        }
 
         let regionalChargedAmount;
         if (targetCurrency === 'NGN') {
             regionalChargedAmount = Math.round(book.price);
         } else {
             const currencyScalar = exchangeMatrix[targetCurrency]
-                || FALLBACK_EXCHANGE_MATRIX[targetCurrency]
-                || 1.0;
+                || FALLBACK_EXCHANGE_MATRIX[targetCurrency];
+            // NEW: refuse instead of silently using 1.0
+            if (!currencyScalar) {
+                setError({ message: `${targetCurrency} is not supported right now.` });
+                return;
+            }
             regionalChargedAmount = Math.round(book.price * currencyScalar * 100) / 100;
         }
 
@@ -116,6 +123,12 @@ export const usePayment = (book, formData, options = {}) => {
             amount: regionalChargedAmount,
             currency: targetCurrency,
             payment_options: "card,ussd,banktransfer,mobilemoney,mpesa",
+            // NEW: the webhook (Route D) requires userId + bookId, and uses negotiationId
+            meta: {
+                userId: auth.currentUser?.uid,
+                bookId: book.id,
+                negotiationId: book.negotiationId || extraData?.negotiationId || "",
+            },
             customer: {
                 email: formData.email,
                 phone_number: formData.phone || "",
@@ -163,6 +176,21 @@ export const usePayment = (book, formData, options = {}) => {
         throw new Error('Webhook process pending confirmation');
     };
 
+        const waitForPurchase = async (bookIdToCheck) => {
+        const uid = auth.currentUser?.uid;
+        if (!uid || !bookIdToCheck) return false;
+        const clean = String(bookIdToCheck).replace('firestore-', '');
+        for (let i = 0; i < 5; i++) {
+            try {
+                const snap = await getDoc(doc(db, 'users', uid));
+                const pb = snap.data()?.purchasedBooks || {};
+                if (pb[clean] || pb[bookIdToCheck]) return true;
+            } catch { /* keep trying */ }
+            await new Promise(r => setTimeout(r, 2000));
+        }
+        return false;
+    };
+    
     // ─────────────────────────────────────────────────────────────────────────
     // ROUTE B: Wallet Book Purchase
     // ─────────────────────────────────────────────────────────────────────────
@@ -183,7 +211,6 @@ export const usePayment = (book, formData, options = {}) => {
                 throw new Error("Please enter your 4-digit PIN.");
             }
 
-            // Standardized with network request time boundary limits
             const res = await fetchWithTimeout('/api/wallet-purchase', {
                 method: 'POST',
                 headers: {
@@ -194,11 +221,15 @@ export const usePayment = (book, formData, options = {}) => {
                     userId: currentUser.uid,
                     bookId: book.id,
                     bookTitle: book.title || 'Unknown Title',
-                    // SECURITY NOTE: Your backend must evaluate real value from database via bookId
+                    // The server loads the real price from the database
                     pin: enteredPin.toString().trim(),
                     email: formData?.email || null,
                     name: formData?.name || null,
-                    extraData,
+                    // NEW: guarantee the negotiation id reaches /api/wallet-purchase
+                    extraData: {
+                        ...extraData,
+                        negotiationId: extraData?.negotiationId || book.negotiationId || null,
+                    },
                 }),
             }, 15000);
 
@@ -214,6 +245,15 @@ export const usePayment = (book, formData, options = {}) => {
                 onSuccess(book.id, data.txRef, extraData);
             }
         } catch (err) {
+            // The server may have finished after the browser gave up. Check before failing.
+            if (err.message?.startsWith('Request timed out')) {
+                const landed = await waitForPurchase(book?.id);
+                if (landed) {
+                    setPaymentSuccess(true);
+                    setProcessing(false);
+                    return;
+                }
+            }
             setError({
                 message: err.message === 'PIN_NOT_SET'
                     ? "You haven't set a PIN yet. Please set a PIN to continue."
@@ -282,7 +322,7 @@ export const usePayment = (book, formData, options = {}) => {
     };
 
     // ─────────────────────────────────────────────────────────────────────────
-    // PIN management helpers
+    // PIN management helpers (UNCHANGED, still insecure, see note below)
     // ─────────────────────────────────────────────────────────────────────────
     const setupInitialPin = async (newPin) => {
         setProcessing(true);

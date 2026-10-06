@@ -1,9 +1,12 @@
 // app/api/verification/initialize/route.js
-// POST { method: "flutterwave" | "wallet", returnPath?, pin? }  — only these two payment methods.
+// POST { method: "flutterwave" | "wallet", returnPath?, pin? }
+// CHANGE: payment is now the LAST step. It is refused unless an admin has approved the application
+// (status "approved_awaiting_payment") or this is a renewal of an already-verified paid seller.
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { VERIFY_PRICE_NGN, VERIFY_DAYS, verificationUpdate } from "@/lib/server/grantSellerVerification";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { canPay } from "@/lib/server/verificationGate";
 
 class HttpError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
 
@@ -11,6 +14,12 @@ class HttpError extends Error { constructor(status, msg) { super(msg); this.stat
 async function checkTransferPin(uid, pin) {
     if (!/^\d{4}$/.test(pin)) throw new HttpError(400, "Enter your 4-digit PIN.");
     throw new HttpError(501, "Wallet PIN check is not connected yet.");
+}
+
+/** Shared rule lives in lib/server/verificationGate.js. Called again inside the wallet transaction. */
+function assertCanPay(seller) {
+    const r = canPay(seller);
+    if (!r.ok) throw new HttpError(r.status, r.error);
 }
 
 export async function POST(req) {
@@ -30,6 +39,8 @@ export async function POST(req) {
         if (user.isSeller !== true) throw new HttpError(403, "Only sellers can get verified.");
         const isFaculty = user.isLecturer === true || ["lecturer", "faculty"].includes(user.role) || !!user.lecturerVerificationStatus;
         if (isFaculty) throw new HttpError(403, "Faculty are verified through the account process.");
+
+        assertCanPay(seller); // <-- NEW
 
         const txRef = `LANVER-${uid.slice(0, 6)}-${Date.now()}`;
         const payRef = adminDb.collection("verificationPayments").doc(txRef);
@@ -62,6 +73,7 @@ export async function POST(req) {
             let upd;
             await adminDb.runTransaction(async (tx) => {
                 const s = await tx.get(sellerRef);
+                assertCanPay(s.data()); // <-- NEW: re-check inside the transaction
                 if ((Number(s.data()?.accountBalance) || 0) < VERIFY_PRICE_NGN) throw new HttpError(402, "Your wallet balance is too low. Fund it or pay with Flutterwave.");
                 upd = verificationUpdate(s.data()?.verifiedUntil);
                 tx.update(sellerRef, { accountBalance: FieldValue.increment(-VERIFY_PRICE_NGN), ...upd });

@@ -1,5 +1,6 @@
 import { getAdminDb, admin } from '@/lib/firebase-admin';
 import { NextResponse } from 'next/server';
+import { resolveNegotiatedPrice } from '@/lib/negotiationPricing';
 
 export async function POST(request) {
     try {
@@ -73,15 +74,30 @@ export async function POST(request) {
                 return { errorStatus: 'BOOK_NOT_FOUND', message: 'The requested book could not be found.' };
             }
 
-            const bookData = bookSnap.data();
-
+           
             // 🔒 SECURITY FIX: Override client-passed price completely. Use verified database value.
-            const verifiedPrice = Math.floor(Number(bookData?.price || bookData?.amount));
+            const bookRecord = bookSnap.data();
+
+            const negIdIn = extraData?.negotiationId ? String(extraData.negotiationId) : null;
+            const negRef = negIdIn ? adminDb.collection('negotiations').doc(negIdIn) : null;
+            const negSnap = negRef ? await transaction.get(negRef) : null;   // must stay before any write
+
+            let verifiedPrice = Math.floor(Number(bookRecord?.price || bookRecord?.amount));
+            if (negRef) {
+                try {
+                    verifiedPrice = resolveNegotiatedPrice({
+                        neg: negSnap.exists ? negSnap.data() : null,
+                        book: bookRecord, userId, bookId: cleanBookId,
+                    });
+                } catch (e) {
+                    return { errorStatus: 'NEGOTIATION_INVALID', message: e.message };
+                }
+            }
             if (isNaN(verifiedPrice) || verifiedPrice <= 0) {
-                return { errorStatus: 'INVALID_PRICE', message: 'This item has an invalid price configuration structure.' };
+                return { errorStatus: 'INVALID_PRICE', message: '...' };
             }
 
-            const realSellerId = bookData?.sellerId || bookData?.userId;
+            const realSellerId = bookRecord?.sellerId || bookRecord?.userId;
             if (!realSellerId) {
                 return { errorStatus: 'VENDOR_NOT_FOUND', message: 'This book does not have a registered vendor.' };
             }
@@ -135,15 +151,25 @@ export async function POST(request) {
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
 
-            transaction.update(sellerWalletRef, {
+            transaction.set(sellerWalletRef, {
                 accountBalance: admin.firestore.FieldValue.increment(sellerAmount),
+                totalEarnings: admin.firestore.FieldValue.increment(sellerAmount),
+                booksSold: admin.firestore.FieldValue.increment(1),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
+            }, { merge: true });
+
+            if (negRef) {
+                transaction.update(negRef, {
+                    status: 'purchased',
+                    purchasedAtMs: Date.now(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+            }
 
             // ── 10. Grant access ──────────────────────────────────────────
             const purchasePayload = {
                 id: bookId,
-                title: bookTitle || bookData.title || 'Book',
+                title: bookTitle || bookRecord.title || 'Book',
                 purchasedAt: new Date().toISOString(),
                 amount: verifiedPrice,
                 transactionRef: txRef,
@@ -171,7 +197,7 @@ export async function POST(request) {
                 buyerName: name || null,
                 buyerPhone: buyerWalletData.phone || null,
                 bookId,
-                bookTitle: bookTitle || bookData.title || null,
+                bookTitle: bookTitle || bookRecord.title || null,
                 amount: verifiedPrice,
                 platformFee,
                 sellerAmount,

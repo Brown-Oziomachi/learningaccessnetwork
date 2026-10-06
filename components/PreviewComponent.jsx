@@ -58,6 +58,7 @@ import { useCurrency } from "@/app/context/CurrencyContext";
 import BookNegotiationCard from "@/components/negotiation/BookNegotiationCard";
 import { NegotiationHost } from "@/components/negotiation/NegotiationHost";
 import { getNegotiationSettings } from "@/lib/negotiation";
+import { VerifiedBadge, paidVerificationActive } from "@/components/seller/Verification";
 
 /* ── palette ── */
 const NAVY = "#0d2244";
@@ -342,9 +343,22 @@ const [sellerSoldCount, setSellerSoldCount] = useState(null);
         location: s?.businessInfo?.state || s?.businessInfo?.country || u?.state || u?.country || "",
         shop: s?.businessInfo?.businessName || "",
         bio: s?.businessInfo?.businessDescription || u?.bio || "",
-        verified:
-          s?.isVerifiedSeller === true || u?.isVerifiedSeller === true ||
-          u?.isVerified === true || u?.lecturerVerificationStatus === "approved",
+          verified: (() => {
+            const LECTURER_TITLES = ["lecturer", "dr.", "prof.", "professor", "mrs", "mr"];
+            const lecturerMode =
+              u?.isLecturer === true ||
+              u?.role === "lecturer" ||
+              LECTURER_TITLES.includes(String(title || "").toLowerCase());
+            if (lecturerMode) {
+              return (
+                (u?.isVerified === true || u?.lecturerVerificationStatus === "approved") &&
+                u?.lecturerVerificationStatus !== "pending" &&
+                u?.lecturerVerificationStatus !== "rejected"
+              );
+            }
+            return paidVerificationActive(s);
+      })(),
+      
         booksSold: s?.booksSold || 0,
         slug: s?.slug || makeSlug(title, u?.firstName, u?.surname) || makeSlug(u?.firstName, u?.surname),
       });
@@ -581,8 +595,9 @@ const addSale = (rawId) => {
         setAllBooks(processed);
         try {
           /* Fetch all approved non-frozen books */
-          const snap = await getDocs(query(collection(db, "advertMyBook"), where("status", "==", "approved"), where("isGloballyFrozen", "==", false)));
-          /* Also fetch free books directly (same query as OpenAccessPage) */
+const snap = await getDocs(
+  query(collection(db, "advertMyBook"), where("status", "==", "approved")),
+);          /* Also fetch free books directly (same query as OpenAccessPage) */
           const freeSnap = await getDocs(query(collection(db, "advertMyBook"), where("isFree", "==", true), where("status", "==", "approved")));
           const freeIdsSeen = new Set();
           const freeFirestoreBooks = [];
@@ -604,23 +619,36 @@ const addSale = (rawId) => {
             freeFirestoreBooks.push(b);
           });
           const fb = [];
-          snap.forEach((d) => {
-            if (freeIdsSeen.has(d.id)) return; /* skip — already in freeFirestoreBooks */
-            const data = d.data();
-            if (!data.bookTitle) return;
-            const b = {
-              id: `firestore-${d.id}`, firestoreId: d.id,
-              title: data.bookTitle, author: data.author, category: data.category,
-              price: data.price, isFree: data.isFree, accessType: data.accessType,
-              pages: data.pages, format: data.format || "PDF",
-              description: data.description, driveFileId: data.driveFileId,
-              pdfUrl: data.pdfUrl, previewUrl: data.previewUrl, embedUrl: data.embedUrl,
-              isFromFirestore: true,
-              tableOfContents: data.tableOfContents || data.tableOfContent || null,
-            };
-            b.image = getThumbnailUrl(b);
-            fb.push(b);
-          });
+                   snap.forEach((d) => {
+                     if (freeIdsSeen.has(d.id))
+                       return; /* skip — already in freeFirestoreBooks */
+                     const data = d.data();
+                     if (!data.bookTitle) return;
+                     if (data.isGloballyFrozen === true)
+                       return; /* skip frozen books in JS instead of the query */
+                     const b = {
+                       id: `firestore-${d.id}`,
+                       firestoreId: d.id,
+                       title: data.bookTitle,
+                       author: data.author,
+                       category: data.category,
+                       price: data.price,
+                       isFree: data.isFree,
+                       accessType: data.accessType,
+                       pages: data.pages,
+                       format: data.format || "PDF",
+                       description: data.description,
+                       driveFileId: data.driveFileId,
+                       pdfUrl: data.pdfUrl,
+                       previewUrl: data.previewUrl,
+                       embedUrl: data.embedUrl,
+                       isFromFirestore: true,
+                       tableOfContents:
+                         data.tableOfContents || data.tableOfContent || null,
+                     };
+                     b.image = getThumbnailUrl(b);
+                     fb.push(b);
+                   });
           /* ── All three arrays are now fully built — combine and split ── */
           const combined = [...processed, ...fb, ...freeFirestoreBooks].sort(() => Math.random() - 0.5);
           setAllBooks(combined);
@@ -775,17 +803,45 @@ const addSale = (rawId) => {
 const BookOwnerPanel = () => {
   if (loadingOwnerProfile) {
     return (
-      <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "20px" }}>
-        <div style={{ display: "flex", gap: 14, animation: "pulse2 1.5s infinite" }}>
-          <div style={{ width: 72, height: 72, borderRadius: 22, background: "#f0ebe0", flexShrink: 0 }} />
+      <div
+        style={{
+          background: "#fff",
+          border: "0.5px solid #e5ddd0",
+          padding: "20px",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            gap: 14,
+            animation: "pulse2 1.5s infinite",
+          }}
+        >
+          <div
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 22,
+              background: "#f0ebe0",
+              flexShrink: 0,
+            }}
+          />
           <div style={{ flex: 1 }}>
-            <div style={{ height: 12, background: "#f0ebe0", marginBottom: 8, width: "60%" }} />
+            <div
+              style={{
+                height: 12,
+                background: "#f0ebe0",
+                marginBottom: 8,
+                width: "60%",
+              }}
+            />
             <div style={{ height: 9, background: "#f7f0e8", width: "40%" }} />
           </div>
         </div>
       </div>
     );
   }
+
   if (!bookOwnerProfile) return null;
 
   const p = bookOwnerProfile;
@@ -801,45 +857,157 @@ const BookOwnerPanel = () => {
   const ell = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 };
 
   return (
-    <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "20px" }}>
-      <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "0 0 12px", fontFamily: "'Lato',sans-serif" }}>
+    <div
+      style={{
+        background: "#fff",
+        border: "0.5px solid #e5ddd0",
+        padding: "20px",
+      }}
+    >
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: "0.16em",
+          textTransform: "uppercase",
+          color: GOLD,
+          margin: "0 0 12px",
+          fontFamily: "'Lato',sans-serif",
+        }}
+      >
         Uploaded By
       </p>
 
       <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
         {/* Avatar: initials sit behind the photo, so a broken image falls back cleanly */}
-        <Link href={profileHref} aria-label={`Open ${displayName}'s profile`}
-          style={{ position: "relative", width: 72, height: 72, flexShrink: 0, borderRadius: 22, overflow: "hidden", border: "1px solid #e5ddd0", background: NAVY, display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>
-          <span style={{ color: GOLD, fontSize: 24, fontWeight: 900, fontFamily: "'Playfair Display',serif" }}>{initials}</span>
-          {p.photoURL && (
-            <img src={p.photoURL} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }}
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }} />
+        <div
+          style={{ position: "relative", width: 72, height: 72, flexShrink: 0 }}
+        >
+          <Link
+            href={profileHref}
+            aria-label={`Open ${displayName}'s profile`}
+            style={{
+              position: "relative",
+              width: "100%",
+              height: "100%",
+              borderRadius: 22,
+              overflow: "hidden",
+              border: `${p.verified ? 2 : 1}px solid ${p.verified ? "#1d9bf0" : "#e5ddd0"}`,
+              background: NAVY,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              textDecoration: "none",
+            }}
+          >
+            <span
+              style={{
+                color: GOLD,
+                fontSize: 24,
+                fontWeight: 900,
+                fontFamily: "'Playfair Display',serif",
+              }}
+            >
+              {initials}
+            </span>
+            {p.photoURL && (
+              <img
+                src={p.photoURL}
+                alt=""
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  objectPosition: "top center",
+                }}
+              />
+            )}
+          </Link>
+          {p.verified && (
+            <VerifiedBadge
+              size={20}
+              ring="#fff"
+              style={{ position: "absolute", right: -4, bottom: -4 }}
+            />
           )}
-        </Link>
+        </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-            <Link href={profileHref} style={{ textDecoration: "none", minWidth: 0 }}>
-              <span style={{ ...ell, display: "block", fontFamily: "'Playfair Display',serif", fontSize: 16, fontWeight: 700, color: NAVY, lineHeight: 1.25 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              minWidth: 0,
+            }}
+          >
+            <Link
+              href={profileHref}
+              style={{ textDecoration: "none", minWidth: 0 }}
+            >
+              <span
+                style={{
+                  ...ell,
+                  display: "block",
+                  fontFamily: "'Playfair Display',serif",
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: NAVY,
+                  lineHeight: 1.25,
+                }}
+              >
                 {displayName}
               </span>
             </Link>
-            {p.verified && <Shield size={13} style={{ color: GOLD, flexShrink: 0 }} aria-label="Verified" />}
           </div>
 
-          {p.institution && <p style={{ ...subRow, marginTop: 2 }}><span style={ell}>{p.institution}</span></p>}
+          {p.institution && (
+            <p style={{ ...subRow, marginTop: 2 }}>
+              <span style={ell}>{p.institution}</span>
+            </p>
+          )}
           {p.location && (
-            <p style={subRow}><MapPin size={11} style={{ color: GOLD, flexShrink: 0 }} /><span style={ell}>{p.location}</span></p>
+            <p style={subRow}>
+              <MapPin size={11} style={{ color: GOLD, flexShrink: 0 }} />
+              <span style={ell}>{p.location}</span>
+            </p>
           )}
           {p.shop && (
-            <p style={subRow}><Store size={11} style={{ color: GOLD, flexShrink: 0 }} /><span style={ell}>{p.shop}</span></p>
+            <p style={subRow}>
+              <Store size={11} style={{ color: GOLD, flexShrink: 0 }} />
+              <span style={ell}>{p.shop}</span>
+            </p>
+          )}
+          {p.verified && (
+            <p style={{ ...subRow, color: "#1d9bf0", fontWeight: 700 }}>
+              <VerifiedBadge size={12} />{" "}
+              {p.title ? "Verified faculty" : "Verified seller"}
+            </p>
           )}
         </div>
       </div>
 
       {/* Short bio */}
       {p.bio && (
-        <p style={{ fontSize: 12, color: "#666", lineHeight: 1.65, margin: "14px 0 0", fontFamily: "'Lato',sans-serif", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word" }}>
+        <p
+          style={{
+            fontSize: 12,
+            color: "#666",
+            lineHeight: 1.65,
+            margin: "14px 0 0",
+            fontFamily: "'Lato',sans-serif",
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            wordBreak: "break-word",
+          }}
+        >
           {p.bio}
         </p>
       )}
@@ -847,24 +1015,80 @@ const BookOwnerPanel = () => {
       {/* Stats */}
       <div style={{ display: "flex", gap: 8, margin: "14px 0 0" }}>
         {[
-          { icon: <Users size={12} style={{ color: GOLD }} />, label: `${ownerFollowers} follower${ownerFollowers === 1 ? "" : "s"}` },
-          { icon: <ShoppingBag size={12} style={{ color: GOLD }} />, label: `${p.booksSold} sold` },
+          {
+            icon: <Users size={12} style={{ color: GOLD }} />,
+            label: `${ownerFollowers} follower${ownerFollowers === 1 ? "" : "s"}`,
+          },
+          {
+            icon: <ShoppingBag size={12} style={{ color: GOLD }} />,
+            label: `${p.booksSold} sold`,
+          },
         ].map(({ icon, label }) => (
-          <div key={label} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: CREAM, border: "0.5px solid #f0ebe0", padding: "8px 6px", fontSize: 11, fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>
-            {icon}{label}
+          <div
+            key={label}
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              background: CREAM,
+              border: "0.5px solid #f0ebe0",
+              padding: "8px 6px",
+              fontSize: 11,
+              fontWeight: 700,
+              color: NAVY,
+              fontFamily: "'Lato',sans-serif",
+            }}
+          >
+            {icon}
+            {label}
           </div>
         ))}
       </div>
 
       {/* Actions */}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <Link href={profileHref}
-          style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, background: GOLD, color: NAVY, padding: "11px 8px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none", fontFamily: "'Lato',sans-serif", letterSpacing: "0.04em" }}>
+        <Link
+          href={profileHref}
+          style={{
+            flex: 1,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            background: GOLD,
+            color: NAVY,
+            padding: "11px 8px",
+            borderRadius: 8,
+            fontSize: 12,
+            fontWeight: 700,
+            textDecoration: "none",
+            fontFamily: "'Lato',sans-serif",
+            letterSpacing: "0.04em",
+          }}
+        >
           View profile
         </Link>
         {!isOwnBook && (
-          <button onClick={handleFollowOwner} disabled={isFollowLoading}
-            style={{ flex: 1, padding: "11px 8px", borderRadius: 8, border: isFollowing ? "0.5px solid #86efac" : "none", background: isFollowing ? "rgba(22,163,74,0.08)" : "#ece6da", color: isFollowing ? "#16a34a" : NAVY, fontSize: 12, fontWeight: 700, cursor: isFollowLoading ? "wait" : "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.04em", transition: "background .15s" }}>
+          <button
+            onClick={handleFollowOwner}
+            disabled={isFollowLoading}
+            style={{
+              flex: 1,
+              padding: "11px 8px",
+              borderRadius: 8,
+              border: isFollowing ? "0.5px solid #86efac" : "none",
+              background: isFollowing ? "rgba(22,163,74,0.08)" : "#ece6da",
+              color: isFollowing ? "#16a34a" : NAVY,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: isFollowLoading ? "wait" : "pointer",
+              fontFamily: "'Lato',sans-serif",
+              letterSpacing: "0.04em",
+              transition: "background .15s",
+            }}
+          >
             {isFollowLoading ? "…" : isFollowing ? "✓ Following" : "+ Follow"}
           </button>
         )}

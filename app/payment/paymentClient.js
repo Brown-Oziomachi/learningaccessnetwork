@@ -412,26 +412,27 @@ const book = useMemo(
   if (!negotiationId || !rawBook) return;
   const clean = (v) => String(v || "").replace("firestore-", "");
   let handled = false;
-  const unsub = onAuthStateChanged(auth, async (u) => {
-    if (!u || handled) return;
-    handled = true;
-    try {
-      const snap = await getDoc(doc(db, "negotiations", negotiationId));
-      if (!snap.exists()) throw new Error("We couldn't find this offer.");
-      const n = snap.data();
-      if (n.status === "paid") throw new Error("This offer has already been paid for.");
-      if (n.status !== "accepted") throw new Error("The seller hasn't accepted this offer.");
-      if ((n.buyerId || n.buyerUid || n.userId) !== u.uid) throw new Error("This offer belongs to another account.");
-      if (clean(n.bookId) !== clean(bookId)) throw new Error("This offer is for a different document.");
-      const exp = n.expiresAt?.toMillis?.() ?? 0;
-      if (exp && exp < Date.now()) throw new Error("This offer has expired.");
-      const price = [n.agreedPrice, n.acceptedPrice, n.finalPrice, n.counterPrice, n.offerPrice, n.amount]
-        .map(Number).find((v) => v > 0);
-      if (!price) throw new Error("The agreed price is missing on this offer.");
-      setNegotiation({ id: snap.id, price });
-    } catch (e) { setNegError(e.message); }
-    finally { setNegLoading(false); }
-  });
+        const unsub = onAuthStateChanged(auth, async (u) => {
+            if (!u) { setNegError("Please sign in to continue."); setNegLoading(false); return; }
+            if (handled) return;
+            handled = true;
+            try {
+                const snap = await getDoc(doc(db, "negotiations", negotiationId));
+                if (!snap.exists()) throw new Error("We couldn't find this offer.");
+                const n = snap.data();
+                if (["purchased", "paid", "used"].includes(n.status)) throw new Error("This offer has already been paid for.");
+                if (!["agreed", "accepted"].includes(n.status)) throw new Error("The seller hasn't accepted this offer.");
+                if ((n.buyerId || n.buyerUid || n.userId) !== u.uid) throw new Error("This offer belongs to another account.");
+                if (clean(n.bookId) !== clean(bookId)) throw new Error("This offer is for a different document.");
+                const exp = n.expiresAtMs ?? n.expiresAt?.toMillis?.() ?? 0;
+                if (exp && exp < Date.now()) throw new Error("This offer has expired.");
+                const price = Number(n.agreedPrice) || Number(n.finalPrice);
+                if (!(price > 0)) throw new Error("The agreed price is missing on this offer.");
+                setNegotiation({ id: snap.id, price });
+            } catch (e) { setNegError(e.message); }
+            finally { setNegLoading(false); }
+        });
+
   return () => unsub();
     }, [negotiationId, rawBook, bookId]);
     

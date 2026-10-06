@@ -230,6 +230,8 @@ const TYPE_CONFIG = {
   },
 };
 
+const VERIFY_LINK = "/my-account/seller-account#verification";
+
 const getConfig = (type) =>
   TYPE_CONFIG[type] || {
     icon: AlertCircle,
@@ -558,6 +560,10 @@ next.add(n._globalId);
     if (physicalTypes.has(n.type)) {
       const assetId = n.assetId || "";
       window.location.href = `/my-account/seller-account/repository${assetId ? `?highlight=${assetId}` : ""}`;
+      return;
+    }
+       if (n.type === "welcome_seller") {
+      window.location.href = VERIFY_LINK;
       return;
     }
     if (n.link) window.location.href = n.link;
@@ -1022,6 +1028,36 @@ next.add(n._globalId);
                                         >
                                           {n.message}
                                         </p>
+                                      )}
+                                      {n.type === "welcome_seller" && (
+                                        <div
+                                          style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "5px",
+                                            background: "rgba(29,155,240,0.1)",
+                                            border:
+                                              "0.5px solid rgba(29,155,240,0.4)",
+                                            padding: "3px 9px",
+                                            marginTop: "6px",
+                                          }}
+                                        >
+                                          <BadgeCheck
+                                            size={11}
+                                            style={{ color: "#1d9bf0" }}
+                                          />
+                                          <span
+                                            style={{
+                                              fontSize: "10px",
+                                              fontWeight: 700,
+                                              color: "#1d9bf0",
+                                              fontFamily: "'Lato',sans-serif",
+                                            }}
+                                          >
+                                            Get your blue check: start
+                                            verification
+                                          </span>
+                                        </div>
                                       )}
                                       {isOfficial && (
                                         <p

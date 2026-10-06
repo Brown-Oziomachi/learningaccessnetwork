@@ -1,19 +1,28 @@
 // components/seller/Verification.jsx
-// Shared: blue check, verify modal (before/after + Flutterwave or Wallet), return-from-Flutterwave hook.
+// Shared: blue check, before/after preview, verify modal (Flutterwave or Wallet), return-from-Flutterwave hook.
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebaseConfig";
-import { X, ChevronDown, Wallet, CreditCard, AlertCircle } from "lucide-react";
+import { X, Wallet, CreditCard, AlertCircle } from "lucide-react";
 
 export const VERIFY_PRICE = 2000;
-export const FREE_VERIFY_FOLLOWERS = 1000;
+
 const NAVY = "#0d2244",
   GOLD = "#b8963e",
   BLUE = "#1d9bf0",
   CREAM = "#f5f0e8";
+
+const label = {
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: ".14em",
+  textTransform: "uppercase",
+  margin: "0 0 10px",
+  fontFamily: "'Lato',sans-serif",
+};
 
 const toMs = (t) =>
   t?.toMillis
@@ -29,13 +38,6 @@ export function paidVerificationActive(s) {
   if (!s?.isVerifiedSeller) return false;
   const exp = toMs(s.verifiedUntil);
   return !exp || exp > Date.now();
-}
-/** Verified = paid and active, OR 1,000+ followers. Faculty never use this. */
-export function isSellerVerified(s, followers) {
-  return (
-    paidVerificationActive(s) ||
-    Number(followers ?? s?.followersCount ?? 0) >= FREE_VERIFY_FOLLOWERS
-  );
 }
 
 export function VerifiedBadge({
@@ -82,6 +84,114 @@ export function VerifiedBadge({
         />
       </svg>
     </span>
+  );
+}
+
+/** "Now" vs "After verifying" cards. Used in the checklist modal and the pay modal. */
+export function VerifiedPreview({ name = "Your name", photo }) {
+  const card = (title, verified) => (
+    <div
+      style={{
+        flex: "1 1 150px",
+        minWidth: 0,
+        textAlign: "center",
+        padding: "16px 10px 18px",
+        border: `1.5px solid ${verified ? BLUE : "#e5ddd0"}`,
+        background: verified ? "#f4faff" : "#fff",
+      }}
+    >
+      <p
+        style={{
+          ...label,
+          color: verified ? BLUE : "#999",
+          margin: "0 0 12px",
+        }}
+      >
+        {title}
+      </p>
+      <div
+        style={{
+          position: "relative",
+          width: 68,
+          height: 68,
+          margin: "0 auto 10px",
+        }}
+      >
+        {photo ? (
+          <img
+            src={photo}
+            alt=""
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: "50%",
+              objectFit: "cover",
+              border: `2px solid ${verified ? BLUE : "#e5ddd0"}`,
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: "50%",
+              background: CREAM,
+              border: "2px solid #e5ddd0",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 26,
+              fontWeight: 900,
+              color: GOLD,
+              fontFamily: "'Playfair Display',serif",
+            }}
+          >
+            {(name || "?").charAt(0).toUpperCase()}
+          </div>
+        )}
+        {verified && (
+          <VerifiedBadge
+            size={22}
+            ring="#f4faff"
+            style={{ position: "absolute", right: -4, bottom: -2 }}
+          />
+        )}
+      </div>
+      <p
+        style={{
+          fontFamily: "'Playfair Display',serif",
+          fontWeight: 700,
+          fontSize: 14,
+          color: NAVY,
+          margin: "0 0 6px",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {name}
+      </p>
+      <span
+        style={{
+          display: "inline-block",
+          fontSize: 10,
+          fontWeight: 700,
+          padding: "3px 10px",
+          borderRadius: 99,
+          background: verified ? "rgba(29,155,240,.12)" : "#f1efe9",
+          color: verified ? BLUE : "#888",
+        }}
+      >
+        {verified ? "Verified seller" : "Seller"}
+      </span>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      {card("Now", false)}
+      {card("After verifying", true)}
+    </div>
   );
 }
 
@@ -134,21 +244,11 @@ export function useVerificationReturn(onDone) {
   }, []);
 }
 
-const label = {
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: ".14em",
-  textTransform: "uppercase",
-  margin: "0 0 10px",
-  fontFamily: "'Lato',sans-serif",
-};
-
 export function VerifySellerModal({
   open,
   onClose,
   name = "Your name",
   photo,
-  followers = 0,
   walletBalance,
   onVerified,
 }) {
@@ -157,7 +257,6 @@ export function VerifySellerModal({
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [why, setWhy] = useState(false);
   const [until, setUntil] = useState(null);
 
   useEffect(() => {
@@ -166,15 +265,11 @@ export function VerifySellerModal({
       setPin("");
       setError("");
       setBusy(false);
-      setWhy(false);
     }
   }, [open]);
+
   if (!open || typeof document === "undefined") return null;
 
-  const pct = Math.min(
-    100,
-    Math.round((followers / FREE_VERIFY_FOLLOWERS) * 100),
-  );
   const walletShort =
     typeof walletBalance === "number" && walletBalance < VERIFY_PRICE;
 
@@ -233,104 +328,6 @@ export function VerifySellerModal({
     }
   };
 
-  const preview = (title, verified) => (
-    <div
-      style={{
-        flex: "1 1 150px",
-        minWidth: 0,
-        textAlign: "center",
-        padding: "16px 10px 18px",
-        border: `1.5px solid ${verified ? BLUE : "#e5ddd0"}`,
-        background: verified ? "#f4faff" : "#fff",
-      }}
-    >
-      <p
-        style={{
-          ...label,
-          color: verified ? BLUE : "#999",
-          margin: "0 0 12px",
-        }}
-      >
-        {title}
-      </p>
-      <div
-        style={{
-          position: "relative",
-          width: 68,
-          height: 68,
-          margin: "0 auto 10px",
-        }}
-      >
-        {photo ? (
-          <img
-            src={photo}
-            alt=""
-            style={{
-              width: "100%",
-              height: "100%",
-              borderRadius: "50%",
-              objectFit: "cover",
-              border: `2px solid ${verified ? BLUE : "#e5ddd0"}`,
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              width: "100%",
-              height: "100%",
-              borderRadius: "50%",
-              background: CREAM,
-              border: "2px solid #e5ddd0",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 26,
-              fontWeight: 900,
-              color: GOLD,
-              fontFamily: "'Playfair Display',serif",
-            }}
-          >
-            {name.charAt(0).toUpperCase()}
-          </div>
-        )}
-        {verified && (
-          <VerifiedBadge
-            size={22}
-            ring="#f4faff"
-            style={{ position: "absolute", right: -4, bottom: -2 }}
-          />
-        )}
-      </div>
-      <p
-        style={{
-          fontFamily: "'Playfair Display',serif",
-          fontWeight: 700,
-          fontSize: 14,
-          color: NAVY,
-          margin: "0 0 6px",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {name}
-      </p>
-      <span
-        style={{
-          display: "inline-block",
-          fontSize: 10,
-          fontWeight: 700,
-          padding: "3px 10px",
-          borderRadius: 99,
-          background: verified ? "rgba(29,155,240,.12)" : "#f1efe9",
-          color: verified ? BLUE : "#888",
-        }}
-      >
-        {verified ? "Verified seller" : "Seller"}
-      </span>
-    </div>
-  );
-
   const pinKey = (d) => (
     <button
       key={d}
@@ -378,6 +375,7 @@ export function VerifySellerModal({
           fontFamily: "'Lato',sans-serif",
         }}
       >
+        {/* Header */}
         <div
           style={{
             background: NAVY,
@@ -397,6 +395,7 @@ export function VerifySellerModal({
                 fontSize: 19,
                 fontWeight: 700,
                 color: "#fff",
+                margin: 0,
               }}
             >
               {view === "pin"
@@ -425,19 +424,12 @@ export function VerifySellerModal({
           </button>
         </div>
 
+        {/* Body */}
         <div style={{ padding: 20 }}>
           {view === "main" && (
             <>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  flexWrap: "wrap",
-                  marginBottom: 18,
-                }}
-              >
-                {preview("Now", false)}
-                {preview("After verifying", true)}
+              <div style={{ marginBottom: 18 }}>
+                <VerifiedPreview name={name} photo={photo} />
               </div>
 
               <p
@@ -462,7 +454,7 @@ export function VerifySellerModal({
                   / month
                 </span>
               </p>
-              <p style={{ fontSize: 12, color: "#888", marginBottom: 14 }}>
+              <p style={{ fontSize: 12, color: "#888", margin: "0 0 14px" }}>
                 Lasts 30 days. Renew whenever you like.
               </p>
 
@@ -510,12 +502,20 @@ export function VerifySellerModal({
                         marginBottom: 6,
                       }}
                     />
-                    <p style={{ fontSize: 13, fontWeight: 700, color: NAVY }}>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: NAVY,
+                        margin: 0,
+                      }}
+                    >
                       {t}
                     </p>
                     <p
                       style={{
                         fontSize: 11,
+                        margin: 0,
                         color:
                           id === "wallet" && walletShort ? "#dc2626" : "#999",
                       }}
@@ -543,7 +543,9 @@ export function VerifySellerModal({
                     size={14}
                     style={{ color: "#ef4444", flexShrink: 0, marginTop: 1 }}
                   />
-                  <p style={{ fontSize: 12, color: "#dc2626" }}>{error}</p>
+                  <p style={{ fontSize: 12, color: "#dc2626", margin: 0 }}>
+                    {error}
+                  </p>
                 </div>
               )}
 
@@ -565,104 +567,6 @@ export function VerifySellerModal({
               >
                 {busy ? "Opening payment…" : "Verify my account"}
               </button>
-
-              <button
-                onClick={() => setWhy((w) => !w)}
-                aria-expanded={why}
-                style={{
-                  width: "100%",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  marginTop: 12,
-                  color: NAVY,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 5,
-                  textDecoration: "underline",
-                }}
-              >
-                Read why and what you gain{" "}
-                <ChevronDown
-                  size={13}
-                  style={{
-                    transform: why ? "rotate(180deg)" : "none",
-                    transition: "transform .2s",
-                  }}
-                />
-              </button>
-              {why && (
-                <ul
-                  style={{
-                    listStyle: "none",
-                    margin: "10px 0 0",
-                    padding: "12px 14px",
-                    background: CREAM,
-                    border: "0.5px solid rgba(184,150,62,.25)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 9,
-                  }}
-                >
-                  {[
-                    "A blue check beside your photo on your profile.",
-                    "“Verified seller” in place of “Seller”, so buyers know you are real.",
-                    "Students and buyers trust you faster, so they are more willing to buy your materials.",
-                    "Active while your 30 days run. If it lapses, the badge goes until you renew.",
-                  ].map((t) => (
-                    <li
-                      key={t}
-                      style={{
-                        display: "flex",
-                        gap: 9,
-                        fontSize: 12.5,
-                        color: "#555",
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      <VerifiedBadge size={14} style={{ marginTop: 2 }} />
-                      {t}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <div
-                style={{
-                  marginTop: 16,
-                  padding: "14px",
-                  border: "0.5px solid #e5ddd0",
-                  background: "#fafaf8",
-                }}
-              >
-                <p style={{ fontSize: 13, color: "#444", lineHeight: 1.6 }}>
-                  Not verified yet?{" "}
-                  <strong style={{ color: NAVY }}>1,000 followers</strong>{" "}
-                  verifies you for free. Don't have 1,000? Pay{" "}
-                  <strong style={{ color: NAVY }}>
-                    ₦{VERIFY_PRICE.toLocaleString()}/month
-                  </strong>{" "}
-                  so buyers and students can trust you.
-                </p>
-                <div
-                  style={{ height: 6, background: "#ece6d8", marginTop: 10 }}
-                >
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${pct}%`,
-                      background: GOLD,
-                    }}
-                  />
-                </div>
-                <p style={{ fontSize: 11, color: "#888", marginTop: 5 }}>
-                  {followers.toLocaleString()} /{" "}
-                  {FREE_VERIFY_FOLLOWERS.toLocaleString()} followers
-                </p>
-              </div>
             </>
           )}
 
@@ -673,7 +577,7 @@ export function VerifySellerModal({
                   fontSize: 13,
                   color: "#777",
                   textAlign: "center",
-                  marginBottom: 16,
+                  margin: "0 0 16px",
                 }}
               >
                 Pay{" "}
@@ -715,7 +619,7 @@ export function VerifySellerModal({
                     fontSize: 12,
                     color: "#dc2626",
                     textAlign: "center",
-                    marginBottom: 10,
+                    margin: "0 0 10px",
                   }}
                 >
                   {error}
@@ -807,7 +711,7 @@ export function VerifySellerModal({
               >
                 Your blue check is live
               </p>
-              <p style={{ fontSize: 13, color: "#777", marginBottom: 18 }}>
+              <p style={{ fontSize: 13, color: "#777", margin: "0 0 18px" }}>
                 {until
                   ? `Verified until ${new Date(until).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.`
                   : "You are now a verified seller."}

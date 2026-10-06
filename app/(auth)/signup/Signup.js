@@ -1,8 +1,11 @@
 'use client';
+import React, { useState, useEffect } from 'react';
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Globe, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { auth } from '@/lib/firebaseConfig';
+import {onAuthStateChanged } from 'firebase/auth';
 
 const NAVY  = "#0d2244";
 const GOLD  = "#b8963e";
@@ -12,6 +15,7 @@ const BG    = "#f5f1ea";
 export default function SignUpClient() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const [checkingAuth, setCheckingAuth] = useState(true);
 
     const email = searchParams.get('email');
     const ref = searchParams.get('referral_code');
@@ -21,6 +25,23 @@ export default function SignUpClient() {
             ? `?${email ? `email=${email}` : ''}${email && ref ? '&' : ''}${ref ? `referral_code=${ref}` : ''}`
             : ''
     }`;
+
+      useEffect(() => {
+            const unsubscribe = onAuthStateChanged(auth, (user) => {
+                if (user) router.replace("/home");
+                else setCheckingAuth(false);
+            });
+            return () => unsubscribe();
+      }, [router]);
+    
+
+
+    if (checkingAuth) return (
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: BG }}>
+            <div style={{ width: 36, height: 36, border: `3px solid rgba(13,34,68,0.1)`, borderTopColor: NAVY, borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+    );
 
     return (
         <>

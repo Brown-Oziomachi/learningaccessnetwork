@@ -108,6 +108,7 @@ export default function HomeClient() {
     const [selectedAds, setSelectedAds] = useState([]);
     const [freeBooks, setFreeBooks] = useState([]);
     const [loadingFreeBooks, setLoadingFreeBooks] = useState(true);
+    const [checkingAuth, setCheckingAuth] = useState(true);
 
     const router = useRouter();
     const goldAds = useAds("Gold", 10);
@@ -151,12 +152,13 @@ export default function HomeClient() {
                 where("isFree", "==", true),
                 where("status", "==", "approved"),
                 orderBy("createdAt", "desc"),
-                limit(12)
+                limit(6)
             );
             const snap = await getDocs(q);
             const books = [];
             snap.forEach(d => {
                 const data = d.data();
+                if (data.isGloballyFrozen === true) return;
                 if (!data.bookTitle) return;
                 const b = {
                     id: `firestore-${d.id}`,
@@ -214,7 +216,8 @@ export default function HomeClient() {
                 const q = query(
                     collection(db, "advertMyBook"),
                     where("status", "==", "approved"),
-                    limit(40)
+                    where("price", ">", 0),
+                    limit(6)
                 );
                 const snap = await getDocs(q);
                 if (!snap.empty) {
@@ -222,6 +225,7 @@ export default function HomeClient() {
                     snap.forEach(d => {
                         console.log("Doc ID:", d.id, "| Data:", d.data()); // ← ADD THIS
                         const data = d.data();
+                        if (data.isGloballyFrozen === true) return;
                         if (data.bookTitle && data.price !== undefined) {
                             const b = {
                                 id: `firestore-${d.id}`,
@@ -240,9 +244,8 @@ export default function HomeClient() {
                             books.push(b);
                         }
                     });
-                    setAllBooks(books); // set books first without sorting by sales
-                } else {
-                    setAllBooks([]);
+                    books.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                    setAllBooks(books);
                 }
             } catch (e) {
                 console.error("Books fetch error:", e); // ADD THIS
@@ -310,6 +313,14 @@ export default function HomeClient() {
     };
 
     if (loading) return <HomeLoading />;
+
+
+    if (checkingAuth) return (
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: BG }}>
+            <div style={{ width: 36, height: 36, border: `3px solid rgba(13,34,68,0.1)`, borderTopColor: NAVY, borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+    );
 
     return (
         <>

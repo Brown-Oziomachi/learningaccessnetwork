@@ -241,14 +241,14 @@ export default function AllBooksClient() {
                     const snap = await getDocs(
                         query(
                             collection(db, 'advertMyBook'),
-                            where('status', '==', 'approved'),
-                            orderBy('createdAt', 'desc')
+                            where('status', '==', 'approved')
                         )
                     );
                     if (!snap.empty) {
                         const fb = [];
                         snap.forEach(d => {
                             const data = d.data();
+                            if (data.isGloballyFrozen === true) return;
                             if (data.bookTitle) {        // ← removed price gate
                                 const b = {
                                     id: `firestore-${d.id}`,
@@ -265,6 +265,7 @@ export default function AllBooksClient() {
                                     pdfUrl: data.pdfUrl,
                                     embedUrl: data.embedUrl,
                                     isFromFirestore: true,
+                                    createdAt: data.createdAt,
                                     rating: 4.5,
                                     reviews: 0,
                                 };
@@ -272,6 +273,7 @@ export default function AllBooksClient() {
                                 fb.push(b);
                             }
                         });
+                        fb.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
                         setAllBooks([...processed, ...fb]);
                     }
                 } catch { }

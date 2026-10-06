@@ -23,6 +23,9 @@ import { createPortal } from "react-dom";
 import { AFRICAN_COUNTRIES } from "@/lib/africanCountries";
 import { NegotiationHost, NegotiationInboxCard } from "@/components/negotiation/NegotiationHost";
 import { useNegotiationBadge } from "@/lib/negotiation";  
+import { paidVerificationActive, useVerificationReturn, VerifiedBadge, VerifiedPreview, VerifySellerModal } from "@/components/seller/Verification";
+import VerificationChecklist from "@/components/VerificationChecklist";
+import { KycCard, KycModal, useKycStatus } from "@/components/seller/Kyc";
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -157,7 +160,7 @@ const nigerianBanks = [
 ];
 
 /* ─── VerifiedFacultyBadge ───────────────────────────────────── */
-function VerifiedFacultyBadge({ user, seller }) {
+function VerifiedFacultyBadge({ user, seller, style }) {
     const isFaculty = user?.role === "lecturer" || user?.isLecturer === true ||
         user?.lecturerVerificationStatus === "pending" ||
         user?.lecturerVerificationStatus === "approved";
@@ -180,9 +183,10 @@ const isVerified =
                 width: "16px", height: "16px", borderRadius: "50%",
                 background: badgeColor, flexShrink: 0, verticalAlign: "middle",
                 marginLeft: "4px", cursor: "default",
-                boxShadow: isVerified ? "0 0 0 1.5px rgba(29,155,240,0.25)" : "none",
-                transition: "background 0.2s",
-            }}>
+                 boxShadow: isVerified ? "0 0 0 1.5px rgba(29,155,240,0.25)" : "none",
+                 transition: "background 0.2s",
+                 ...style,
+             }}>
             {isVerified ? (
                 <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true">
                     <path d="M2 5.2L4 7.2L8 3" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -406,7 +410,7 @@ function SuccessModal({ amount, reference, onClose }) {
             <div style={{ background: '#fff', width: '100%', maxWidth: '360px', overflow: 'hidden', boxShadow: '0 32px 64px rgba(13,34,68,0.3)' }}>
                 <div style={{ background: NAVY, padding: '40px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
                     <div style={{ width: '64px', height: '64px', background: '#16a34a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
-                        <svg TESTING FRESH REBUILD style={{ width: '32px', height: '32px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg style={{ width: '32px', height: '32px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
@@ -744,7 +748,6 @@ function TierModal({ onClose, totalEarnings, isFaculty, fmt }) {
                                 {viewing.max === Infinity
                                     ? `${fmt ? fmt(viewing.min) : `₦${viewing.min.toLocaleString()}`}+`
                                     : `${fmt ? fmt(viewing.min) : `₦${viewing.min.toLocaleString()}`} – ${fmt ? fmt(viewing.max) : `₦${viewing.max.toLocaleString()}`}`}
-                                jsx
                             </p>
                         </div>
                         {viewing.id === current.id && (
@@ -930,8 +933,15 @@ export default function SellerAccountClient() {
     const [bioDraft, setBioDraft] = useState("");
     const [editingBio, setEditingBio] = useState(false);
     const [savingBio, setSavingBio] = useState(false);
-    const negBadge = useNegotiationBadge(user?.uid);
-
+const negBadge = useNegotiationBadge(user?.uid)
+const [showVerify, setShowVerify] = useState(false);
+const [showChecklist, setShowChecklist] = useState(false);
+const [verifProgress, setVerifProgress] = useState({ done: 0, total: 0, status: "none" });
+const [followerCount, setFollowerCount] = useState(0);
+const [showKyc, setShowKyc] = useState(false);
+    const kyc = useKycStatus(user?.uid);
+    
+useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerified: true } : s)); });
     useEffect(() => {
         if (!showBankModal) return;
         let cancelled = false;
@@ -985,6 +995,36 @@ export default function SellerAccountClient() {
 
     const isSellerUser = user?.isSeller === true;
 
+    const verified = !!seller && !isFacultyUser && !!seller.paidVerified;
+    const canGetVerified = !!seller && !isFacultyUser && !verified;
+    const facultyVerified =
+        isFacultyUser &&
+        (user?.isVerified === true || user?.lecturerVerificationStatus === "approved") &&
+        user?.lecturerVerificationStatus !== "pending" &&
+        user?.lecturerVerificationStatus !== "rejected";
+    const showBlue = verified || facultyVerified;
+
+    useEffect(() => {
+    if (!user?.uid || !canGetVerified) return;
+    let off = false;
+    (async () => {
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const r = await fetch("/api/seller/verification/apply?route=paid", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const d = await r.json();
+            if (off || !d?.checks) return;
+            setVerifProgress({
+                done: d.checks.filter((c) => c.ok).length,
+                total: d.checks.length,
+                status: d.status || "none",
+            });
+        } catch { }
+    })();
+    return () => { off = true; };
+}, [user?.uid, canGetVerified, showChecklist]);
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) { await fetchUserData(currentUser.uid); }
@@ -1008,7 +1048,7 @@ export default function SellerAccountClient() {
                 if (sellerDoc.exists()) {
                     const sellerData = sellerDoc.data();
                     bankDetails = sellerData.bankDetails || null;
-                    setSeller({ uid, ...sellerData });
+                    setSeller({ uid, ...sellerData, paidVerified: paidVerificationActive(sellerData) });
                     setBio(sellerData.businessInfo?.businessDescription || "");
                     setAccountBalance(sellerData.accountBalance || 0);
                     setTotalEarnings(sellerData.totalEarnings || 0);
@@ -1020,6 +1060,11 @@ export default function SellerAccountClient() {
                     await setDoc(doc(db, "sellers", uid), { sellerId: uid, sellerEmail: userData.email, sellerName: userData.displayName || `${userData.firstName} ${userData.surname}`, accountBalance: 0, totalEarnings: 0, booksSold: 0, totalWithdrawn: 0, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
                     setAccountBalance(0); setTotalEarnings(0); setBooksSold(0);
                 }
+                try {
+                    const fSnap = await getDocs(query(collection(db, "follows"), where("lecturerId", "==", uid)));
+                    setFollowerCount(fSnap.size);
+                } catch { setFollowerCount(0); }
+
                 setUser({ uid, ...userData, bankDetails });
                 setFormData({
                     firstName: userData.firstName || "", surname: userData.surname || "",
@@ -1341,11 +1386,19 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                             background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
                             minWidth: 0, flex: 1, overflow: 'hidden',
                         }}>
-                            <img
-                                src={user?.photoURL || user?.photoBase64 || "/lan-logo.png"}
-                                style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}`, flexShrink: 0 }}
-                                alt="Profile"
-                            />
+                            <div style={{ position: 'relative', width: 40, height: 40, flexShrink: 0 }}>
+                                <img
+                                    src={user?.photoURL || user?.photoBase64 || "/lan-logo.png"}
+                                   style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${showBlue ? '#1d9bf0' : GOLD}`, display: 'block' }}
+                                    alt="Profile"
+                                    />
+                                    {verified && <VerifiedBadge size={16} ring="#fff" style={{ position: 'absolute', right: -3, bottom: -2 }} />}
+                                    <VerifiedFacultyBadge
+                                        user={user}
+                                        seller={seller}
+                                        style={{ position: 'absolute', right: -3, bottom: -2, marginLeft: 0, boxSizing: 'content-box', border: '2px solid #fff' }}
+                                    />
+                            </div>
                             <div style={{ textAlign: 'left', minWidth: 0, overflow: 'hidden' }}>
                                 <p style={{
                                     fontFamily: "'Playfair Display',serif", fontSize: '14px', fontWeight: 700, color: NAVY, margin: 0,
@@ -1353,9 +1406,8 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                     textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                 }}>
                                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {seller?.title ? `${seller.title} ` : ""}{user?.firstName} {user?.surname}
-                                    </span>
-                                    <VerifiedFacultyBadge user={user} seller={seller} />
+                                    {seller?.title ? `${seller.title} ` : ""}{user?.firstName} {user?.surname}
+                                </span>
                                 </p>
                                 <div className="gold-pill" style={{ marginTop: '3px' }}>
                                     <div className="pulse-dot" style={{
@@ -1369,7 +1421,7 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                         {user?.lecturerVerificationStatus === 'pending' ? 'Pending'
                                             : user?.lecturerVerificationStatus === 'rejected' ? 'Rejected'
                                                 : isFacultyUser ? 'Verified Faculty'
-                                                    : seller?.isVerifiedSeller ? 'Verified Seller'
+                                                    : verified ? 'Verified Seller'
                                                         : 'LAN Seller'}
                                     </span>
                                 </div>
@@ -1399,6 +1451,37 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                             </button>
                         </div>
                     </div>
+                    {!isFacultyUser && (
+                        <div style={{ marginBottom: 20 }}>
+                            <KycCard kyc={kyc} onStart={() => setShowKyc(true)} />
+                        </div>
+                    )}
+
+                    {canGetVerified && (() => {
+                        const { done, total, status } = verifProgress;
+                        const label =
+                            status === "pending_review" ? "Under review"
+                                : status === "approved_awaiting_payment" ? "Pay for badge"
+                                    : done > 0 ? "Complete verification"
+                                        : "Start verification";
+                        return (
+                            <div id="verification" style={{ marginBottom: 20 }}>
+                                <button onClick={() => setShowChecklist(true)}
+                                    style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "#fff", border: `1.5px solid ${GOLD}`, padding: "14px 16px", cursor: "pointer", textAlign: "left", fontFamily: "'Lato',sans-serif" }}>
+                                    <VerifiedBadge size={34} />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: "0 0 2px" }}>Get your blue check</p>
+                                        <p style={{ fontSize: 11, color: "#aaa", margin: 0 }}>
+                                            {total > 0 ? `${done} of ${total} requirements met` : "Build trust with students"}
+                                        </p>
+                                    </div>
+                                    <span style={{ background: NAVY, color: "#fff", fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", padding: "8px 12px", flexShrink: 0 }}>
+                                        {label}
+                                    </span>
+                                </button>
+                            </div>
+                        );
+                    })()}
 
                     {/* ── 2-col layout ── */}
                     <div className="lg-grid">
@@ -1692,6 +1775,7 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                             <div style={{ background: BG, flex: 1, overflowY: 'auto', padding: '12px' }}>
                                 {[
                                     { label: 'My Profile', icon: <User size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setIsEditing(true); } },
+                                    { label: kyc.status === 'approved' ? 'Identity Verified (KYC)' : 'Identity Verification (KYC)', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>, onClick: () => { setShowProfileModal(false); setShowKyc(true); } },
                                     {
                                         label: 'Bank Details', icon: <Building size={18} style={{ color: NAVY }} />, onClick: () => {
                                             setShowProfileModal(false);
@@ -1710,7 +1794,7 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                     { label: user?.lecturerVerificationStatus === 'pending' ? 'Impact Analytics (Pending)' : 'Impact Analytics', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={user?.lecturerVerificationStatus === 'pending' ? '#d97706' : NAVY} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /><line x1="2" y1="20" x2="22" y2="20" /></svg>, onClick: () => { setShowProfileModal(false); router.push('/my-account/seller-account/Impact-analytics'); } },
                                     { label: 'Reset Transfer PIN', icon: <Settings size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setResetPinView('forgot'); setResetPinError(''); setResetPinSuccess(false); setResetOtpInput(''); setResetNewPin(''); setShowResetPinModal(true); } },
                                     { label: 'Help', icon: <AlertCircle size={18} style={{ color: NAVY }} />, onClick: handleButton },
-                                ].map(({ label, icon, onClick }) => (
+                                ].filter((item) => !(isFacultyUser && item.label.includes('KYC'))).map(({ label, icon, onClick }) => (
                                     <button key={label} onClick={onClick} className="action-row" style={{ marginBottom: '6px', textAlign: 'left' }}>
                                         <div style={{ width: '36px', height: '36px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}>{icon}</div>
                                         <span style={{ fontSize: '13px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif", flex: 1 }}>{label}</span>
@@ -1732,7 +1816,7 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                         ['Country', user?.country || 'Not set'],
                                         ['LAN Account No.', user?.lanAccountNumber || 'Not set'],
                                         ['Referral Code', user?.referralCode || 'Not set'],
-                                        ['Account Type', isFacultyUser ? `${seller?.title || user?.lecturerTitle || ''} · Verified Faculty`.trim() : 'Verified Seller'],
+                                        ['Account Type', isFacultyUser ? `${seller?.title || user?.lecturerTitle || ''} · Verified Faculty`.trim() : verified ? 'Verified Seller' : 'Seller'],
                                         ['Verification', user?.lecturerVerificationStatus === 'approved' ? '✅ Approved' : user?.lecturerVerificationStatus === 'pending' ? '⏳ Pending' : user?.lecturerVerificationStatus === 'rejected' ? '❌ Rejected' : 'N/A'],
                                         ['Member Since', user?.createdAt?.toDate ? user.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'],
                                     ].map(([k, v]) => (
@@ -2286,9 +2370,48 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                     </div>
                 )}
 
+                    {canGetVerified && showChecklist && (
+                        <div className="modal-overlay" style={{ marginTop: "94px" }}>
+                            <div className="modal-inner">
+                                <div style={{ background: NAVY, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                                    <div>
+                                        <p style={{ color: GOLD, fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>Blue check</p>
+                                        <h2 className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>
+                                            {verifProgress.done > 0 ? "Complete verification" : "Start verification"}
+                                        </h2>
+                                    </div>
+                                    <button onClick={() => setShowChecklist(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}><X size={22} /></button>
+                                </div>
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: BG }}>
+                                <div style={{ marginBottom: 16 }}>
+                                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD, margin: '0 0 10px', fontFamily: "'Lato',sans-serif" }}>
+                                        How your profile will look
+                                    </p>
+                                    <VerifiedPreview
+                                        name={`${user?.firstName || ""} ${user?.surname || ""}`.trim() || seller?.sellerName}
+                                        photo={user?.photoURL || user?.photoBase64 || null}
+                                    />
+                                </div>
+                                <VerificationChecklist onPay={() => { setShowChecklist(false); setShowVerify(true); }} />
+                            </div>
+                            </div>
+                        </div>
+                                    )}
+                
+                {!isFacultyUser && <KycModal open={showKyc} onClose={() => setShowKyc(false)} user={user} />}                
+                {canGetVerified && (
+                    <VerifySellerModal
+                        open={showVerify}
+                        onClose={() => setShowVerify(false)}
+                        name={`${user?.firstName || ""} ${user?.surname || ""}`.trim() || seller?.sellerName}
+                        photo={user?.photoURL || user?.photoBase64 || null}
+                        onVerified={() => setSeller((s) => ({ ...s, paidVerified: true }))}
+                    />
+                )}
+
                 {/* Account Switch Sheet */}
                 <AccountSwitchSheet isOpen={showSwitchModal} onClose={() => setShowSwitchModal(false)} isStudent={user?.isStudent === true} router={router} />
-
+                
                 {/* Deactivate Modal */}
                 {showDeactivateModal && (
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 80, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>

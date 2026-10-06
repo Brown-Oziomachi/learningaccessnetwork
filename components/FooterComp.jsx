@@ -50,6 +50,7 @@ const FOOTER_COLUMNS = [
       { label: "Recharge Services", href: "/seller/recharge-services" },
       { label: "Growing Your Followers", href: "/seller/grow-followers" },
       { label: "Price Negotiation", href: "/students/negotiation" },
+      { label: "Verification & the Blue Check", href: "/seller/verification" },
     ],
   },
   {

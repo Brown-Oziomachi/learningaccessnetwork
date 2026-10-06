@@ -3,6 +3,16 @@ import { calculatePaymentDistribution } from '@/utils/paymentProcessor';
 import { sendServerNotification } from '@/lib/notificationEngine';
 import { serverFetchBookDetails } from '@/lib/serverBookUtils';
 import { adminDb, admin } from '@/lib/firebase-admin';
+import { resolveNegotiatedPrice } from '@/lib/negotiationPricing';
+
+// units of `currency` per 1 NGN
+async function getNgnRate(currency) {
+    const res = await fetch('https://open.er-api.com/v6/latest/NGN');
+    if (!res.ok) throw new Error('rate fetch failed');
+    const r = (await res.json())?.rates?.[currency];
+    if (!r) throw new Error(`no rate for ${currency}`);
+    return r;
+}
 
 export async function POST(request) {
     try {
@@ -154,7 +164,6 @@ export async function POST(request) {
             const txDocRef = adminDb.collection('transactions').doc(tx_ref);
             const bountyDocRef = adminDb.collection('bounties').doc(`escrow-${tx_ref}`);
 
-            //  SECURITY FIX: Explicitly mapped references to match webhook constants
             const escrowResult = await adminDb.runTransaction(async (transaction) => {
                 const txSnap = await transaction.get(txDocRef);
                 if (txSnap.exists) return { duplicate: true };
@@ -319,23 +328,55 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Book verification failed' }, { status: 404 });
         }
 
-        const distribution = calculatePaymentDistribution(verifiedBook, amount);
-        const netEarning = distribution.sellerAmount;
-        const platformFee = distribution.platformFee;
         const activeSellerId = verifiedBook.sellerId || 'PLATFORM_ADMIN';
 
         const txDocRef = adminDb.collection('transactions').doc(tx_ref);
         const userRef = adminDb.collection('users').doc(userId);
         const sellerRef = adminDb.collection('sellers').doc(activeSellerId);
+        const negRef = metadata.negotiationId
+            ? adminDb.collection('negotiations').doc(String(metadata.negotiationId))
+            : null;
+
+        // Outside the transaction. A failure returns 500 so Flutterwave retries.
+        let rate;
+        try {
+            rate = currency === 'NGN' ? 1 : await getNgnRate(currency);
+        } catch (e) {
+            console.error('Rate lookup failed:', e.message);
+            return NextResponse.json({ error: 'Rate unavailable, retry' }, { status: 500 });
+        }
 
         const referralResult = await adminDb.runTransaction(async (transaction) => {
+            /* ═══ READS (all reads before any write) ═══ */
             const txSnap = await transaction.get(txDocRef);
             if (txSnap.exists) return { duplicate: true };
 
+            const negSnap = negRef ? await transaction.get(negRef) : null;
+
+            // What this buyer SHOULD have paid, in NGN
+            let expectedNGN = Math.floor(Number(verifiedBook.price));
+            if (negSnap?.exists) {
+                try {
+                    expectedNGN = resolveNegotiatedPrice({
+                        neg: negSnap.data(), book: verifiedBook, userId, bookId, checkExpiry: false,
+                    });
+                } catch { /* invalid or used offer: stay at list price */ }
+            }
+
+            // 3% tolerance for exchange-rate drift
+            if (amount / rate < expectedNGN * 0.97) {
+                return { underpaid: true, expectedNGN };
+            }
+
+            const distribution = calculatePaymentDistribution(verifiedBook, expectedNGN);
+            const netEarning = distribution.sellerAmount;
+            const platformFee = distribution.platformFee;
+
             let qualifiedReferralRef = null;
             let referralData = null;
+            let expiredReferralRef = null;
 
-            if (amount >= 1000) {
+            if (expectedNGN >= 1000) {
                 const refQuery = adminDb.collection('referrals')
                     .where('referredUserId', '==', userId)
                     .where('status', '==', 'pending')
@@ -348,23 +389,32 @@ export async function POST(request) {
                     const data = potentialMatch.data();
                     const createdTime = data.createdAt?.toDate() || new Date();
                     const daysActive = (Date.now() - createdTime.getTime()) / (1000 * 60 * 60 * 24);
-
                     if (daysActive <= 30) {
                         qualifiedReferralRef = potentialMatch.ref;
                         referralData = data;
                     } else {
-                        transaction.update(potentialMatch.ref, { status: 'expired' });
+                        expiredReferralRef = potentialMatch.ref;   // written later
                     }
                 }
             }
 
-            //  SECURITY FIX: Add automatic document creation fallback setup for new users
             const userSnap = await transaction.get(userRef);
+            const sellerSnap = await transaction.get(sellerRef);   // last read
+
+            /* ═══ WRITES ═══ */
+            if (expiredReferralRef) {
+                transaction.update(expiredReferralRef, { status: 'expired' });
+            }
+
+            if (negSnap?.exists && negSnap.data().status === 'agreed' && negSnap.data().buyerId === userId) {
+                transaction.update(negRef, { status: 'purchased', purchasedAtMs: Date.now() });
+            }
+
             const accessPayload = {
                 id: bookId,
                 title: verifiedBook.title,
                 purchasedAt: new Date().toISOString(),
-                amount,
+                amount: expectedNGN,
                 transactionRef: tx_ref,
             };
 
@@ -379,8 +429,6 @@ export async function POST(request) {
             }
 
             let currentBalance = netEarning;
-            const sellerSnap = await transaction.get(sellerRef);
-
             if (sellerSnap.exists) {
                 currentBalance = (sellerSnap.data().accountBalance || 0) + netEarning;
                 transaction.update(sellerRef, {
@@ -425,10 +473,12 @@ export async function POST(request) {
                 sellerId: activeSellerId,
                 bookId,
                 bookTitle: verifiedBook.title,
-                amount,
+                amount,                       // what Flutterwave charged, in `currency`
+                amountNGN: expectedNGN,       // what the sale is worth in naira
                 netEarning,
                 platformFee,
                 currency,
+                negotiationId: negSnap?.exists ? negRef.id : null,
                 status: 'completed',
                 paymentMethod: paymentData.payment_type || 'card',
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -439,6 +489,8 @@ export async function POST(request) {
                 referralUnlocked: !!qualifiedReferralRef,
                 referralData,
                 currentBalance,
+                netEarning,
+                expectedNGN,
             };
         });
 
@@ -446,6 +498,17 @@ export async function POST(request) {
             console.log('Duplicate transaction skipped:', tx_ref);
             return NextResponse.json({ message: 'Transaction already tracked' }, { status: 200 });
         }
+
+        if (referralResult.underpaid) {
+            await adminDb.collection('flaggedTransactions').doc(tx_ref).set({
+                tx_ref, userId, bookId, amount, currency,
+                expectedNGN: referralResult.expectedNGN,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            return NextResponse.json({ message: 'Flagged: underpaid' }, { status: 200 });
+        }
+
+        const { netEarning, expectedNGN } = referralResult;
 
         // Post-transaction tasks (fire-and-forget metrics)
         if (bookId.startsWith('firestore-')) {
@@ -476,7 +539,7 @@ export async function POST(request) {
                 data: {
                     sellerName: verifiedBook.sellerName || 'Seller',
                     bookTitle: verifiedBook.title,
-                    amount,
+                    amount: expectedNGN,
                     netEarning,
                     buyerEmail: customer.email,
                     currentBalance: referralResult.currentBalance,
@@ -493,6 +556,7 @@ export async function POST(request) {
                     buyerName: customer.name || 'Reader',
                     bookTitle: verifiedBook.title,
                     amount,
+                    currency,
                     sellerName: verifiedBook.sellerName || 'LAN Library',
                     orderId: tx_ref,
                 },

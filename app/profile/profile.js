@@ -22,13 +22,11 @@ import {
 } from "lucide-react";
 import FollowingModal from "./[slug]/FollowingModal";
 
-import { FREE_VERIFY_FOLLOWERS, paidVerificationActive, useVerificationReturn, VerifiedBadge, VerifySellerModal } from "@/components/seller/Verification";
-
-const DASHBOARD_HREF = "/my-account/seller-account/";
+import { paidVerificationActive, useVerificationReturn, VerifiedBadge } from "@/components/seller/Verification";
 
 const NAVY = "#0d2244", INK = "#081530", GOLD = "#b8963e", GOLDD = "#d4aa5a", BG = "#f5f1ea", BLUE = "#1d9bf0";
 const FALLBACK_IMG = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-
+// const DASHBOARD_HREF = "/dashboard";
 /* ─── Helpers ─── */
 const getThumbnailUrl = (book) => {
     if (!book) return FALLBACK_IMG;
@@ -205,9 +203,9 @@ export default function ClientProfileContent({ sellerSlug }) {
     const [userData, setUserData] = useState(null);
     const [resolvedUid, setResolvedUid] = useState(null);
     const [slugResolving, setSlugResolving] = useState(true);
-    const [showVerify, setShowVerify] = useState(false);
 
     const isOwner = !!user && !!resolvedUid && user.uid === resolvedUid;
+    const DASHBOARDHREF = "/my-account/seller-account/";
 
     // Back from Flutterwave on the owner's own profile
     useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerified: true } : s)); });
@@ -264,19 +262,24 @@ export default function ClientProfileContent({ sellerSlug }) {
         if (!user) { router.push(`/signup?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
         if (followLoading) return;
         setFollowLoad(true);
-        const followRef = doc(db, "follows", `${user.uid}_${resolvedUid}`);
-        const sellerRef = doc(db, "sellers", resolvedUid);
-        try {
-            if (isFollowing) {
-                await deleteDoc(followRef); setFollowing(false); setFollowers((p) => Math.max(0, p - 1));
-            } else {
-                await setDoc(followRef, { followerId: user.uid, lecturerId: resolvedUid, lecturerName: seller?.sellerName || "", createdAt: serverTimestamp() });
-                try { await updateDoc(sellerRef, { followersCount: increment(1) }); }
-                catch { await setDoc(sellerRef, { followersCount: 1 }, { merge: true }); }
-                setFollowing(true); setFollowers((p) => p + 1);
-            }
-        } catch (err) { console.error(err); }
-        finally { setFollowLoad(false); }
+       const followRef = doc(db, "follows", `${user.uid}_${resolvedUid}`);
+try {
+    if (isFollowing) {
+        await deleteDoc(followRef);
+        setFollowing(false);
+        setFollowers((p) => Math.max(0, p - 1));
+    } else {
+        await setDoc(followRef, {
+            followerId: user.uid,
+            lecturerId: resolvedUid,
+            lecturerName: seller?.sellerName || "",
+            createdAt: serverTimestamp(),
+        });
+        setFollowing(true);
+        setFollowers((p) => p + 1);
+    }
+} catch (err) { console.error("follow error:", err); }
+finally { setFollowLoad(false); }
     };
 
     /* Profile data */
@@ -375,9 +378,13 @@ export default function ClientProfileContent({ sellerSlug }) {
         ? userData?.isLecturer || userData?.role === "lecturer" ||
         ["lecturer", "dr.", "prof.", "professor", "mrs", "mr"].includes((seller.sellerTitle || "").toLowerCase())
         : false;
-    // Sellers only. Faculty verification is handled by the account process.
-    const verified = !!seller && !lecturerMode && (seller.paidVerified || followerCount >= FREE_VERIFY_FOLLOWERS);
-    const canGetVerified = isOwner && !!seller && !lecturerMode && !verified;
+   const verified = !!seller && !lecturerMode && seller.paidVerified;
+const facultyVerified =
+    lecturerMode && !!userData &&
+    (userData.isVerified === true || userData.lecturerVerificationStatus === "approved") &&
+    userData.lecturerVerificationStatus !== "pending" &&
+    userData.lecturerVerificationStatus !== "rejected";
+const showBlue = verified || facultyVerified;
 
     const displayTitle = seller ? (lecturerMode ? `${seller.sellerTitle} ${seller.sellerName}`.trim() : seller.sellerName) : "Profile";
     const countryDisplay = getCountryDisplay(seller?.sellerCountry);
@@ -513,7 +520,6 @@ export default function ClientProfileContent({ sellerSlug }) {
                     <div style={{ minWidth: 0, flex: 1 }}>
                         <p className="lan-serif" style={{ fontSize: 13, fontWeight: 700, color: NAVY, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayTitle}</span>
-                            {verified && <VerifiedBadge size={14} />}
                         </p>
                         <p className="muted" style={{ fontSize: 10 }}>{totalPaid} paid, {totalFree} free, {formatCount(followerCount)} followers</p>
                     </div>
@@ -524,25 +530,27 @@ export default function ClientProfileContent({ sellerSlug }) {
             <div className="hero">
                 <div className="lan-serif" style={{ position: "absolute", bottom: -14, right: 20, fontSize: 120, fontWeight: 900, color: "rgba(255,255,255,.04)", pointerEvents: "none", userSelect: "none" }}>LAN</div>
                 <div style={{ position: "absolute", top: 16, left: 16 }}>
-                    {lecturerMode
-                        ? <span className="pill"><GraduationCap size={11} /> Academic educator</span>
-                        : verified
-                            ? <span className="pill pill-blue"><VerifiedBadge size={12} /> Verified seller</span>
-                            : <span className="pill">Seller</span>}
+                   {lecturerMode
+    ? facultyVerified
+        ? <span className="pill pill-blue"><VerifiedBadge size={12} title="Verified faculty" /> Verified faculty</span>
+        : <span className="pill"><GraduationCap size={11} /> Academic educator</span>
+    : verified
+        ? <span className="pill pill-blue"><VerifiedBadge size={12} /> Verified seller</span>
+        : <span className="pill">Seller</span>}
                 </div>
 
                 <div className="hero-pad" style={{ maxWidth: 1100, margin: "0 auto", padding: "64px 24px 0" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap", paddingBottom: 8 }}>
                         <div style={{ width: lecturerMode ? 112 : 100, height: lecturerMode ? 112 : 100, flexShrink: 0, position: "relative" }}>
                             {sellerPhoto
-                                ? <img src={sellerPhoto} alt={seller.sellerName} className={`ring ${verified ? "ring-blue" : ""}`} />
+                                ?  <img src={sellerPhoto} alt={seller.sellerName} className={`ring ${showBlue ? "ring-blue" : ""}`} />
                                 : (
-                                    <div className={`ring ${verified ? "ring-blue" : ""}`} style={{ background: "rgba(255,255,255,.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <div className={`ring ${showBlue ? "ring-blue" :  ""}`} style={{ background: "rgba(255,255,255,.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                         {lecturerMode ? <GraduationCap size={38} style={{ color: GOLD }} /> :
                                             <span className="lan-serif" style={{ color: GOLD, fontSize: 34, fontWeight: 900 }}>{seller.sellerName?.charAt(0)?.toUpperCase() || "?"}</span>}
                                     </div>
                                 )}
-                            {verified && <VerifiedBadge size={26} ring={INK} style={{ position: "absolute", right: -4, bottom: 0 }} />}
+                            {showBlue && <VerifiedBadge size={26} ring={INK} title={lecturerMode ? "Verified faculty" : "Verified seller"} style={{ position: "absolute", right: -4, bottom: 0 }} />}
                         </div>
 
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -565,8 +573,7 @@ export default function ClientProfileContent({ sellerSlug }) {
                             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                                 {isOwner ? (
                                     <>
-                                        <Link href={DASHBOARD_HREF} className="btn btn-gold"><LayoutDashboard size={13} /> Owner dashboard</Link>
-                                        {canGetVerified && <button className="btn btn-ghost" onClick={() => setShowVerify(true)}>Verify</button>}
+                                        <Link href={DASHBOARDHREF} className="btn btn-gold"><LayoutDashboard size={13} /> Owner dashboard</Link>
                                     </>
                                 ) : (
                                     <>
@@ -662,11 +669,6 @@ export default function ClientProfileContent({ sellerSlug }) {
                     </div>
                 )}
             </div>
-
-            {canGetVerified && (
-                <VerifySellerModal open={showVerify} onClose={() => setShowVerify(false)} name={seller.sellerName} photo={sellerPhoto} followers={followerCount}
-                    onVerified={() => setSeller((s) => ({ ...s, paidVerified: true }))} />
-            )}
 
             <FollowingModal open={showFollowing} onClose={() => setShowFollowing(false)} profileUid={resolvedUid} profileName={seller.sellerName} isOwner={isOwner} router={router} onUnfollowed={() => setFollowingCount((c) => Math.max(0, c - 1))} />
         </div>

@@ -891,7 +891,120 @@ Your referral income stacks with every other income stream on the platform. Docu
             "lan-shift",
         ],
         tags: ["Commission", "Community", "Africa", "Passive Income"],
-    }
+    },
+
+    verification: {
+        badge: "Verification",
+        badgeIcon: "✔",
+        category: "TRUST & CREDIBILITY",
+        readTime: "9 min read",
+        title: "Why Verification Matters: How the Blue Check Builds Buyer Trust",
+        subtitle:
+            "Students pay for documents they cannot fully inspect first. A verified badge is the fastest way to tell them that the person behind the listing is real, accountable and worth buying from.",
+        hero: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1400&q=80",
+        intro: `Every purchase on LAN Library starts with a small act of trust. A student reads a title, a description and a short preview, then pays real money for a document they have not fully read. They cannot flip through all 200 pages in a shop first. They cannot ask a friend who bought it last year. They are deciding, in a few seconds, whether the person on the other side of the listing is worth believing.
+
+The verified badge exists to make that decision easier. It is a small blue check beside a name, but it carries a clear message: this account has been looked at, this person is real, and they have something to lose if they mislead you. For students on tight budgets, that message is often the difference between buying and walking away. For sellers and lecturers, it is one of the most valuable things you can add to your profile.`,
+        sections: [
+            {
+                heading: "The Trust Problem on Any Online Marketplace",
+                body: `Online marketplaces share a basic problem: the buyer has to pay before they can fully check what they are getting. On LAN, that problem is sharper than usual, because the buyers are students. Many of them are spending money that was set aside for transport, food or a semester's materials. A bad purchase is not an inconvenience, it is a real loss.
+
+Students also know that anyone can make an account. A name and a profile photo can be invented in minutes. Without some signal that separates real, accountable creators from anonymous strangers, every listing starts under suspicion, and honest sellers pay the price for the few who are not.
+
+That is why trust signals matter more than almost any other feature on a marketplace. A strong description helps, a good preview helps, and reviews help. But the badge works before any of those: it tells a visitor something reassuring in the first second they see your name, before they have read a word of your listing.`,
+            },
+            {
+                heading: "What the Blue Check Tells a Buyer",
+                body: `On LAN, a verified account carries a blue check in several places, so the signal is hard to miss. It appears beside the account name, on the profile photo (which also gets a blue ring), and as a Verified seller label on the public profile. Visitors who open a profile see it straight away, and students who follow a link from WhatsApp or social media land on a page that already looks credible.
+
+There are two kinds of verification, and each tells the student something slightly different. A Verified Seller badge says that our team checked who the seller is and reviewed the quality of their work before the badge was given. A Verified Faculty badge says that a lecturer's identity and institutional position were reviewed through the faculty process, which uses documents such as a staff ID and appointment letter. Faculty accounts that are still waiting for review show a different, amber marker, so students can always tell the difference between pending and confirmed.
+
+In both cases the message to the buyer is the same: this is a real, identifiable person, not a throwaway account. That is exactly what a student needs to know before paying for materials they will rely on in an exam.`,
+            },
+            {
+                heading: "Why Students Trust a Verified Account",
+                body: `The trust is not blind. It rests on four practical reasons that students understand instinctively.
+
+The first is reduced risk. A student comparing two similar documents, one from a verified account and one from an unknown one, will usually feel safer choosing the verified one. They may not articulate why, but the badge lowers the chance of a bad outcome, and people choose lower-risk options when money is tight.
+
+The second is accountability. A verified account has an identity attached to it, and an identity can be reported and reviewed. Sellers with a verified profile have a reputation to protect. Students know that a seller who has gone to the trouble of verifying is unlikely to risk it on a misleading listing.
+
+The third is familiarity. Students already read blue checks on the social platforms they use every day. They understand what the symbol means without being taught: this account is the real one. Seeing the same symbol on LAN gives them an instant frame of reference.
+
+The fourth is that the work was checked too. A verified seller does not only prove who they are. They also need a track record of approved documents and a clean copyright record before the badge is given. A buyer who sees the blue check knows that real documents from this account have already passed review.`,
+            },
+            {
+                heading: "How a Seller Gets Verified",
+                body: `Sellers get the blue check by applying and being approved. It cannot be bought on its own: our team checks who you are and the quality of your work first. The whole process lives in one place, and it has three steps.
+
+Step one is identity. You confirm your full legal name, verify your phone number with a one-time code, upload a photo of your NIN or student ID card, and add a clear profile photo of yourself, not a cartoon or a logo. Your ID photo is kept private and is only used for the check.
+
+Step two is quality. Your account needs at least 10 approved documents, it needs to be older than 14 days, and it needs to be free of copyright strikes in the last 30 days. These checks are automatic, so you can see for yourself which ones you already meet.
+
+Step three is approval and activation. Once the checklist is complete, you submit it for review. Our team usually responds within 24 to 72 hours. If you are approved, you activate the badge, and the Seller Dashboard guides you to the final step.
+
+You will find all of this on your <link slug="seller-dashboard" text="Seller Dashboard" />. While you are unverified, a Get your blue check card sits under your header. It shows how many requirements you have met, and its button reads Start verification at first, then Complete verification once you have made progress. Tapping it opens the full checklist in a window, together with a Now and After verifying preview that shows your own photo and name with and without the blue check, so you can see exactly what students will see. When you are verified, the card disappears and the blue check takes its place on your dashboard and on your public profile.`,
+            },
+            {
+                heading: "Paying Monthly or Using the Free Option",
+                body: `The checklist offers two options for the final step, and you can switch between them at the top of the window.
+
+With the monthly option, the badge costs a small monthly fee after you are approved. It currently stands at ₦2,000 a month, and the checklist always shows the current price before you pay. You can pay with Flutterwave using a card, bank transfer or USSD, or from your LAN wallet using your PIN. One payment keeps the badge active for 30 days, and you can renew whenever you like.
+
+With the free option, there is nothing to pay. The badge is granted once our team approves your application.
+
+The important point is the order. Money is always the last step. You are never asked to pay until your identity and your work have already been approved, so you are not paying for a badge you might not get.
+
+Keep in mind that a paid badge runs for 30 days. If it lapses, the badge is removed until you renew. A copyright strike can also put an active badge at risk, because the badge is meant to show a seller who can be relied on.`,
+            },
+            {
+                heading: "For Lecturers: Faculty Verification",
+                body: `Lecturers and other academic staff do not use the seller checklist. Faculty accounts are verified through the account process itself. During sign-up, faculty submit their credentials, which are reviewed before the account is confirmed.
+
+The Seller Dashboard shows a clear timeline of where you are: credentials submitted, faculty ID verified, and payout active once you have added your bank details. While review is under way, your profile shows a pending marker. When review is complete, it changes to the blue verified badge, along with your title and department.
+
+For lecturers the badge matters even more than for other sellers, because students want to know that notes and past papers really come from the person whose name is on them. A confirmed Verified Faculty badge answers the question every student quietly asks: is this really my lecturer, or someone using their name? It also supports the student discount feature, because students are far more comfortable requesting a discount from a lecturer whose identity they can see is confirmed.`,
+            },
+            {
+                heading: "How Verification Helps You Sell",
+                body: `A badge will not make a weak document sell, and no one should promise that. What it does is remove one of the biggest reasons good documents go unbought: doubt about the seller.
+
+When a student lands on your profile, the first thing they decide is whether to keep reading or leave. A blue check on your photo and name helps them keep reading. When they open a listing, they are already inclined to give your description and preview a fair look. That small head start matters most for new sellers, who have few sales and reviews yet and so have little else to point to.
+
+Verification also helps when you share your profile outside LAN. A link posted in a class WhatsApp group, a Telegram channel or a social media bio looks more credible when the page it opens already shows a verified seller. Students decide quickly whether to trust a shared link, and a verified profile makes that decision easier.
+
+Finally, it supports everything else you do on the platform. Buyers feel more comfortable making offers on negotiable documents from sellers they trust. Referrals convert better when the person you recommended can see that you are a verified creator. And every follower, review and sale that follows adds to the reputation the badge started. If you want to build that audience alongside your verification, <link slug="grow-followers" text="our guide to growing your followers" /> shows how.`,
+            },
+            {
+                heading: "For Students: How to Read a Profile Before You Buy",
+                body: `A verified badge is a strong signal, but the smartest buyers use it alongside other evidence. Here is a quick way to check a seller in under a minute.
+
+Start with the badge. A blue check means the account has been confirmed, either through the seller review or through the faculty process. An amber marker on a faculty account means review is still pending, which is not a red flag by itself, but it does mean that the confirmation is not complete yet.
+
+Next, look at the numbers on the profile: how many followers they have, how many documents they have uploaded, and how many have sold. A seller with a steady audience and a sensible catalogue has usually been doing this for a while. Then read the reviews on the specific document you want, because they tell you whether it matched its description for the students who bought it before you.
+
+Finally, always open the preview. A badge tells you who is selling, but only the preview tells you whether this particular document fits your course. If something does not match what was promised, you can report it to our team, and the report is reviewed. Verification reduces risk, it does not replace careful reading.`,
+            },
+            {
+                heading: "Protecting the Trust the Badge Represents",
+                body: `The badge is only worth something because buyers believe in it, which means every verified seller has a part in keeping that belief intact. A blue check is not a shield. Sellers who mislead buyers, misdescribe their documents or ignore legitimate complaints damage the reputation that verification gives them, and reports against accounts are reviewed whatever badge they carry.
+
+The habits that keep a verified profile strong are simple. Describe each document honestly and match it to the right course and level. Keep your preview representative of the whole document. Respond to buyer reviews and questions politely and promptly. Keep your profile photo, name and bio accurate and up to date. And keep adding useful material, because a verified account with a growing, well-kept catalogue is exactly what students are looking for.
+
+Do these things consistently and the badge becomes more than a symbol. It becomes shorthand for a seller who can be relied on, and that reputation is worth more to your income over time than any single sale.`,
+            },
+        ],
+        cta: { label: "Get Verified", href: "/my-account/seller-account" },
+        related: [
+            "grow-followers",
+            "seller-network",
+            "seller-dashboard",
+            "upload-document",
+            "referral",
+        ],
+        tags: ["Verification", "Trust", "Verified Badge", "Credibility", "Africa"],
+    },
 };
 
 /* ─── Related meta ─────────────────────────────────────────── */
@@ -946,7 +1059,11 @@ const RELATED_META = {
         icon: "🤝",
         desc: "Featuring LAN API via your domain",
     },
-
+    verification: {
+        label: "Verification & the Blue Check",
+        icon: "✔",
+        desc: "Why verified accounts earn student trust",
+    },
 };
 
 /* ─── Parse inline link syntax ─────────────────────────────── */
