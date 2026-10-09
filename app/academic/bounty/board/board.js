@@ -429,7 +429,8 @@ function HowItWorksPanel() {
 }
 
 /* ─── BID MODAL ─────────────────────────────────────────────── */
-function BidModal({ bounty, user, onClose, fmt }) {
+function BidModal({ bounty, user, onClose }) {
+  const { fmt } = useCurrency();
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -441,8 +442,8 @@ function BidModal({ bounty, user, onClose, fmt }) {
   const handleClaim = async () => {
     setLoading(true); setError("");
     try {
-      await incrementProposals(bounty.id);
       await claimBountyWithNotification(bounty.id, user.uid, user);
+      await incrementProposals(bounty.id);
       setSubmitted(true);
     } catch (e) {
       console.error("Claim failed:", e);
@@ -754,9 +755,9 @@ export function CreateModal({ onClose, user, userProfile }) {
 
   /* ── Reward conversions ── */
   const localAmount = Number(form.reward) || 0;
-  const ngnAmount = isNGN
-    ? localAmount
-    : Math.round(localAmount / (rates[currInfo.currency] ?? FALLBACK_RATES[currInfo.currency] ?? 1));
+  const rate = rates[currInfo.currency] ?? FALLBACK_RATES[currInfo.currency];
+  const rateMissing = !isNGN && !rate;
+  const ngnAmount = isNGN ? localAmount : rate ? Math.round(localAmount / rate) : 0;
   const payoutNGN = Math.round(ngnAmount * 0.8);
 
   /* ── Fetch live exchange rates ── */
@@ -815,6 +816,7 @@ export function CreateModal({ onClose, user, userProfile }) {
       setError("Requirements must be under 500 characters.");
       return;
     }
+    if (rateMissing) { setError(`${currInfo.currency} isn't supported yet. Please pick another country or pay in NGN.`); return; }
     if (localAmount < 1) { setError("Please enter a reward amount."); return; }
     if (ngnAmount < 100) { setError("Minimum bounty reward is ₦100 equivalent."); return; }
     if (!contact.email || !contact.phone) { setError("Please fill in your email and phone."); return; }
@@ -856,6 +858,16 @@ export function CreateModal({ onClose, user, userProfile }) {
       currency: currInfo.currency,
       payment_options: "card,ussd,banktransfer,mobilemoney",
       customer: { email: contact.email, phone_number: contact.phone, name: contact.name },
+      meta: {
+        type: "bounty",
+        userId: user.uid,
+        title: form.title,
+        description: form.description,
+        university: form.university,
+        department: form.department,
+        deadline: form.deadline || "",
+        tags: form.tags || "",
+      },
       customizations: {
         title: "LAN Library — Post a Bounty",
         description: `Bounty: ${form.title}`,
@@ -863,7 +875,9 @@ export function CreateModal({ onClose, user, userProfile }) {
       },
       callback: async (res) => {
         if (res.status === "successful" || res.status === "completed") {
-          setProcessing(true); await submitBounty(txRef);
+          setProcessing(false);
+          alert("Payment received! Your bounty will appear on the board within a minute.");
+          onClose();
         } else {
           setError("Payment was not successful. Please try again.");
         }
@@ -1233,7 +1247,7 @@ export function CreateModal({ onClose, user, userProfile }) {
                     fontSize: 11, color: "#555", fontFamily: "'Lato',sans-serif",
                     margin: 0, lineHeight: 1.65
                   }}>
-                    Reward held safely in escrow. Charged only when a valid submission is accepted.
+                    You pay now and the reward is held safely in escrow until a submission is accepted.
                     Authors receive <strong style={{ color: NAVY }}>80%</strong>, LAN retains 20%.{" "}
                     <strong>All users will be notified of your bounty.</strong>
                   </p>

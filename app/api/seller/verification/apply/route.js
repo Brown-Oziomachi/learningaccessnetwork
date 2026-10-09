@@ -10,6 +10,7 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { evaluateVerification, VERIFY_RULES } from "@/lib/verification/eligibility";
 
 const DAY = 86400000;
+const TRUST_KYC_PHONE = true; // set false once you build a real phone OTP route
 const toMs = (t) => t?.toMillis?.() ?? (t ? new Date(t).getTime() : 0);
 
 async function authUid(req) {
@@ -19,14 +20,20 @@ async function authUid(req) {
 }
 
 async function collectStats(db, uid, route) {
-    const [userSnap, sellerSnap, kycSnap] = await Promise.all([
+    const [userSnap, sellerSnap, kycSnap, subSnap] = await Promise.all([
         db.doc(`users/${uid}`).get(),
         db.doc(`sellers/${uid}`).get(),
-        db.doc(`sellerKyc/${uid}`).get(), // private collection, admin-only reads
+        db.doc(`sellerKyc/${uid}`).get(),        // private collection, admin-only reads
+        db.doc(`kycSubmissions/${uid}`).get(),   // what the KYC form writes
     ]);
     const u = userSnap.data() || {};
     const kyc = kycSnap.data() || {};
+    const sub = subSnap.data() || {};
     const now = Date.now();
+
+    const kycApproved = String(sub.status ?? "").trim().toLowerCase() === "approved";
+    const photo = u.photoURL || u.photoBase64 || "";
+    const hasProfilePhoto = !!photo && !photo.includes("lan-logo");
 
     // Approved books only (pending/rejected do not count)
     const [a, b] = await Promise.all([
@@ -40,10 +47,10 @@ async function collectStats(db, uid, route) {
     const lastStrike = strikes.docs.reduce((m, d) => Math.max(m, toMs(d.data().createdAt)), 0);
 
     const stats = {
-        fullName: kyc.fullName || "",
-        phoneVerified: kyc.phoneVerified === true,   // set by your OTP route, never by the client
-        idSubmitted: !!kyc.idImagePath,
-        hasRealPhoto: kyc.photoApproved === true,    // admin ticks this during review
+        fullName: kyc.fullName || (kycApproved ? sub.fullName : "") || "",
+        phoneVerified: kyc.phoneVerified === true || (TRUST_KYC_PHONE && kycApproved && !!sub.phone),
+        idSubmitted: !!kyc.idImagePath || (kycApproved && !!sub.frontUrl),
+        hasRealPhoto: kyc.photoApproved === true || (kycApproved && hasProfilePhoto),
         approvedBooks: approvedIds.size,
         accountAgeDays: Math.floor((now - toMs(u.createdAt)) / DAY),
         daysSinceLastStrike: lastStrike ? Math.floor((now - lastStrike) / DAY) : Infinity,
@@ -126,7 +133,7 @@ export async function POST(req) {
     }
 }
 
-/* ── Still needed server-side (same pattern, not repeated here) ──────────────
+/* ── Still needed server-side ────────────────────────────────────────────────
  * 1. /api/admin/verification/decide  (admin only)
  *      approve + route=free  -> sellers/{uid}: isVerifiedSeller:true, verifiedRoute:"free", verificationStatus:"verified"
  *      approve + route=paid  -> verificationStatus:"approved_awaiting_payment"   (NO badge yet)

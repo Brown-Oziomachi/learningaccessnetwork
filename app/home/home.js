@@ -38,7 +38,7 @@ const documentTypes = [
     { name: "Summary", slug: "summary", image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=400", description: "Quick study breakdowns" },
     { name: "Syllabus", slug: "syllabus", image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400", description: "Course requirements" },
     { name: "Course Outline", slug: "course-outline", image: "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=400", description: "Topic distributions" },
-    { name: "signment", slug: "assignment", image: "https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=400", description: "Practice tasks and projects" },
+    { name: "Assignment", slug: "assignment", image: "https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=400", description: "Practice tasks and projects" },
     { name: "Project", slug: "project", image: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400", description: "Detailed student projects" },
     { name: "Lab Manual", slug: "lab-manual", image: "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=400", description: "Practical guides and lab reports" },
     { name: "Handwritten Notes", slug: "handwritten-notes", image: "https://images.unsplash.com/photo-1503467913725-8484b65b0715?w=400", description: "Authentic student class notes" },
@@ -90,6 +90,17 @@ const getThumbnailUrl = (book) => {
     }
     return book.image || null; };
 
+    const readCache = (key, ttl = 5 * 60 * 1000) => {
+    try {
+        const c = JSON.parse(sessionStorage.getItem(key));
+        if (c && Date.now() - c.t < ttl) return c.data;
+    } catch { }
+    return null;
+};
+const writeCache = (key, data) => {
+    try { sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), data })); } catch { }
+};
+
 /* ════════════════════════════════════════════════════════════════
    COMPONENT
 ════════════════════════════════════════════════════════════════ */
@@ -113,7 +124,6 @@ export default function HomeClient() {
     const router = useRouter();
     const goldAds = useAds("Gold", 10);
     const silverAds = useAds("Silver", 10);
-    const topAd = useAds("Gold", 10);   // ← ADD THIS
 
 
     const topAdIds = new Set(goldAds.slice(0, 4).map(a => a.adId));
@@ -142,75 +152,76 @@ export default function HomeClient() {
         setSelectedAds(shuffled.slice(0, 5));
     }, [goldAds, silverAds]);
 
-
     useEffect(() => {
-    const fetchFreeBooks = async () => {
-        try {
-            setLoadingFreeBooks(true);
-            const q = query(
-                collection(db, "advertMyBook"),
-                where("isFree", "==", true),
-                where("status", "==", "approved"),
-                orderBy("createdAt", "desc"),
-                limit(6)
-            );
-            const snap = await getDocs(q);
-            const books = [];
-            snap.forEach(d => {
-                const data = d.data();
-                if (data.isGloballyFrozen === true) return;
-                if (!data.bookTitle) return;
-                const b = {
-                    id: `firestore-${d.id}`,
-                    firestoreId: d.id,
-                    title: data.bookTitle,
-                    author: data.author || "Unknown",
-                    category: (data.category || "General").toLowerCase(),
-                    price: 0,
-                    driveFileId: data.driveFileId,
-                    pdfUrl: data.pdfUrl,
-                    embedUrl: data.embedUrl,
-                    image: data.coverImage || data.image || null,
-                    isFromFirestore: true,
-                    createdAt: data.createdAt,
-                };
-                b.image = getThumbnailUrl(b);
-                books.push(b);
-            });
-            setFreeBooks(books);
-        } catch (e) {
-            console.error("Free books fetch error:", e);
-            setFreeBooks([]);
-        } finally {
-            setLoadingFreeBooks(false);
-        }
-    };
-    fetchFreeBooks();
-}, []);
+        const fetchFreeBooks = async () => {
+            const cached = readCache("home_free_books");
+            if (cached) {
+                setFreeBooks(cached);
+                setLoadingFreeBooks(false);
+                return;
+            }
 
-
-    /* sales */
-    useEffect(() => {
-        const fetchSales = async () => {
             try {
-                const snap = await getDocs(collection(db, "users"));
-                const map = {};
-                snap.docs.forEach(u => {
-                    Object.values(u.data().purchasedBooks || {}).forEach(p => {
-                        const id = p.bookId || p.id || p.firestoreId;
-                        if (id) { map[id] = (map[id] || 0) + 1; map[`firestore-${id}`] = (map[`firestore-${id}`] || 0) + 1; }
-                    });
+                setLoadingFreeBooks(true);
+                const q = query(
+                    collection(db, "advertMyBook"),
+                    where("isFree", "==", true),
+                    where("status", "==", "approved"),
+                    orderBy("createdAt", "desc"),
+                    limit(6)
+                );
+                const snap = await getDocs(q);
+                const books = [];
+                snap.forEach(d => {
+                    const data = d.data();
+                    if (data.isGloballyFrozen === true) return;
+                    if (!data.bookTitle) return;
+                    const b = {
+                        id: `firestore-${d.id}`,
+                        firestoreId: d.id,
+                        title: data.bookTitle,
+                        author: data.author || "Unknown",
+                        category: (data.category || "General").toLowerCase(),
+                        price: 0,
+                        driveFileId: data.driveFileId,
+                        pdfUrl: data.pdfUrl,
+                        embedUrl: data.embedUrl,
+                        image: data.coverImage || data.image || null,
+                        isFromFirestore: true,
+                        createdAt: data.createdAt,
+                    };
+                    b.image = getThumbnailUrl(b);
+                    books.push(b);
                 });
-                setBookSalesCount(map);
-            } catch { }
+                setFreeBooks(books);
+                writeCache("home_free_books", books);
+            } catch (e) {
+                console.error("Free books fetch error:", e);
+                setFreeBooks([]);
+            } finally {
+                setLoadingFreeBooks(false);
+            }
         };
-        fetchSales();
+        fetchFreeBooks();
     }, []);
 
     /* books */
 
     useEffect(() => {
         const fetchBooks = async () => {
+            const cached = readCache("home_paid_books");
+            if (cached) {
+                const counts = {};
+                cached.forEach(b => {
+                    counts[b.id] = b.purchases;
+                    counts[b.firestoreId] = b.purchases;
+                });
+                setBookSalesCount(counts);
+                setAllBooks(cached);
+                setLoadingBooks(false);
+                return;
+            }
+
             try {
                 setLoadingBooks(true);
                 const q = query(
@@ -223,7 +234,6 @@ export default function HomeClient() {
                 if (!snap.empty) {
                     const books = [];
                     snap.forEach(d => {
-                        console.log("Doc ID:", d.id, "| Data:", d.data()); // ← ADD THIS
                         const data = d.data();
                         if (data.isGloballyFrozen === true) return;
                         if (data.bookTitle && data.price !== undefined) {
@@ -234,6 +244,7 @@ export default function HomeClient() {
                                 author: data.author || "Unknown",
                                 category: (data.category || "education").toLowerCase(),
                                 price: Number(data.price) || 0,
+                                purchases: Number(data.purchases) || 0,
                                 driveFileId: data.driveFileId,
                                 pdfUrl: data.pdfUrl,
                                 embedUrl: data.embedUrl,
@@ -245,67 +256,55 @@ export default function HomeClient() {
                         }
                     });
                     books.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                    const counts = {};
+                    books.forEach(b => {
+                        counts[b.id] = b.purchases;
+                        counts[b.firestoreId] = b.purchases;
+                    });
+                    setBookSalesCount(counts);
                     setAllBooks(books);
+                    writeCache("home_paid_books", books);
                 }
             } catch (e) {
-                console.error("Books fetch error:", e); // ADD THIS
+                console.error("Books fetch error:", e);
                 setAllBooks([]);
             } finally {
                 setLoadingBooks(false);
             }
         };
         fetchBooks();
-    }, []); // ← Empty dependency, runs once on mount
+    }, []);
 
-    /* purchased */
     useEffect(() => {
-        const fetchPurchased = async () => {
+        const unsub = onAuthStateChanged(auth, async (cu) => {
+if (!cu) {
+    setLoading(false);
+    setCheckingAuth(false);
+    setCheckingSeller(false);
+    router.push("/signin");
+    return;
+}            setUser(cu);
             try {
-                const cu = auth.currentUser;
-                if (!cu) return;
                 const ud = await getDoc(doc(db, "users", cu.uid));
-                if (ud.exists()) {
-                    const pb = ud.data().purchasedBooks || {};
-                    const arr = Array.isArray(pb) ? pb : Object.values(pb);
-                    setPurchasedBookIds(new Set(arr.map(b => b.id || b.bookId || b.firestoreId).filter(Boolean)));
-                }
-            } catch { }
-        };
-        if (user) fetchPurchased();
-    }, [user]);
-
-    const isPurchased = id =>
-        purchasedBookIds.has(id) || purchasedBookIds.has(`firestore-${id}`) ||
-        purchasedBookIds.has(String(id).replace("firestore-", ""));
-
-      useEffect(() => {
-            const unsub = onAuthStateChanged(auth, (u) => {
-                if (u) setUser(u);
-                else router.push('/signin');
-                setCheckingAuth(false);
-            });
-            return () => unsub();
-        }, [router]);
-    
-    /* auth */
-    useEffect(() => {
-        const unsub = onAuthStateChanged(auth, async cu => {
-            if (cu) {
-                setUser(cu);
-                try {
-                    setCheckingSeller(true);
-                    const ud = await getDoc(doc(db, "users", cu.uid));
-                    setIsSeller(ud.exists() ? ud.data().isSeller === true : false);
-                } catch { setIsSeller(false); }
-                finally { setCheckingSeller(false); }
-            } else {
-                setUser(null); setIsSeller(false); setCheckingSeller(false);
-            }
+                const data = ud.exists() ? ud.data() : {};
+                setIsSeller(data.isSeller === true);
+                const pb = data.purchasedBooks || {};
+                const arr = Array.isArray(pb) ? pb : Object.values(pb);
+                setPurchasedBookIds(
+                    new Set(arr.map(b => b.id || b.bookId || b.firestoreId).filter(Boolean))
+                );
+            } catch { setIsSeller(false); }
+            setCheckingSeller(false);
+            setCheckingAuth(false);
             setLoading(false);
         });
-        const t = setTimeout(() => setLoading(false), 1200);
-        return () => { unsub(); clearTimeout(t); };
-    }, []);
+        return unsub;
+    }, [router]);
+
+    const isPurchased = id =>
+        purchasedBookIds.has(id) ||
+        purchasedBookIds.has(`firestore-${id}`) ||
+        purchasedBookIds.has(String(id).replace("firestore-", ""));
 
     const HandleClick = () => {
         if (!user) { router.push("/signin"); return; }
@@ -668,7 +667,7 @@ export default function HomeClient() {
                                                 flexShrink: 0,
                                                 border: "0.5px solid #e5ddd0",
                                             }}
-                                            onError={e => { e.target.style.display = "LAN Documents"; }}
+                                            onError={e => { e.target.style.display = "none"; }}
                                         />
                                     )}
 
@@ -1165,7 +1164,7 @@ export default function HomeClient() {
                                             style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "18px" }}>
                                         {filteredCategories.map((cat, i) => (
 
-                                            <a key={i}
+                                            <Link key={i}
                                                 href={`/category/${cat.name.toLowerCase().replace(/ & /g, "-").replace(/ /g, "-")}`}
                                                 className="browse-card"
                                                 style={{ textDecoration: "none", display: "block", background: CREAM, border: "0.5px solid #e5ddd0", overflow: "hidden" }}
@@ -1216,7 +1215,7 @@ export default function HomeClient() {
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </a>
+                                            </Link>
                                         ))}
                                     </div>
                                 )}

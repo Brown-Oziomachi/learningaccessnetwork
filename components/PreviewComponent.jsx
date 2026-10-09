@@ -7,7 +7,8 @@ import {
   updateDoc,
   collection,
   query,
-  where,
+    where,
+  limit,
   getDocs,
   addDoc,
   serverTimestamp,
@@ -414,14 +415,18 @@ const [sellerSoldCount, setSellerSoldCount] = useState(null);
     const fetchPhysicalInventory = async () => {
       try {
         setLoadingPhysical(true);
-        const cleanId = bookId.replace("firestore-", "");
-        const allSnap = await getDocs(collection(db, "physicalInventory"));
-        let found = null;
-        allSnap.forEach((d) => {
-          const data = d.data();
-          if (data.bookId === cleanId || data.bookId === bookId || data.bookId === `firestore-${cleanId}`) found = { id: d.id, ...data };
-        });
-        setPhysicalInventory(found);
+                const cleanId = bookId.replace("firestore-", "");
+                const allSnap = await getDocs(
+                  query(
+                    collection(db, "physicalInventory"),
+                    where("bookId", "in", [cleanId, bookId]),
+                    limit(1),
+                  ),
+                );
+                const found = allSnap.empty
+                  ? null
+                  : { id: allSnap.docs[0].id, ...allSnap.docs[0].data() };
+                setPhysicalInventory(found);
       } catch { } finally { setLoadingPhysical(false); }
     };
     fetchPhysicalInventory();
@@ -521,27 +526,6 @@ const [sellerSoldCount, setSellerSoldCount] = useState(null);
   };
 
   useEffect(() => {
-    const fetchSales = async () => {
-      try {
-        const map = {};
-const addSale = (rawId) => {
-  if (!rawId) return;
-  const clean = String(rawId).replace("firestore-", "");
-  map[clean] = (map[clean] || 0) + 1;
-};
-        const usersSnap = await getDocs(collection(db, "users"));
-        usersSnap.docs.forEach((u) => { Object.values(u.data().purchasedBooks || {}).forEach((p) => { addSale(p.bookId || p.id || p.firestoreId); }); });
-        try {
-          const physSalesSnap = await getDocs(collection(db, "physicalSales"));
-          physSalesSnap.docs.forEach((d) => { const data = d.data(); addSale(data.bookId || data.inventoryId); });
-        } catch { }
-        setBookSalesCount(map);
-      } catch { }
-    };
-    fetchSales();
-  }, []);
-
-  useEffect(() => {
     const handleVisibility = async () => { if (!document.hidden && user) await checkPurchaseStatus(user.uid); };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
@@ -581,6 +565,7 @@ const addSale = (rawId) => {
             setIsPrintLicensingEnabled(raw.isPrintLicensingEnabled === true);
             setIsGloballyFrozen(raw.isGloballyFrozen === true);
             setNegSettings(getNegotiationSettings(raw));
+            if (Number(raw.purchases) > 0) setBookSalesCount({ [cId]: Number(raw.purchases) });
           }
         }
             } catch (err) { console.error("fetchBook error:", err); } finally { setLoading(false); }
@@ -588,83 +573,80 @@ const addSale = (rawId) => {
     if (bookId) fetchBook();
   }, [bookId]);
 
-  useEffect(() => {
-    const fetchAllBooks = async () => {
-      try {
-        const processed = booksData.map((b) => ({ ...b, image: getThumbnailUrl(b) }));
-        setAllBooks(processed);
-        try {
-          /* Fetch all approved non-frozen books */
-const snap = await getDocs(
-  query(collection(db, "advertMyBook"), where("status", "==", "approved")),
-);          /* Also fetch free books directly (same query as OpenAccessPage) */
-          const freeSnap = await getDocs(query(collection(db, "advertMyBook"), where("isFree", "==", true), where("status", "==", "approved")));
-          const freeIdsSeen = new Set();
-          const freeFirestoreBooks = [];
-          freeSnap.forEach((d) => {
-            freeIdsSeen.add(d.id);
-            const data = d.data();
-            if (!data.bookTitle) return;
-            const b = {
-              id: `firestore-${d.id}`, firestoreId: d.id,
-              title: data.bookTitle, author: data.author, category: data.category,
-              price: 0, isFree: true, accessType: "free",
-              pages: data.pages, format: data.format || "PDF",
-              description: data.description, driveFileId: data.driveFileId,
-              pdfUrl: data.pdfUrl, previewUrl: data.previewUrl, embedUrl: data.embedUrl,
-              isFromFirestore: true,
-              tableOfContents: data.tableOfContents || data.tableOfContent || null,
-            };
-            b.image = getThumbnailUrl(b);
-            freeFirestoreBooks.push(b);
-          });
-          const fb = [];
-                   snap.forEach((d) => {
-                     if (freeIdsSeen.has(d.id))
-                       return; /* skip — already in freeFirestoreBooks */
-                     const data = d.data();
-                     if (!data.bookTitle) return;
-                     if (data.isGloballyFrozen === true)
-                       return; /* skip frozen books in JS instead of the query */
-                     const b = {
-                       id: `firestore-${d.id}`,
-                       firestoreId: d.id,
-                       title: data.bookTitle,
-                       author: data.author,
-                       category: data.category,
-                       price: data.price,
-                       isFree: data.isFree,
-                       accessType: data.accessType,
-                       pages: data.pages,
-                       format: data.format || "PDF",
-                       description: data.description,
-                       driveFileId: data.driveFileId,
-                       pdfUrl: data.pdfUrl,
-                       previewUrl: data.previewUrl,
-                       embedUrl: data.embedUrl,
-                       isFromFirestore: true,
-                       tableOfContents:
-                         data.tableOfContents || data.tableOfContent || null,
-                     };
-                     b.image = getThumbnailUrl(b);
-                     fb.push(b);
-                   });
-          /* ── All three arrays are now fully built — combine and split ── */
-          const combined = [...processed, ...fb, ...freeFirestoreBooks].sort(() => Math.random() - 0.5);
-          setAllBooks(combined);
-          const freeSuggestions = [...freeFirestoreBooks, ...processed.filter(b => isOpenAccess(b))].slice(0, 6);
-          setSuggestedFreeBooks(freeSuggestions);
-          setSuggestedPaidBooks(fb.filter(b => !isOpenAccess(b)).slice(0, 6));
-        } catch { }
-      } catch {
-        const fallback = booksData.map((b) => ({ ...b, image: getThumbnailUrl(b) }));
-        setAllBooks(fallback);
-        setSuggestedFreeBooks(fallback.filter(b => isOpenAccess(b)).slice(0, 6));
-        setSuggestedPaidBooks(fallback.filter(b => !isOpenAccess(b)).slice(0, 6));
-      }
-    };
-    fetchAllBooks();
-  }, []);
+   useEffect(() => {
+     const fetchAllBooks = async () => {
+       const processed = booksData.map((b) => ({
+         ...b,
+         image: getThumbnailUrl(b),
+       }));
+       setAllBooks(processed);
+
+       const toBook = (d, free) => {
+         const data = d.data();
+         if (!data.bookTitle || data.isGloballyFrozen === true) return null;
+         const b = {
+           id: `firestore-${d.id}`,
+           firestoreId: d.id,
+           title: data.bookTitle,
+           author: data.author,
+           category: data.category,
+           price: free ? 0 : data.price,
+           isFree: free ? true : data.isFree,
+           accessType: free ? "free" : data.accessType,
+           pages: data.pages,
+           format: data.format || "PDF",
+           description: data.description,
+           driveFileId: data.driveFileId,
+           pdfUrl: data.pdfUrl,
+           previewUrl: data.previewUrl,
+           embedUrl: data.embedUrl,
+           isFromFirestore: true,
+           tableOfContents: data.tableOfContents || data.tableOfContent || null,
+         };
+         b.image = getThumbnailUrl(b);
+         return b;
+       };
+
+       let freeFirestoreBooks = [];
+       let paidBooks = [];
+       try {
+         const [freeSnap, paidSnap] = await Promise.all([
+           getDocs(
+             query(
+               collection(db, "advertMyBook"),
+               where("isFree", "==", true),
+               where("status", "==", "approved"),
+               limit(8),
+             ),
+           ),
+           getDocs(
+             query(
+               collection(db, "advertMyBook"),
+               where("status", "==", "approved"),
+               where("price", ">", 0),
+               limit(8),
+             ),
+           ),
+         ]);
+         freeFirestoreBooks = freeSnap.docs
+           .map((d) => toBook(d, true))
+           .filter(Boolean);
+         paidBooks = paidSnap.docs.map((d) => toBook(d, false)).filter(Boolean);
+       } catch {}
+
+       setAllBooks([...processed, ...paidBooks, ...freeFirestoreBooks]);
+       setSuggestedFreeBooks(
+         [
+           ...freeFirestoreBooks,
+           ...processed.filter((b) => isOpenAccess(b)),
+         ].slice(0, 6),
+       );
+       setSuggestedPaidBooks(
+         paidBooks.filter((b) => !isOpenAccess(b)).slice(0, 6),
+       );
+     };
+     fetchAllBooks();
+   }, []);
 
   const checkPurchaseStatus = async (userId) => {
     try {

@@ -6,14 +6,7 @@ import { doc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebaseConfig";
 import { uploadImageToCloudinary } from "@/lib/uploadImageToCloudinary";
 import { AFRICAN_COUNTRIES } from "@/lib/africanCountries";
-import {
-  X,
-  ShieldCheck,
-  Clock,
-  AlertCircle,
-  Upload,
-  CheckCircle,
-} from "lucide-react";
+import { X, ShieldCheck, Clock, AlertCircle, Upload, CheckCircle, Eye, EyeOff } from "lucide-react";
 
 const NAVY = "#0d2244";
 const GOLD = "#b8963e";
@@ -61,7 +54,12 @@ export function useKycStatus(uid) {
       (s) =>
         setState({
           loading: false,
-          status: s.exists() ? s.data().status || "pending" : "none",
+          status: s.exists()
+            ? String(s.data().status || "pending")
+                .trim()
+                .toLowerCase()
+            : "none",
+
           data: s.exists() ? s.data() : null,
         }),
       () => setState({ loading: false, status: "none", data: null }),
@@ -182,6 +180,163 @@ export function KycCard({ kyc, onStart }) {
         </button>
       )}
     </div>
+  );
+}
+
+/* ── approved summary (read-only, owner only) ────────────────── */
+/* ── approved details modal (owner only) ─────────────────────── */
+export function KycDetailsModal({ open, onClose, kyc }) {
+  const [reveal, setReveal] = useState(false);
+  useEffect(() => { if (!open) setReveal(false); }, [open]);
+
+  const d = kyc?.data;
+  if (!open || !d || typeof document === "undefined") return null;
+
+  const idLabel = ID_TYPES.find((t) => t.value === d.idType)?.label || d.idType;
+  const country = AFRICAN_COUNTRIES.find((c) => c.code === d.country)?.name || d.country;
+  const fmtDate = (t) =>
+    t?.toDate?.().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) || null;
+
+  const idNumber = String(d.idNumber || "");
+  const masked = idNumber
+    ? "•".repeat(Math.max(idNumber.length - 4, 0)) + idNumber.slice(-4)
+    : "—";
+
+  const rows = [
+    ["Full name", d.fullName],
+    ["Date of birth", d.dateOfBirth],
+    ["Phone", d.phone],
+    ["Email", d.email],
+    ["Address", d.address],
+    ["Country", country],
+    ["ID type", idLabel],
+    ["Submitted", fmtDate(d.submittedAt)],
+    ["Reviewed", fmtDate(d.reviewedAt)],
+  ];
+
+  const photos = [
+    ["Front of ID", d.frontUrl],
+    ["Back of ID", d.backUrl],
+    ["Selfie holding ID", d.selfieUrl],
+  ].filter(([, url]) => !!url);
+
+  const rowStyle = {
+    display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12,
+    padding: "8px 0", borderBottom: "0.5px solid #f0ebe0", fontFamily: "'Lato',sans-serif",
+  };
+
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(7,19,31,.7)", zIndex: 1500,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 16, backdropFilter: "blur(4px)",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label="Identity details"
+        style={{
+          background: "#fff", width: "100%", maxWidth: 520, maxHeight: "92vh",
+          display: "flex", flexDirection: "column", border: `0.5px solid ${LINE}`,
+        }}
+      >
+        <div style={{ background: NAVY, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+          <div>
+            <p style={{ fontSize: 11, color: GOLD, fontWeight: 700, margin: "0 0 3px", fontFamily: "'Lato',sans-serif" }}>
+              Identity verification
+            </p>
+            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 700, color: "#fff", margin: 0 }}>
+              Your submitted details
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            style={{ width: 32, height: 32, border: "0.5px solid rgba(255,255,255,.2)", background: "transparent", color: "rgba(255,255,255,.7)", display: "grid", placeItems: "center", cursor: "pointer" }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div style={{ padding: 20, overflowY: "auto", flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f0fdf4", border: "0.5px solid #bbf7d0", padding: "10px 12px", marginBottom: 14 }}>
+            <CheckCircle size={16} style={{ color: "#16a34a" }} />
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#166534", fontFamily: "'Lato',sans-serif" }}>
+              Identity verified
+            </span>
+          </div>
+
+          {rows.map(([k, v]) => (
+            <div key={k} style={rowStyle}>
+              <span style={{ color: "#888", flexShrink: 0 }}>{k}</span>
+              <span style={{ fontWeight: 700, color: NAVY, textAlign: "right", wordBreak: "break-word" }}>{v || "—"}</span>
+            </div>
+          ))}
+
+          {/* ID number with eye toggle */}
+          <div style={{ ...rowStyle, alignItems: "center" }}>
+            <span style={{ color: "#888", flexShrink: 0 }}>ID number</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontFamily: "monospace", fontWeight: 700, color: NAVY, letterSpacing: "0.08em", fontSize: 13 }}>
+                {reveal ? idNumber || "—" : masked}
+              </span>
+              {idNumber && (
+                <button
+                  type="button"
+                  onClick={() => setReveal((r) => !r)}
+                  aria-label={reveal ? "Hide ID number" : "Show ID number"}
+                  title={reveal ? "Hide" : "Show"}
+                  style={{ width: 28, height: 28, display: "grid", placeItems: "center", background: CREAM, border: `0.5px solid ${LINE}`, color: NAVY, cursor: "pointer" }}
+                >
+                  {reveal ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              )}
+            </span>
+          </div>
+
+          {d.reviewNote && (
+            <div style={{ ...rowStyle, borderBottom: "none" }}>
+              <span style={{ color: "#888", flexShrink: 0 }}>Review note</span>
+              <span style={{ fontWeight: 700, color: NAVY, textAlign: "right" }}>{d.reviewNote}</span>
+            </div>
+          )}
+
+          {photos.length > 0 && (
+            <>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: GOLD, margin: "18px 0 10px", fontFamily: "'Lato',sans-serif" }}>
+                Documents
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
+                {photos.map(([label, url]) => (
+                  <div key={label}>
+                    <p style={{ ...lbl, marginBottom: 4 }}>{label}</p>
+                    <a href={url} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: CREAM, border: `0.5px solid ${LINE}` }}>
+                      <img src={url} alt={label} style={{ width: "100%", maxHeight: 240, objectFit: "contain", display: "block" }} />
+                    </a>
+                  </div>
+                ))}
+              </div>
+              <p style={{ fontSize: 10, color: "#aaa", margin: "8px 0 0", fontFamily: "'Lato',sans-serif" }}>
+                Tap a photo to open it full size.
+              </p>
+            </>
+          )}
+        </div>
+
+        <div style={{ padding: "14px 20px", borderTop: `0.5px solid ${LINE}`, flexShrink: 0 }}>
+          <button
+            onClick={onClose}
+            style={{ width: "100%", background: NAVY, color: "#fff", padding: 12, border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

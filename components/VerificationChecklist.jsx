@@ -24,8 +24,13 @@ export default function VerificationChecklist({ onPay /* () => start Flutterwave
         return res.json();
     }, [route]);
 
-    useEffect(() => { setData(null); call("GET").then(setData).catch(() => setErr("Could not load your progress.")); }, [call]);
-
+useEffect(() => {
+    setData(null); setErr("");
+    call("GET")
+        .then((r) => (r?.success === false ? setErr(r.error || "Could not load your progress.") : setData(r)))
+        .catch(() => setErr("Could not load your progress."));
+}, [call]);
+  
     const apply = async () => {
         setBusy(true); setErr("");
         const r = await call("POST", { route });

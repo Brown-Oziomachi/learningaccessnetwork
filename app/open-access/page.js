@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { collection, query, where, orderBy, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, orderBy, limit, getDocs, getCountFromServer, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 import Navbar from "@/components/NavBar";
 import Footer from "@/components/FooterComp";
@@ -368,6 +368,7 @@ export default function OpenAccessPage() {
     const [freeContributors, setFreeContributors] = useState([]);
     const [showContributorsModal, setShowContributorsModal] = useState(false);
     const [showModal, setShowModal]       = useState(false);
+    const [totalFree, setTotalFree] = useState(null);
 
     /* ── Fetch all free books (no limit) ── */
     useEffect(() => {
@@ -377,10 +378,13 @@ export default function OpenAccessPage() {
                     collection(db, "advertMyBook"),
                     where("isFree", "==", true),
                     where("status", "==", "approved"),
-                    orderBy("createdAt", "desc")
-                    /* ← NO limit() — show everything */
+                                      orderBy("createdAt", "desc"),
+                    limit(60)
                 );
                 const snap = await getDocs(q);
+                getCountFromServer(
+                    query(collection(db, "advertMyBook"), where("isFree", "==", true), where("status", "==", "approved"))
+                ).then(s => setTotalFree(s.data().count)).catch(() => {});
                 const arr = [];
                 const sellerMap = {}; /* uid → { name, photoURL, bookCount } */
 
@@ -681,8 +685,7 @@ const hasMoreContributors = contributors.length > 6;
                         {/* Stats */}
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 32, borderTop: "0.5px solid rgba(134,239,172,0.15)", paddingTop: 24 }}>
                             {[
-                                { val: loading ? "…" : books.length, label: "Free Documents" },
-                                { val: "0₦",                          label: "Cost to Access" },
+                                { val: loading ? "…" : (totalFree ?? books.length), label: "Free Documents" },                                { val: "0₦",                          label: "Cost to Access" },
                                 { val: contributors.length || "…",    label: "Contributors" },
                                 { val: "Always",                      label: "Available" },
                             ].map(({ val, label }) => (

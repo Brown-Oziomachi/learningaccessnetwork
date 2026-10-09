@@ -242,7 +242,6 @@ function BidModal({ bounty, user, onClose, viewCurrency }) {
   const handleClaim = async () => {
     setLoading(true); setError("");
     try {
-      await incrementProposals(bounty.id);
       await claimBountyWithNotification(bounty.id, user.uid, user);
       setSubmitted(true);
     } catch (e) {
@@ -948,7 +947,7 @@ function TrackPanel({ bounty, onClose, viewCurrency }) {
    EDIT PANEL  (owner only)
 ══════════════════════════════════════════════════════════ */
 function EditPanel({ bounty, onClose }) {
-  const [form,   setForm]   = useState({ title: bounty.title || "", tags: (bounty.tags || []).join(", ") });
+  const [form, setForm] = useState({ description: bounty.description || "", tags: (bounty.tags || []).join(", ") });
   const [saving, setSaving] = useState(false);
   const inp = { padding: "10px 12px", border: "0.5px solid #e5ddd0", fontSize: 13, fontFamily: "'Lato',sans-serif", outline: "none", width: "100%", background: BG, color: NAVY, boxSizing: "border-box" };
 
@@ -957,44 +956,191 @@ function EditPanel({ bounty, onClose }) {
     try {
       const { updateDoc, doc: fd } = await import("firebase/firestore");
       const tags = form.tags ? form.tags.split(",").map(t => t.trim()).filter(Boolean) : [];
-      await updateDoc(fd(db, "bounties", bounty.id), { title: form.title, tags });
+      await updateDoc(fd(db, "bounties", bounty.id), { description: form.description.trim(), tags });
       onClose();
     } catch (e) { alert("Failed to save: " + e.message); }
     finally { setSaving(false); }
   };
 
   return createPortal(
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(7,19,31,.6)", zIndex: 1300, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(4px)" }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", maxWidth: 440, width: "100%", border: "0.5px solid #e5ddd0", animation: "fadeUp .28s both" }}>
-        <div style={{ background: NAVY, padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(7,19,31,.6)",
+        zIndex: 1300,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        backdropFilter: "blur(4px)",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#fff",
+          maxWidth: 440,
+          width: "100%",
+          border: "0.5px solid #e5ddd0",
+          animation: "fadeUp .28s both",
+        }}
+      >
+        <div
+          style={{
+            background: NAVY,
+            padding: "18px 20px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <div>
-            <p style={{ fontSize: 9, color: GOLD, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", margin: "0 0 3px" }}>Edit</p>
-            <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>Update Bounty</p>
+            <p
+              style={{
+                fontSize: 9,
+                color: GOLD,
+                fontWeight: 700,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                fontFamily: "'Lato',sans-serif",
+                margin: "0 0 3px",
+              }}
+            >
+              Edit
+            </p>
+            <p
+              style={{
+                fontFamily: "'Playfair Display',serif",
+                fontSize: 16,
+                fontWeight: 700,
+                color: "#fff",
+                margin: 0,
+              }}
+            >
+              Update Bounty
+            </p>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,.4)", fontSize: 22, cursor: "pointer" }}>×</button>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(255,255,255,.4)",
+              fontSize: 22,
+              cursor: "pointer",
+            }}
+          >
+            ×
+          </button>
         </div>
-        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ padding: "10px 14px", background: "rgba(184,150,62,.07)", border: "0.5px solid rgba(184,150,62,.25)", fontSize: 12, color: "#a16207", fontFamily: "'Lato',sans-serif", lineHeight: 1.65 }}>
+        <div
+          style={{
+            padding: 20,
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
+          <div
+            style={{
+              padding: "10px 14px",
+              background: "rgba(184,150,62,.07)",
+              border: "0.5px solid rgba(184,150,62,.25)",
+              fontSize: 12,
+              color: "#a16207",
+              fontFamily: "'Lato',sans-serif",
+              lineHeight: 1.65,
+            }}
+          >
             Only description and tags can be edited after posting.
           </div>
           <div>
-            <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aaa", fontFamily: "'Lato',sans-serif", display: "block", marginBottom: 6 }}>Description</label>
-            <textarea value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} rows={3} style={{ ...inp, resize: "vertical", lineHeight: 1.6 }} />
+            <label
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: "#aaa",
+                fontFamily: "'Lato',sans-serif",
+                display: "block",
+                marginBottom: 6,
+              }}
+            >
+              Description
+            </label>
+            <textarea
+              value={form.description}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, description: e.target.value }))
+              }
+              rows={3}
+              style={{ ...inp, resize: "vertical", lineHeight: 1.6 }}
+            />
           </div>
           <div>
-            <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aaa", fontFamily: "'Lato',sans-serif", display: "block", marginBottom: 6 }}>Tags (comma-separated)</label>
-            <input value={form.tags} onChange={e => setForm(p => ({ ...p, tags: e.target.value }))} style={inp} placeholder="e.g. Past Questions, Maths" />
+            <label
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: "#aaa",
+                fontFamily: "'Lato',sans-serif",
+                display: "block",
+                marginBottom: 6,
+              }}
+            >
+              Tags (comma-separated)
+            </label>
+            <input
+              value={form.tags}
+              onChange={(e) => setForm((p) => ({ ...p, tags: e.target.value }))}
+              style={inp}
+              placeholder="e.g. Past Questions, Maths"
+            />
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={onClose} style={{ flex: 1, padding: "12px", background: "#f5f5f5", color: "#666", border: "0.5px solid #e5ddd0", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>Cancel</button>
-            <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: "12px", background: saving ? "#ccc" : GOLD, color: NAVY, border: "none", fontSize: 12, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", fontFamily: "'Lato',sans-serif" }}>
+            <button
+              onClick={onClose}
+              style={{
+                flex: 1,
+                padding: "12px",
+                background: "#f5f5f5",
+                color: "#666",
+                border: "0.5px solid #e5ddd0",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "'Lato',sans-serif",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                flex: 1,
+                padding: "12px",
+                background: saving ? "#ccc" : GOLD,
+                color: NAVY,
+                border: "none",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: saving ? "not-allowed" : "pointer",
+                fontFamily: "'Lato',sans-serif",
+              }}
+            >
               {saving ? "Saving…" : "Save Changes"}
             </button>
           </div>
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }
 
@@ -1187,9 +1333,10 @@ const [descExpanded, setDescExpanded] = useState(false);
           >
             Your bounty ·{" "}
             <strong style={{ color: NAVY }}>
-              `${displaySymbol}${fmtAmt(displayAmt, viewCurrency)}
+              {displaySymbol}
+              {fmtAmt(displayAmt, viewCurrency)}
             </strong>{" "}
-            in escrow`
+            in escrow
           </span>
         </div>
       );

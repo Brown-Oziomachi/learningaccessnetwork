@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { calculatePaymentDistribution } from '@/utils/paymentProcessor';
-import { sendServerNotification } from '@/lib/notificationEngine';
+import { sendServerNotification, notifyUser } from '@/lib/notificationEngine';
 import { serverFetchBookDetails } from '@/lib/serverBookUtils';
 import { adminDb, admin } from '@/lib/firebase-admin';
 import { resolveNegotiatedPrice } from '@/lib/negotiationPricing';
 
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://lanlibrary.com';
+const maskEmail = (e = '') => e.replace(/^(.).*(@.*)$/, '$1***$2');
 // units of `currency` per 1 NGN
 async function getNgnRate(currency) {
     const res = await fetch('https://open.er-api.com/v6/latest/NGN');
@@ -52,7 +54,7 @@ export async function POST(request) {
 
             const revenueRef = adminDb.collection('revenue').doc(`boost-${tx_ref}`);
             const promoDocRef = adminDb.collection('promotions').doc(`promo-${tx_ref}`);
-            const bookRef = adminDb.collection('advertMyBook').doc(bookId);
+            const bookRef = adminDb.collection('advertMyBook').doc(String(bookId).replace('firestore-', ''));
             const txDocRef = adminDb.collection('transactions').doc(tx_ref);
             const durationDays = days || 7;
 
@@ -106,7 +108,7 @@ export async function POST(request) {
                         webhookConfirmed: true,
                         clicks: 0,
                         impressions: 0,
-                        expiryDate: null,
+                        expiryDate: admin.firestore.Timestamp.fromMillis(Date.now() + Number(durationDays) * 86400000),
                         startDate: admin.firestore.FieldValue.serverTimestamp(),
                         createdAt: admin.firestore.FieldValue.serverTimestamp(),
                     });
@@ -158,15 +160,52 @@ export async function POST(request) {
             ROUTE B: BOUNTY ESCROW PROCESSING
            ══════════════════════════════════════════════════════════ */
         if (tx_ref.startsWith('bounty_')) {
-            const posterId = metadata.userId || tx_ref.split('_')[1];
-            const bountyTitle = metadata.bountyTitle || 'Academic Request Documentation';
+            const posterId = tx_ref.split('_')[1];
+            if (!posterId) {
+                return NextResponse.json({ error: 'Bad bounty reference' }, { status: 400 });
+            }
 
+            let rate;
+            try {
+                rate = currency === 'NGN' ? 1 : await getNgnRate(currency);
+            } catch (e) {
+                console.error('Rate lookup failed:', e.message);
+                return NextResponse.json({ error: 'Rate unavailable, retry' }, { status: 500 });
+            }
+            const rewardNGN = Math.round(amount / rate);
+
+            const posterSnap = await adminDb.collection('users').doc(posterId).get();
+            const poster = posterSnap.exists ? posterSnap.data() : {};
+            const postedBy =
+                poster.displayName ||
+                `${poster.firstName || ''} ${poster.surname || ''}`.trim() ||
+                customer.name || 'Student';
+
+            const bountyId = `escrow-${tx_ref}`;
             const txDocRef = adminDb.collection('transactions').doc(tx_ref);
-            const bountyDocRef = adminDb.collection('bounties').doc(`escrow-${tx_ref}`);
+            const bountyRef = adminDb.collection('bounties').doc(bountyId);
+            const privateRef = adminDb.collection('bountyPrivate').doc(bountyId);
+
+            const title = String(metadata.title || 'Academic request').slice(0, 200);
+            const description = String(metadata.description || '').slice(0, 500);
+            const university = String(metadata.university || '').slice(0, 120);
+            const department = String(metadata.department || '').slice(0, 120);
+            const deadline = metadata.deadline || null;
+            const tags = String(metadata.tags || '').split(',').map(t => t.trim()).filter(Boolean).slice(0, 8);
+
+            if (rewardNGN < 100) {
+                await adminDb.collection('flaggedTransactions').doc(tx_ref).set({
+                    tx_ref, posterId, amount, currency, reason: 'bounty_below_minimum',
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                return NextResponse.json({ message: 'Flagged: below minimum' }, { status: 200 });
+            }
 
             const escrowResult = await adminDb.runTransaction(async (transaction) => {
                 const txSnap = await transaction.get(txDocRef);
                 if (txSnap.exists) return { duplicate: true };
+
+                const ts = admin.firestore.FieldValue.serverTimestamp();
 
                 transaction.set(txDocRef, {
                     transactionId: tx_ref,
@@ -175,37 +214,52 @@ export async function POST(request) {
                     userId: posterId,
                     sellerId: 'ESCROW_PLATFORM',
                     buyerEmail: customer.email || null,
-                    buyerName: customer.name || 'Student Account',
-                    buyerPhone: customer.phone || null,
+                    buyerName: customer.name || 'Student',
                     bookId: 'bounty_escrow',
-                    bookTitle: bountyTitle,
-                    amount: amount,
+                    bookTitle: title,
+                    amount,
+                    amountNGN: rewardNGN,
                     platformFee: 0,
-                    sellerAmount: amount,
-                    exchangeRateUsed: 1,
+                    sellerAmount: rewardNGN,
                     currency: currency || 'NGN',
                     type: 'bounty_escrow_funding',
                     status: 'completed',
                     paymentMethod: paymentData.payment_type || 'card',
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    createdAt: ts,
                 });
 
-                transaction.set(bountyDocRef, {
-                    bountyId: `escrow-${tx_ref}`,
-                    posterId,
-                    posterEmail: customer.email,
-                    posterName: customer.name || 'Student',
-                    title: bountyTitle,
-                    reward: amount,
-                    status: 'open',
+                transaction.set(bountyRef, {
+                    title, description, university, department,
+                    reward: rewardNGN,
+                    rewardLocal: amount,
+                    rewardCurrency: currency || 'NGN',
+                    deadline, tags,
+                    postedBy,
+                    postedByUid: posterId,
                     paymentRef: tx_ref,
                     paymentMethod: 'flutterwave',
-                    university: metadata.university || null,
-                    department: metadata.department || null,
+                    escrowAmount: rewardNGN,
+                    escrowLocked: true,
+                    escrowStatus: 'locked',
+                    status: 'open',
+                    proposals: 0,
+                    maxProposals: 10,
+                    claimedBy: [],
+                    claimedByUid: null,
+                    claimedByName: null,
+                    linkedBookId: null,
                     webhookConfirmed: true,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                }, { merge: true });
+                    createdAt: ts,
+                    updatedAt: ts,
+                });
+
+                // email/phone live in an Admin-only doc, not on the public bounty
+                transaction.set(privateRef, {
+                    posterId,
+                    posterEmail: customer.email || null,
+                    posterPhone: customer.phone_number || customer.phone || null,
+                    createdAt: ts,
+                });
 
                 return { duplicate: false };
             });
@@ -214,23 +268,7 @@ export async function POST(request) {
                 return NextResponse.json({ message: 'Bounty transaction already tracked' }, { status: 200 });
             }
 
-            if (customer.email) {
-                sendServerNotification({
-                    type: 'new_bounty',
-                    to: customer.email,
-                    userId: posterId,
-                    data: {
-                        posterName: customer.name || 'Student',
-                        bountyTitle,
-                        reward: amount,
-                        university: metadata.university || '',
-                        department: metadata.department || '',
-                        ctaUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/academic/bounty/board`,
-                    },
-                }).catch(e => console.error('Bounty confirmation dispatch error:', e.message));
-            }
-
-            return NextResponse.json({ message: 'Bounty escrow account captured cleanly' }, { status: 200 });
+            return NextResponse.json({ message: 'Bounty escrow captured' }, { status: 200 });
         }
 
         /* ══════════════════════════════════════════════════════════
@@ -238,23 +276,23 @@ export async function POST(request) {
            ══════════════════════════════════════════════════════════ */
         if (metadata.printLicense === true || metadata.printLicense === 'true') {
             const buyerId = metadata.userId || payload.data.customer?.id;
-            const bookId = metadata.bookId;
+            const printBookId = metadata.bookId;
 
-            if (!buyerId || !bookId) {
+            if (!buyerId || !printBookId) {
                 console.error(' Missing print permission identification properties:', metadata);
                 return NextResponse.json({ error: 'Missing metadata for license configuration' }, { status: 400 });
             }
 
-            const verifiedBook = await serverFetchBookDetails(bookId);
-            const bookTitle = verifiedBook ? verifiedBook.title : 'Academic Material Document';
-            const txDocRef = adminDb.collection('transactions').doc(tx_ref);
+            const verifiedPrintBook = await serverFetchBookDetails(printBookId);
+            const bookTitle = verifiedPrintBook ? verifiedPrintBook.title : 'Academic Material Document';
+            const txDocRefPrint = adminDb.collection('transactions').doc(tx_ref);
             const userLicenseRef = adminDb.collection('users').doc(buyerId);
 
             const licenseResult = await adminDb.runTransaction(async (transaction) => {
-                const txSnap = await transaction.get(txDocRef);
+                const txSnap = await transaction.get(txDocRefPrint);
                 if (txSnap.exists) return { duplicate: true };
 
-                transaction.set(txDocRef, {
+                transaction.set(txDocRefPrint, {
                     transactionRef: tx_ref,
                     userId: buyerId,
                     buyerEmail: customer.email,
@@ -262,7 +300,7 @@ export async function POST(request) {
                     amount,
                     currency,
                     type: 'print_license_purchase',
-                    bookId,
+                    bookId: printBookId,
                     bookTitle,
                     status: 'completed',
                     paymentMethod: paymentData.payment_type || 'card',
@@ -271,7 +309,7 @@ export async function POST(request) {
 
                 const userSnap = await transaction.get(userLicenseRef);
                 const licensePayload = {
-                    bookId,
+                    bookId: printBookId,
                     bookTitle,
                     licensedAt: new Date().toISOString(),
                     paymentRef: tx_ref,
@@ -280,11 +318,11 @@ export async function POST(request) {
 
                 if (userSnap.exists) {
                     transaction.update(userLicenseRef, {
-                        [`printPermissions.${bookId}`]: licensePayload,
+                        [`printPermissions.${printBookId}`]: licensePayload,
                     });
                 } else {
                     transaction.set(userLicenseRef, {
-                        printPermissions: { [bookId]: licensePayload }
+                        printPermissions: { [printBookId]: licensePayload }
                     }, { merge: true });
                 }
 
@@ -296,17 +334,45 @@ export async function POST(request) {
             }
 
             if (customer.email) {
-                sendServerNotification({
-                    type: 'print_license_confirmed',
-                    to: customer.email,
-                    userId: buyerId,
-                    data: {
-                        buyerName: customer.name || 'Reader',
-                        bookTitle,
-                        orderId: tx_ref,
-                        ctaUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/document/${bookId}`,
-                    },
-                }).catch(e => console.error('Print authorization confirmation dispatch error:', e.message));
+                after(async () => {
+                    const jobs = [];
+                    if (activeSellerId !== 'PLATFORM_ADMIN') {
+                        jobs.push(notifyUser({
+                            userId: activeSellerId,
+                            to: verifiedPrintBook?.sellerEmail,
+                            type: 'sale_alert',
+                            data: {
+                                sellerName: verifiedPrintBook?.sellerName || 'Seller',
+                                bookTitle: verifiedPrintBook?.title,
+                                amount: expectedNGN,
+                                netEarning,
+                                buyerEmail: maskEmail(customer.email),
+                                currentBalance: referralResult.currentBalance,
+                            },
+                            inApp: {
+                                type: 'sale',
+                                title: 'New sale 🎉',
+                                message: `"${verifiedPrintBook?.title}" sold. ₦${Number(netEarning).toLocaleString('en-NG')} added to your balance.`,
+                                link: '/my-account/seller-account',
+                            },
+                        }));
+                    }
+                    if (customer.email) {
+                        jobs.push(sendServerNotification({
+                            type: 'order_receipt',
+                            to: customer.email,
+                            userId,
+                            data: {
+                                buyerName: customer.name || 'Reader',
+                                bookTitle: verifiedPrintBook?.title,
+                                amount: expectedNGN,        // the receipt prints ₦, so pass the naira value
+                                sellerName: verifiedBook.sellerName || 'LAN Library',
+                                orderId: tx_ref,
+                            },
+                        }));
+                    }
+                    await Promise.allSettled(jobs);
+                });
             }
 
             return NextResponse.json({ message: 'Print license permissions issued successfully' }, { status: 200 });
@@ -452,7 +518,7 @@ export async function POST(request) {
 
             if (qualifiedReferralRef && referralData) {
                 const referrerUserRef = adminDb.collection('users').doc(referralData.referrerId);
-                const rewardPayout = referralData.reward || 500;
+                const rewardPayout = 500;
 
                 transaction.update(qualifiedReferralRef, {
                     status: 'completed',
@@ -475,7 +541,7 @@ export async function POST(request) {
                 bookTitle: verifiedBook.title,
                 amount,                       // what Flutterwave charged, in `currency`
                 amountNGN: expectedNGN,       // what the sale is worth in naira
-                netEarning,
+                netEarning, sellerAmount: netEarning, buyerCountry: userSnap.exists ? (userSnap.data().country || null) : null,
                 platformFee,
                 currency,
                 negotiationId: negSnap?.exists ? negRef.id : null,
@@ -531,38 +597,37 @@ export async function POST(request) {
             }).catch(e => console.error('Referral notification drop:', e));
         }
 
-        if (verifiedBook.sellerEmail) {
-            sendServerNotification({
-                type: 'sale_alert',
-                to: verifiedBook.sellerEmail,
-                userId: activeSellerId,
-                data: {
-                    sellerName: verifiedBook.sellerName || 'Seller',
-                    bookTitle: verifiedBook.title,
-                    amount: expectedNGN,
-                    netEarning,
-                    buyerEmail: customer.email,
-                    currentBalance: referralResult.currentBalance,
-                },
-            }).catch(e => console.error('Seller Sale Alert delivery error:', e.message));
-        }
-
-        if (customer.email) {
-            sendServerNotification({
-                type: 'order_receipt',
-                to: customer.email,
-                userId,
-                data: {
-                    buyerName: customer.name || 'Reader',
-                    bookTitle: verifiedBook.title,
-                    amount,
-                    currency,
-                    sellerName: verifiedBook.sellerName || 'LAN Library',
-                    orderId: tx_ref,
-                },
-            }).catch(e => console.error(' Buyer Receipt delivery error:', e.message));
-        }
-
+         after(async () => {
+                const link = `/academic/bounty/board?highlight=${bountyId}`;
+                const rewardFmt = `₦${rewardNGN.toLocaleString('en-NG')}`;
+                await Promise.allSettled([
+                    adminDb.collection('globalNotifications').add({
+                        type: 'new_bounty',
+                        title: 'New Bounty Posted on the Board 💰',
+                        message: `${postedBy} posted a ${rewardFmt} bounty: "${title}". Be the first to claim it!`,
+                        link,
+                        bountyId,
+                        reward: rewardNGN,
+                        posterName: postedBy,
+                        university,
+                        department,
+                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    }),
+                    notifyUser({
+                        userId: posterId,
+                        to: customer.email,
+                        type: 'bounty_posted',
+                        data: { bountyTitle: title, reward: rewardNGN, ctaUrl: `${SITE}${link}` },
+                        inApp: {
+                            type: 'new_bounty',
+                            title: 'Your bounty is live 🎯',
+                            message: `${rewardFmt} is held in escrow for "${title}".`,
+                            link,
+                        },
+                    }),
+                ]);
+         });
+        
         return NextResponse.json({ message: 'Webhook ledger transaction processed securely' }, { status: 200 });
 
     } catch (error) {
@@ -572,4 +637,8 @@ export async function POST(request) {
             { status: 500 }
         );
     }
+}
+
+export async function GET() {
+    return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
 }

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
 import { booksData } from "@/lib/booksData";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, increment, orderBy } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, increment, orderBy, limit } from 'firebase/firestore';
 import Navbar from '@/components/NavBar';
 import Footer from '@/components/FooterComp';
 import { useAds, injectAds } from "@/lib/useAds";
@@ -200,23 +200,6 @@ export default function AllBooksClient() {
         return book.image || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
     };
 
-    /* ── feedback ── */
-    useEffect(() => {
-        const fetchFeedback = async () => {
-            try {
-                const snap = await getDocs(collection(db, "bookFeedbacks"));
-                const map = {};
-                snap.forEach(d => {
-                    const id = d.data().bookId; if (!id) return;
-                    const clean = id.replace("firestore-", "");
-                    [id, clean, `firestore-${clean}`].forEach(k => { map[k] = (map[k] || 0) + 1; });
-                });
-                setBookFeedbackCounts(map);
-            } catch { }
-        };
-        fetchFeedback();
-    }, []);
-
     const getFeedbackCount = (book) => {
         const id = String(book.id || "");
         const fid = String(book.firestoreId || "");
@@ -239,9 +222,11 @@ export default function AllBooksClient() {
                 try {
                     /* Single query — no price filter; sort by createdAt desc for freshness */
                     const snap = await getDocs(
-                        query(
+                                              query(
                             collection(db, 'advertMyBook'),
-                            where('status', '==', 'approved')
+                            where('status', '==', 'approved'),
+                            orderBy('createdAt', 'desc'),
+                            limit(60)
                         )
                     );
                     if (!snap.empty) {
@@ -257,6 +242,7 @@ export default function AllBooksClient() {
                                     author: data.author || 'Unknown',
                                     category: (data.category || 'education').toLowerCase(),
                                     price: Number(data.price) || 0,   // 0 = free
+                                    purchases: Number(data.purchases) || 0,
                                     isFree: data.isFree === true || Number(data.price) === 0,
                                     pages: data.pages || 100,
                                     format: 'PDF',
@@ -273,7 +259,10 @@ export default function AllBooksClient() {
                                 fb.push(b);
                             }
                         });
-                        fb.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                                              fb.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                        const counts = {};
+                        fb.forEach(b => { counts[b.id] = b.purchases; counts[b.firestoreId] = b.purchases; });
+                        setBookSalesCount(counts);
                         setAllBooks([...processed, ...fb]);
                     }
                 } catch { }
@@ -332,24 +321,6 @@ export default function AllBooksClient() {
     };
 
     useEffect(() => { setVisibleRows(5); }, [selectedCategory, searchQuery, sortBy]);
-
-    /* ── sales ── */
-    useEffect(() => {
-        const fetchSales = async () => {
-            try {
-                const snap = await getDocs(collection(db, "users"));
-                const map = {};
-                snap.docs.forEach(u => {
-                    Object.values(u.data().purchasedBooks || {}).forEach(p => {
-                        const id = p.bookId || p.id || p.firestoreId;
-                        if (id) { map[id] = (map[id] || 0) + 1; map[`firestore-${id}`] = (map[`firestore-${id}`] || 0) + 1; }
-                    });
-                });
-                setBookSalesCount(map);
-            } catch { }
-        };
-        fetchSales();
-    }, []);
 
     /* ── auth ── */
     useEffect(() => {

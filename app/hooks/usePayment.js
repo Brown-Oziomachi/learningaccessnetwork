@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect } from 'react';
 import { db, auth } from '@/lib/firebaseConfig';
-import { doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fallback exchange matrix (NGN base): same currencies as PaymentClient
@@ -23,11 +23,11 @@ const fetchLiveExchangeRates = async () => {
         if (!res.ok) throw new Error('Rate fetch failed');
         const data = await res.json();
         if (data?.rates) {
-            return { ...FALLBACK_EXCHANGE_MATRIX, ...data.rates, NGN: 1 };
+            return { ...FALLBACK_EXCHANGE_MATRIX, ...data.rates, NGN: 1, __live: true };
         }
-        return FALLBACK_EXCHANGE_MATRIX;
+        return { ...FALLBACK_EXCHANGE_MATRIX, __live: false };
     } catch {
-        return FALLBACK_EXCHANGE_MATRIX;
+        return { ...FALLBACK_EXCHANGE_MATRIX, __live: false };
     }
 };
 
@@ -46,6 +46,19 @@ const fetchWithTimeout = async (url, options, timeoutMs = 15000) => {
         }
         throw err;
     }
+};
+
+const callApi = async (path, body) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error('Please sign in again.');
+    const res = await fetchWithTimeout(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+        body: JSON.stringify(body || {}),
+    }, 15000);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Request failed.');
+    return data;
 };
 
 export const usePayment = (book, formData, options = {}) => {
@@ -96,8 +109,8 @@ export const usePayment = (book, formData, options = {}) => {
             return;
         }
         // NEW: don't charge a foreign currency before live rates are in
-        if (targetCurrency !== 'NGN' && !ratesLoaded) {
-            setError({ message: "Fetching exchange rates. Please try again in a moment." });
+        if (targetCurrency !== 'NGN' && (!ratesLoaded || !exchangeMatrix.__live)) {
+            setError({ message: "Live exchange rates are unavailable. Please pay in NGN or try again shortly." });
             return;
         }
 
@@ -327,54 +340,34 @@ export const usePayment = (book, formData, options = {}) => {
     const setupInitialPin = async (newPin) => {
         setProcessing(true);
         try {
-            const currentUser = auth.currentUser;
-            if (!currentUser) throw new Error("Authentication verification expired.");
-
-            const sellerRef = doc(db, 'sellers', currentUser.uid);
-            await updateDoc(sellerRef, {
-                transactionPin: newPin.toString().trim(),
-                transferPin: newPin.toString().trim(),
-                updatedAt: serverTimestamp(),
-            });
+            await callApi('/api/pin/set', { pin: String(newPin).trim() });
             return { success: true };
-        } catch {
-            setError({ message: "Failed to establish validation security pin context structures." });
+        } catch (e) {
+            setError({ message: e.message });
             return { success: false };
-        } finally {
-            setProcessing(false);
-        }
+        } finally { setProcessing(false); }
     };
 
     const requestPinReset = async () => {
-        const currentUser = auth.currentUser;
-        if (!currentUser) return { success: false };
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        setProcessing(true);
         try {
-            const sellerRef = doc(db, 'sellers', currentUser.uid);
-            await updateDoc(sellerRef, { resetOtp: otp, otpExpiry: Date.now() + 600000 });
+            await callApi('/api/pin/reset/request');
             return { success: true };
-        } catch {
+        } catch (e) {
+            setError({ message: e.message });
             return { success: false };
-        }
+        } finally { setProcessing(false); }
     };
 
     const verifyOtpAndSetPin = async (enteredOtp, newPin) => {
-        const currentUser = auth.currentUser;
-        const sellerRef = doc(db, 'sellers', currentUser.uid);
-        const sellerSnap = await getDoc(sellerRef);
-        const data = sellerSnap.data();
-
-        if (enteredOtp === data?.resetOtp && Date.now() < data?.otpExpiry) {
-            await updateDoc(sellerRef, {
-                transactionPin: newPin.toString().trim(),
-                transferPin: newPin.toString().trim(),
-                resetOtp: null,
-                otpExpiry: null,
+        setProcessing(true);
+        try {
+            await callApi('/api/pin/reset/confirm', {
+                otp: String(enteredOtp).trim(),
+                newPin: String(newPin).trim(),
             });
             return true;
-        } else {
-            throw new Error("Invalid or expired validation code confirmation mapping.");
-        }
+        } finally { setProcessing(false); }   // errors reach the dashboard's catch
     };
 
     return {

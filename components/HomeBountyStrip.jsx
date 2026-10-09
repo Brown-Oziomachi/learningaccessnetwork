@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { subscribeToLatestOpenBounties } from "@/lib/bountyService";
+ import { fetchLatestOpenBounties } from "@/lib/bountyService";
 import { useCurrency } from "@/app/context/CurrencyContext";
 
 const NAVY = "#0d2244";
@@ -41,21 +41,25 @@ export default function HomeBountyStrip() {
   const [loading, setLoading] = useState(true);
   const { fmt, currency } = useCurrency();
 
-  useEffect(() => {
-    const unsub = subscribeToLatestOpenBounties((list) => {
-      const now = Date.now();
-      const active = list.filter((b) => {
-        if (!b.deadline) return true;
-        const d = b.deadline?.toDate
-          ? b.deadline.toDate()
-          : new Date(b.deadline);
-        return d > now;
-      });
-      setBounties(active);
-      setLoading(false);
-    }, 4);
-    return () => unsub();
-  }, []);
+
+useEffect(() => {
+    let off = false;
+    (async () => {
+        try {
+            const cached = JSON.parse(sessionStorage.getItem("home_bounties") || "null");
+            let list = cached && Date.now() - cached.t < 5 * 60 * 1000 ? cached.list : null;
+            if (!list) {
+                list = await fetchLatestOpenBounties(4);
+                try { sessionStorage.setItem("home_bounties", JSON.stringify({ t: Date.now(), list })); } catch { }
+            }
+            if (off) return;
+            const now = Date.now();
+            setBounties(list.filter((b) => !b.deadline || new Date(b.deadline) > now));
+        } catch { }
+        finally { if (!off) setLoading(false); }
+    })();
+    return () => { off = true; };
+}, []);
 
   if (loading || bounties.length === 0) return null;
 

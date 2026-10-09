@@ -7,7 +7,7 @@ import {
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebaseConfig";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, increment, setDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, getCountFromServer, serverTimestamp, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/NavBar";
@@ -22,10 +22,9 @@ import BountyDashboardCard from "./Bounty-cashboard-card/page";
 import { createPortal } from "react-dom";
 import { AFRICAN_COUNTRIES } from "@/lib/africanCountries";
 import { NegotiationHost, NegotiationInboxCard } from "@/components/negotiation/NegotiationHost";
-import { useNegotiationBadge } from "@/lib/negotiation";  
 import { paidVerificationActive, useVerificationReturn, VerifiedBadge, VerifiedPreview, VerifySellerModal } from "@/components/seller/Verification";
 import VerificationChecklist from "@/components/VerificationChecklist";
-import { KycCard, KycModal, useKycStatus } from "@/components/seller/Kyc";
+import { KycModal, KycCard, KycDetailsModal, useKycStatus } from "@/components/seller/Kyc";
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -166,16 +165,16 @@ function VerifiedFacultyBadge({ user, seller, style }) {
         user?.lecturerVerificationStatus === "approved";
     if (!isFaculty) return null;
 
-const isVerified = 
-    (user?.isVerified === true || user?.lecturerVerificationStatus === "approved") &&
-    user?.lecturerVerificationStatus !== "pending" &&
-    user?.lecturerVerificationStatus !== "rejected";
+    const isVerified =
+        (user?.isVerified === true || user?.lecturerVerificationStatus === "approved") &&
+        user?.lecturerVerificationStatus !== "pending" &&
+        user?.lecturerVerificationStatus !== "rejected";
 
     const badgeColor = isVerified ? "#1d9bf0" : "#f59e0b"; // blue = verified, amber = pending
     const tooltip = isVerified
         ? `Verified Faculty — ${user?.department || seller?.title || "Academic Staff"}`
         : "Faculty verification pending";
-     return (
+    return (
         <span title={tooltip}
             aria-label={isVerified ? "Verified Faculty" : "Pending Faculty Verification"}
             style={{
@@ -183,10 +182,10 @@ const isVerified =
                 width: "16px", height: "16px", borderRadius: "50%",
                 background: badgeColor, flexShrink: 0, verticalAlign: "middle",
                 marginLeft: "4px", cursor: "default",
-                 boxShadow: isVerified ? "0 0 0 1.5px rgba(29,155,240,0.25)" : "none",
-                 transition: "background 0.2s",
-                 ...style,
-             }}>
+                boxShadow: isVerified ? "0 0 0 1.5px rgba(29,155,240,0.25)" : "none",
+                transition: "background 0.2s",
+                ...style,
+            }}>
             {isVerified ? (
                 <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true">
                     <path d="M2 5.2L4 7.2L8 3" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -869,8 +868,7 @@ function TierSummaryCard({ totalEarnings, isFaculty, onViewDetails, fmt }) {
     );
 }
 
-/* ─── PinModal ───────────────────────────────────────────────── */
-/* (already defined above) */
+// helper functions (moved into component scope where needed)
 
 /* ════════════════════════════════════════════════════════════════
    MAIN COMPONENT
@@ -933,15 +931,15 @@ export default function SellerAccountClient() {
     const [bioDraft, setBioDraft] = useState("");
     const [editingBio, setEditingBio] = useState(false);
     const [savingBio, setSavingBio] = useState(false);
-const negBadge = useNegotiationBadge(user?.uid)
-const [showVerify, setShowVerify] = useState(false);
-const [showChecklist, setShowChecklist] = useState(false);
-const [verifProgress, setVerifProgress] = useState({ done: 0, total: 0, status: "none" });
-const [followerCount, setFollowerCount] = useState(0);
-const [showKyc, setShowKyc] = useState(false);
+    const [showVerify, setShowVerify] = useState(false);
+    const [showChecklist, setShowChecklist] = useState(false);
+    const [verifProgress, setVerifProgress] = useState({ done: 0, total: 0, status: "none" });
+    const [followerCount, setFollowerCount] = useState(0);
+    const [showKyc, setShowKyc] = useState(false);
+    const [showKycDetails, setShowKycDetails] = useState(false);
     const kyc = useKycStatus(user?.uid);
-    
-useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerified: true } : s)); });
+
+    useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerified: true } : s)); });
     useEffect(() => {
         if (!showBankModal) return;
         let cancelled = false;
@@ -980,11 +978,29 @@ useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerif
     const currInfo = CURRENCY_DISPLAY[currency] || CURRENCY_DISPLAY.NGN;
     const isNGN = currency === "NGN";
     const fmt = (ngnAmt) => displayCurrency(ngnAmt, currency, currInfo);
+    const payoutOf = (amount) => displayCurrency(amount, currency, currInfo);
 
     const handleCurrencyChange = (code) => {
         setCurrency(code);
         if (typeof window !== "undefined") localStorage.setItem("lan_display_currency", code);
     };
+
+    // ── Member since label (derived from user.createdAt if available) ──
+    const memberSince = (() => {
+        if (!user) return "";
+        const c = user.createdAt || user?.memberSince || user?.joinedAt;
+        if (!c) return "";
+        try {
+            // Firestore Timestamp
+            if (c.toDate) return c.toDate().toLocaleDateString();
+            // JS Date
+            if (c instanceof Date) return c.toLocaleDateString();
+            // ISO string
+            return new Date(c).toLocaleDateString();
+        } catch (e) {
+            return String(c);
+        }
+    })();
 
     // ── Determine user type flags ──
     const isFacultyUser =
@@ -995,35 +1011,40 @@ useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerif
 
     const isSellerUser = user?.isSeller === true;
 
-    const verified = !!seller && !isFacultyUser && !!seller.paidVerified;
-    const canGetVerified = !!seller && !isFacultyUser && !verified;
+    const verifiedUntilMs = seller?.verifiedUntil?.toMillis?.() ?? 0;
+    const badgeActive =
+        !!seller?.paidVerified ||
+        (seller?.isVerifiedSeller === true &&
+            (seller?.verifiedRoute === "free" || verifiedUntilMs > Date.now()));
+    const verified = !!seller && !isFacultyUser && badgeActive; const canGetVerified = !!seller && !isFacultyUser && !verified;
     const facultyVerified =
         isFacultyUser &&
         (user?.isVerified === true || user?.lecturerVerificationStatus === "approved") &&
         user?.lecturerVerificationStatus !== "pending" &&
         user?.lecturerVerificationStatus !== "rejected";
     const showBlue = verified || facultyVerified;
+    const verificationLabel = facultyVerified ? 'Verified Faculty' : verified ? 'Verified Seller' : 'Not verified';
 
     useEffect(() => {
-    if (!user?.uid || !canGetVerified) return;
-    let off = false;
-    (async () => {
-        try {
-            const token = await auth.currentUser.getIdToken();
-            const r = await fetch("/api/seller/verification/apply?route=paid", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            const d = await r.json();
-            if (off || !d?.checks) return;
-            setVerifProgress({
-                done: d.checks.filter((c) => c.ok).length,
-                total: d.checks.length,
-                status: d.status || "none",
-            });
-        } catch { }
-    })();
-    return () => { off = true; };
-}, [user?.uid, canGetVerified, showChecklist]);
+        if (!user?.uid || !canGetVerified) return;
+        let off = false;
+        (async () => {
+            try {
+                const token = await auth.currentUser.getIdToken();
+                const r = await fetch("/api/seller/verification/apply?route=paid", {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const d = await r.json();
+                if (off || !d?.checks) return;
+                setVerifProgress({
+                    done: d.checks.filter((c) => c.ok).length,
+                    total: d.checks.length,
+                    status: d.status || "none",
+                });
+            } catch { }
+        })();
+        return () => { off = true; };
+    }, [user?.uid, canGetVerified, showChecklist, kyc.status]);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -1053,16 +1074,18 @@ useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerif
                     setAccountBalance(sellerData.accountBalance || 0);
                     setTotalEarnings(sellerData.totalEarnings || 0);
                     setBooksSold(sellerData.booksSold || 0);
-                    const booksQuery = query(collection(db, "advertMyBook"), where("sellerId", "==", uid));
-                    const booksSnap = await getDocs(booksQuery);
-                    setSellerBooks(booksSnap.docs.map(d => ({ ...d.data(), id: `firestore-${d.id}`, title: d.data().bookTitle })));
+                    const fetchSellerBooks = async () => {
+                        if (sellerBooks.length || !user?.uid) return;
+                        const snap = await getDocs(query(collection(db, "advertMyBook"), where("sellerId", "==", user.uid)));
+                        setSellerBooks(snap.docs.map(d => ({ ...d.data(), id: `firestore-${d.id}`, title: d.data().bookTitle })));
+                    };
                 } else {
                     await setDoc(doc(db, "sellers", uid), { sellerId: uid, sellerEmail: userData.email, sellerName: userData.displayName || `${userData.firstName} ${userData.surname}`, accountBalance: 0, totalEarnings: 0, booksSold: 0, totalWithdrawn: 0, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
                     setAccountBalance(0); setTotalEarnings(0); setBooksSold(0);
                 }
                 try {
-                    const fSnap = await getDocs(query(collection(db, "follows"), where("lecturerId", "==", uid)));
-                    setFollowerCount(fSnap.size);
+                    const fSnap = await getCountFromServer(query(collection(db, "follows"), where("lecturerId", "==", uid)));
+                    setFollowerCount(fSnap.data().count);
                 } catch { setFollowerCount(0); }
 
                 setUser({ uid, ...userData, bankDetails });
@@ -1075,7 +1098,7 @@ useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerif
                 });
                 await fetchSellerTransactions(uid);
                 try {
-                    const bq = query(collection(db, 'bounties'), where('claimedBy', '==', uid));
+                    const bq = query(collection(db, 'bounties'), where('claimedBy', 'array-contains', uid));
                     const bs = await getDocs(bq);
                     setMyClaimedBounties(bs.docs.map(d => ({ id: d.id, ...d.data() })));
                 } catch { }
@@ -1088,6 +1111,21 @@ useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerif
         const flags = { "Nigeria": "🇳🇬", "Ghana": "🇬🇭", "Kenya": "🇰🇪", "South Africa": "🇿🇦", "United States": "🇺🇸", "United Kingdom": "🇬🇧", "Canada": "🇨🇦", "Australia": "🇦🇺", "India": "🇮🇳", "Germany": "🇩🇪", "France": "🇫🇷", "Brazil": "🇧🇷", "Uganda": "🇺🇬", "Tanzania": "🇹🇿", "Rwanda": "🇷🇼", "Cameroon": "🇨🇲", "Ethiopia": "🇪🇹", "Egypt": "🇪🇬", "Senegal": "🇸🇳", "Ivory Coast": "🇨🇮" };
         return flags[country] || "🌍";
     }
+
+    const countryCache = new Map();
+    const getCountry = (id) => {
+        if (!id) return Promise.resolve(null);
+        if (!countryCache.has(id)) {
+            countryCache.set(id,
+                getDoc(doc(db, "users", id))
+                    .then(s => (s.exists() ? s.data().country || null : null))
+                    .catch(() => null));
+        }
+        return countryCache.get(id);
+    };
+
+    // transactions processed in fetchSellerTransactions; avoid top-level await
+    const txnsFromCollection = [];
 
     const fetchPhysicalOrders = async () => {
         if (!user?.uid) return;
@@ -1103,16 +1141,25 @@ useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerif
     const fetchSellerTransactions = async (uid) => {
         try {
             let allTransactions = [];
+            const countryCache = new Map();
+            const getCountry = (id) => {
+                if (!id) return Promise.resolve(null);
+                if (!countryCache.has(id)) {
+                    countryCache.set(id,
+                        getDoc(doc(db, "users", id))
+                            .then(s => (s.exists() ? s.data().country || null : null))
+                            .catch(() => null));
+                }
+                return countryCache.get(id);
+            };
             const transactionsQuery = query(collection(db, "transactions"), where("sellerId", "==", uid));
             const transactionsSnapshot = await getDocs(transactionsQuery);
             const txnsFromCollection = await Promise.all(
                 transactionsSnapshot.docs.map(async (docSnap) => {
                     const data = docSnap.data();
-                    let buyerCountry = null;
                     const buyerId = data.buyerId || data.userId || data.buyerUid || data.uid || null;
-                    if (buyerId && buyerId !== uid) {
-                        try { const bd = await getDoc(doc(db, "users", buyerId)); if (bd.exists()) buyerCountry = bd.data().country || null; } catch { }
-                    }
+                    const buyerCountry = data.buyerCountry
+                        || (buyerId && buyerId !== uid ? await getCountry(buyerId) : null);
                     return { id: docSnap.id, ...data, bookTitle: data.bookTitle || data.title, buyerCountry, createdAtDate: data.createdAt?.toDate?.() || (data.purchaseDate ? new Date(data.purchaseDate) : new Date()) };
                 })
             );
@@ -1128,13 +1175,13 @@ useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerif
             const incomingQuery = query(collection(db, "transfers"), where("recipientId", "==", uid));
             const incomingSnap = await getDocs(incomingQuery);
             const incomingList = await Promise.all(incomingSnap.docs.map(async (d) => {
-                const data = d.data(); let buyerCountry = null;
-                if (data.senderId) { try { const sd = await getDoc(doc(db, "users", data.senderId)); if (sd.exists()) buyerCountry = sd.data().country || null; } catch { } }
+                const data = d.data();
+                const buyerCountry = await getCountry(data.senderId);
                 return { id: `incoming-${d.id}`, ...data, bookTitle: `Transfer from ${data.senderName || "Unknown"}`, buyerName: data.senderName || "Unknown", amount: data.amount, sellerAmount: data.amount, buyerCountry, createdAtDate: data.createdAt?.toDate?.() || new Date(), type: "transfer_in" };
             }));
             const physicalSalesQuery = query(collection(db, "physicalSales"), where("sellerId", "==", uid));
             const physicalSalesSnap = await getDocs(physicalSalesQuery);
-            const physicalSalesList = physicalSalesSnap.docs.map(d => { const data = d.data(); return { ...data, bookTitle: `📦 ${data.bookTitle} (Registry Pickup)`, buyerName: data.studentName || data.buyerName || "Student", amount: data.salePrice || data.price || 0, sellerAmount: data.sellerPayout || 0, platformFee: data.platformFee || 0, createdAtDate: data.soldAt?.toDate?.() || new Date(), type: "physical_sale" }; });
+            const physicalSalesList = physicalSalesSnap.docs.map(d => { const data = d.data(); return { ...data, id: `physical-${d.id}`, bookTitle: `📦 ${data.bookTitle} (Registry Pickup)`, buyerName: data.studentName || data.buyerName || "Student", amount: data.salePrice || data.price || 0, sellerAmount: data.sellerPayout || 0, platformFee: data.platformFee || 0, createdAtDate: data.soldAt?.toDate?.() || new Date(), type: "physical_sale" }; });
             try {
                 const bountyFulfilledSnap = await getDocs(query(collection(db, "bounties"), where("fulfilledByUid", "==", uid), where("status", "==", "fulfilled")));
                 const bountyPayoutsList = bountyFulfilledSnap.docs.map(d => { const data = d.data(); const escrow = data.escrowAmount || data.reward || 0; return { id: `bounty-payout-${d.id}`, bookTitle: `🎯 Bounty Reward — ${data.title || "Bounty"}`, buyerName: data.postedBy || "Student", amount: escrow, sellerAmount: data.authorPayout || Math.round(escrow * 0.8), platformFee: data.platformFee || Math.round(escrow * 0.2), createdAtDate: data.approvedAt?.toDate?.() || data.fulfilledAt?.toDate?.() || new Date(), type: "bounty_payout" }; });
@@ -1147,11 +1194,19 @@ useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerif
             } catch (e) { console.warn("Bounty posted fetch failed:", e); }
             allTransactions = [...allTransactions, ...transfersList, ...incomingList, ...physicalSalesList];
             allTransactions.sort((a, b) => b.createdAtDate - a.createdAtDate);
+            const seenPayouts = new Set();
+            allTransactions = allTransactions.filter((t) => {
+                if (t.type !== "bounty_payout") return true;
+                const k = t.bountyId || t.id;
+                if (seenPayouts.has(k)) return false;
+                seenPayouts.add(k);
+                return true;
+            });
             setTransactions(allTransactions);
         } catch (error) { console.error("Error fetching seller transactions:", error); }
     };
 
-        const handleSaveBank = async () => {
+    const handleSaveBank = async () => {
         if (!bankFormData.accountName || !bankFormData.accountNumber || !bankFormData.bankName) { alert("Please fill in all required fields"); return; }
         if (bankCustom && !bankFormData.bankCode) { alert("Please enter your bank code"); return; }
         if (bankCountry === "NG" && bankFormData.accountNumber.length !== 10) { alert("Nigerian account numbers must be 10 digits"); return; }
@@ -1193,27 +1248,27 @@ useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerif
     };
 
     const handleSaveBio = async () => {
-    try {
-        setSavingBio(true);
-        const clean = bioDraft.trim();
-        // Dot notation updates only this field, so businessName stays intact
-        await updateDoc(doc(db, "sellers", user.uid), {
-            "businessInfo.businessDescription": clean,
-            updatedAt: serverTimestamp(),
-        });
-        setBio(clean);
-        setSeller(prev => ({
-            ...prev,
-            businessInfo: { ...(prev?.businessInfo || {}), businessDescription: clean },
-        }));
-        setEditingBio(false);
-    } catch (error) {
-        alert("Failed to update bio: " + error.message);
-    } finally {
-        setSavingBio(false);
-    }
+        try {
+            setSavingBio(true);
+            const clean = bioDraft.trim();
+            // Dot notation updates only this field, so businessName stays intact
+            await updateDoc(doc(db, "sellers", user.uid), {
+                "businessInfo.businessDescription": clean,
+                updatedAt: serverTimestamp(),
+            });
+            setBio(clean);
+            setSeller(prev => ({
+                ...prev,
+                businessInfo: { ...(prev?.businessInfo || {}), businessDescription: clean },
+            }));
+            setEditingBio(false);
+        } catch (error) {
+            alert("Failed to update bio: " + error.message);
+        } finally {
+            setSavingBio(false);
+        }
     };
-    
+
     const handleSave = async () => {
         try {
             const updatePayload = {
@@ -1230,90 +1285,91 @@ useVerificationReturn((r) => { if (r.ok) setSeller((s) => (s ? { ...s, paidVerif
         } catch (error) { alert("Failed to save profile: " + error.message); }
     };
 
- const handlePinConfirm = async (currentOtp = null) => {
-    setPinError("");
-    setWithdrawing(true);
-    
-    try {
-        const amountToDeduct = parseFloat(withdrawAmount);
-                const res = await fetch('/api/wallet-withdraw', {
-            method: 'POST',
-                        headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${await auth.currentUser.getIdToken()}`,
-            },
-            body: JSON.stringify({
-                amount: amountToDeduct,
-                pin: pinValue.toString().trim(),
-                otp: currentOtp 
-            })
-        });
+    const handlePinConfirm = async (currentOtp = null) => {
+        setPinError("");
+        setWithdrawing(true);
 
-        const data = await res.json();
+        try {
+            const amountToDeduct = parseFloat(withdrawAmount);
+            const res = await fetch('/api/wallet-withdraw', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${await auth.currentUser.getIdToken()}`,
+                },
+                body: JSON.stringify({
+                    amount: amountToDeduct,
+                    pin: pinValue.toString().trim(),
+                    otp: currentOtp
+                })
+            });
 
-        if (!res.ok) {
-            // 3. Handle OTP Challenge event if threshold is crossed (> 5000)
-            if (data.status === 'OTP_SENT') {
-                // Prompt the user for an OTP inside your UI
-                const promptedOtp = prompt("A verification code was sent for high-value withdrawals. Enter OTP:");
-                if (!promptedOtp) {
-                    throw new Error("OTP verification is required to authorize this payment.");
+            const data = await res.json();
+
+            if (!res.ok) {
+                // 3. Handle OTP Challenge event if threshold is crossed (> 5000)
+                if (data.status === 'OTP_SENT') {
+                    // Prompt the user for an OTP inside your UI
+                    const promptedOtp = prompt("A verification code was sent for high-value withdrawals. Enter OTP:");
+                    if (!promptedOtp) {
+                        throw new Error("OTP verification is required to authorize this payment.");
+                    }
+                    // Recursively call confirm passing down the string token challenge
+                    setWithdrawing(false);
+                    await handlePinConfirm(promptedOtp.trim());
+                    return;
                 }
-                // Recursively call confirm passing down the string token challenge
-                setWithdrawing(false);
-                await handlePinConfirm(promptedOtp.trim());
-                return;
+                throw new Error(data.error || "Failed to process transaction.");
             }
-            throw new Error(data.error || "Failed to process transaction.");
+
+            setShowPinModal(false);
+            setAccountBalance(prev => prev - amountToDeduct);
+
+            // Optimistically update list layout locally before re-fetch cascades
+            setWithdrawals(prev => [{
+                amount: amountToDeduct,
+                status: "pending",
+                reference: data.txRef || "PENDING-APPROVAL",
+                bankDetails: user.bankDetails,
+                requestedAtDate: new Date()
+            }, ...prev]);
+
+            setWithdrawAmount("");
+            setSuccessData({ amount: amountToDeduct, reference: data.txRef || "Pending Verification" });
+            setPinValue("");
+
+        } catch (error) {
+            setPinError(error.message);
+            setPinValue("");
+        } finally {
+            setWithdrawing(false);
         }
+    };
 
-        setShowPinModal(false);
-        setAccountBalance(prev => prev - amountToDeduct);
-        
-        // Optimistically update list layout locally before re-fetch cascades
-        setWithdrawals(prev => [{
-            id: `temp-${Date.now()}`,
-            sellerId: user.uid,
-            amount: amountToDeduct,
-            status: "pending",
-            reference: data.txRef || "PENDING-APPROVAL",
-            bankDetails: user.bankDetails,
-            requestedAtDate: new Date()
-        }, ...prev]);
+    const handleWithdraw = async () => {
+        const amount = parseFloat(withdrawAmount);
+        setWithdrawalError("");
 
-        setWithdrawAmount("");
-        setSuccessData({ amount: amountToDeduct, reference: data.txRef || "Pending Verification" });
+        if (!amount || isNaN(amount)) { setWithdrawalError("Please enter a valid amount"); return; }
+        if (amount < 1000) { setWithdrawalError("Minimum withdrawal amount is ₦1,000"); return; }
+        if (amount > accountBalance) { setWithdrawalError(`Insufficient balance. Available: ₦${accountBalance.toLocaleString()}`); return; }
+        if (!user?.bankDetails) { setWithdrawalError("Please add bank details first"); return; }
+        if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in the Settings/Transfer page."); return; }
+        setShowWithdrawModal(false);
         setPinValue("");
-        
-    } catch (error) {
-        setPinError(error.message);
-        setPinValue("");
-    } finally {
-        setWithdrawing(false);
-    }
-};
-
-   const handleWithdraw = async () => {
-    const amount = parseFloat(withdrawAmount);
-    setWithdrawalError("");
-    
-    if (!amount || isNaN(amount)) { setWithdrawalError("Please enter a valid amount"); return; }
-    if (amount < 1000) { setWithdrawalError("Minimum withdrawal amount is ₦1,000"); return; }
-    if (amount > accountBalance) { setWithdrawalError(`Insufficient balance. Available: ₦${accountBalance.toLocaleString()}`); return; }
-    if (!user?.bankDetails) { setWithdrawalError("Please add bank details first"); return; }
-if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in the Settings/Transfer page."); return; }    
-    setShowWithdrawModal(false);
-    setPinValue("");
-    setPinError("");
-    setShowPinModal(true);
-};
+        setPinError("");
+        setShowPinModal(true);
+    };
 
     const handleDeactivateAccount = async () => {
         if (deactivateConfirmText !== "DELETE") return;
         try {
             setDeactivating(true); setDeactivateError("");
-            await updateDoc(doc(db, "users", user.uid), { isDeactivated: true, deactivatedAt: serverTimestamp() });
-            await updateDoc(doc(db, "sellers", user.uid), { isDeactivated: true, deactivatedAt: serverTimestamp() });
+            const res = await fetch("/api/account/deactivate", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` },
+            });
+            if (!res.ok) throw new Error("Request failed");
             await auth.signOut(); router.push("/signin");
         } catch (err) { setDeactivateError("Failed to deactivate account. Please try again."); setDeactivating(false); }
     };
@@ -1389,15 +1445,15 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                             <div style={{ position: 'relative', width: 40, height: 40, flexShrink: 0 }}>
                                 <img
                                     src={user?.photoURL || user?.photoBase64 || "/lan-logo.png"}
-                                   style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${showBlue ? '#1d9bf0' : GOLD}`, display: 'block' }}
+                                    style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${showBlue ? '#1d9bf0' : GOLD}`, display: 'block' }}
                                     alt="Profile"
-                                    />
-                                    {verified && <VerifiedBadge size={16} ring="#fff" style={{ position: 'absolute', right: -3, bottom: -2 }} />}
-                                    <VerifiedFacultyBadge
-                                        user={user}
-                                        seller={seller}
-                                        style={{ position: 'absolute', right: -3, bottom: -2, marginLeft: 0, boxSizing: 'content-box', border: '2px solid #fff' }}
-                                    />
+                                />
+                                {verified && <VerifiedBadge size={16} ring="#fff" style={{ position: 'absolute', right: -3, bottom: -2 }} />}
+                                <VerifiedFacultyBadge
+                                    user={user}
+                                    seller={seller}
+                                    style={{ position: 'absolute', right: -3, bottom: -2, marginLeft: 0, boxSizing: 'content-box', border: '2px solid #fff' }}
+                                />
                             </div>
                             <div style={{ textAlign: 'left', minWidth: 0, overflow: 'hidden' }}>
                                 <p style={{
@@ -1406,8 +1462,8 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                     textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                 }}>
                                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {seller?.title ? `${seller.title} ` : ""}{user?.firstName} {user?.surname}
-                                </span>
+                                        {seller?.title ? `${seller.title} ` : ""}{user?.firstName} {user?.surname}
+                                    </span>
                                 </p>
                                 <div className="gold-pill" style={{ marginTop: '3px' }}>
                                     <div className="pulse-dot" style={{
@@ -1588,7 +1644,7 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                     transactions.slice(0, 5).map((txn) => {
                                         const isOut = txn.type === "transfer_out" || txn.type === "bounty_posted";
                                         const isBountyPayout = txn.type === "bounty_payout";
-                                        const sellerAmt = txn.sellerAmount || txn.amount * 0.8;
+                                        const sellerAmt = payoutOf(txn);
                                         const amountDisplay = isOut
                                             ? `-${fmt(Math.abs(sellerAmt))}`
                                             : `+${fmt(Number(sellerAmt))}`;
@@ -1775,7 +1831,13 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                             <div style={{ background: BG, flex: 1, overflowY: 'auto', padding: '12px' }}>
                                 {[
                                     { label: 'My Profile', icon: <User size={18} style={{ color: NAVY }} />, onClick: () => { setShowProfileModal(false); setIsEditing(true); } },
-                                    { label: kyc.status === 'approved' ? 'Identity Verified (KYC)' : 'Identity Verification (KYC)', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>, onClick: () => { setShowProfileModal(false); setShowKyc(true); } },
+                                    {
+                                        label: kyc.status === 'approved' ? 'Identity Verified (KYC)' : 'Identity Verification (KYC)', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>, onClick: () => {
+                                            setShowProfileModal(false);
+                                            if (kyc.status === "approved") setShowKycDetails(true);
+                                            else setShowKyc(true);
+                                        }
+                                    },
                                     {
                                         label: 'Bank Details', icon: <Building size={18} style={{ color: NAVY }} />, onClick: () => {
                                             setShowProfileModal(false);
@@ -1817,8 +1879,8 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                         ['LAN Account No.', user?.lanAccountNumber || 'Not set'],
                                         ['Referral Code', user?.referralCode || 'Not set'],
                                         ['Account Type', isFacultyUser ? `${seller?.title || user?.lecturerTitle || ''} · Verified Faculty`.trim() : verified ? 'Verified Seller' : 'Seller'],
-                                        ['Verification', user?.lecturerVerificationStatus === 'approved' ? '✅ Approved' : user?.lecturerVerificationStatus === 'pending' ? '⏳ Pending' : user?.lecturerVerificationStatus === 'rejected' ? '❌ Rejected' : 'N/A'],
-                                        ['Member Since', user?.createdAt?.toDate ? user.createdAt.toDate().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'],
+                                        ['Verification', verificationLabel],
+                                        ['Member Since', memberSince],
                                     ].map(([k, v]) => (
                                         <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '7px 0', borderBottom: '0.5px solid #f0ebe0', gap: 8 }}>
                                             <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{k}</span>
@@ -1828,7 +1890,7 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                 </div>
 
                                 {FACULTY_TITLES.includes(seller?.title) && (
-                                    <button onClick={() => { setShowProfileModal(false); setShowExportModal(true); }} className="action-row" style={{ marginBottom: '6px' }}>
+                                    <button onClick={() => { setShowProfileModal(false); fetchSellerBooks(); setShowExportModal(true); }} className="action-row" style={{ marginBottom: '6px' }}>
                                         <div style={{ width: '36px', height: '36px', border: '0.5px solid #e5ddd0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, flexShrink: 0 }}><Download size={18} style={{ color: NAVY }} /></div>
                                         <div style={{ flex: 1 }}>
                                             <p style={{ fontSize: '13px', fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>Export Student List</p>
@@ -1856,7 +1918,7 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                 {showTransactionHistory && (
                     <div className="modal-overlay" style={{ marginTop: "94px" }}>
                         <div className="modal-inner" >
-                            <div style={{ background: NAVY, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0,  }}>
+                            <div style={{ background: NAVY, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0, }}>
                                 <button onClick={() => setShowTransactionHistory(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff', flexShrink: 0 }}><X size={22} /></button>
                                 <h2 className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>Transaction History</h2>
                             </div>
@@ -1880,17 +1942,25 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                                     </div>
                                                 </div>
                                                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                                    <p style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a', margin: '0 0 2px', fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap' }}>+{fmt(Number(txn.sellerAmount || (txn.amount * 0.85)))}</p>
+                                                    {(() => {
+                                                        const out = txn.type === 'transfer_out' || txn.type === 'bounty_posted';
+                                                        const amt = Math.abs(payoutOf(txn));
+                                                        return (
+                                                            <p style={{ fontSize: '12px', fontWeight: 700, color: out ? '#ef4444' : '#16a34a', margin: '0 0 2px', fontFamily: "'Lato',sans-serif", whiteSpace: 'nowrap' }}>
+                                                                {out ? '-' : '+'}{fmt(amt)}
+                                                            </p>
+                                                        );
+                                                    })()}
                                                     <span style={{ fontSize: '10px', background: '#f0fdf4', color: '#16a34a', padding: '2px 6px', fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>Success</span>
                                                 </div>
                                             </div>
                                             <div style={{ background: CREAM, border: '0.5px solid #f0ebe0', padding: '8px 10px' }}>
                                                 {[
                                                     ['Buyer', txn.buyerName || txn.studentName || '—'],
-                                                    ['Price', fmt(Number(txn.amount || txn.salePrice || 0))],
+                                                    ['Price', fmt(paidNGN(txn))],
                                                     ['Country', txn.buyerCountry ? `${getCountryFlag(txn.buyerCountry)} ${txn.buyerCountry}` : '—'],
-                                                    ['Your Payout (80%)', `+${fmt(Number(txn.sellerAmount || txn.sellerPayout || (txn.amount * 0.80) || 0))}`],
-                                                    ['Platform Fee (20%)', `-${fmt(Number(txn.platformFee || txn.fee || ((txn.amount || txn.salePrice || 0) * 0.20)))}`],
+                                                    ['Your Payout (80%)', `+${fmt(Math.abs(payoutOf(txn)))}`],
+                                                    ['Platform Fee (20%)', `-${fmt(feeOf(txn))}`],
                                                 ].map(([k, v]) => (
                                                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '3px 0', gap: 8 }}>
                                                         <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{k}</span>
@@ -1941,7 +2011,7 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                 <button onClick={() => { setShowWithdrawModal(false); setWithdrawalError(""); setWithdrawAmount(""); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}><X size={22} /></button>
                             </div>
                             <div style={{ flex: 1, overflowY: 'auto' }}>
-                                <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #f0ebe0', background: '#fffbeb', display: 'flex', alignItems: 'flex-start', gap: '10px',  }}>
+                                <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #f0ebe0', background: '#fffbeb', display: 'flex', alignItems: 'flex-start', gap: '10px', }}>
                                     <AlertCircle size={16} style={{ color: '#d97706', flexShrink: 0, marginTop: 1 }} />
                                     <div>
                                         <p style={{ fontSize: '12px', fontWeight: 700, color: '#92400e', margin: '0 0 2px', fontFamily: "'Lato',sans-serif" }}>LAN Approval Required</p>
@@ -1977,7 +2047,7 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                     )}
                                     <label style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#888', display: 'block', marginBottom: '6px', fontFamily: "'Lato',sans-serif" }}>Amount</label>
                                     <input type="number" value={withdrawAmount} onChange={e => { setWithdrawAmount(e.target.value); setWithdrawalError(""); }} placeholder="Enter amount" min="1000" max={accountBalance}
-                                        style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '12px 14px', fontSize: '15px', fontWeight: 700, color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box', marginBottom: '6px' }} />                                   
+                                        style={{ width: '100%', border: '0.5px solid #e5ddd0', padding: '12px 14px', fontSize: '15px', fontWeight: 700, color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", boxSizing: 'border-box', marginBottom: '6px' }} />
                                     <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '18px', fontFamily: "'Lato',sans-serif" }}>Minimum: ₦1,000</p>
                                     <div style={{ display: 'flex', gap: '10px' }}>
                                         <button onClick={() => { setShowWithdrawModal(false); setWithdrawalError(""); setWithdrawAmount(""); }}
@@ -2013,50 +2083,50 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                     {uploading && <p style={{ fontSize: '11px', color: GOLD, marginTop: '8px', fontFamily: "'Lato',sans-serif" }}>Uploading photo…</p>}
 
                                     {/* ── Bio ── */}
-<div style={{ maxWidth: 420, margin: '16px auto 0', textAlign: 'left' }}>
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, margin: 0, fontFamily: "'Lato',sans-serif" }}>Bio</p>
-        {!editingBio && (
-            <button
-                onClick={() => { setBioDraft(bio); setEditingBio(true); }}
-                aria-label="Edit bio"
-                title="Edit bio"
-                style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, border: '0.5px solid #e5ddd0', cursor: 'pointer', color: NAVY }}>
-                <Pencil size={12} />
-            </button>
-        )}
-    </div>
+                                    <div style={{ maxWidth: 420, margin: '16px auto 0', textAlign: 'left' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                            <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, margin: 0, fontFamily: "'Lato',sans-serif" }}>Bio</p>
+                                            {!editingBio && (
+                                                <button
+                                                    onClick={() => { setBioDraft(bio); setEditingBio(true); }}
+                                                    aria-label="Edit bio"
+                                                    title="Edit bio"
+                                                    style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: CREAM, border: '0.5px solid #e5ddd0', cursor: 'pointer', color: NAVY }}>
+                                                    <Pencil size={12} />
+                                                </button>
+                                            )}
+                                        </div>
 
-    {editingBio ? (
-        <>
-            <textarea
-                value={bioDraft}
-                onChange={e => setBioDraft(e.target.value)}
-                maxLength={300}
-                rows={4}
-                placeholder="Tell buyers what kinds of documents and materials you share…"
-                style={{ width: '100%', border: `0.5px solid ${GOLD}`, padding: '10px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", resize: 'vertical', lineHeight: 1.6 }}
-            />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-                <span style={{ fontSize: 10, color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{bioDraft.length}/300</span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => setEditingBio(false)} disabled={savingBio}
-                        style={{ background: '#f5f5f5', color: '#666', padding: '7px 14px', border: '0.5px solid #e5ddd0', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
-                        Cancel
-                    </button>
-                    <button onClick={handleSaveBio} disabled={savingBio}
-                        style={{ background: NAVY, color: '#fff', padding: '7px 14px', border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", opacity: savingBio ? 0.6 : 1 }}>
-                        {savingBio ? 'Saving…' : 'Save Bio'}
-                    </button>
-                </div>
-            </div>
-        </>
-    ) : (
-        <p style={{ fontSize: '13px', color: bio ? '#555' : '#aaa', margin: 0, lineHeight: 1.65, fontFamily: "'Lato',sans-serif", fontStyle: bio ? 'normal' : 'italic', background: CREAM, border: '0.5px solid #f0ebe0', padding: '10px 12px', wordBreak: 'break-word' }}>
-            {bio || "No bio yet. Tap the pen to add one."}
-        </p>
-    )}
-</div>
+                                        {editingBio ? (
+                                            <>
+                                                <textarea
+                                                    value={bioDraft}
+                                                    onChange={e => setBioDraft(e.target.value)}
+                                                    maxLength={300}
+                                                    rows={4}
+                                                    placeholder="Tell buyers what kinds of documents and materials you share…"
+                                                    style={{ width: '100%', border: `0.5px solid ${GOLD}`, padding: '10px 12px', fontSize: '13px', color: NAVY, outline: 'none', fontFamily: "'Lato',sans-serif", resize: 'vertical', lineHeight: 1.6 }}
+                                                />
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                                                    <span style={{ fontSize: 10, color: '#aaa', fontFamily: "'Lato',sans-serif" }}>{bioDraft.length}/300</span>
+                                                    <div style={{ display: 'flex', gap: 8 }}>
+                                                        <button onClick={() => setEditingBio(false)} disabled={savingBio}
+                                                            style={{ background: '#f5f5f5', color: '#666', padding: '7px 14px', border: '0.5px solid #e5ddd0', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif" }}>
+                                                            Cancel
+                                                        </button>
+                                                        <button onClick={handleSaveBio} disabled={savingBio}
+                                                            style={{ background: NAVY, color: '#fff', padding: '7px 14px', border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Lato',sans-serif", opacity: savingBio ? 0.6 : 1 }}>
+                                                            {savingBio ? 'Saving…' : 'Save Bio'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <p style={{ fontSize: '13px', color: bio ? '#555' : '#aaa', margin: 0, lineHeight: 1.65, fontFamily: "'Lato',sans-serif", fontStyle: bio ? 'normal' : 'italic', background: CREAM, border: '0.5px solid #f0ebe0', padding: '10px 12px', wordBreak: 'break-word' }}>
+                                                {bio || "No bio yet. Tap the pen to add one."}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                                 <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '10px', fontFamily: "'Lato',sans-serif" }}>Personal Details</p>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
@@ -2237,12 +2307,12 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                                             </div>
                                                             <button onClick={() => setRevealedCodes(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
                                                                 style={{ width: "100%", background: isRevealed ? CREAM : NAVY, color: isRevealed ? NAVY : "#fff", border: `0.5px solid ${isRevealed ? "#e5ddd0" : NAVY}`, padding: "9px", fontSize: "11px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.05em", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", marginBottom: "10px" }}>
-                                                        {isRevealed ? (
-                                                            <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg> Hide Code</>
-                                                        ) : (
-                                                            <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Reveal Pickup Code</>
-                                                        )}                                                           
-                                                        </button>
+                                                                {isRevealed ? (
+                                                                    <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg> Hide Code</>
+                                                                ) : (
+                                                                    <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg> Reveal Pickup Code</>
+                                                                )}
+                                                            </button>
                                                         </>
                                                     )}
                                                     {isCancelled && <div style={{ background: "#fef2f2", border: "0.5px solid #fecaca", padding: "10px 12px", marginBottom: "10px" }}><p style={{ fontSize: "12px", color: "#dc2626", fontFamily: "'Lato',sans-serif", margin: 0, textAlign: "center" }}>This order was cancelled.</p></div>}
@@ -2370,18 +2440,18 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                     </div>
                 )}
 
-                    {canGetVerified && showChecklist && (
-                        <div className="modal-overlay" style={{ marginTop: "94px" }}>
-                            <div className="modal-inner">
-                                <div style={{ background: NAVY, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-                                    <div>
-                                        <p style={{ color: GOLD, fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>Blue check</p>
-                                        <h2 className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>
-                                            {verifProgress.done > 0 ? "Complete verification" : "Start verification"}
-                                        </h2>
-                                    </div>
-                                    <button onClick={() => setShowChecklist(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}><X size={22} /></button>
+                {canGetVerified && showChecklist && (
+                    <div className="modal-overlay" style={{ marginTop: "94px" }}>
+                        <div className="modal-inner">
+                            <div style={{ background: NAVY, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                                <div>
+                                    <p style={{ color: GOLD, fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', margin: '0 0 4px', fontFamily: "'Lato',sans-serif" }}>Blue check</p>
+                                    <h2 className="lan-serif" style={{ fontSize: '18px', fontWeight: 700, color: '#fff', margin: 0 }}>
+                                        {verifProgress.done > 0 ? "Complete verification" : "Start verification"}
+                                    </h2>
                                 </div>
+                                <button onClick={() => setShowChecklist(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#fff' }}><X size={22} /></button>
+                            </div>
                             <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: BG }}>
                                 <div style={{ marginBottom: 16 }}>
                                     <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD, margin: '0 0 10px', fontFamily: "'Lato',sans-serif" }}>
@@ -2394,11 +2464,12 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
                                 </div>
                                 <VerificationChecklist onPay={() => { setShowChecklist(false); setShowVerify(true); }} />
                             </div>
-                            </div>
                         </div>
-                                    )}
-                
-                {!isFacultyUser && <KycModal open={showKyc} onClose={() => setShowKyc(false)} user={user} />}                
+                    </div>
+                )}
+
+                {!isFacultyUser && <KycModal open={showKyc} onClose={() => setShowKyc(false)} user={user} />}
+                {!isFacultyUser && <KycDetailsModal open={showKycDetails} onClose={() => setShowKycDetails(false)} kyc={kyc} />}
                 {canGetVerified && (
                     <VerifySellerModal
                         open={showVerify}
@@ -2411,7 +2482,7 @@ if (!seller?.hasPin) { setWithdrawalError("Please set up a transfer PIN first in
 
                 {/* Account Switch Sheet */}
                 <AccountSwitchSheet isOpen={showSwitchModal} onClose={() => setShowSwitchModal(false)} isStudent={user?.isStudent === true} router={router} />
-                
+
                 {/* Deactivate Modal */}
                 {showDeactivateModal && (
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 80, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>

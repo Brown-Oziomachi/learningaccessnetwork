@@ -225,6 +225,7 @@ const FOOTER_COLUMNS = [
       { label: "Seller Dashboard", href: "/seller/seller-dashboard" },
       { label: "Recharge Services", href: "/seller/recharge-services" },
       { label: "Growing Your Followers", href: "/seller/grow-followers" },
+      { label: "Verification & the Blue Check", href: "/seller/verification" },
 
     ],
   },
@@ -616,8 +617,22 @@ export default function LandingPage() {
       <style>{GLOBAL_STYLES}</style>
       <div className="lan-landing">
 
+        {/* ══════ NEW SELLER BANNER ══════ */}
+        <Link
+          href="/seller/start-selling"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexWrap: "wrap", gap: 8, padding: "10px 16px", textAlign: "center",
+            background: GOLD, color: NAVY, textDecoration: "none",
+            fontFamily: "'Lato',sans-serif", fontSize: 13, fontWeight: 700,
+          }}
+        >
+          New to selling on LAN? Get verified and start earning.
+          <span style={{ textDecoration: "underline", textUnderlineOffset: 3 }}>Learn how</span>
+        </Link>
+
         {/* ══════ HEADER ══════ */}
-        <header className="hero-bg" style={{ position: "sticky", top: 0, zIndex: 50, borderBottom: "0.5px solid rgba(184,150,62,0.18)",  }}>
+        <header className="hero-bg" style={{ position: "sticky", top: 0, zIndex: 50, borderBottom: "0.5px solid rgba(184,150,62,0.18)", }}>
           <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 72 }}>
             {/* wordmark */}
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

@@ -1,130 +1,181 @@
-import { getAdminDb, admin } from '@/lib/firebase-admin';
+import crypto from 'crypto';
 import { NextResponse } from 'next/server';
+import { getAdminDb, admin } from '@/lib/firebase-admin';
+import { notifyUser } from '@/lib/notificationEngine';
+import { checkPin, hasAnyPin, hashPin } from '@/lib/pinStore';
 
 const WITHDRAWAL_THRESHOLD = 5000;
 const MIN_WITHDRAWAL = 1000;
+const MAX_ATTEMPTS = 5;
+const LOCK_MS = 30 * 60 * 1000;
+const OTP_TTL_MS = 10 * 60 * 1000;
+
+class UserError extends Error { }
+
+const sha = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
+const safeEq = (a, b) => {
+    const x = Buffer.from(String(a));
+    const y = Buffer.from(String(b));
+    return x.length === y.length && crypto.timingSafeEqual(x, y);
+};
 
 export async function POST(request) {
     try {
         const adminDb = getAdminDb();
 
         const idToken = request.headers.get('authorization')?.replace('Bearer ', '');
-        if (!idToken) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+        if (!idToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         let userId;
-        try {
-            ({ uid: userId } = await admin.auth().verifyIdToken(idToken));
-        } catch {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+        try { ({ uid: userId } = await admin.auth().verifyIdToken(idToken)); }
+        catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }); }
 
         const { amount: rawAmount, pin, otp } = await request.json();
-
-        if (!rawAmount || !pin) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-        }
-
         const amount = Math.floor(Number(rawAmount));
-        if (isNaN(amount) || amount <= 0) {
-            return NextResponse.json({ error: 'Invalid withdrawal amount' }, { status: 400 });
-        }
-        if (amount < MIN_WITHDRAWAL) {
-            return NextResponse.json({ error: 'Minimum withdrawal is ₦1,000' }, { status: 400 });
-        }
+        if (!Number.isFinite(amount) || amount <= 0) throw new UserError('Invalid withdrawal amount');
+        if (amount < MIN_WITHDRAWAL) throw new UserError('Minimum withdrawal is ₦1,000');
+        if (!/^\d{4}$/.test(String(pin ?? '').trim())) throw new UserError('Enter your 4-digit PIN.');
 
         const sellerRef = adminDb.collection('sellers').doc(userId);
+        const userRef = adminDb.collection('users').doc(userId);
+        const privateRef = adminDb.collection('sellerPrivate').doc(userId);
 
-        const result = await adminDb.runTransaction(async (transaction) => {
-            const sellerSnap = await transaction.get(sellerRef);
-            if (!sellerSnap.exists) {
-                throw new Error('Seller profile record not found.');
+        const result = await adminDb.runTransaction(async (tx) => {
+            let migrateLegacy = false;
+            const [sellerSnap, userSnap, privSnap] = await Promise.all([
+                tx.get(sellerRef), tx.get(userRef), tx.get(privateRef),
+            ]);
+            if (!sellerSnap.exists) throw new UserError('Seller profile not found.');
+
+            const seller = sellerSnap.data();
+            const user = userSnap.exists ? userSnap.data() : {};
+            const priv = privSnap.exists ? privSnap.data() : {};
+            const now = Date.now();
+
+            if (user.isDeactivated || seller.isDeactivated) throw new UserError('This account is deactivated.');
+            if (['pending', 'rejected'].includes(user.lecturerVerificationStatus)) {
+                throw new UserError('Withdrawals unlock after verification.');
+            }
+            if (!seller.bankDetails?.accountNumber) throw new UserError('Add your bank details first.');
+            if (priv.lockedUntil && now < priv.lockedUntil) {
+                throw new UserError('Too many wrong attempts. Try again later.');
             }
 
-            const sellerData = sellerSnap.data();
-            const storedPin = sellerData.transactionPin || sellerData.transferPin;
+            if (!hasAnyPin({ seller, priv })) throw new UserError('Set your transfer PIN first.');
 
-            if (!storedPin) {
-                throw new Error('PIN_NOT_SET');
-            }
-            if (pin.toString().trim() !== storedPin.toString().trim()) {
-                throw new Error('Incorrect PIN.');
-            }
+            // Wrong PIN/OTP must RETURN (not throw) so the attempt counter is saved.
+            const fail = (message) => {
+                const attempts = (priv.attempts || 0) + 1;
+                const lock = attempts >= MAX_ATTEMPTS;
+                tx.set(privateRef, {
+                    attempts: lock ? 0 : attempts,
+                    lockedUntil: lock ? now + LOCK_MS : null,
+                }, { merge: true });
+                return { error: message };
+            };
 
-            // OTP generation check for high-value operations
-            if (amount > WITHDRAWAL_THRESHOLD && !otp) {
-                const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+            const pinCheck = checkPin({ uid: userId, pin, seller, priv });
+            if (!pinCheck.ok) return fail('Incorrect PIN.');
+            migrateLegacy = pinCheck.legacy;
 
-                transaction.update(sellerRef, {
-                    withdrawalOtp: generatedOtp,
-                    otpExpiry: Date.now() + 600000,
-                });
-
-                return { status: 'OTP_SENT', generatedOtp, sellerEmail: sellerData.sellerEmail };
-            }
-
-            if (otp) {
-                if (otp !== sellerData.withdrawalOtp || Date.now() > sellerData.otpExpiry) {
-                    throw new Error('Invalid or expired OTP.');
+            if (amount > WITHDRAWAL_THRESHOLD) {
+                if (!otp) {
+                    const code = String(crypto.randomInt(100000, 1000000));
+                    tx.set(privateRef, {
+                        otpHash: sha(code),
+                        otpAmount: amount,
+                        otpExpiry: now + OTP_TTL_MS,
+                    }, { merge: true });
+                    return {
+                        status: 'OTP_SENT',
+                        code,
+                        email: seller.sellerEmail || user.email || null,
+                        name: seller.sellerName || user.firstName || 'Seller',
+                    };
+                }
+                if (
+                    !priv.otpHash ||
+                    now > priv.otpExpiry ||
+                    priv.otpAmount !== amount ||
+                    !safeEq(sha(String(otp).trim()), priv.otpHash)
+                ) {
+                    return fail('Invalid or expired OTP.');
                 }
             }
 
-            const currentBalance = sellerData.accountBalance || 0;
-            if (currentBalance < amount) {
-                throw new Error(`Insufficient funds. Your balance is ₦${currentBalance.toLocaleString()}`);
+            const balance = seller.accountBalance || 0;
+            if (balance < amount) {
+                throw new UserError(`Insufficient funds. Your balance is ₦${balance.toLocaleString()}`);
             }
 
-            transaction.update(sellerRef, {
+            tx.update(sellerRef, {
                 accountBalance: admin.firestore.FieldValue.increment(-amount),
-                withdrawalOtp: null,
-                otpExpiry: null,
+                // clean up legacy public OTP fields
+                withdrawalOtp: admin.firestore.FieldValue.delete(),
+                otpExpiry: admin.firestore.FieldValue.delete(),
+                ...(migrateLegacy ? {
+                    transactionPin: admin.firestore.FieldValue.delete(),
+                    transferPin: admin.firestore.FieldValue.delete(),
+                    hasPin: true,
+                } : {}),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
+            tx.set(privateRef, {
+                attempts: 0, lockedUntil: null, otpHash: null, otpAmount: null, otpExpiry: null,
+                ...(migrateLegacy ? { pinHash: hashPin(userId, pin) } : {}),
+            }, { merge: true });
 
-            const withdrawalDocRef = adminDb.collection('withdrawals').doc();
-            transaction.set(withdrawalDocRef, {
-                withdrawalId: withdrawalDocRef.id,
+            const withdrawalRef = adminDb.collection('withdrawals').doc();
+            tx.set(withdrawalRef, {
+                withdrawalId: withdrawalRef.id,
                 sellerId: userId,
-                userId: userId,
+                userId,
                 amount,
-                bankDetails: sellerData.bankDetails || null,
+                bankDetails: seller.bankDetails,
                 status: 'pending',
                 type: 'withdrawal',
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
-
-            return { status: 'COMPLETED' };
+            return { status: 'COMPLETED', withdrawalId: withdrawalRef.id };
         });
 
-        // 🔒 RESPONSE ALIGNMENT FIX: Handled with status mapping to interact seamlessly with frontend try-catch loops
+        if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
+
         if (result.status === 'OTP_SENT') {
-            if (result.sellerEmail) {
-                sendServerNotification({
-                    type: 'withdrawal_otp',
-                    to: result.sellerEmail,
-                    userId,
-                    data: { otp: result.generatedOtp, amount },
-                }).catch(e => console.error('Withdrawal OTP email failed:', e.message));
+            if (!result.email) {
+                return NextResponse.json({ error: 'No email on file for verification.' }, { status: 400 });
             }
-            return NextResponse.json({ status: 'OTP_SENT' }, { status: 400 });
+            try {
+                const res = await notifyUser({
+                    userId,
+                    to: result.email,
+                    type: 'withdrawal_otp',
+                    data: { name: result.name, otp: result.code, amount },
+                    inApp: {
+                        type: 'security_otp',
+                        title: 'Your withdrawal code',
+                        message: `Your code is ${result.code}. It expires in 10 minutes. Never share it.`,
+                        extra: { sensitive: true, expiresAt: Date.now() + OTP_TTL_MS },
+                    },
+                });
+                if (res.every((r) => r.status === 'rejected')) {
+                    return NextResponse.json({ error: 'Could not send the verification code. Try again.' }, { status: 500 });
+                }
+            } catch (e) {
+                console.error('Withdrawal OTP email failed:', e.message);
+                return NextResponse.json({ error: 'Could not send the verification code. Try again.' }, { status: 500 });
+            }
+            return NextResponse.json({ status: 'OTP_SENT' }, { status: 400 }); // dashboard expects this shape
         }
+        const old = await adminDb.collection('notifications')
+            .where('userId', '==', userId).where('type', '==', 'security_otp').get();
+        await Promise.all(old.docs.map((d) => d.ref.delete()));
 
-        return NextResponse.json({ success: true }, { status: 200 });
-
+        return NextResponse.json({ success: true, txRef: result.withdrawalId }, { status: 200 });
     } catch (error) {
-        console.error('WITHDRAWAL FAILURE EXCEPTION:', error);
-
-        const userFacing = [
-            'PIN_NOT_SET',
-            'Incorrect PIN',
-            'Insufficient funds',
-            'Invalid or expired OTP',
-            'Seller profile record',
-        ].some(msg => error.message?.includes(msg));
-
-        return NextResponse.json(
-            { error: userFacing ? error.message : 'Withdrawal transaction halted.' },
-            { status: 400 }
-        );
+        if (error instanceof UserError) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        console.error('WITHDRAWAL FAILURE:', error);
+        return NextResponse.json({ error: 'Withdrawal could not be processed.' }, { status: 500 });
     }
 }

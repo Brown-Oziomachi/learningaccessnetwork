@@ -180,6 +180,7 @@ export default function PublishFlowWithBountyClient({ onPublishSuccess }) {
   const [type, setType] = useState(null);
   const [selectedBounty, setSelectedBounty] = useState(null);
   const [userData, setUserData] = useState(null);
+  const [triedStep3, setTriedStep3] = useState(false);
 
   /* ── Form state — mirrors AdvertiseClient exactly ── */
   const [form, setForm] = useState({
@@ -187,6 +188,8 @@ export default function PublishFlowWithBountyClient({ onPublishSuccess }) {
     description: "", tableOfContents: "",
     price: "", format: "PDF", pages: "",
     accessType: "paid",
+    negotiationChoice: "",
+    maxDiscountPercent: 20,
     // academic
     universityCountry: "", institution: "", department: "",
     courseCode: "", semester: "", session: "", level: "100",
@@ -251,6 +254,7 @@ export default function PublishFlowWithBountyClient({ onPublishSuccess }) {
       description: `Fulfilment of bounty request: "${bounty.title}"`,
       price: String(bounty.reward || 0),
       docType: "Bounty Fulfillment",
+      negotiationChoice: p.negotiationChoice || "fixed",
     }));
   }, []);
 
@@ -326,7 +330,10 @@ export default function PublishFlowWithBountyClient({ onPublishSuccess }) {
       setError("Please enter a valid price.");
       return;
     }
-
+    if (form.accessType === "paid" && !form.negotiationChoice) {
+      setError("Please choose Negotiable or Fixed price.");
+      return;
+    }
     setError("");
     setSubmitting(true);
     try {
@@ -380,6 +387,11 @@ export default function PublishFlowWithBountyClient({ onPublishSuccess }) {
         isFree: form.accessType === "free",
         price: form.accessType === "free" ? 0 : Number(form.price),
         accessType: form.accessType,
+        isNegotiable: form.accessType !== "free" && form.negotiationChoice === "negotiable",
+        maxDiscountPercent:
+          form.accessType !== "free" && form.negotiationChoice === "negotiable"
+            ? Number(form.maxDiscountPercent)
+            : null,
         // genre
         genre: form.genre || null,
         isbn: form.isbn || null,
@@ -770,6 +782,61 @@ export default function PublishFlowWithBountyClient({ onPublishSuccess }) {
               </div>
             </Field>
 
+     {/* Negotiation choice */}
+            {form.accessType === "paid" && (
+              <div style={{ marginTop: 16 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "#888", fontFamily: "'Lato',sans-serif", marginBottom: 10 }}>
+                  Price negotiation <span style={{ color: "#ea580c" }}>*</span>
+                </p>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: 2, border: triedStep3 && !form.negotiationChoice ? "2px solid #ef4444" : "2px solid transparent" }}>
+                  {[
+                    { value: "negotiable", title: "🤝 Negotiable", desc: "Buyer can send one offer. You accept, reject, or send a final price.", color: GOLD },
+                    { value: "fixed", title: "🔒 Fixed price", desc: "Buyer pays the listed price. No offers.", color: NAVY },
+                  ].map(opt => {
+                    const on = form.negotiationChoice === opt.value;
+                    return (
+                      <button key={opt.value} type="button" onClick={() => set("negotiationChoice", opt.value)}
+                        style={{ textAlign: "left", padding: "14px", cursor: "pointer", border: `1.5px solid ${on ? opt.color : "#e5ddd0"}`, background: on ? `${opt.color}14` : "#fff", transition: "all .18s" }}>
+                        <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, fontWeight: 700, color: on ? opt.color : NAVY, fontFamily: "'Lato',sans-serif" }}>
+                          {opt.title}{on && <CheckIcon />}
+                        </span>
+                        <span style={{ display: "block", fontSize: 11, color: "#999", marginTop: 4, lineHeight: 1.5, fontFamily: "'Lato',sans-serif" }}>{opt.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {triedStep3 && !form.negotiationChoice && (
+                  <p style={{ fontSize: 12, color: "#dc2626", margin: "8px 0 0", display: "flex", alignItems: "center", gap: 4, fontFamily: "'Lato',sans-serif" }}>
+                    <AlertIcon /> Choose Negotiable or Fixed price to continue.
+                  </p>
+                )}
+
+                {form.negotiationChoice === "negotiable" && (
+                  <div style={{ marginTop: 12, padding: "14px 16px", background: "#fffbeb", border: "1px solid #fde68a" }}>
+                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#92400e", margin: "0 0 8px", fontFamily: "'Lato',sans-serif" }}>
+                      Biggest discount a buyer can ask for
+                    </p>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {[10, 20, 30, 40].map(p => (
+                        <button key={p} type="button" onClick={() => set("maxDiscountPercent", p)}
+                          style={{ flex: 1, padding: "8px 0", fontSize: 12, fontWeight: 700, cursor: "pointer", border: `1.5px solid ${form.maxDiscountPercent === p ? GOLD : "#e5ddd0"}`, background: form.maxDiscountPercent === p ? GOLD : "#fff", color: form.maxDiscountPercent === p ? NAVY : "#555", fontFamily: "'Lato',sans-serif" }}>
+                          {p}%
+                        </button>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: 11, color: "#92400e", margin: "10px 0 0", lineHeight: 1.6, fontFamily: "'Lato',sans-serif" }}>
+                      {Number(form.price) > 0 && (
+                        <>Lowest offer you will ever see: <strong>₦{Math.ceil(Number(form.price) * (1 - form.maxDiscountPercent / 100)).toLocaleString("en-NG")}</strong>. </>
+                      )}
+                      Nothing changes without your approval.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            
             {/* Payout preview */}
             {form.accessType === "paid" && form.price && Number(form.price) > 0 && (
               <div style={{ marginTop: 16, padding: "14px 16px", background: "rgba(22,163,74,.07)", border: ".5px solid rgba(22,163,74,.25)" }}>
@@ -789,7 +856,14 @@ export default function PublishFlowWithBountyClient({ onPublishSuccess }) {
               <button onClick={() => setStep(2)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", background: "none", border: ".5px solid #e5ddd0", fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", cursor: "pointer", color: "#888", fontFamily: "'Lato',sans-serif" }}>
                 <ChevronLeft /> Back
               </button>
-              <button onClick={() => { if (file || driveLink.trim()) setStep(4); else setError("Please upload a file or paste a Drive link."); }}
+              <button   onClick={() => {
+                  setTriedStep3(true);
+                  if (!file && !driveLink.trim()) { setError("Please upload a file or paste a Drive link."); return; }
+                  if (!form.pages) { setError("Please enter the number of pages."); return; }
+                  if (form.accessType === "paid" && !form.negotiationChoice) return;
+                  setError("");
+                  setStep(4);
+                }}
                 disabled={!file && !driveLink.trim()}
                 style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 28px", background: (file || driveLink.trim()) ? GOLD : "#e5ddd0", color: (file || driveLink.trim()) ? NAVY : "#aaa", border: "none", fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>
                 Review <ChevronRight />
@@ -828,6 +902,7 @@ export default function PublishFlowWithBountyClient({ onPublishSuccess }) {
                   ["Pages", form.pages],
                   ["Format", form.format],
                   ["Price", form.accessType === "free" ? "Free" : `₦${Number(form.price).toLocaleString("en-NG")}`],
+                  ["Negotiation", form.accessType === "free" ? null : form.negotiationChoice === "negotiable" ? `Negotiable (up to ${form.maxDiscountPercent}% off)` : "Fixed price"],
                   ["File", file?.name || (driveLink ? "Google Drive link" : null)],
                   ["Cover", selectedCoverImage?.name || null],
                   ["Bounty ID", selectedBounty?.id],

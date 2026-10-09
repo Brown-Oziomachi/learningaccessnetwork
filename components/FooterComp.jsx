@@ -40,6 +40,7 @@ const FOOTER_COLUMNS = [
   {
     heading: "For Sellers",
     links: [
+      { label: "Start Selling Guide", href: "/seller/start-selling" },
       { label: "Seller Network", href: "/seller/network" },
       { label: "Upload Document", href: "/seller/upload-document" },
       { label: "LAN Wallet", href: "/seller/lan-wallet" },

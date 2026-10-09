@@ -390,8 +390,8 @@ useEffect(() => {
     if (!userId) return;
     const q = query(
       collection(db, "notifications"),
-      where("userId", "==", userId),
-      orderBy("createdAt", "desc"),
+      where("status", "==", "resolved"),
+      orderBy("resolvedAt", "desc"),
     );
     return onSnapshot(q, (snap) =>
       setNotifications(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
@@ -508,12 +508,13 @@ next.add(n._globalId);
   };
 
   const deleteNotification = async (e, n) => {
-    if (n._globalId) {
-  markAsRead(n);
-  setGlobalNotifs((prev) => prev.filter((g) => g.id !== n._globalId));
-  return;
-}
-    e.stopPropagation();
+  e.stopPropagation();
+  if (n._globalId) {
+    markAsRead(n);
+    setGlobalNotifs((prev) => prev.filter((g) => g.id !== n._globalId));
+    return;
+  }
+
     if (n._reportId) {
       markAsRead(n);
       setRepliedReports((prev) => prev.filter((r) => r.id !== n._reportId));
@@ -566,7 +567,7 @@ next.add(n._globalId);
       window.location.href = VERIFY_LINK;
       return;
     }
-    if (n.link) window.location.href = n.link;
+    if (n.link && /^\/(?!\/)/.test(n.link)) window.location.href = n.link;
   };
 
   const handleBellClick = () => {

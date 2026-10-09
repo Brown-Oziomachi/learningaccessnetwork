@@ -362,6 +362,15 @@ finally { setFollowLoad(false); }
         return () => clearTimeout(timeoutId);
     }, [resolvedUid]);
 
+    auth.currentUser?.getIdToken().then((t) =>
+        fetch("/api/follow/notify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+            body: JSON.stringify({ lecturerId }),
+        })
+    ).catch(() => { });
+    
+
     /* Derived */
     const q = searchQuery.toLowerCase();
     const visible = sellerBooks.filter((b) =>
