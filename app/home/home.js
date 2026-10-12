@@ -21,6 +21,7 @@ import { useAds, injectAds } from "@/lib/useAds";
 import FeaturedAdsCarousel from "@/components/FeaturedAdsCarousel";
 import HomeBountyStrip from "@/components/HomeBountyStrip";
 import { useCurrency } from "../context/CurrencyContext";
+import BookTile, { BOOK_GRID_CSS } from "@/components/BookTile";
 
 /* ─── colour tokens ─────────────────────────────────────────── */
 const NAVY = "#0d2244";
@@ -321,11 +322,30 @@ if (!cu) {
         </div>
     );
 
+  const paidBooks = allBooks.filter(b => Number(String(b.price).replace(/[^0-9.]/g, "")) > 0);
+const topSold = paidBooks.slice(0, 12).reduce(
+    (m, b) => Math.max(m, bookSalesCount[b.id] || bookSalesCount[b.firestoreId] || 0), 0
+);
+const paidTile = (book) => {
+    const sold = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
+    return (
+        <BookTile
+            key={book.id}
+            href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
+            image={book.image}
+            title={book.title}
+            owned={isPurchased(book.id)}
+            priceText={fmt(book.price)}
+            tag={sold > 0 && sold === topSold ? "🔥 Trending" : undefined}
+        />
+    );
+};
+
     return (
         <>
             <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
-
+          ${BOOK_GRID_CSS}
         .lan-root { font-family: 'Lato', sans-serif; background: ${BG}; }
         .lan-serif { font-family: 'Playfair Display', Georgia, serif; }
 
@@ -813,116 +833,32 @@ if (!cu) {
 
     {/* ── FREE BOOKS GRID ── */}
     <div style={{ marginBottom: "40px" }}>
-        {loadingFreeBooks ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "20px" }}>
-                {[...Array(12)].map((_, i) => (
-                    <div key={i} style={{ background: "#e5ddd0", aspectRatio: "3/4", animation: "pulse 1.5s ease-in-out infinite" }} />
-                ))}
-            </div>
-        ) : freeBooks.length === 0 ? (
-            <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "40px 24px", textAlign: "center" }}>
-                <p style={{ fontSize: "13px", color: "#aaa" }}>No free documents available right now.</p>
-            </div>
-        ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "20px" }}>
-               {freeBooks.map(book => {
-    const owned = isPurchased(book.id);
-    return (
-        <Link key={book.id} href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block", background: "#fff" }}>
+      {loadingFreeBooks ? (
+    <div className="book-grid">
+        {[...Array(6)].map((_, i) => (
+            <div key={i} style={{ background: "#e5ddd0", aspectRatio: "3/4", borderRadius: 6, animation: "pulse 1.5s ease-in-out infinite" }} />
+        ))}
+    </div>
+) : freeBooks.length === 0 ? (
+    <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "40px 24px", textAlign: "center" }}>
+        <p style={{ fontSize: "13px", color: "#aaa" }}>No free documents available right now.</p>
+    </div>
+) : (
+       <div className="book-grid">
+        {freeBooks.map(book => (
+            <BookTile
+                key={book.id}
+                href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`}
+                image={book.image}
+                title={book.title}
+                free
+                owned={isPurchased(book.id)}
+            />
+        ))}
+    </div>
+)}
 
-            {/* ── Thumbnail — green fallback + image on top ── */}
-            <div style={{ position: "relative", background: "#d1fae5", overflow: "hidden" }}>
-                <img
-                    src={book.image}
-                    alt={book.title}
-                    style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block" }}
-                    onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
-                    className="book-thumb"
-                />
-
-                {/* PDF badge top-left */}
-                <div style={{
-                    position: "absolute", top: 8, left: 8,
-                    display: "flex", alignItems: "center", gap: 4,
-                    background: "rgba(5,46,22,0.85)", padding: "3px 8px"
-                }}>
-                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#86efac", display: "inline-block" }} />
-                    <span style={{ fontSize: 9, fontWeight: 700, color: "#86efac", fontFamily: "'Lato',sans-serif", letterSpacing: ".1em" }}>PDF</span>
-                </div>
-
-                {/* 🔓 FREE badge top-right */}
-                <div style={{
-                    position: "absolute", top: 8, right: 8,
-                    background: "#16a34a", color: "#fff",
-                    fontSize: 9, fontWeight: 700, padding: "3px 7px",
-                    fontFamily: "'Lato',sans-serif", letterSpacing: ".06em",
-                    display: "flex", alignItems: "center", gap: 3
-                }}>
-                    🔓 FREE
-                </div>
-
-                {owned && (
-                    <span style={{
-                        position: "absolute", bottom: 8, left: 8,
-                        background: "#16a34a", color: "#fff",
-                        fontSize: 9, fontWeight: 700, padding: "3px 7px",
-                        fontFamily: "'Lato',sans-serif"
-                    }}>OWNED</span>
-                )}
-            </div>
-
-            {/* ── Card body ── */}
-            <div style={{
-                padding: "10px 10px 14px",
-                borderTop: "0.5px solid rgba(22,163,74,0.15)",
-                background: "#fff"
-            }}>
-                <h4 style={{
-                    fontFamily: "'Playfair Display',serif", fontSize: 12, fontWeight: 700,
-                    color: NAVY, margin: "0 0 3px",
-                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                    overflow: "hidden", lineHeight: 1.35
-                }}>
-                    {book.title}
-                </h4>
-                <p style={{
-                    fontSize: 11, color: "#888", margin: "0 0 8px",
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    fontFamily: "'Lato',sans-serif"
-                }}>
-                    {book.author}
-                </p>
-
-                {/* Category tag */}
-                {book.category && (
-                    <span style={{
-                        display: "inline-block",
-                        background: "#dcfce7", border: "0.5px solid rgba(22,163,74,0.3)",
-                        color: "#166534", fontSize: 8, fontWeight: 700,
-                        letterSpacing: ".08em", textTransform: "uppercase",
-                        padding: "3px 7px", fontFamily: "'Lato',sans-serif"
-                    }}>
-                        {book.category}
-                    </span>
-                )}
-
-                {/* Open Access dot + label — matches open-access BookCard */}
-                <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 5 }}>
-                    <span style={{
-                        width: 5, height: 5, borderRadius: "50%",
-                        background: "#16a34a", display: "inline-block", flexShrink: 0
-                    }} />
-                    <span style={{
-                        fontSize: 10, fontWeight: 700, color: "#16a34a",
-                        fontFamily: "'Lato',sans-serif", letterSpacing: ".05em"
-                    }}>Open Access</span>
-                </div>
-            </div>
-        </Link>
-    );
-})}
-            </div>
-        )}
+        {/* "View all free books" strip */}
 
         {/* "View all free books" strip */}
         <div style={{ marginTop: "16px", background: "#f0fdf4", border: "0.5px solid #16a34a", padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -966,140 +902,17 @@ if (!cu) {
         </div>
     ) : (
         <>
-            {/* ── Row 1: paid books 0-4 (5 books before any ads) ── */}
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "20px", marginBottom: "24px" }}>
-                                        {allBooks
-                                            .filter(b => {
-                                                // Safe numeric coercion: handles numbers, numeric strings, and strips currency flags
-                                                const cleanPrice = Number(String(b.price).replace(/[^0-9.]/g, ''));
-                                                return cleanPrice > 0;
-                                            })
-                                            .slice(0, 5)
-                                            .map(book => {
-                                                // Use fallback IDs consistently across your handlers
-                                                const targetId = book.id || book.firestoreId;
-                                                const soldCount = bookSalesCount[targetId] || 0;
+                   <>
+            <div className="book-grid" style={{ marginBottom: 24 }}>{paidBooks.slice(0, 5).map(paidTile)}</div>
 
-                                                // Optimization: Avoid running a .reduce loop inside your map loop if possible
-                                                const topSold = allBooks.slice(0, 12).reduce((m, b) => Math.max(m, bookSalesCount[b.id] || bookSalesCount[b.firestoreId] || 0), 0);
-                                                const isTrending = soldCount > 0 && soldCount === topSold;
-                                                const owned = isPurchased(targetId);
-                    return (
-                        <Link key={book.id} href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block", background: "#fff" }}>
-                            <div style={{ position: "relative" }}>
-                                <div style={{ position: "relative", width: "100%", aspectRatio: "3/4", background: NAVY, overflow: "hidden" }}>
-                                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "12px", background: `linear-gradient(135deg, ${NAVY} 0%, #1a3a6e 100%)` }}>
-                                        <div style={{ width: "36px", height: "36px", border: `1px solid rgba(184,150,62,0.4)`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "10px", flexShrink: 0 }}>
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
-                                        </div>
-                                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "11px", fontWeight: 700, color: "#fff", textAlign: "center", lineHeight: 1.35, margin: "0 0 6px", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{book.title}</p>
-                                        <p style={{ fontSize: "9px", color: "rgba(184,150,62,0.7)", fontFamily: "'Lato',sans-serif", textAlign: "center", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>{book.author}</p>
-                                    </div>
-                                    {book.image && (
-                                        <img src={book.image} alt={book.title}
-                                            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                                            onError={e => { e.target.style.display = "none"; }}
-                                            className="book-thumb"
-                                        />
-                                    )}
-                                </div>
-                                <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontFamily: "'Lato',sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff" }}>
-                                    <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />PDF
-                                </div>
-                                {owned && <span style={{ position: "absolute", top: "8px", right: "8px", background: "#16a34a", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>OWNED</span>}
-                                {!owned && isTrending && <span style={{ position: "absolute", bottom: "8px", left: "8px", background: "#ea580c", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>🔥 Trending</span>}
-                            </div>
-                            <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0" }}>
-                                <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>{book.title}</h4>
-                                <p style={{ fontSize: "11px", color: NAVY, margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "wrap" }}>
-                                    {book.category && !owned && (
-                                        <span style={{ display: "inline-block", background: CREAM, border: `0.5px solid rgba(184,150,62,0.3)`, color: GOLD, fontSize: "8px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 7px", fontFamily: "'Lato',sans-serif", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.category}</span>
-                                    )}
-                                    {book.price > 0 && !owned && (
-                                        <span style={{ fontSize: "11px", fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{fmt(book.price)}</span>
-                                    )}
-                                </div>
-                                {soldCount > 0 && <p style={{ fontSize: "10px", color: NAVY, margin: "5px 0 0", display: "flex", alignItems: "center", gap: "4px", fontFamily: "'Lato',sans-serif" }}><ShoppingBag size={9} /> {soldCount} sold</p>}
-                            </div>
-                        </Link>
-                    );
-                })}
-            </div>
-
-            {/* ── Gold Carousel AFTER 5 paid books ── */}
             <FeaturedAdsCarousel tier="Gold" maxAds={2} autoPlay={true} autoPlayMs={4000} style={{ marginBottom: "24px" }} />
 
-            {/* ── Row 2: paid books 5-10 ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "20px", marginBottom: "24px" }}>
-                {allBooks.filter(b => b.price > 0).slice(5, 10).map(book => {
-                    const soldCount = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
-                    const owned = isPurchased(book.id);
-                    return (
-                        <Link key={book.id} href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block", background: "#fff" }}>
-                            <div style={{ position: "relative", background: "#ede8df" }}>
-                                <div style={{ position: "relative", width: "100%", aspectRatio: "3/4", background: NAVY, overflow: "hidden" }}>
-                                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "12px", background: `linear-gradient(135deg, ${NAVY} 0%, #1a3a6e 100%)` }}>
-                                        <div style={{ width: "36px", height: "36px", border: `1px solid rgba(184,150,62,0.4)`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "10px", flexShrink: 0 }}>
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
-                                        </div>
-                                        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "11px", fontWeight: 700, color: "#fff", textAlign: "center", lineHeight: 1.35, margin: "0 0 6px", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{book.title}</p>
-                                        <p style={{ fontSize: "9px", color: "rgba(184,150,62,0.7)", fontFamily: "'Lato',sans-serif", textAlign: "center", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>{book.author}</p>
-                                    </div>
-                                    <img src={book.image} alt={book.title}
-                                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                                        onError={e => { e.target.style.display = "none"; }}
-                                        className="book-thumb"
-                                    />
-                                </div>
-                                {owned && <span style={{ position: "absolute", top: "8px", right: "8px", background: "#16a34a", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>OWNED</span>}
-                            </div>
-                            <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0" }}>
-                                <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>{book.title}</h4>
-                                <p style={{ fontSize: "11px", color: NAVY, margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
-                                {book.category && !owned && (
-                                    <span style={{ display: "inline-block", background: CREAM, border: `0.5px solid rgba(184,150,62,0.3)`, color: GOLD, fontSize: "8px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 7px", fontFamily: "'Lato',sans-serif", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.category}</span>
-                                )}
-                                {soldCount > 0 && <p style={{ fontSize: "10px", color: NAVY, margin: "5px 0 0", display: "flex", alignItems: "center", gap: "4px", fontFamily: "'Lato',sans-serif" }}><ShoppingBag size={9} /> {soldCount} sold</p>}
-                            </div>
-                        </Link>
-                    );
-                })}
-            </div>
+            <div className="book-grid" style={{ marginBottom: 24 }}>{paidBooks.slice(5, 10).map(paidTile)}</div>
 
-            {/* ── Silver Carousel after row 2 ── */}
             <FeaturedAdsCarousel tier="Silver" maxAds={2} autoPlay={true} autoPlayMs={5000} style={{ marginBottom: "24px" }} />
 
-            {/* ── Row 3: paid books 10-15 ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "20px", marginBottom: "24px" }}>
-                {allBooks.filter(b => b.price > 0).slice(10, 15).map(book => {
-                    const soldCount = bookSalesCount[book.id] || bookSalesCount[book.firestoreId] || 0;
-                    const owned = isPurchased(book.id);
-                    return (
-                        <Link key={book.id} href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block", background: "#fff" }}>
-                            <div style={{ position: "relative", background: "#ede8df" }}>
-                                <img src={book.image} alt={book.title}
-                                    style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block" }}
-                                    onError={e => { e.target.style.display = "none"; }}
-                                    className="book-thumb"
-                                />
-                                <div style={{ position: "absolute", top: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontFamily: "'Lato',sans-serif", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff" }}>
-                                    <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />PDF
-                                </div>
-                                {owned && <span style={{ position: "absolute", top: "8px", right: "8px", background: "#16a34a", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>OWNED</span>}
-                            </div>
-                            <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0" }}>
-                                <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>{book.title}</h4>
-                                <p style={{ fontSize: "11px", color: NAVY, margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato',sans-serif" }}>{book.author}</p>
-                                {book.category && !owned && (
-                                    <span style={{ display: "inline-block", background: CREAM, border: `0.5px solid rgba(184,150,62,0.3)`, color: GOLD, fontSize: "8px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 7px", fontFamily: "'Lato',sans-serif", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.category}</span>
-                                )}
-                                {soldCount > 0 && <p style={{ fontSize: "10px", color: NAVY, margin: "5px 0 0", display: "flex", alignItems: "center", gap: "4px", fontFamily: "'Lato',sans-serif" }}><ShoppingBag size={9} /> {soldCount} sold</p>}
-                            </div>
-                        </Link>
-                    );
-                })}
-            </div>
+            <div className="book-grid" style={{ marginBottom: 24 }}>{paidBooks.slice(10, 15).map(paidTile)}</div>
+        </>
         </>
                     )}
                 </div>

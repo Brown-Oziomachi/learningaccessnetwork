@@ -188,8 +188,8 @@ function CreatePinScreen({ onSave }) {
     if (confirmPin !== pin) { setError("PINs don't match. Try again."); setConfirmPin(""); return; }
     setError(""); setSaving(true);
     try { await onSave(pin); setDone(true); }
-    catch { setError("Failed to save PIN. Please try again."); }
-    finally { setSaving(false); }
+    catch (e) { setError(e?.message || "Failed to save PIN. Please try again."); }
+        finally { setSaving(false); }
   };
 
   const modalHeader = {
@@ -444,8 +444,12 @@ export default function TransferClient() {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
       body: JSON.stringify({ pin }),
     });
-    const j = await res.json();
-    if (!j.success) throw new Error(j.error || "Failed to save PIN.");
+       let j = null;
+    try { j = await res.json(); } catch { }
+    if (!res.ok || !j?.success) {
+      console.error("set-pin failed:", res.status, j);
+      throw new Error(j?.error || `Server returned ${res.status}`);
+    }
     setSeller((prev) => ({ ...prev, hasPin: true }));
     setHasPin(true);
   };

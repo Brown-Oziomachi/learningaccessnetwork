@@ -24,6 +24,18 @@ function highlight(text, query) {
     );
 }
 
+const makeSlug = (title, name) =>
+    `${title ? title + " " : ""}${name || ""}`
+        .trim().toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-");
+
+const lecturerHref = (l) => {
+    const slug = l.slug || makeSlug(l.title, l.name);
+    return slug ? `/profile/${slug}` : `/seller-profile?sellerId=${l.id}`;
+};
+
 // Which tab is active
 const TABS = ["Universities", "Lecturers"];
 
@@ -416,7 +428,7 @@ export default function UniversityDirectoryClient({
                                         const bgColors = ["#0d2244", "#1a3a5c", "#2c1810", "#1a2c1a"];
                                         const bg = bgColors[(l.name || "").charCodeAt(0) % bgColors.length];
                                         return (
-                                            <Link key={l.id} href={`/seller-profile?sellerId=${l.id}`} className="lect-card">
+<Link key={l.id} href={lecturerHref(l)} className="lect-card">
                                                 <div className="lect-avatar" style={{ background: bg, color: GOLD }}>
                                                     {initials}
                                                 </div>

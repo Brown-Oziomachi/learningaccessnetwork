@@ -978,14 +978,22 @@ export default function SellerAccountClient() {
     const currInfo = CURRENCY_DISPLAY[currency] || CURRENCY_DISPLAY.NGN;
     const isNGN = currency === "NGN";
     const fmt = (ngnAmt) => displayCurrency(ngnAmt, currency, currInfo);
-    const payoutOf = (amount) => displayCurrency(amount, currency, currInfo);
+
+const paidNGN = (txn) => Number(txn.amount ?? txn.salePrice ?? txn.price ?? 0) || 0;
+const payoutOf = (txn) => {
+    const v = txn.sellerAmount ?? txn.sellerPayout;
+    return v !== undefined && v !== null ? (Number(v) || 0) : paidNGN(txn) * 0.8;
+};
+const feeOf = (txn) => {
+    if (txn.platformFee != null) return Number(txn.platformFee) || 0;
+    return Math.max(paidNGN(txn) - Math.abs(payoutOf(txn)), 0);
+};
 
     const handleCurrencyChange = (code) => {
         setCurrency(code);
         if (typeof window !== "undefined") localStorage.setItem("lan_display_currency", code);
     };
 
-    // ── Member since label (derived from user.createdAt if available) ──
     const memberSince = (() => {
         if (!user) return "";
         const c = user.createdAt || user?.memberSince || user?.joinedAt;
@@ -1074,11 +1082,7 @@ export default function SellerAccountClient() {
                     setAccountBalance(sellerData.accountBalance || 0);
                     setTotalEarnings(sellerData.totalEarnings || 0);
                     setBooksSold(sellerData.booksSold || 0);
-                    const fetchSellerBooks = async () => {
-                        if (sellerBooks.length || !user?.uid) return;
-                        const snap = await getDocs(query(collection(db, "advertMyBook"), where("sellerId", "==", user.uid)));
-                        setSellerBooks(snap.docs.map(d => ({ ...d.data(), id: `firestore-${d.id}`, title: d.data().bookTitle })));
-                    };
+                   
                 } else {
                     await setDoc(doc(db, "sellers", uid), { sellerId: uid, sellerEmail: userData.email, sellerName: userData.displayName || `${userData.firstName} ${userData.surname}`, accountBalance: 0, totalEarnings: 0, booksSold: 0, totalWithdrawn: 0, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
                     setAccountBalance(0); setTotalEarnings(0); setBooksSold(0);
@@ -1171,8 +1175,12 @@ export default function SellerAccountClient() {
             setWithdrawals(withdrawalsList);
             const transfersQuery = query(collection(db, "transfers"), where("senderId", "==", uid));
             const transfersSnap = await getDocs(transfersQuery);
-            const transfersList = transfersSnap.docs.map(d => { const data = d.data(); return { id: d.id, ...data, bookTitle: `Transfer to ${data.recipientName || "Unknown"}`, buyerName: data.recipientName || "Unknown", amount: data.amount, sellerAmount: -data.amount, createdAtDate: data.createdAt?.toDate?.() || new Date(), type: "transfer_out" }; });
-            const incomingQuery = query(collection(db, "transfers"), where("recipientId", "==", uid));
+            const transfersList = await Promise.all(transfersSnap.docs.map(async (d) => {
+                const data = d.data();
+                const buyerCountry = await getCountry(data.recipientId);
+                return { id: d.id, ...data, bookTitle: `Transfer to ${data.recipientName || "Unknown"}`, buyerName: data.recipientName || "Unknown", amount: data.amount, sellerAmount: -data.amount, buyerCountry, createdAtDate: data.createdAt?.toDate?.() || new Date(), type: "transfer_out" };
+            }));
+                        const incomingQuery = query(collection(db, "transfers"), where("recipientId", "==", uid));
             const incomingSnap = await getDocs(incomingQuery);
             const incomingList = await Promise.all(incomingSnap.docs.map(async (d) => {
                 const data = d.data();
@@ -1184,8 +1192,13 @@ export default function SellerAccountClient() {
             const physicalSalesList = physicalSalesSnap.docs.map(d => { const data = d.data(); return { ...data, id: `physical-${d.id}`, bookTitle: `📦 ${data.bookTitle} (Registry Pickup)`, buyerName: data.studentName || data.buyerName || "Student", amount: data.salePrice || data.price || 0, sellerAmount: data.sellerPayout || 0, platformFee: data.platformFee || 0, createdAtDate: data.soldAt?.toDate?.() || new Date(), type: "physical_sale" }; });
             try {
                 const bountyFulfilledSnap = await getDocs(query(collection(db, "bounties"), where("fulfilledByUid", "==", uid), where("status", "==", "fulfilled")));
-                const bountyPayoutsList = bountyFulfilledSnap.docs.map(d => { const data = d.data(); const escrow = data.escrowAmount || data.reward || 0; return { id: `bounty-payout-${d.id}`, bookTitle: `🎯 Bounty Reward — ${data.title || "Bounty"}`, buyerName: data.postedBy || "Student", amount: escrow, sellerAmount: data.authorPayout || Math.round(escrow * 0.8), platformFee: data.platformFee || Math.round(escrow * 0.2), createdAtDate: data.approvedAt?.toDate?.() || data.fulfilledAt?.toDate?.() || new Date(), type: "bounty_payout" }; });
-                allTransactions = [...allTransactions, ...bountyPayoutsList];
+                const bountyPayoutsList = await Promise.all(bountyFulfilledSnap.docs.map(async (d) => {
+                    const data = d.data();
+                    const escrow = data.escrowAmount || data.reward || 0;
+                    const buyerCountry = await getCountry(data.postedByUid);
+                    return { id: `bounty-payout-${d.id}`, bookTitle: `🎯 Bounty Reward — ${data.title || "Bounty"}`, buyerName: data.postedBy || "Student", amount: escrow, sellerAmount: data.authorPayout || Math.round(escrow * 0.8), platformFee: data.platformFee || Math.round(escrow * 0.2), buyerCountry, createdAtDate: data.approvedAt?.toDate?.() || data.fulfilledAt?.toDate?.() || new Date(), type: "bounty_payout" };
+                }));
+                                allTransactions = [...allTransactions, ...bountyPayoutsList];
             } catch (e) { console.warn("Bounty payouts fetch failed:", e); }
             try {
                 const bountyPostedSnap = await getDocs(query(collection(db, "bounties"), where("postedByUid", "==", uid)));
@@ -1205,6 +1218,12 @@ export default function SellerAccountClient() {
             setTransactions(allTransactions);
         } catch (error) { console.error("Error fetching seller transactions:", error); }
     };
+
+    const fetchSellerBooks = async () => {
+    if (sellerBooks.length || !user?.uid) return;
+    const snap = await getDocs(query(collection(db, "advertMyBook"), where("sellerId", "==", user.uid)));
+    setSellerBooks(snap.docs.map(d => ({ ...d.data(), id: `firestore-${d.id}`, title: d.data().bookTitle })));
+};
 
     const handleSaveBank = async () => {
         if (!bankFormData.accountName || !bankFormData.accountNumber || !bankFormData.bankName) { alert("Please fill in all required fields"); return; }
@@ -1386,6 +1405,63 @@ export default function SellerAccountClient() {
             </div>
         </div>
     );
+
+
+        const txnStatusLabel = (t) => ({
+        transfer_out: "Sent",
+        transfer_in: "Received",
+        bounty_posted: "Escrow locked",
+        bounty_payout: "Bounty paid",
+        physical_sale: "Physical sale",
+    }[t.type] || "Success");
+
+    // returns [label, value, tone] rows. tone: "plus" | "minus" | undefined
+    const txnDetailRows = (t) => {
+        const flagged = t.buyerCountry ? `${getCountryFlag(t.buyerCountry)} ${t.buyerCountry}` : "—";
+        switch (t.type) {
+            case "bounty_posted":
+                return [
+                    ["Type", "Bounty request"],
+                    ["Held in escrow", fmt(paidNGN(t)), "minus"],
+                    ["Status", "Locked until a submission is approved"],
+                ];
+            case "transfer_out":
+                return [
+                    ["Sent to", t.buyerName || "—"],
+                    ["Amount sent", fmt(paidNGN(t)), "minus"],
+                    ["Recipient country", flagged],
+                ];
+            case "transfer_in":
+                return [
+                    ["Received from", t.buyerName || "—"],
+                    ["Amount received", fmt(paidNGN(t)), "plus"],
+                    ["Sender country", flagged],
+                ];
+            case "bounty_payout":
+                return [
+                    ["Posted by", t.buyerName || "—"],
+                    ["Bounty reward", fmt(paidNGN(t))],
+                    ["Poster country", flagged],
+                    ["Your payout (80%)", `+${fmt(Math.abs(payoutOf(t)))}`, "plus"],
+                    ["Platform fee (20%)", `-${fmt(feeOf(t))}`, "minus"],
+                ];
+            case "physical_sale":
+                return [
+                    ["Buyer", t.buyerName || t.studentName || "—"],
+                    ["Price", fmt(paidNGN(t))],
+                    ["Your payout (80%)", `+${fmt(Math.abs(payoutOf(t)))}`, "plus"],
+                    ["Platform fee (20%)", `-${fmt(feeOf(t))}`, "minus"],
+                ];
+            default:
+                return [
+                    ["Buyer", t.buyerName || t.studentName || "—"],
+                    ["Price", fmt(paidNGN(t))],
+                    ["Country", flagged],
+                    ["Your payout (80%)", `+${fmt(Math.abs(payoutOf(t)))}`, "plus"],
+                    ["Platform fee (20%)", `-${fmt(feeOf(t))}`, "minus"],
+                ];
+        }
+    };
 
     return (
         <>
@@ -1951,20 +2027,13 @@ export default function SellerAccountClient() {
                                                             </p>
                                                         );
                                                     })()}
-                                                    <span style={{ fontSize: '10px', background: '#f0fdf4', color: '#16a34a', padding: '2px 6px', fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>Success</span>
-                                                </div>
+                                                    <span style={{ fontSize: '10px', background: txn.type === 'bounty_posted' ? '#fef9c3' : '#f0fdf4', color: txn.type === 'bounty_posted' ? '#a16207' : '#16a34a', padding: '2px 6px', fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>{txnStatusLabel(txn)}</span>                                                </div>
                                             </div>
-                                            <div style={{ background: CREAM, border: '0.5px solid #f0ebe0', padding: '8px 10px' }}>
-                                                {[
-                                                    ['Buyer', txn.buyerName || txn.studentName || '—'],
-                                                    ['Price', fmt(paidNGN(txn))],
-                                                    ['Country', txn.buyerCountry ? `${getCountryFlag(txn.buyerCountry)} ${txn.buyerCountry}` : '—'],
-                                                    ['Your Payout (80%)', `+${fmt(Math.abs(payoutOf(txn)))}`],
-                                                    ['Platform Fee (20%)', `-${fmt(feeOf(txn))}`],
-                                                ].map(([k, v]) => (
+                                                                                       <div style={{ background: CREAM, border: '0.5px solid #f0ebe0', padding: '8px 10px' }}>
+                                                {txnDetailRows(txn).map(([k, v, tone]) => (
                                                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '3px 0', gap: 8 }}>
                                                         <span style={{ color: '#aaa', fontFamily: "'Lato',sans-serif", flexShrink: 0 }}>{k}</span>
-                                                        <span style={{ fontWeight: 700, color: k.includes('Fee') ? '#ef4444' : k.includes('Payout') ? '#16a34a' : NAVY, fontFamily: "'Lato',sans-serif", textAlign: 'right' }}>{v}</span>
+                                                        <span style={{ fontWeight: 700, color: tone === 'minus' ? '#ef4444' : tone === 'plus' ? '#16a34a' : NAVY, fontFamily: "'Lato',sans-serif", textAlign: 'right' }}>{v}</span>
                                                     </div>
                                                 ))}
                                             </div>

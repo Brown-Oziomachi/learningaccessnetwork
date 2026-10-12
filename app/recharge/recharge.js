@@ -183,20 +183,22 @@ function PinConfirmModal({ onVerify, onClose }) {
   const [attempts, setAttempts] = useState(0);
   const MAX = 3;
 
-  const verify = (p) => {
+const verify = async (p) => {
     const target = p || pin;
-    if (target.length < 4) return;
-    const ok = onVerify(target);
-    if (!ok) {
-      const next = attempts + 1;
-      setAttempts(next);
+    if (target.length < 4 || checking) return;
+    setChecking(true);
+    const res = await onVerify(target);
+    setChecking(false);
+    if (!res.ok) {
+      setAttempts((a) => a + 1);
       setPin("");
-      setError(next >= MAX
-        ? "Too many incorrect attempts. Please close and try again."
-        : `Incorrect PIN. ${MAX - next} attempt${MAX - next === 1 ? "" : "s"} remaining.`);
+      setError(res.error || "Incorrect PIN.");
     }
-  };
-  useEffect(() => { if (pin.length === 4 && attempts < MAX) verify(pin); }, [pin]); // eslint-disable-line
+};
+
+  useEffect(() => {
+    if (pin.length === 4 && attempts < MAX) verify(pin);
+  }, [pin]); 
   const locked = attempts >= MAX;
 
   return (
@@ -400,6 +402,7 @@ export default function RechargeClient() {
   const [smartcardNumber, setSmartcardNumber]       = useState("");
   const [airtimePlans, setAirtimePlans]             = useState([]);
   const [loadingAirtimePlans, setLoadingAirtimePlans] = useState(false);
+ const [checking, setChecking] = useState(false);
 
   /* focus states */
   const [focusPhone, setFocusPhone]   = useState(false);
@@ -529,14 +532,23 @@ useEffect(() => {
   };
 
   const requirePin = (action) => { setPinAction(() => action); setShowPinModal(true); };
-  const handleVerifyPin = (entered) => {
-    if (entered === seller?.transferPin) {
-      setShowPinModal(false);
-      if (pinAction) { pinAction(); setPinAction(null); }
-      return true;
-    }
-    return false;
-  };
+ const handleVerifyPin = async (entered) => {
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const r = await fetch("/api/seller/pin/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ pin: entered }),
+        });
+        const d = await r.json();
+        if (d.ok) {
+            setShowPinModal(false);
+            if (pinAction) { pinAction(); setPinAction(null); }
+            return { ok: true };
+        }
+        return { ok: false, error: d.error };
+    } catch { return { ok: false, error: "Could not verify PIN. Try again." }; }
+};
 
   const finalAmount =
     tab === "airtime"
@@ -686,7 +698,7 @@ useEffect(() => {
       </div></div>
     </>
   );
-  if (!seller.transferPin) return (
+  if (!seller.hasPin) return (
     <>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Lato:wght@400;700&display=swap');`}</style>
       <div style={guardStyle}><div style={guardBox}>

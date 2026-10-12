@@ -533,7 +533,7 @@ function FulfillmentReviewModal({ bounty, bidder, user, onClose, onApproved, onD
             onApproved(); 
             // Redirect to saved books page
             if (typeof window !== "undefined") {
-                window.location.href = "/my-book";
+                window.location.href = "/my-books";
             }        } catch (e) {
             setError("Failed to release funds: " + e.message);
         } finally {

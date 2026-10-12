@@ -59,7 +59,8 @@ const mapBook = (ds, data, ownerId, contributor) => ({
     contributorId: contributor?.id || null,
     contributorName: contributor?.name || null,
     contributorTitle: contributor?.title || null,
-    contributorPhoto: contributor?.photoUrl || null,
+    contributorSlug: contributor?.slug || null,
+        contributorPhoto: contributor?.photoUrl || null,
     contributorDept: contributor?.department || null,
     contributorProfileId: contributor?.profileId || null,
 });
@@ -89,7 +90,8 @@ export default async function UniversityHubPage({ params }) {
             sellersSnap.forEach((ds) => {
                 allSellerIds.add(ds.id);
                 const data = ds.data();
-                const title = (data.title || "").toLowerCase();
+                                const rawTitle = data.title || data.sellerTitle || "";
+                const title = rawTitle.toLowerCase();
                 const isLecturer = FACULTY_TITLES.some((t) =>
                     title.includes(t.toLowerCase())
                 );
@@ -97,8 +99,9 @@ export default async function UniversityHubPage({ params }) {
 
                 contributors.push({
                     id: ds.id,
+                    slug: data.slug || null,
                     name: data.sellerName || data.displayName || "Unknown",
-                    title: data.title || "Lecturer",
+                    title: rawTitle || "Lecturer",
                     photoUrl: null,
                     department: data.department || null,
                     faculty: data.faculty || null,

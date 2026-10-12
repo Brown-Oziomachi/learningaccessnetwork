@@ -44,6 +44,28 @@ const sectionCard = {
     background: "#fff", border: `0.5px solid #e5ddd0`, padding: "22px", marginBottom: "16px",
 };
 
+/* ─── Cover: image if it loads, otherwise the book title (no stock photo) ─── */
+function Cover({ src, title, style, titleSize = 12, children }) {
+    const [failed, setFailed] = useState(false);
+    useEffect(() => { setFailed(false); }, [src]);
+    const showImg = src && !failed;
+    return (
+        <div style={{ position: "relative", width: "100%", aspectRatio: "3 / 4", background: NAVY, overflow: "hidden", border: "0.5px solid #e5ddd0", ...style }}>
+            {showImg ? (
+                <img src={src} alt={title} loading="lazy" onError={() => setFailed(true)}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            ) : (
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: "10px", textAlign: "center", background: `linear-gradient(160deg, ${NAVY}, #1a3a6e)`, borderTop: `2px solid ${GOLD}` }}>
+                    <span style={{ fontFamily: "'Playfair Display', serif", color: "#fff", fontSize: `${titleSize}px`, fontWeight: 700, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word" }}>
+                        {title}
+                    </span>
+                </div>
+            )}
+            {children}
+        </div>
+    );
+}
+
 /* ─── Offline PDF Reader ─────────────────────────────────── */
 function OfflinePdfReader({ pdfObjectUrl, book, onClose }) {
     const canvasRef = useRef(null);
@@ -242,13 +264,14 @@ export default function MyBooksClient() {
 
     const { isOnline, offlineIds, offlineBooks, formattedStorageSize, downloadForOffline, removeOfflineBook, getOfflinePdfUrl, isBookOffline, getDownloadState } = useOfflineBooks();
 
+    /* No stock-photo fallback: returns null when there is no cover source */
     const getThumbnailUrl = (book) => {
-        if (!book) return 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+        if (!book) return null;
         if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
         if (book.embedUrl) { const m = book.embedUrl.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})/); if (m) return `https://drive.google.com/thumbnail?id=${m[1] || m[2]}&sz=w400`; }
         const pdf = book.pdfUrl || book.pdfLink;
         if (pdf?.includes('drive.google.com')) { const m = pdf.match(/\/d\/([\w-]{25,})|\/file\/d\/([\w-]{25,})/); if (m) return `https://drive.google.com/thumbnail?id=${m[1] || m[2]}&sz=w400`; }
-        return book.image || book.coverImage || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400';
+        return book.image || book.coverImage || null;
     };
 
     const extractFileId = (url) => {
@@ -343,6 +366,7 @@ export default function MyBooksClient() {
         else alert(`Download link for ${book.title} will be sent to ${user?.email}`);
     };
     const formatDate = (d) => { if (!d) return 'N/A'; return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }); };
+    const formatShort = (d) => { if (!d) return ''; return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); };
 
     /* ─── Loading ─────────────────────────────────────────── */
     if (loading) return (
@@ -436,17 +460,19 @@ export default function MyBooksClient() {
                 {/* Overview panel */}
                 {showOverview && (
                     <>
-                        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 40,  }} onClick={() => setShowOverview(false)} />
-                        <div style={{ position: "fixed", inset: "0 0 0 auto", width: "380px", background: "#fff", zIndex: 50, overflowY: "auto", borderLeft: `0.5px solid #e5ddd0` }}>
+                        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 40 }} onClick={() => setShowOverview(false)} />
+                        <div style={{ position: "fixed", inset: "0 0 0 auto", width: "380px", maxWidth: "100%", background: "#fff", zIndex: 50, overflowY: "auto", borderLeft: `0.5px solid #e5ddd0` }}>
                             <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `0.5px solid rgba(184,150,62,0.2)` }}>
-                                <div className="mt-40">
+                                <div>
                                     <p style={{ ...eyebrow, marginBottom: "2px" }}>Book Info</p>
                                     <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "16px", fontWeight: 700, color: "#fff", margin: 0 }}>Overview</p>
                                 </div>
                                 <button onClick={() => setShowOverview(false)} style={{ background: "none", border: `0.5px solid rgba(255,255,255,0.2)`, padding: "6px", cursor: "pointer", color: "rgba(255,255,255,0.5)", display: "flex" }}><X size={15} /></button>
                             </div>
                             <div style={{ padding: "24px" }}>
-                                <img src={selectedBook.image || selectedBook.coverImage} alt={selectedBook.title} style={{ width: "100%", height: "240px", objectFit: "cover", marginBottom: "16px", border: `0.5px solid #e5ddd0` }} />
+                                <div style={{ width: "140px", marginBottom: "16px" }}>
+                                    <Cover src={selectedBook.image || selectedBook.coverImage} title={selectedBook.title} />
+                                </div>
                                 <p style={eyebrow}>Title</p>
                                 <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "18px", fontWeight: 700, color: NAVY, marginBottom: "4px" }}>{selectedBook.title}</h3>
                                 <p style={{ fontSize: "12px", color: "#aaa", marginBottom: "16px" }}>By {selectedBook.author}</p>
@@ -483,7 +509,9 @@ export default function MyBooksClient() {
                             <div style={{ overflowY: "auto", maxHeight: "calc(85vh - 70px)", padding: "20px" }}>
                                 {getRelatedBooks(selectedBook).map(rb => (
                                     <div key={rb.id} style={{ display: "flex", gap: "16px", padding: "14px 0", borderBottom: "0.5px solid #f0ebe0" }}>
-                                        <img src={rb.image} alt={rb.title} style={{ width: "80px", height: "110px", objectFit: "cover", flexShrink: 0, border: `0.5px solid #e5ddd0` }} />
+                                        <div style={{ width: "64px", flexShrink: 0 }}>
+                                            <Cover src={rb.image} title={rb.title} titleSize={9} />
+                                        </div>
                                         <div style={{ flex: 1 }}>
                                             <h4 style={{ fontFamily: "'Playfair Display', serif", fontSize: "15px", fontWeight: 700, color: NAVY, marginBottom: "4px" }}>{rb.title}</h4>
                                             <p style={{ fontSize: "11px", color: "#aaa", marginBottom: "12px" }}>By {rb.author}</p>
@@ -511,12 +539,22 @@ export default function MyBooksClient() {
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
                 .lan-lib-root { font-family:'Lato',sans-serif; background:${BG}; min-height:100vh; }
-                .book-card-hover { transition:box-shadow 0.2s; }
-                .book-card-hover:hover { box-shadow:0 8px 32px rgba(13,34,68,0.12); }
                 .lan-offline-btn:hover { background:#fff1f2 !important; color:#dc2626 !important; border-color:#fca5a5 !important; }
                 @keyframes spin{to{transform:rotate(360deg)}}
                 @keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
                 .anim{animation:slideUp 0.4s cubic-bezier(.4,0,.2,1) both}
+
+                /* small fixed-width book cards */
+                .mb-grid{display:grid;grid-template-columns:repeat(auto-fill,136px);gap:12px;justify-content:center;}
+                @media(min-width:640px){.mb-grid{grid-template-columns:repeat(auto-fill,150px);gap:16px;justify-content:start;}}
+                .mb-card{background:#fff;border:0.5px solid #e5ddd0;padding:8px;min-width:0;transition:box-shadow .2s,border-color .2s,transform .2s;}
+                .mb-card:hover{border-color:${GOLD};box-shadow:0 8px 22px rgba(13,34,68,0.12);transform:translateY(-2px);}
+                .mb-title{margin:7px 0 0;font-size:11px;line-height:1.35;color:${NAVY};font-weight:700;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}
+                .mb-author{margin:2px 0 0;font-size:10px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+                .mb-meta{margin:3px 0 0;font-size:10px;color:#777;}
+                .mb-offline{margin-top:7px;}
+                .mb-offline > button,.mb-offline > span{width:100%;justify-content:center;box-sizing:border-box;}
+                .mb-badge{position:absolute;font-size:7px;font-weight:700;padding:2px 6px;letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;gap:3px;}
             `}</style>
             <div className="lan-lib-root">
                 <Navbar />
@@ -613,42 +651,35 @@ export default function MyBooksClient() {
                                 </div>
                             )}
 
-                            {/* Book grid */}
+                            {/* Book grid: small cards */}
                             {displayBooks.length > 0 && (
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "16px" }} className="anim">
+                                <div className="mb-grid anim">
                                     {displayBooks.map((book, idx) => {
                                         const saved = isBookOffline(book.id);
                                         const dlState = getDownloadState(book.id);
+                                        const price = book.amount ?? book.price;
+                                        const priceText = price == null ? null : Number(price) > 0 ? `₦${Number(price).toLocaleString()}` : "Free";
+                                        const meta = [priceText, formatShort(book.purchaseDate)].filter(Boolean).join(" · ");
                                         return (
-                                            <div key={book.id || book.transactionId || idx} style={{ background: "#fff", border: `0.5px solid #e5ddd0` }} className="book-card-hover">
-                                                <div style={{ position: "relative" }}>
-                                                    <img src={book.coverImage || book.image} alt={book.title} style={{ width: "100%", height: "200px", objectFit: "cover", display: "block", borderBottom: `0.5px solid #e5ddd0` }}
-                                                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'; }} />
-                                                    {/* Purchased badge */}
-                                                    <div style={{ position: "absolute", top: "10px", right: "10px", background: NAVY, color: "#fff", fontSize: "8px", fontWeight: 700, padding: "3px 8px", letterSpacing: "0.1em", textTransform: "uppercase" }}>Purchased</div>
-                                                    {/* Offline badge */}
+                                            <div key={book.id || book.transactionId || idx} className="mb-card">
+                                                <Cover src={book.coverImage || book.image} title={book.title}>
+                                                    <div className="mb-badge" style={{ top: 0, right: 0, background: NAVY, color: "#fff" }}>Purchased</div>
                                                     {saved && (
-                                                        <div style={{ position: "absolute", top: "10px", left: "10px", background: GOLD, color: NAVY, fontSize: "8px", fontWeight: 700, padding: "3px 8px", display: "flex", alignItems: "center", gap: "4px", letterSpacing: "0.08em" }}>
-                                                            <HardDrive size={9} /> Offline
+                                                        <div className="mb-badge" style={{ bottom: 0, left: 0, background: GOLD, color: NAVY }}>
+                                                            <HardDrive size={8} /> Offline
                                                         </div>
                                                     )}
+                                                </Cover>
+                                                <p className="mb-title" title={book.title}>{book.title}</p>
+                                                {book.author && <p className="mb-author">{book.author}</p>}
+                                                {meta && <p className="mb-meta">{meta}</p>}
+                                                <div className="mb-offline">
+                                                    <SaveOfflineButton book={book} isOffline={saved} downloadState={dlState} onSave={downloadForOffline} onRemove={removeOfflineBook} isOnline={isOnline} />
                                                 </div>
-                                                <div style={{ padding: "16px" }}>
-                                                    <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "15px", fontWeight: 700, color: NAVY, marginBottom: "4px", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{book.title}</h3>
-                                                    <p style={{ fontSize: "11px", color: "#aaa", marginBottom: "10px" }}>{book.author}</p>
-                                                    <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", fontSize: "11px", color: "#666" }}>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><Calendar size={11} style={{ color: GOLD }} /> {formatDate(book.purchaseDate)}</div>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><CreditCard size={11} style={{ color: GOLD }} /> ₦{book.amount?.toLocaleString() || book.price?.toLocaleString() || 'N/A'}</div>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><FileText size={11} style={{ color: GOLD }} /> {book.pages || 'N/A'} pages · {book.format || 'PDF'}</div>
-                                                    </div>
-                                                    <div style={{ marginBottom: "10px" }}>
-                                                        <SaveOfflineButton book={book} isOffline={saved} downloadState={dlState} onSave={downloadForOffline} onRemove={removeOfflineBook} isOnline={isOnline} />
-                                                    </div>
-                                                    <button onClick={() => handleOpenBook(book)} style={{ ...navyBtn(false), width: "100%", background: saved && !isOnline ? GOLD : NAVY, color: saved && !isOnline ? NAVY : "#fff" }}>
-                                                        <ExternalLink size={13} />
-                                                        {saved && !isOnline ? 'Read Offline' : 'Read Book'}
-                                                    </button>
-                                                </div>
+                                                <button onClick={() => handleOpenBook(book)} style={{ ...navyBtn(false), width: "100%", marginTop: "6px", padding: "8px 10px", fontSize: "11px", background: saved && !isOnline ? GOLD : NAVY, color: saved && !isOnline ? NAVY : "#fff" }}>
+                                                    <ExternalLink size={12} />
+                                                    {saved && !isOnline ? 'Read Offline' : 'Read'}
+                                                </button>
                                             </div>
                                         );
                                     })}

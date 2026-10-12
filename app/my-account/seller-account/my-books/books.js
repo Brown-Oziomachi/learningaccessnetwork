@@ -174,6 +174,7 @@ export default function MyPostedBooksClient() {
 
     /* ── unpublish / republish ── */
     const toggleUnpublish = async (book) => {
+        if (book.status === "pending") return;
         const next = !book.unpublished;
         try {
             await updateDoc(doc(db, "advertMyBook", book.id), { unpublished: next });
@@ -183,6 +184,7 @@ export default function MyPostedBooksClient() {
 
     /* ── edit modal open ── */
     const openEditModal = (book) => {
+    if (book.status === "pending") return;
         setSelectedBook(book);
         setEditForm({
             bookTitle: book.bookTitle || "",
@@ -289,7 +291,7 @@ const PricingBadge = ({ book }) => {
         if (book.unpublished) return { label: 'Unpublished', bg: '#f8f8f8', color: '#6b7280', border: '#d1d5db' };
         switch (book.status) {
             case 'approved': return { label: 'Approved', bg: '#f0fdf4', color: '#16a34a', border: '#86efac' };
-            case 'pending': return { label: 'Pending', bg: '#fffbeb', color: '#d97706', border: '#fde68a' };
+            case 'pending': return { label: 'Pending approval', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' };
             case 'rejected': return { label: 'Rejected', bg: '#fef2f2', color: '#dc2626', border: '#fecaca' };
             default: return { label: 'Active', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' };
         }
@@ -462,13 +464,17 @@ const PricingBadge = ({ book }) => {
                                         const salesCount = getBookSalesCount(book);
                                         const totalSales = getBookTotalSales(book);
                                         const statusCfg = getStatusConfig(book);
+                                        const pending = book.status === "pending";
                                         const isEditingPrice = editingPriceId === book.id;
                                         return (
                                             <div key={book.id}
                                                 className={book.unpublished ? 'unpub-row' : ''}
-                                                style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1.2fr 1fr 1fr 1fr 1.4fr', borderBottom: '0.5px solid #f0ebe0', transition: 'background 0.15s' }}
-                                                onMouseEnter={e => e.currentTarget.style.background = CREAM}
-                                                onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                                                style={{
+                                                    display: 'grid', gridTemplateColumns: '2.5fr 1fr 1.2fr 1fr 1fr 1fr 1.4fr', borderBottom: '0.5px solid #f0ebe0', transition: 'background 0.15s',
+                                                    background: pending ? '#eff6ff' : '#fff', borderLeft: pending ? '3px solid #1d4ed8' : '3px solid transparent'
+                                                }}
+                                                onMouseEnter={e => { if (!pending) e.currentTarget.style.background = CREAM; }}
+                                                onMouseLeave={e => { e.currentTarget.style.background = pending ? '#eff6ff' : '#fff'; }}>
 
                                                 {/* Title */}
                                                 <div style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -506,11 +512,11 @@ const PricingBadge = ({ book }) => {
                                                         </div>
                                                     ) : (
                                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
-                                                                    onClick={() => { setEditingPriceId(book.id); setPriceInputVal(book.price); }}
-                                                                    title="Click to edit price">
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: pending ? 'default' : 'pointer' }}
+                                                                    onClick={() => { if (pending) return; setEditingPriceId(book.id); setPriceInputVal(book.price); }}
+                                                                    title={pending ? "Available after approval" : "Click to edit price"}>
                                                                     <span style={{ fontSize: '13px', fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{fmt(Number(book.price) || 0)}</span>
-                                                                    <Pencil size={11} style={{ color: GOLD, opacity: 0.7 }} />
+                                                            {!pending && <Pencil size={11} style={{ color: GOLD, opacity: 0.7 }} />}
                                                                 </div>
                                                                 <PricingBadge book={book} />
                                                             </div>

@@ -36,19 +36,21 @@ export default async function UniversityDirectoryPage() {
         const snap = await adminDb
             .collection("sellers")
             .where("university", ">", "")
-            .select("sellerName", "displayName", "title", "university", "department")
-            .get();
+            .select("sellerName", "displayName", "title", "sellerTitle", "slug", "university", "department")
+                        .get();
 
         snap.forEach((ds) => {
             const data = ds.data();
-            const title = (data.title || "").toLowerCase();
+                        const rawTitle = data.title || data.sellerTitle || "";
+            const title = rawTitle.toLowerCase();
             const isLecturer = FACULTY_TITLES.some((t) => title.includes(t.toLowerCase()));
             if (!isLecturer) return;
 
             lecturers.push({
                 id: ds.id,
+                slug: data.slug || null,
                 name: data.sellerName || data.displayName || "",
-                title: data.title || "Lecturer",
+                title: rawTitle || "Lecturer",
                 university: data.university || "",
                 department: data.department || "",
             });
