@@ -1423,7 +1423,7 @@ export default function BookPreviewPage({ bookDetails }) {
                   <textarea autoFocus value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} placeholder="Share your thoughts about this book…" rows={4}
                     style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "0.5px solid rgba(255,255,255,0.15)", padding: "12px", color: "#fff", fontSize: "13px", resize: "none", outline: "none", fontFamily: "'Lato',sans-serif", boxSizing: "border-box" }} />
                   <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)", marginTop: "4px", marginBottom: "18px", fontFamily: "'Lato',sans-serif" }}>{feedbackText.length}/500</p>
-                  <div style={{ display: "flex", gap: "10px" }}>
+                  <div style={{ display: "flex", gap: "11px" }}>
                     <button onClick={() => { setShowFeedbackModal(false); setFeedbackText(""); setFeedbackRating(0); }} style={{ flex: 1, padding: "12px", border: "0.5px solid rgba(255,255,255,0.2)", background: "transparent", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>Cancel</button>
                     <button onClick={submitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()} style={{ flex: 1, padding: "12px", background: GOLD, border: "none", color: NAVY, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", opacity: isSubmittingFeedback || !feedbackText.trim() ? 0.5 : 1 }}>
                       {isSubmittingFeedback ? "Submitting…" : "Submit Review"}
