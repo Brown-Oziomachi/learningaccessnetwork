@@ -296,21 +296,31 @@ function CreatePinScreen({ onSave }) {
 
 /* ─── PIN CONFIRM MODAL ─────────────────────────────────────── */
 function PinConfirmModal({ onVerify, onClose }) {
-  const [pin, setPin]         = useState("");
-  const [masked, setMasked]   = useState(true);
-  const [error, setError]     = useState("");
+  const [pin, setPin]           = useState("");
+  const [masked, setMasked]     = useState(true);
+  const [error, setError]       = useState("");
   const [attempts, setAttempts] = useState(0);
-  const MAX = 3;
-
   const [checking, setChecking] = useState(false);
+  const [done, setDone]         = useState(false);
+  const busy = useRef(false);          // blocks double-submit (auto-submit + click)
+  const MAX = 3;
+  const locked = attempts >= MAX;
 
   const verify = async (p) => {
-    const target = p || pin;
-    if (target.length < 4 || checking) return;
+    const target = p ?? pin;
+    if (target.length < 4 || busy.current || locked || done) return;
+    busy.current = true;
     setChecking(true);
+    setError("");
     const result = await onVerify(target);
+    busy.current = false;
     setChecking(false);
-    if (result.ok) return;
+
+    if (result.ok) {                   // success state, then close
+      setDone(true);
+      setTimeout(onClose, 900);
+      return;
+    }
     if (result.pinError) {
       const next = attempts + 1;
       setAttempts(next);
@@ -323,8 +333,10 @@ function PinConfirmModal({ onVerify, onClose }) {
     }
   };
 
-  useEffect(() => { if (pin.length === 4 && attempts < MAX) verify(pin); }, [pin]); // eslint-disable-line
-  const locked = attempts >= MAX;
+  useEffect(() => { if (pin.length === 4 && !locked) verify(pin); }, [pin]); // eslint-disable-line
+
+  const inputsDisabled = locked || checking || done;
+  const btnDisabled = pin.length < 4 || checking || done;
 
   const modalHeader = {
     background: NAVY,
@@ -338,37 +350,65 @@ function PinConfirmModal({ onVerify, onClose }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <div style={{ background: "#fff", width: "100%", maxWidth: "380px", border: `0.5px solid rgba(184,150,62,0.25)`, overflow: "hidden" }}>
         <div style={modalHeader}>
           <div>
             <p style={{ ...eyebrow, marginBottom: "2px" }}>Confirm Payment</p>
             <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "16px", fontWeight: 700, color: "#fff", margin: 0 }}>Enter Your PIN</p>
           </div>
-          <button onClick={onClose} style={{ width: "30px", height: "30px", border: `0.5px solid rgba(255,255,255,0.2)`, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.5)" }}>
-            <X size={15} />
-          </button>
-        </div>
-        <div style={{ padding: "24px" }}>
-          {error && (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#fff1f2", border: `0.5px solid #fca5a5`, padding: "10px 14px", marginBottom: "14px" }}>
-              <AlertCircle size={14} style={{ color: "#ef4444", flexShrink: 0 }} />
-              <p style={{ fontSize: "12px", color: "#dc2626", margin: 0 }}>{error}</p>
-            </div>
-          )}
-          <PinInput value={pin} onChange={locked ? () => {} : setPin} masked={masked} disabled={locked} />
-          <button onClick={() => setMasked((m) => !m)} style={{ display: "flex", alignItems: "center", gap: "5px", margin: "12px auto 0", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", fontFamily: "'Lato', sans-serif" }}>
-            {masked ? <Eye size={12} /> : <EyeOff size={12} />}
-            {masked ? "Show PIN" : "Hide PIN"}
-          </button>
-          {!locked && (
-            <button onClick={() => verify(pin)} disabled={pin.length < 4 || checking} style={{ ...navyBtn(pin.length < 4 || checking), marginTop: "16px" }}>
-              Confirm
+          {!checking && !done && (
+            <button onClick={onClose} style={{ width: "30px", height: "30px", border: `0.5px solid rgba(255,255,255,0.2)`, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.5)" }}>
+              <X size={15} />
             </button>
           )}
-          <button onClick={onClose} style={{ width: "100%", marginTop: "8px", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", fontFamily: "'Lato', sans-serif", padding: "8px" }}>
-            Cancel
-          </button>
+        </div>
+
+        <div style={{ padding: "24px" }}>
+          {done ? (
+            <div style={{ textAlign: "center", padding: "12px 0" }}>
+              <div style={{ width: "56px", height: "56px", border: "0.5px solid rgba(22,163,74,0.3)", background: "rgba(22,163,74,0.06)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+                <CheckCircle2 size={26} style={{ color: "#16a34a" }} />
+              </div>
+              <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "16px", fontWeight: 700, color: NAVY, margin: 0 }}>Transfer sent</p>
+            </div>
+          ) : (
+            <>
+              {error && (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#fff1f2", border: `0.5px solid #fca5a5`, padding: "10px 14px", marginBottom: "14px" }}>
+                  <AlertCircle size={14} style={{ color: "#ef4444", flexShrink: 0 }} />
+                  <p style={{ fontSize: "12px", color: "#dc2626", margin: 0 }}>{error}</p>
+                </div>
+              )}
+
+              <PinInput value={pin} onChange={inputsDisabled ? () => {} : setPin} masked={masked} disabled={inputsDisabled} />
+
+              <button onClick={() => setMasked((m) => !m)} disabled={checking} style={{ display: "flex", alignItems: "center", gap: "5px", margin: "12px auto 0", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", fontFamily: "'Lato', sans-serif" }}>
+                {masked ? <Eye size={12} /> : <EyeOff size={12} />}
+                {masked ? "Show PIN" : "Hide PIN"}
+              </button>
+
+              {!locked && (
+                <button onClick={() => verify(pin)} disabled={btnDisabled} style={{ ...navyBtn(btnDisabled && !checking), opacity: checking ? 0.9 : btnDisabled ? 0.5 : 1, cursor: checking ? "wait" : btnDisabled ? "not-allowed" : "pointer", background: NAVY, marginTop: "16px" }}>
+                  {checking ? (
+                    <>
+                      <div style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                      Sending…
+                    </>
+                  ) : (
+                    <><Lock size={14} /> Confirm</>
+                  )}
+                </button>
+              )}
+
+              {!checking && (
+                <button onClick={onClose} style={{ width: "100%", marginTop: "8px", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", fontFamily: "'Lato', sans-serif", padding: "8px" }}>
+                  Cancel
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -493,11 +533,12 @@ export default function TransferClient() {
     }
   };
 
-  const handleVerifyPin = async (pin) => {
-    const result = await handleTransfer(pin);
-    if (result.ok || !result.pinError) setShowPinModal(false);
-    return result;
-  };
+ const handleVerifyPin = async (pin) => {
+  const result = await handleTransfer(pin);
+  // wrong PIN -> stay open (modal shows the error); other errors -> close, error shows on Step 2
+  if (!result.ok && !result.pinError) setShowPinModal(false);
+  return result;
+};
 
   const handleCopyAccount = async () => {
     if (!seller?.accountNumber) return;

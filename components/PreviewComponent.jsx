@@ -12,7 +12,7 @@ import {
   Download, Share2, Bookmark, MoreVertical, Menu, X, Eye, FileText,
   ChevronRight, ChevronDown, Layers, ThumbsUp, Flag, CheckCircle, Upload,
   HelpCircle, ShoppingBag, Users, Sparkles, Package, MapPin, Star, Unlock,
-  Printer, Lock, AlertCircle, Store, Tag, GraduationCap,
+  Printer, Lock, AlertCircle, Store, Tag, GraduationCap, Zap, ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { fetchBookDetails } from "@/utils/bookUtils";
@@ -27,6 +27,7 @@ import { VerifiedBadge, paidVerificationActive } from "@/components/seller/Verif
 
 /* ── palette ── */
 const NAVY = "#0d2244";
+const NAVY_HOVER = "#17325f";
 const GOLD = "#b8963e";
 const CREAM = "#f5f0e8";
 const BG = "#f5f1ea";
@@ -53,51 +54,183 @@ const driveFileId = (book) => {
   const re = /\/d\/([\w-]{25,})|id=([\w-]{25,})/;
   return (
     (book.embedUrl && pick(book.embedUrl, re)) ||
-    (book.pdfUrl?.includes("drive.google.com") && pick(book.pdfUrl, re)) ||
+    (book.pdfUrl?.includes("drive.google.com") && (pick(book.pdfUrl, re) || book.pdfUrl.match(/[-\w]{25,}/)?.[0])) ||
     ((book.coverImage || book.image)?.includes("drive.google.com") && pick(book.coverImage || book.image, re)) ||
     null
   );
 };
 
-/* Ordered list of image sources to try. No stock photo at the end. */
+
 const coverCandidates = (book) => {
   if (!book) return [];
   const out = [];
-  const direct = book.coverImage || book.image;
   const id = driveFileId(book);
-  if (direct && !direct.includes("drive.google.com")) out.push(direct);
   if (id) {
-    out.push(`https://lh3.googleusercontent.com/d/${id}=w800`);
-    out.push(`https://drive.google.com/thumbnail?id=${id}&sz=w800`);
-  } else if (direct) out.push(direct);
+    out.push(`https://drive.google.com/thumbnail?id=${id}&sz=w400`);
+    out.push(`https://drive.google.com/thumbnail?id=${id}&sz=w1000`);
+    out.push(`https://lh3.googleusercontent.com/d/${id}=w1000`);
+  }
+  [book.image, book.coverImage].forEach((u) => {
+    if (u) out.push(u);
+  });
   return [...new Set(out)];
 };
 
-/* ─── BookCover: whole cover (no cropping), tries each source, then shows the title ─── */
-function BookCover({ book, title, titleSize = 14, fit = "contain", style }) {
+/* PDF.js, loaded once */
+let pdfjsPromise = null;
+const loadPdfJs = () => {
+  if (typeof window === "undefined") return Promise.reject(new Error("no window"));
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (pdfjsPromise) return pdfjsPromise;
+  pdfjsPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    script.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      resolve(window.pdfjsLib);
+    };
+    script.onerror = () => { pdfjsPromise = null; reject(new Error("pdfjs failed to load")); };
+    document.head.appendChild(script);
+  });
+  return pdfjsPromise;
+};
+
+/* ─── BookCover: the whole cover, never cropped. `natural` lets it take its own height. ─── */
+function BookCover({ book, title, titleSize = 14, fit = "contain", natural = false, style }) {
   const list = coverCandidates(book);
   const key = list.join("|");
   const [idx, setIdx] = useState(0);
-  useEffect(() => { setIdx(0); }, [key]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => { setIdx(0); setLoaded(false); }, [key]);
   const src = list[idx];
+  const freeHeight = natural && loaded;
   return (
-    <div style={{ position: "relative", width: "100%", aspectRatio: "3/4", background: "#ece6d8", overflow: "hidden", ...style }}>
+    <div style={{ position: "relative", width: "100%", aspectRatio: freeHeight ? undefined : "3/4", background: "#ece6d8", overflow: "hidden", ...style }}>
       {src ? (
-        <img
+              <img
           key={src}
           src={src}
           alt={title}
           loading="eager"
           decoding="async"
-          referrerPolicy="no-referrer"
-          onError={() => setIdx((i) => i + 1)}
-          style={{ width: "100%", height: "100%", objectFit: fit, display: "block" }}
+          onLoad={() => setLoaded(true)}
+          onError={() => { setLoaded(false); setIdx((i) => i + 1); }}
+          style={freeHeight ? { width: "100%", height: "auto", display: "block" } : { width: "100%", height: "100%", objectFit: fit, display: "block" }}
         />
       ) : (
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: "10%", textAlign: "center", background: `linear-gradient(160deg, ${NAVY}, #1a3a6e)`, borderTop: `2px solid ${GOLD}` }}>
           <span style={{ fontFamily: "'Playfair Display',serif", color: "#fff", fontSize: `${titleSize}px`, fontWeight: 700, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 6, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word" }}>{title}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── LockedPreview: cover + first page only, in a scroll box that stops at the first page ─── */
+function LockedPreview({ book, total, footer }) {
+  const [page, setPage] = useState(null);
+  const [state, setState] = useState("loading"); // loading | ok | none
+
+  const driveId = driveFileId(book);
+  const direct = book?.pdfUrl && !book.pdfUrl.includes("drive.google.com") ? book.pdfUrl : null;
+  const sourceKey = [
+    direct,
+    direct && `/api/pdf-proxy?url=${encodeURIComponent(direct)}`,
+    driveId && `/api/pdf-proxy?id=${driveId}`,
+  ].filter(Boolean).join("|");
+
+  useEffect(() => {
+    setPage(null);
+    const sources = sourceKey ? sourceKey.split("|") : [];
+    if (!sources.length) { setState("none"); return; }
+    let dead = false;
+    setState("loading");
+
+    (async () => {
+      let lib;
+      try { lib = await loadPdfJs(); } catch { if (!dead) setState("none"); return; }
+
+      for (const src of sources) {
+        if (dead) return;
+        let pdf = null;
+        try {
+          pdf = await lib.getDocument({ url: src, disableAutoFetch: true }).promise;
+          if (pdf.numPages < 2) continue;            // page 1 = cover, page 2 = first page
+          const p = await pdf.getPage(2);
+          const vp = p.getViewport({ scale: 1.6 });
+          const canvas = document.createElement("canvas");
+          canvas.width = vp.width; canvas.height = vp.height;
+          await p.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+          if (!dead) { setPage(canvas.toDataURL("image/jpeg", 0.85)); setState("ok"); }
+          return;
+        } catch (e) {
+          console.warn("First-page preview failed for", src, e);   // try the next source
+        } finally {
+          try { pdf?.destroy(); } catch { }
+        }
+      }
+      if (!dead) setState("none");
+    })();
+
+    return () => { dead = true; };
+  }, [sourceKey]);
+
+  const caption = { fontFamily: "'Lato',sans-serif", fontSize: 11, fontWeight: 700, color: "#888", textAlign: "center", margin: "10px 0 0", letterSpacing: "0.04em" };
+  const sheet = { background: "#fff", boxShadow: "0 8px 26px rgba(13,34,68,0.18)", border: "0.5px solid #e5ddd0" };
+
+  return (
+    <div>
+      {/* Scrollable: cover, then first page, nothing after */}
+      <div
+        style={{
+          maxHeight: "min(82vh, 900px)",
+          overflowY: "auto",
+          overscrollBehavior: "contain",
+          padding: "22px 16px 8px",
+        }}
+      >
+        <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", flexDirection: "column", gap: 28 }}>
+          <figure style={{ margin: 0, width: "100%" }}>
+            <div style={sheet}><BookCover book={book} title={book.title} titleSize={28} natural /></div>
+            <figcaption style={caption}>Cover</figcaption>
+          </figure>
+
+          {state === "loading" && (
+            <figure style={{ margin: 0, width: "100%" }}>
+              <div style={{ ...sheet, aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 26, height: 26, border: `2px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+              </div>
+              <figcaption style={caption}>First page</figcaption>
+            </figure>
+          )}
+
+          {state === "ok" && page && (
+            <figure style={{ margin: 0, width: "100%" }}>
+              <div style={sheet} onContextMenu={(e) => e.preventDefault()}>
+                <img src={page} alt={`${book.title} - first page`} draggable={false} style={{ width: "100%", height: "auto", display: "block", userSelect: "none", WebkitUserSelect: "none", pointerEvents: "none" }} />
+              </div>
+              <figcaption style={caption}>First page</figcaption>
+            </figure>
+          )}
+
+          {state === "none" && (
+            <p style={{ ...caption, margin: 0, padding: "12px 0", fontWeight: 400 }}>First page preview isn't available for this document.</p>
+          )}
+        </div>
+      </div>
+
+      <div style={{ margin: "16px", padding: "22px 18px", background: CREAM, border: "0.5px solid #e5ddd0", textAlign: "center" }}>
+        <div style={{ width: 40, height: 40, borderRadius: "50%", background: NAVY, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" }}>
+          <Lock size={17} style={{ color: GOLD }} />
+        </div>
+        <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 700, color: NAVY, margin: "0 0 4px" }}>
+          {total ? `Read all ${total} pages` : "Read the full document"}
+        </p>
+        <p style={{ fontSize: 12, color: "#777", lineHeight: 1.6, margin: "0 auto 16px", maxWidth: 380, fontFamily: "'Lato',sans-serif" }}>
+          You are previewing the cover and first page. Purchase to unlock the rest.
+        </p>
+        <div style={{ maxWidth: 420, margin: "0 auto" }}>{footer}</div>
+      </div>
     </div>
   );
 }
@@ -176,6 +309,7 @@ export default function BookPreviewPage({ bookDetails }) {
   const [negSettings, setNegSettings] = useState(null);
   const [negMeta, setNegMeta] = useState({ on: false, pct: 0, academic: false });
   const [buyMenu, setBuyMenu] = useState(null); // which split button's menu is open
+  const [showNegotiation, setShowNegotiation] = useState(false);
 
   const [bookOwnerProfile, setBookOwnerProfile] = useState(null);
   const [ownerFollowers, setOwnerFollowers] = useState(0);
@@ -190,14 +324,6 @@ export default function BookPreviewPage({ bookDetails }) {
     if (!isOpenAccess(book) || isSellerBook(book)) return;
     const pdfSrc = book.pdfUrl || book.embedUrl;
     if (!pdfSrc) return;
-    const loadPdfJs = () => new Promise((resolve, reject) => {
-      if (window.pdfjsLib) { resolve(window.pdfjsLib); return; }
-      const script = document.createElement("script");
-      script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-      script.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; resolve(window.pdfjsLib); };
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
     (async () => {
       try {
         setCalculatingPages(true);
@@ -207,6 +333,16 @@ export default function BookPreviewPage({ bookDetails }) {
       } catch { } finally { setCalculatingPages(false); }
     })();
   }, [book]);
+
+  /* ── Negotiation modal: Esc closes it, page behind stops scrolling ── */
+  useEffect(() => {
+    if (!showNegotiation) return;
+    const onKey = (e) => { if (e.key === "Escape") setShowNegotiation(false); };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+  }, [showNegotiation]);
 
   useEffect(() => {
     if (!bookId) return;
@@ -459,6 +595,7 @@ export default function BookPreviewPage({ bookDetails }) {
         setViewCount(0); setPositiveRatingPercent(null); setTotalRatings(0);
         setBookFeedbackCount(0); setPdfPageCount(null); setCalculatingPages(false);
         setNegSettings(null); setNegMeta({ on: false, pct: 0, academic: false });
+        setShowNegotiation(false);
 
         const bookData = await fetchBookDetails(bookId);
         const cId = bookId?.replace("firestore-", "");
@@ -482,7 +619,22 @@ export default function BookPreviewPage({ bookDetails }) {
               };
           const realTitle = raw?.bookTitle || raw?.title;
           if (realTitle && looksLikeId(merged.title, cId)) merged.title = realTitle;
-          if (!merged.title) merged.title = "Untitled document";
+                   if (!merged.title) merged.title = "Untitled document";
+          if (raw) {
+            merged.driveFileId = merged.driveFileId || raw.driveFileId;
+            merged.embedUrl = merged.embedUrl || raw.embedUrl;
+            merged.pdfUrl = merged.pdfUrl || raw.pdfUrl;
+            merged.coverImage = merged.coverImage || raw.coverImage || raw.image;
+            merged.image = merged.image || raw.image;
+          }
+const staticBook = booksData.find((b) => String(b.id).replace("firestore-", "") === String(cId));
+if (staticBook) {
+  merged.image = merged.image || staticBook.image;
+  merged.coverImage = merged.coverImage || staticBook.coverImage;
+  merged.driveFileId = merged.driveFileId || staticBook.driveFileId;
+  merged.embedUrl = merged.embedUrl || staticBook.embedUrl;
+  merged.pdfUrl = merged.pdfUrl || staticBook.pdfUrl;
+}
           if (!merged.author && raw?.author) merged.author = raw.author;
           setBook(merged);
         }
@@ -674,23 +826,21 @@ export default function BookPreviewPage({ bookDetails }) {
       return { title: "Make an offer", sub: pct ? `Lecturer allows up to ${pct}% off` : "Send the lecturer an offer" };
     return { title: "Negotiate price", sub: pct ? `Offer up to ${pct}% less` : "Send the seller an offer" };
   };
+  const neg = negInfo();
 
   const goNegotiate = () => {
-    setBuyMenu(null); setShowOptionsModal(false);
-    setTimeout(() => {
-      const el = document.getElementById("price-negotiation");
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-      else showToastMessage("Open the offer box under the book.");
-    }, 150);
+    setBuyMenu(null);
+    setShowOptionsModal(false);
+    setShowNegotiation(true);
   };
 
   /* ───────────── render helpers (plain functions, so nothing remounts) ───────────── */
 
-  /* Purchase + arrow dropdown (split button) */
+  /* Navy split button. The arrow lists Purchase and Negotiation / Discount. */
   const renderBuyButton = (slot, opts = {}) => {
     if (!canBuy) return null;
-    const neg = negInfo();
     const open = buyMenu === slot;
+    const studentDiscount = negMeta.academic && viewerType === "student";
     return (
       <div style={{ position: "relative", width: "100%" }}>
         {open && <div onClick={() => setBuyMenu(null)} style={{ position: "fixed", inset: 0, zIndex: 30 }} />}
@@ -698,15 +848,22 @@ export default function BookPreviewPage({ bookDetails }) {
           <button className="buy-main" onClick={handlePurchase}>
             <Download size={16} /> Purchase · {fmt(book.price)}
           </button>
-          <button className="buy-arrow" onClick={() => setBuyMenu(open ? null : slot)} aria-label="More purchase options" aria-expanded={open}>
+          <button className="buy-arrow" onClick={() => setBuyMenu(open ? null : slot)} aria-label="Purchase and price options" aria-expanded={open}>
             <ChevronDown size={18} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .18s" }} />
           </button>
         </div>
         {open && (
           <div className="buy-menu" style={opts.up ? { bottom: "calc(100% + 6px)" } : { top: "calc(100% + 6px)" }}>
+            <button className="buy-item" onClick={() => { setBuyMenu(null); handlePurchase(); }}>
+              <span className="buy-ico"><Download size={16} /></span>
+              <span style={{ textAlign: "left" }}>
+                <strong>Purchase</strong>
+                <em>Pay {fmt(book.price)} and get full access</em>
+              </span>
+            </button>
             {neg ? (
               <button className="buy-item" onClick={goNegotiate}>
-                <span className="buy-ico">{negMeta.academic && viewerType === "student" ? <GraduationCap size={16} /> : <Tag size={16} />}</span>
+                <span className="buy-ico">{studentDiscount ? <GraduationCap size={16} /> : <Tag size={16} />}</span>
                 <span style={{ textAlign: "left" }}>
                   <strong>{neg.title}</strong>
                   <em>{neg.sub}</em>
@@ -718,15 +875,18 @@ export default function BookPreviewPage({ bookDetails }) {
                 <span style={{ textAlign: "left" }}><strong>Fixed price</strong><em>The seller is not taking offers</em></span>
               </div>
             )}
-            <button className="buy-item" onClick={() => { setBuyMenu(null); handleSaveForLater(); }}>
-              <span className="buy-ico"><Bookmark size={16} style={isSaved ? { fill: NAVY } : {}} /></span>
-              <span style={{ textAlign: "left" }}><strong>{isSaved ? "Saved for later" : "Save for later"}</strong><em>Buy when you are ready</em></span>
-            </button>
           </div>
         )}
       </div>
     );
   };
+
+  const renderAssurance = () => canBuy ? (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, margin: "10px 2px 0", fontFamily: "'Lato',sans-serif", fontSize: 11, color: "#777" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 7 }}><Zap size={12} style={{ color: GOLD }} /> Opens in My Books right after payment</span>
+      <span style={{ display: "flex", alignItems: "center", gap: 7 }}><ShieldCheck size={12} style={{ color: GOLD }} /> Secure checkout</span>
+    </div>
+  ) : null;
 
   const renderPageCount = (fontSize = "10px") => {
     const showCalculating = free && !isSellerBook(book) && calculatingPages;
@@ -856,63 +1016,59 @@ export default function BookPreviewPage({ bookDetails }) {
     );
   };
 
-  const renderPdfViewer = (heightClass = "600px", fullHeight = "900px") => {
+  const renderPdfViewer = (fullHeight = "900px") => {
     const hasAccess = isPurchased || free;
+    if (!hasAccess) {
+      return (
+        <div style={{ background: BG }}>
+          <LockedPreview book={book} total={displayPages} footer={<>{renderBuyButton("locked", { up: true })}{renderAssurance()}</>} />
+        </div>
+      );
+    }
     return (
       <div style={{ background: BG }}>
-        {hasAccess ? (
-          <div style={{ padding: "16px" }}>
-            {free && !isPurchased && (
-              <div style={{ background: "rgba(22,163,74,0.08)", border: "0.5px solid rgba(22,163,74,0.25)", padding: "12px 16px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "10px" }}>
-                <Unlock size={15} style={{ color: "#16a34a", flexShrink: 0 }} />
-                <p style={{ fontSize: "12px", color: "#15803d", margin: 0, fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>This is an Open Access document — reading is free. Save to your library with one click.</p>
-              </div>
-            )}
-            {book.embedUrl ? (
-              <div style={{ position: "relative" }}>
-                <iframe src={book.embedUrl} style={{ width: "100%", height: fullHeight, border: "none", display: "block" }} title={book.title} allow="autoplay" />
-                {!free && <div style={{ position: "absolute", top: 0, right: 0, height: "76px", width: "220px", background: "#323639", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "0 20px", gap: "8px" }} onContextMenu={(e) => e.preventDefault()}>
-                  <span style={{ color: GOLD, fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif" }}>LAN Library</span>
-                  <Lock size={14} style={{ color: "#888" }} />
-                </div>}
-              </div>
-            ) : book.pdfUrl ? (
-              <iframe src={`${book.pdfUrl}#view=FitH`} style={{ width: "100%", height: fullHeight, border: "none", display: "block" }} title={book.title} />
-            ) : (
-              <div style={{ background: "#fff", padding: "24px", border: "0.5px solid #e5ddd0" }}>
-                <div style={{ background: "#f0fdf4", border: "0.5px solid #86efac", padding: "14px 18px", marginBottom: "20px", display: "flex", alignItems: "center", gap: "12px" }}>
-                  <CheckCircle size={20} style={{ color: "#16a34a", flexShrink: 0 }} />
-                  <div>
-                    <p style={{ fontWeight: 700, color: "#15803d", margin: "0 0 2px", fontSize: "13px", fontFamily: "'Lato',sans-serif" }}>{free ? "Open Access Document" : "Full Access Granted"}</p>
-                    <p style={{ fontSize: "12px", color: "#166534", margin: 0, fontFamily: "'Lato',sans-serif" }}>You have full access to {book.title}</p>
-                  </div>
-                </div>
-                <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: "20px", fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>{book.title}</h3>
-                <p style={{ fontSize: "13px", color: "#666", lineHeight: 1.75 }}>{book.description}</p>
-              </div>
-            )}
-            {free && (
-              <div style={{ marginTop: "16px", background: "#fff", border: `0.5px solid rgba(184,150,62,0.3)`, padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-                <div>
-                  <p style={{ fontSize: "11px", fontWeight: 700, color: GOLD, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>Open Access</p>
-                  <p style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>Save a copy to your library</p>
-                </div>
-                <button onClick={handleFreeAccess} style={{ display: "flex", alignItems: "center", gap: "8px", background: NAVY, color: GOLD, padding: "11px 22px", border: `0.5px solid ${GOLD}`, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em" }}>
-                  <Download size={14} /> Save to My Books
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div>
-            <div style={{ position: "relative", overflow: "hidden", height: !book.embedUrl && !book.pdfUrl ? "0px" : heightClass }}>
-              {book.embedUrl ? <iframe src={book.embedUrl} style={{ width: "100%", height: "100%", border: "none", pointerEvents: "none" }} title={`${book.title} - Preview`} scrolling="no" />
-                : book.pdfUrl ? <iframe src={`${book.pdfUrl}#view=FitH&page=1&toolbar=0`} style={{ width: "100%", height: "100%", border: "none", pointerEvents: "none" }} title={`${book.title} - Preview`} scrolling="no" /> : null}
+        <div style={{ padding: "16px" }}>
+          {free && !isPurchased && (
+            <div style={{ background: "rgba(22,163,74,0.08)", border: "0.5px solid rgba(22,163,74,0.25)", padding: "12px 16px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "10px" }}>
+              <Unlock size={15} style={{ color: "#16a34a", flexShrink: 0 }} />
+              <p style={{ fontSize: "12px", color: "#15803d", margin: 0, fontFamily: "'Lato',sans-serif", fontWeight: 700 }}>This is an Open Access document — reading is free. Save to your library with one click.</p>
             </div>
-            {/* Only the Purchase button, with the arrow for negotiation */}
-            <div style={{ padding: "16px" }}>{renderBuyButton("locked", { up: true })}</div>
-          </div>
-        )}
+          )}
+          {book.embedUrl ? (
+            <div style={{ position: "relative" }}>
+              <iframe src={book.embedUrl} style={{ width: "100%", height: fullHeight, border: "none", display: "block" }} title={book.title} allow="autoplay" />
+              {!free && <div style={{ position: "absolute", top: 0, right: 0, height: "76px", width: "220px", background: "#323639", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "0 20px", gap: "8px" }} onContextMenu={(e) => e.preventDefault()}>
+                <span style={{ color: GOLD, fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif" }}>LAN Library</span>
+                <Lock size={14} style={{ color: "#888" }} />
+              </div>}
+            </div>
+          ) : book.pdfUrl ? (
+            <iframe src={`${book.pdfUrl}#view=FitH`} style={{ width: "100%", height: fullHeight, border: "none", display: "block" }} title={book.title} />
+          ) : (
+            <div style={{ background: "#fff", padding: "24px", border: "0.5px solid #e5ddd0" }}>
+              <div style={{ background: "#f0fdf4", border: "0.5px solid #86efac", padding: "14px 18px", marginBottom: "20px", display: "flex", alignItems: "center", gap: "12px" }}>
+                <CheckCircle size={20} style={{ color: "#16a34a", flexShrink: 0 }} />
+                <div>
+                  <p style={{ fontWeight: 700, color: "#15803d", margin: "0 0 2px", fontSize: "13px", fontFamily: "'Lato',sans-serif" }}>{free ? "Open Access Document" : "Full Access Granted"}</p>
+                  <p style={{ fontSize: "12px", color: "#166534", margin: 0, fontFamily: "'Lato',sans-serif" }}>You have full access to {book.title}</p>
+                </div>
+              </div>
+              <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: "20px", fontWeight: 700, color: NAVY, margin: "0 0 12px" }}>{book.title}</h3>
+              <p style={{ fontSize: "13px", color: "#666", lineHeight: 1.75 }}>{book.description}</p>
+            </div>
+          )}
+          {free && (
+            <div style={{ marginTop: "16px", background: "#fff", border: `0.5px solid rgba(184,150,62,0.3)`, padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+              <div>
+                <p style={{ fontSize: "11px", fontWeight: 700, color: GOLD, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>Open Access</p>
+                <p style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>Save a copy to your library</p>
+              </div>
+              <button onClick={handleFreeAccess} style={{ display: "flex", alignItems: "center", gap: "8px", background: NAVY, color: GOLD, padding: "11px 22px", border: `0.5px solid ${GOLD}`, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em" }}>
+                <Download size={14} /> Save to My Books
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -970,7 +1126,7 @@ export default function BookPreviewPage({ bookDetails }) {
     { icon: <Sparkles size={18} style={{ color: "#a78bfa" }} />, label: askLabel, onClick: () => router.push(`/ai-chat?bookId=${bookId}&bookTitle=${encodeURIComponent(book?.title || "")}`) },
   ];
 
-  const neg = negInfo();
+  const studentDiscountView = negMeta.academic && viewerType === "student";
 
   return (
     <>
@@ -996,12 +1152,14 @@ export default function BookPreviewPage({ bookDetails }) {
         .physical-available { animation:goldPulse 2.4s ease-in-out infinite; }
         .lan-header-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; min-width:0; overflow:hidden; }
         @media(max-width:480px){ .oa-header-badge { display:none !important; } .lan-header-cta { font-size:10px !important; padding:7px 10px !important; } }
+        @media (prefers-reduced-motion: reduce) { .physical-available, .oa-header-badge, .calculating-pages { animation:none; } }
+        button:focus-visible, a:focus-visible { outline:2px solid ${GOLD}; outline-offset:2px; }
 
-        /* split purchase button */
-        .buy-main { flex:1; display:flex; align-items:center; justify-content:center; gap:8px; background:#15803d; color:#fff; border:none; padding:14px 16px; font-family:'Lato',sans-serif; font-size:14px; font-weight:700; letter-spacing:0.03em; cursor:pointer; border-radius:10px 0 0 10px; transition:background .15s; }
-        .buy-main:hover { background:#166534; }
-        .buy-arrow { width:52px; display:flex; align-items:center; justify-content:center; background:#15803d; color:#fff; border:none; border-left:1px solid rgba(255,255,255,0.35); cursor:pointer; border-radius:0 10px 10px 0; transition:background .15s; }
-        .buy-arrow:hover { background:#166534; }
+        /* split purchase button (navy) */
+        .buy-main { flex:1; display:flex; align-items:center; justify-content:center; gap:8px; background:${NAVY}; color:#fff; border:none; padding:14px 16px; font-family:'Lato',sans-serif; font-size:14px; font-weight:700; letter-spacing:0.03em; cursor:pointer; border-radius:10px 0 0 10px; transition:background .15s; }
+        .buy-main:hover { background:${NAVY_HOVER}; }
+        .buy-arrow { width:52px; display:flex; align-items:center; justify-content:center; background:${NAVY}; color:${GOLD}; border:none; border-left:1px solid rgba(184,150,62,0.55); cursor:pointer; border-radius:0 10px 10px 0; transition:background .15s; }
+        .buy-arrow:hover { background:${NAVY_HOVER}; }
         .buy-menu { position:absolute; left:0; right:0; z-index:32; background:#fff; border:0.5px solid #e5ddd0; border-radius:12px; box-shadow:0 14px 40px rgba(13,34,68,0.22); overflow:hidden; }
         .buy-item { width:100%; display:flex; align-items:center; gap:12px; padding:13px 14px; background:#fff; border:none; border-bottom:0.5px solid #f0ebe0; cursor:pointer; color:${NAVY}; font-family:'Lato',sans-serif; }
         .buy-item:last-child { border-bottom:none; }
@@ -1018,7 +1176,7 @@ export default function BookPreviewPage({ bookDetails }) {
         <header style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "24px 24px", position: "sticky", top: 0, zIndex: 40, borderBottom: "0.5px solid rgba(184,150,62,0.2)" }}>
           <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 12px", height: "56px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0, minWidth: 0 }}>
-              <button onClick={() => setShowNavMenu(!showNavMenu)} style={{ width: "34px", height: "34px", flexShrink: 0, border: "0.5px solid rgba(255,255,255,0.2)", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.7)" }}>
+              <button onClick={() => setShowNavMenu(!showNavMenu)} aria-label="Menu" style={{ width: "34px", height: "34px", flexShrink: 0, border: "0.5px solid rgba(255,255,255,0.2)", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.7)" }}>
                 {showNavMenu ? <X size={18} /> : <Menu size={18} />}
               </button>
               <Link href="/home" style={{ textDecoration: "none", minWidth: 0 }}>
@@ -1061,7 +1219,7 @@ export default function BookPreviewPage({ bookDetails }) {
               <div style={{ background: NAVY, padding: "20px 20px 24px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
                   <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "16px", fontWeight: 700, color: "#fff", margin: 0 }}>[LAN Library]</p>
-                  <button onClick={() => setShowNavMenu(false)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.6)" }}><X size={20} /></button>
+                  <button onClick={() => setShowNavMenu(false)} aria-label="Close menu" style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.6)" }}><X size={20} /></button>
                 </div>
                 {isGloballyFrozen ? (
                   <div style={{ width: "100%", background: "rgba(99,102,241,0.15)", border: "0.5px solid rgba(99,102,241,0.3)", padding: "11px", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#a5b4fc", fontFamily: "'Lato',sans-serif" }}>❄ Resource Frozen by Admin</div>
@@ -1107,7 +1265,7 @@ export default function BookPreviewPage({ bookDetails }) {
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", overflow: "hidden" }}>
                   <div style={{ position: "relative" }}>
-                    <BookCover book={book} title={book.title} titleSize={20} />
+                    <BookCover book={book} title={book.title} titleSize={20} natural />
                     <div style={{ position: "absolute", top: "10px", left: "10px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontSize: "9px", fontWeight: 700, color: "#fff", fontFamily: "'Lato',sans-serif" }}>
                       <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />PDF
                     </div>
@@ -1126,7 +1284,7 @@ export default function BookPreviewPage({ bookDetails }) {
                   </div>
                 </div>
 
-                {canBuy && <div>{renderBuyButton("side")}</div>}
+                {canBuy && <div>{renderBuyButton("side")}{renderAssurance()}</div>}
 
                 <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", padding: "16px", display: "flex", justifyContent: "space-around" }}>
                   {actionList("Ask Educo").map(({ icon, label, onClick }) => <button key={label} className="action-btn" onClick={onClick}>{icon}<span>{label}</span></button>)}
@@ -1173,9 +1331,9 @@ export default function BookPreviewPage({ bookDetails }) {
                   {displayPages != null && <><span style={{ opacity: 0.4 }}>•</span><span>{displayPages} pages</span></>}
                 </div>
 
-                <div style={{ display: "flex", gap: "14px", padding: "14px 16px 16px" }}>
+                <div style={{ display: "flex", gap: "14px", padding: "14px 16px 16px", alignItems: "flex-start" }}>
                   <div style={{ position: "relative", flexShrink: 0, width: "110px" }}>
-                    <BookCover book={book} title={book.title} titleSize={11} />
+                    <BookCover book={book} title={book.title} titleSize={11} natural />
                     {free && <span style={{ position: "absolute", bottom: "6px", left: "6px", background: "#16a34a", color: "#fff", fontSize: "8px", fontWeight: 700, padding: "2px 6px", fontFamily: "'Lato',sans-serif", display: "inline-flex", alignItems: "center", gap: "3px" }}><Unlock size={8} /> FREE</span>}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1196,16 +1354,16 @@ export default function BookPreviewPage({ bookDetails }) {
                   </div>
                 </div>
 
-                {canBuy && <div style={{ padding: "0 16px 14px" }}>{renderBuyButton("mobile")}</div>}
+                {canBuy && <div style={{ padding: "0 16px 14px" }}>{renderBuyButton("mobile")}{renderAssurance()}</div>}
 
                 <div style={{ borderTop: "0.5px solid #e5ddd0", padding: "12px 16px", display: "flex", justifyContent: "space-around" }}>
                   {actionList("Ask AI").map(({ icon, label, onClick }) => <button key={label} className="action-btn" onClick={onClick}>{icon}<span>{label}</span></button>)}
                 </div>
               </div>
 
-              {/* PDF Viewer card */}
+              {/* Preview / reader card */}
               <div style={{ background: "#fff", border: "0.5px solid #e5ddd0", overflow: "hidden" }}>
-                <div style={{ background: NAVY, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ background: NAVY, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <div className="gold-pill">
                       <Eye size={10} style={{ color: GOLD }} />
@@ -1213,6 +1371,7 @@ export default function BookPreviewPage({ bookDetails }) {
                     </div>
                     {free && <div style={{ display: "flex", alignItems: "center", gap: "5px" }}><div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e" }} /><span style={{ fontSize: "9px", color: "#86efac", fontWeight: 700, fontFamily: "'Lato',sans-serif" }}>FREE DOCUMENT</span></div>}
                     {!free && isPurchased && <div style={{ display: "flex", alignItems: "center", gap: "5px" }}><div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e" }} /><span style={{ fontSize: "9px", color: "#86efac", fontWeight: 700, fontFamily: "'Lato',sans-serif" }}>PURCHASED</span></div>}
+                    {canBuy && <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.55)", fontFamily: "'Lato',sans-serif" }}>Cover and first page</span>}
                   </div>
                   <div style={{ display: "flex", gap: "8px" }}>
                     <button onClick={() => setShowOverview(true)} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "5px 10px", border: "0.5px solid rgba(255,255,255,0.2)", background: "transparent", color: "rgba(255,255,255,0.7)", fontSize: "10px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}><Layers size={12} /> Overview</button>
@@ -1222,21 +1381,7 @@ export default function BookPreviewPage({ bookDetails }) {
 
                 {renderPhysicalStock()}
 
-                <div id="price-negotiation" style={{ scrollMarginTop: 80 }}>
-                  <BookNegotiationCard
-                    book={book}
-                    bookId={cleanBookId}
-                    settings={negSettings}
-                    user={user}
-                    sellerName={bookOwnerProfile?.name || book?.sellerName}
-                    fmt={fmt}
-                    isPurchased={isPurchased}
-                    isFrozen={isGloballyFrozen}
-                    onPay={(n) => router.push(`/payment?bookId=${cleanBookId}&negotiationId=${n.id}`)}
-                  />
-                </div>
-
-                {isGloballyFrozen ? <FrozenPdfGate /> : renderPdfViewer("400px", "900px")}
+                {isGloballyFrozen ? <FrozenPdfGate /> : renderPdfViewer("900px")}
 
                 <FeaturedAdsCarousel tier="Gold" maxAds={2} autoPlay={true} autoPlayMs={4000} style={{ marginTop: "1px" }} />
                 <FeaturedAdsCarousel tier="Silver" maxAds={2} autoPlay={true} autoPlayMs={4000} style={{ marginTop: "1px" }} />
@@ -1331,6 +1476,40 @@ export default function BookPreviewPage({ bookDetails }) {
 
         <NegotiationHost user={user} fmt={fmt} />
 
+        {/* ══ NEGOTIATION / DISCOUNT MODAL ══ */}
+        {showNegotiation && (
+          <>
+            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100 }} onClick={() => setShowNegotiation(false)} />
+            <div role="dialog" aria-modal="true" aria-label={neg?.title || "Price offer"} style={{ position: "fixed", inset: 0, zIndex: 101, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", pointerEvents: "none" }}>
+              <div style={{ pointerEvents: "auto", width: "100%", maxWidth: "480px", maxHeight: "90vh", overflowY: "auto", background: "#fff", border: `0.5px solid ${GOLD}` }}>
+                <div style={{ background: NAVY, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, position: "sticky", top: 0, zIndex: 2 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(184,150,62,0.15)", border: "0.5px solid rgba(184,150,62,0.35)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {studentDiscountView ? <GraduationCap size={18} style={{ color: GOLD }} /> : <Tag size={18} style={{ color: GOLD }} />}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 700, color: "#fff", margin: 0 }}>{neg?.title || "Price offer"}</p>
+                      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", margin: "2px 0 0", fontFamily: "'Lato',sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{book.title}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowNegotiation(false)} aria-label="Close" style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", padding: 4, flexShrink: 0 }}><X size={20} /></button>
+                </div>
+                <BookNegotiationCard
+                  book={book}
+                  bookId={cleanBookId}
+                  settings={negSettings}
+                  user={user}
+                  sellerName={bookOwnerProfile?.name || book?.sellerName}
+                  fmt={fmt}
+                  isPurchased={isPurchased}
+                  isFrozen={isGloballyFrozen}
+                  onPay={(n) => { setShowNegotiation(false); router.push(`/payment?bookId=${cleanBookId}&negotiationId=${n.id}`); }}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
         {/* ══ MODALS ══ */}
         {showOverview && (
           <>
@@ -1338,10 +1517,10 @@ export default function BookPreviewPage({ bookDetails }) {
             <div style={{ position: "fixed", top: 0, left: 0, width: "100%", maxWidth: "560px", height: "100vh", background: "#fff", zIndex: 50, overflowY: "scroll" }}>
               <div style={{ background: NAVY, padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
                 <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: "20px", fontWeight: 700, color: "#fff", margin: 0 }}>Overview</h2>
-                <button onClick={() => setShowOverview(false)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#fff" }}><X size={22} /></button>
+                <button onClick={() => setShowOverview(false)} aria-label="Close" style={{ background: "transparent", border: "none", cursor: "pointer", color: "#fff" }}><X size={22} /></button>
               </div>
               <div style={{ padding: "24px", paddingBottom: "80px" }}>
-                <div style={{ width: "180px", marginBottom: "20px" }}><BookCover book={book} title={book.title} titleSize={16} /></div>
+                <div style={{ width: "180px", marginBottom: "20px" }}><BookCover book={book} title={book.title} titleSize={16} natural /></div>
                 {[["Title", book.title, true], ["Author", book.author, false], ["Category", book.category || "General", false], ["Uploaded by", uploaderName, false]].map(([k, v, isSerif]) => (
                   <div key={k} style={{ marginBottom: "14px", paddingBottom: "14px", borderBottom: "0.5px solid #f0ebe0" }}>
                     <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: GOLD, margin: "0 0 4px", fontFamily: "'Lato',sans-serif" }}>{k}</p>
@@ -1363,7 +1542,7 @@ export default function BookPreviewPage({ bookDetails }) {
             <div style={{ position: "fixed", top: 0, right: 0, width: "100%", maxWidth: "560px", height: "100vh", background: "#fff", zIndex: 50, overflowY: "scroll" }}>
               <div style={{ background: NAVY, padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
                 <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: "20px", fontWeight: 700, color: "#fff", margin: 0 }}>Summary</h2>
-                <button onClick={() => setShowSummary(false)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#fff" }}><X size={22} /></button>
+                <button onClick={() => setShowSummary(false)} aria-label="Close" style={{ background: "transparent", border: "none", cursor: "pointer", color: "#fff" }}><X size={22} /></button>
               </div>
               <div style={{ padding: "24px", paddingBottom: "80px" }}>
                 <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: "18px", fontWeight: 700, color: NAVY, margin: "0 0 6px" }}>{book.title}</h3>
@@ -1384,7 +1563,7 @@ export default function BookPreviewPage({ bookDetails }) {
               <div style={{ padding: "20px 20px 32px" }}>
                 <div style={{ width: "36px", height: "3px", background: "#e5ddd0", margin: "0 auto 20px", borderRadius: "2px" }} />
                 {[
-                  ...(neg ? [{ icon: negMeta.academic && viewerType === "student" ? <GraduationCap size={22} style={{ color: GOLD }} /> : <Tag size={22} style={{ color: GOLD }} />, label: neg.title, sub: neg.sub, onClick: goNegotiate }] : []),
+                  ...(neg ? [{ icon: studentDiscountView ? <GraduationCap size={22} style={{ color: GOLD }} /> : <Tag size={22} style={{ color: GOLD }} />, label: neg.title, sub: neg.sub, onClick: goNegotiate }] : []),
                   { icon: <Bookmark size={22} style={isSaved ? { fill: NAVY, color: NAVY } : { color: NAVY }} />, label: isSaved ? "Saved for later" : "Save for later", onClick: handleSaveForLater },
                   { icon: <Share2 size={22} style={{ color: NAVY }} />, label: "Share", onClick: handleShare },
                   { icon: <ThumbsUp size={22} style={{ color: NAVY }} />, label: "Rate this book", onClick: () => { setShowOptionsModal(false); setShowFeedbackModal(true); } },
@@ -1407,14 +1586,14 @@ export default function BookPreviewPage({ bookDetails }) {
         {showFeedbackModal && (
           <>
             <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 100 }} onClick={() => { setShowFeedbackModal(false); setFeedbackText(""); setFeedbackRating(0); }} />
-            <div style={{ position: "fixed", inset: 0, zIndex: 101, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-              <div style={{ background: NAVY, width: "100%", maxWidth: "440px", overflow: "hidden" }}>
+            <div style={{ position: "fixed", inset: 0, zIndex: 101, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", pointerEvents: "none" }}>
+              <div style={{ background: NAVY, width: "100%", maxWidth: "440px", overflow: "hidden", pointerEvents: "auto" }}>
                 <div style={{ padding: "20px 24px", borderBottom: "0.5px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div>
                     <p style={{ fontSize: "10px", color: GOLD, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>Your Review</p>
                     <p style={{ fontFamily: "'Playfair Display',serif", fontSize: "18px", fontWeight: 700, color: "#fff", margin: 0 }}>Write a Review</p>
                   </div>
-                  <button onClick={() => { setShowFeedbackModal(false); setFeedbackText(""); setFeedbackRating(0); }} style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.6)", padding: "4px" }}><X size={20} /></button>
+                  <button onClick={() => { setShowFeedbackModal(false); setFeedbackText(""); setFeedbackRating(0); }} aria-label="Close" style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.6)", padding: "4px" }}><X size={20} /></button>
                 </div>
                 <div style={{ padding: "20px 24px" }}>
                   <div style={{ display: "flex", gap: "6px", marginBottom: "20px" }}>
@@ -1423,7 +1602,7 @@ export default function BookPreviewPage({ bookDetails }) {
                   <textarea autoFocus value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} placeholder="Share your thoughts about this book…" rows={4}
                     style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "0.5px solid rgba(255,255,255,0.15)", padding: "12px", color: "#fff", fontSize: "13px", resize: "none", outline: "none", fontFamily: "'Lato',sans-serif", boxSizing: "border-box" }} />
                   <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)", marginTop: "4px", marginBottom: "18px", fontFamily: "'Lato',sans-serif" }}>{feedbackText.length}/500</p>
-                  <div style={{ display: "flex", gap: "11px" }}>
+                  <div style={{ display: "flex", gap: "10px" }}>
                     <button onClick={() => { setShowFeedbackModal(false); setFeedbackText(""); setFeedbackRating(0); }} style={{ flex: 1, padding: "12px", border: "0.5px solid rgba(255,255,255,0.2)", background: "transparent", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif" }}>Cancel</button>
                     <button onClick={submitFeedback} disabled={isSubmittingFeedback || !feedbackText.trim()} style={{ flex: 1, padding: "12px", background: GOLD, border: "none", color: NAVY, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", opacity: isSubmittingFeedback || !feedbackText.trim() ? 0.5 : 1 }}>
                       {isSubmittingFeedback ? "Submitting…" : "Submit Review"}
