@@ -16,7 +16,7 @@ import {
   Download, Book, Phone, MapPin, CreditCard, Building,
   Clock, ThumbsUp, Smartphone, Bell, ChevronDown, Menu, Home,
   LayoutDashboard, Activity, PieChart, Layers, Star, ArrowUp, ArrowDown,
-  MoreHorizontal, Filter, Plus, Minus, CheckCircle, Info, Package, Receipt, ShoppingBag, GraduationCap, Zap
+  MoreHorizontal, Filter, Plus, Minus, CheckCircle, Info, Package, Receipt, ShoppingBag, GraduationCap, Zap, ShieldCheck  
 } from 'lucide-react';
 import { BookApprovalModal, ReplyModal, TransactionModal, UserModal } from '@/components/ApprovalModal';
 import { db, auth } from '@/lib/firebaseConfig';
@@ -24,6 +24,8 @@ import PromotionsAdminSection from './promotions-admin-section/page';
 import TrafficAnalyticsSection from './trafficAnalyticsSection/page';
 import PrintLicenseLedger from './printLicenseLedger/Page';
 import SellerReportsSection from './sellerReportsSection/page';
+import { getCountFromServer, getAggregateFromServer, sum } from 'firebase/firestore';
+import { paidVerificationActive } from '@/components/seller/Verification';
 
 /* ── CSS Variables & Global Styles ─────────────────────────────────────── */
 const globalStyles = `
@@ -387,6 +389,7 @@ const NAV_SECTIONS = [
       { id: 'support', icon: MessageSquare, label: 'Support', badgeKey: 'openTickets', badgeType: 'danger' },
       { id: 'reports', icon: Flag, label: 'Reports', badgeKey: 'pendingReports', badgeType: 'danger' },
       { id: "seller-reports", icon: Shield, label: "Seller Reports", badgeKey: "pendingSellerReports", badgeType: "danger" },
+      { id: 'verification', icon: ShieldCheck, label: 'Seller Verification' },
     ]
   },
   {
@@ -1368,6 +1371,265 @@ function BountyEscrowSection({ user, onBadgeCount }) {
   );
 }
 
+
+/* ── Seller Verification: applications, KYC and every requirement shown separately ── */
+const adminFetch = async (path, body) => {
+  const token = await auth.currentUser.getIdToken();
+  const res = await fetch(path, {
+    method: body ? 'POST' : 'GET',
+    headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.success === false) { const e = new Error(d.error || 'Request failed'); e.data = d; throw e; }
+  return d;
+};
+const fmtVal = (v) => (v === null || v === undefined || v === '' ? '—' : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : typeof v === 'object' ? JSON.stringify(v) : String(v));
+const APP_PILL = {
+  pending_review: ['pill-warn', 'Awaiting review'],
+  approved_awaiting_payment: ['pill-info', 'Approved · awaiting payment'],
+  verified: ['pill-success', 'Verified'],
+  rejected: ['pill-danger', 'Rejected'],
+  none: ['pill-gray', 'No application'],
+};
+const STAT_LABELS = {
+  fullName: 'Full name on KYC', phoneVerified: 'Phone verified', idSubmitted: 'ID submitted', hasRealPhoto: 'Real profile photo',
+  approvedBooks: 'Approved books', accountAgeDays: 'Account age (days)', daysSinceLastStrike: 'Days since last strike',
+  realFollowers: 'Real followers', totalSalesNGN: 'Total sales (₦)',
+};
+const KYC_ROWS = [['fullName', 'Full name'], ['dateOfBirth', 'Date of birth'], ['phone', 'Phone'], ['email', 'Email'], ['address', 'Address'], ['country', 'Country'], ['idType', 'ID type']];
+
+function CheckRow({ ok, label, value, note, action }) {
+  const color = ok === null ? '#94a3b8' : ok ? '#34d399' : '#f87171';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <span style={{ width: 20, height: 20, borderRadius: '50%', background: `${color}22`, color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+        {ok === null ? '•' : ok ? '✓' : '✕'}
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>{label}</div>
+        {note && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{note}</div>}
+      </div>
+      <div style={{ fontSize: 12, color: ok === null ? 'var(--text-primary)' : color, fontWeight: 700, fontFamily: 'monospace', textAlign: 'right', maxWidth: 220, wordBreak: 'break-word' }}>{value}</div>
+      {action}
+    </div>
+  );
+}
+
+function CheckGroup({ title, rows, scored = true }) {
+  const passed = rows.filter(r => r.ok === true).length;
+  return (
+    <div style={{ background: 'var(--surface)', borderRadius: 10, padding: '12px 14px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{title}</span>
+        {scored && <span style={{ fontSize: 11, fontWeight: 700, color: passed === rows.length ? '#34d399' : '#fbbf24' }}>{passed}/{rows.length}</span>}
+      </div>
+      {rows.length === 0 ? <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Nothing to show</div> : rows.map(r => <CheckRow key={r.label} {...r} />)}
+    </div>
+  );
+}
+
+function SellerVerificationCard({ seller, profile, admin, onChanged }) {
+  const uid = seller.id;
+  const [open, setOpen] = useState(false);
+  const [rv, setRv] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [showId, setShowId] = useState(false);
+
+  const status = seller.verificationStatus || 'none';
+  const badge = paidVerificationActive(seller);
+  const [pillCls, pillLabel] = badge ? ['pill-info', `Verified · ${seller.verifiedRoute || 'manual'}`] : (APP_PILL[status] || APP_PILL.none);
+  const kyc = rv?.kyc;
+  const kycStatus = kyc ? String(kyc.status || 'pending').toLowerCase() : 'none';
+  const name = kyc?.fullName || [profile?.firstName, profile?.surname].filter(Boolean).join(' ') || seller.sellerName || 'Unnamed seller';
+
+  const load = async () => {
+    setErr('');
+    try { setRv(await adminFetch(`/api/admin/verification/review?uid=${uid}`)); }
+    catch (e) { setErr(e.message); }
+  };
+  useEffect(() => { if (open && !rv) load(); }, [open]);
+
+  const decide = async (action) => {
+    let reason = '';
+    if (action === 'approve') { if (!confirm(`Approve this ${rv?.route || ''} application?`)) return; }
+    else {
+      reason = prompt(action === 'reject' ? 'Reason (shown to seller):' : 'Reason for removing the blue check:') || '';
+      if (!reason.trim()) return;
+    }
+    setBusy(true); setErr('');
+    try { await adminFetch('/api/admin/verification/decide', { uid, action, reason }); await load(); onChanged(); }
+    catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
+
+  const reviewKyc = async (next) => {
+    const note = next === 'rejected' ? prompt('Reason (shown to seller):') : null;
+    if (next === 'rejected' && !note?.trim()) return;
+    setBusy(true); setErr('');
+    try {
+      await updateDoc(doc(db, 'kycSubmissions', uid), { status: next, reviewedBy: admin.email, reviewedAt: serverTimestamp(), reviewNote: note || null });
+      await addDoc(collection(db, 'notifications'), {
+        userId: uid, type: next === 'approved' ? 'kyc_approved' : 'kyc_rejected', read: false, createdAt: serverTimestamp(),
+        title: next === 'approved' ? 'Identity verified ✅' : 'Identity verification not approved',
+        message: next === 'approved' ? 'Your KYC was approved.' : `Reason: ${note}`,
+      });
+      await load(); onChanged();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
+
+  /* Group 1: application */
+  const applied = rv?.appliedAt ? new Date(rv.appliedAt).toLocaleString('en-NG') : '—';
+  const application = [
+    { label: 'Status', ok: null, value: pillLabel },
+    { label: 'Route applied for', ok: null, value: rv?.route || seller.verificationRoute || '—' },
+    { label: 'Applied at', ok: null, value: applied },
+    ...(rv?.rejectedReason ? [{ label: 'Rejection reason', ok: false, value: rv.rejectedReason }] : []),
+    ...(seller.verifiedUntil ? [{ label: 'Paid badge valid until', ok: null, value: toDate(seller.verifiedUntil)?.toLocaleDateString('en-NG') }] : []),
+  ];
+
+  /* Group 2: identity (KYC), one row per field */
+  const idNumber = String(kyc?.idNumber || '');
+  const photoRow = (label, url) => ({ label, ok: !!url, value: url ? 'Uploaded' : 'Missing', action: url && <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost" style={{ padding: '3px 8px', fontSize: 10 }}>View</a> });
+  const identity = kyc ? [
+    ...KYC_ROWS.map(([k, l]) => ({ label: l, ok: !!kyc[k], value: fmtVal(kyc[k]) })),
+    { label: 'ID number', ok: !!idNumber, value: showId ? idNumber : (idNumber ? `${'•'.repeat(Math.max(idNumber.length - 4, 0))}${idNumber.slice(-4)}` : '—'),
+      action: idNumber && <button onClick={() => setShowId(s => !s)} className="btn btn-ghost" style={{ padding: '3px 8px', fontSize: 10 }}>{showId ? 'Hide' : 'Show'}</button> },
+    photoRow('ID front', kyc.frontUrl), photoRow('ID back', kyc.backUrl), photoRow('Selfie holding ID', kyc.selfieUrl),
+    {
+      label: 'KYC decision', ok: kycStatus === 'approved' ? true : kycStatus === 'rejected' ? false : null, value: kycStatus,
+      note: kyc.reviewNote ? `Note: ${kyc.reviewNote}` : undefined,
+      action: (
+        <span style={{ display: 'flex', gap: 4 }}>
+          <button disabled={busy} onClick={() => reviewKyc('approved')} className="btn btn-success" style={{ padding: '3px 8px', fontSize: 10 }}>Approve</button>
+          <button disabled={busy} onClick={() => reviewKyc('rejected')} className="btn btn-danger" style={{ padding: '3px 8px', fontSize: 10 }}>Reject</button>
+        </span>
+      ),
+    },
+  ] : [{ label: 'KYC submitted', ok: false, value: rv ? 'No' : '…' }];
+
+  /* Group 3: requirements as the server evaluates them right now */
+  const checks = (rv?.checks || []).map(c => ({
+    ok: c.ok === undefined ? null : !!c.ok,
+    label: String(c.label ?? c.title ?? c.id ?? c.key ?? 'Requirement'),
+    value: fmtVal(c.value ?? c.detail ?? c.current ?? c.have),
+    note: c.need != null ? `Required: ${fmtVal(c.need)}` : (c.hint || c.note),
+  }));
+
+  /* Group 4: raw numbers, live vs. at application */
+  const stats = rv ? Object.keys(STAT_LABELS).map(k => ({
+    label: STAT_LABELS[k], ok: null,
+    value: k === 'daysSinceLastStrike' && rv.live?.[k] == null ? 'No strikes' : fmtVal(rv.live?.[k]),
+    note: rv.snapshot ? `At application: ${k === 'daysSinceLastStrike' && rv.snapshot[k] == null ? 'No strikes' : fmtVal(rv.snapshot[k])}` : undefined,
+  })) : [];
+
+  return (
+    <div className="card" style={{ borderLeft: `3px solid ${badge ? '#1d9bf0' : status === 'pending_review' ? '#f59e0b' : '#475569'}`, padding: 0, overflow: 'hidden' }}>
+      <div onClick={() => setOpen(o => !o)} style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+        <div className="avatar" style={{ width: 36, height: 36 }}>{name[0]?.toUpperCase()}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{name}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{profile?.email || seller.sellerEmail}</div>
+        </div>
+        <span className={`pill ${pillCls}`}><span className="pill-dot" />{pillLabel}</span>
+        <ChevronDown size={16} color="var(--text-muted)" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+      </div>
+
+      {open && (
+        <div style={{ padding: '4px 18px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {!rv && !err && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading live numbers…</div>}
+          {err && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#f87171' }}>{err}</div>}
+          {rv && (
+            <>
+              <div style={{ fontSize: 12, fontWeight: 700, color: rv.eligible ? '#34d399' : '#fbbf24' }}>
+                {rv.eligible ? '✓ Meets every requirement right now' : '⚠ Does not meet every requirement right now'}
+              </div>
+              <CheckGroup title="1 · Application" rows={application} scored={false} />
+              <CheckGroup title="2 · Identity (KYC submission, private)" rows={identity} />
+              <CheckGroup title={`3 · Requirements for the ${rv.route} route (server check)`} rows={checks} />
+              <CheckGroup title="4 · Live numbers vs. at application" rows={stats} scored={false} />
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {status === 'pending_review' && (
+                  <>
+                    <button disabled={busy} onClick={() => decide('approve')} className="btn btn-success"><ShieldCheck size={13} />{rv.route === 'free' ? 'Approve & grant blue check' : 'Approve (seller then pays)'}</button>
+                    <button disabled={busy} onClick={() => decide('reject')} className="btn btn-danger"><X size={13} />Reject</button>
+                  </>
+                )}
+                {status === 'approved_awaiting_payment' && (
+                  <button disabled={busy} onClick={() => decide('reject')} className="btn btn-danger"><X size={13} />Withdraw approval</button>
+                )}
+                {seller.isVerifiedSeller === true && (
+                  <button disabled={busy} onClick={() => decide('revoke')} className="btn btn-danger"><X size={13} />Remove blue check</button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SellerVerificationSection({ users, admin }) {
+  const [sellers, setSellers] = useState([]);
+  const [kycPending, setKycPending] = useState(new Set());
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('review');
+  const [q, setQ] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [snap, k] = await Promise.all([
+        getDocs(collection(db, 'sellers')),
+        getDocs(query(collection(db, 'kycSubmissions'), where('status', '==', 'pending'))).catch(() => null),
+      ]);
+      setSellers(snap.docs.filter(d => d.id !== 'LAN_LIBRARY_PLATFORM').map(d => ({ id: d.id, ...d.data() })));
+      setKycPending(new Set(k ? k.docs.map(d => d.id) : []));
+    } catch (e) { console.error(e); } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const profileOf = (id) => users.find(u => u.id === id);
+  const TABS = [
+    ['review', 'Awaiting review', s => s.verificationStatus === 'pending_review', '#fbbf24'],
+    ['kyc', 'KYC to review', s => kycPending.has(s.id), '#fbbf24'],
+    ['payment', 'Awaiting payment', s => s.verificationStatus === 'approved_awaiting_payment', '#60a5fa'],
+    ['verified', 'Verified', s => paidVerificationActive(s), '#1d9bf0'],
+    ['rejected', 'Rejected', s => s.verificationStatus === 'rejected', '#f87171'],
+    ['all', 'All sellers', () => true, '#94a3b8'],
+  ];
+  const active = TABS.find(t => t[0] === tab);
+  const list = sellers.filter(active[2]).filter(s => {
+    const p = profileOf(s.id) || {};
+    const t = q.toLowerCase();
+    return !t || [s.sellerName, s.sellerEmail, p.email, p.firstName, p.surname, p.displayName].some(x => x?.toLowerCase().includes(t));
+  });
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, marginBottom: 16 }}>
+        {TABS.map(([k, l, f, col]) => (
+          <div key={k} className="card-sm" style={{ cursor: 'pointer', borderColor: tab === k ? col : undefined }} onClick={() => setTab(k)}>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{l}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: col }}>{sellers.filter(f).length}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        <input className="input-dark" placeholder="Search seller name or email…" value={q} onChange={e => setQ(e.target.value)} style={{ flex: 1 }} />
+        <button onClick={load} className="btn btn-ghost"><RefreshCw size={13} />Refresh</button>
+      </div>
+      {loading ? <div style={{ color: 'var(--text-muted)', padding: 32, textAlign: 'center' }}>Loading sellers…</div> : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {list.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Nothing here</div>
+            : list.map(s => <SellerVerificationCard key={s.id} seller={s} profile={profileOf(s.id)} admin={admin} onChanged={load} />)}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ── Main Component ─────────────────────────────────────────────────────── */
 export default function ComprehensiveAdminPanel() {
@@ -2901,6 +3163,19 @@ export default function ComprehensiveAdminPanel() {
               </div>
             </div>
           )}
+
+{activeSection === 'verification' && (
+  <div>
+    <div className="section-header">
+      <div>
+        <div className="section-title"><ShieldCheck size={18} />Seller Verification</div>
+        <div className="section-sub">Every requirement is checked and shown individually</div>
+      </div>
+    </div>
+    <SellerVerificationSection users={users} admin={user} />
+  </div>
+)}
+
 
           {activeSection === 'promotions' && (
             <div>

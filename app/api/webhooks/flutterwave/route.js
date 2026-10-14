@@ -334,45 +334,45 @@ export async function POST(request) {
             }
 
             if (customer.email) {
-                after(async () => {
-                    const jobs = [];
-                    if (activeSellerId !== 'PLATFORM_ADMIN') {
-                        jobs.push(notifyUser({
-                            userId: activeSellerId,
-                            to: verifiedPrintBook?.sellerEmail,
-                            type: 'sale_alert',
-                            data: {
-                                sellerName: verifiedPrintBook?.sellerName || 'Seller',
-                                bookTitle: verifiedPrintBook?.title,
-                                amount: expectedNGN,
-                                netEarning,
-                                buyerEmail: maskEmail(customer.email),
-                                currentBalance: referralResult.currentBalance,
-                            },
-                            inApp: {
-                                type: 'sale',
-                                title: 'New sale 🎉',
-                                message: `"${verifiedPrintBook?.title}" sold. ₦${Number(netEarning).toLocaleString('en-NG')} added to your balance.`,
-                                link: '/my-account/seller-account',
-                            },
-                        }));
-                    }
-                    if (customer.email) {
-                        jobs.push(sendServerNotification({
-                            type: 'order_receipt',
-                            to: customer.email,
-                            userId,
-                            data: {
-                                buyerName: customer.name || 'Reader',
-                                bookTitle: verifiedPrintBook?.title,
-                                amount: expectedNGN,        // the receipt prints ₦, so pass the naira value
-                                sellerName: verifiedBook.sellerName || 'LAN Library',
-                                orderId: tx_ref,
-                            },
-                        }));
-                    }
-                    await Promise.allSettled(jobs);
-                });
+                      after(async () => {
+            const jobs = [];
+            if (activeSellerId !== 'PLATFORM_ADMIN') {
+                jobs.push(notifyUser({
+                    userId: activeSellerId,
+                    to: verifiedBook.sellerEmail,
+                    type: 'sale_alert',
+                    data: {
+                        sellerName: verifiedBook.sellerName || 'Seller',
+                        bookTitle: verifiedBook.title,
+                        amount: expectedNGN,
+                        netEarning,
+                        buyerEmail: maskEmail(customer.email || ''),
+                        currentBalance: referralResult.currentBalance,
+                    },
+                    inApp: {
+                        type: 'sale',
+                        title: 'New sale 🎉',
+                        message: `"${verifiedBook.title}" sold. ₦${Number(netEarning).toLocaleString('en-NG')} added to your balance.`,
+                        link: '/my-account/seller-account',
+                    },
+                }));
+            }
+            if (customer.email) {
+                jobs.push(sendServerNotification({
+                    type: 'order_receipt',
+                    to: customer.email,
+                    userId,
+                    data: {
+                        buyerName: customer.name || 'Reader',
+                        bookTitle: verifiedBook.title,
+                        amount: expectedNGN,
+                        sellerName: verifiedBook.sellerName || 'LAN Library',
+                        orderId: tx_ref,
+                    },
+                }));
+            }
+            await Promise.allSettled(jobs);
+        });
             }
 
             return NextResponse.json({ message: 'Print license permissions issued successfully' }, { status: 200 });

@@ -388,10 +388,10 @@ useEffect(() => {
 
   useEffect(() => {
     if (!userId) return;
-    const q = query(
+       const q = query(
       collection(db, "notifications"),
-      where("status", "==", "resolved"),
-      orderBy("resolvedAt", "desc"),
+      where("userId", "==", userId),
+      limit(100),
     );
     return onSnapshot(q, (snap) =>
       setNotifications(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),

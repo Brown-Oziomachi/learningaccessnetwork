@@ -49,6 +49,16 @@ const TIERS = {
     },
 };
 
+const loadFlutterwave = () => new Promise((resolve, reject) => {
+    if (window.FlutterwaveCheckout) return resolve(window.FlutterwaveCheckout);
+    const s = document.createElement("script");
+    s.src = "https://checkout.flutterwave.com/v3.js";
+    s.async = true;
+    s.onload = () => (window.FlutterwaveCheckout ? resolve(window.FlutterwaveCheckout) : reject(new Error("Flutterwave missing")));
+    s.onerror = () => reject(new Error("Script failed to load"));
+    document.body.appendChild(s);
+});
+
 const DURATIONS = [7, 14, 30, 60, 90];
 
 /* ══════════════════════════════════════════════════════════ */
@@ -154,91 +164,85 @@ const canOpenPay = selectedBook && headline.trim();
             paymentRef: paymentMeta.ref,
             createdAt: serverTimestamp(),
         });
-
-        /* also log to revenue collection for admin dashboard */
-        await addDoc(collection(db, "revenue"), {
-            type: "ad_boost",
-            amount: totalPrice,
-            sellerId: user.uid,
-            sellerEmail: user.email,
-            tier: selectedTier,
-            durationDays: selectedDays,
-            bookId: selectedBook.id,
-            bookTitle: selectedBook.bookTitle || selectedBook.title,
-            paymentMethod: paymentMeta.method,
-            paymentRef: paymentMeta.ref,
-            status: "completed",
-            createdAt: serverTimestamp(),
-        });
-    };
+    }
+       
 
     /* ═══════════════════════════════════════════════════════
        FLUTTERWAVE PAYMENT
     ═══════════════════════════════════════════════════════ */
-    const handleFlutterwavePayment = async () => {
-        if (!buyerEmail || !buyerPhone || !buyerName) {
-            setPayError("Please fill in all contact fields.");
-            return;
-        }
+  const handleFlutterwavePayment = async () => {
+    if (!buyerEmail || !buyerPhone || !buyerName) {
+        setPayError("Please fill in all contact fields.");
+        return;
+    }
+    const publicKey = process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY;
+    if (!publicKey) {
+        setPayError("Payment is not configured (missing public key). Contact support.");
+        return;
+    }
 
-        setProcessing(true);
-        setPayError("");
+    setProcessing(true);
+    setPayError("");
 
-        let FlutterwaveCheckout;
-        try {
-            FlutterwaveCheckout = await initializeFlutterwave();
-        } catch {
-            setPayError("Payment gateway failed to load. Please refresh and try again.");
-            setProcessing(false);
-            return;
-        }
-        setProcessing(false); // stop spinner — modal takes over from here
+    let FlutterwaveCheckout;
+    try {
+        FlutterwaveCheckout = await Promise.race([
+loadFlutterwave(),
+            new Promise((_, rej) => setTimeout(() => rej(new Error("Gateway load timeout")), 12000)),
+        ]);
+        if (typeof FlutterwaveCheckout !== "function") throw new Error("Checkout is not a function");
+    } catch (e) {
+        console.error("[Ad payment] gateway load failed:", e);
+        setPayError("Payment gateway failed to load. Disable ad-blockers, refresh and try again.");
+        setProcessing(false);
+        return;
+    }
+    setProcessing(false);
 
-        const txRef = `AD-FLW-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`;
+    const txRef = `AD-FLW-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-        FlutterwaveCheckout({
-            public_key: process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY,
-            tx_ref: txRef,
-            amount: totalPrice,
-            currency: "NGN",
-            payment_options: "card,ussd,banktransfer",
-            customer: {
-                email: buyerEmail,
-                phone_number: buyerPhone,
-                name: buyerName,
-            },
-            /* ── KEY: meta tells your webhook this is an ad, not a book ── */
-            meta: {
-                type: "ad_boost",          // webhook checks this field
-                tier: selectedTier,
-                days: selectedDays,
-                bookId: selectedBook.id,
-                sellerId: user.uid,
-            },
-            customizations: {
-                title: "LAN Library — Ad Promotion",
-                description: `${selectedTier} tier · ${selectedDays} days`,
-                logo: "/lan-logo.png",
-            },
-            callback: async (response) => {
-                if (response.status === "successful" || response.status === "completed") {
-                    try {
-                        setProcessing(true);
-                        await savePromotion({ method: "flutterwave", ref: response.transaction_id || txRef });
-                        setShowPayModal(false);
-                        setSubmitted(true);
-                    } catch (err) {
-                        setPayError("Payment succeeded but record failed. Contact support with ref: " + txRef);
-                    } finally {
-                        setProcessing(false);
-                    }
-                } else {
-                    setPayError("Payment was not completed. Please try again.");
+    // hide our overlay so it can never sit on top of Flutterwave's iframe
+    setShowPayModal(false);
+
+    FlutterwaveCheckout({
+        public_key: publicKey,
+        tx_ref: txRef,
+        amount: Number(totalPrice),
+        currency: "NGN",
+        payment_options: "card,banktransfer,ussd",
+        customer: { email: buyerEmail, phone_number: buyerPhone, name: buyerName },
+        meta: {
+            type: "ad_boost",
+            tier: String(selectedTier),
+            days: String(selectedDays),
+            bookId: String(selectedBook.id),
+            sellerId: String(user.uid),
+        },
+        customizations: {
+            title: "LAN Library — Ad Promotion",
+            description: `${selectedTier} tier · ${selectedDays} days`,
+            logo: `${window.location.origin}/lan-logo.png`,   // must be absolute
+        },
+        callback: async (response) => {
+            if (response.status === "successful" || response.status === "completed") {
+                try {
+                    setProcessing(true);
+                    await savePromotion({ method: "flutterwave", ref: response.transaction_id || txRef });
+                    setSubmitted(true);
+                } catch (err) {
+                    setShowPayModal(true);
+                    setPayError("Payment succeeded but record failed. Contact support with ref: " + txRef);
+                } finally {
+                    setProcessing(false);
                 }
-            },
-            onclose: () => { },
-        });
-    };
+            } else {
+                setShowPayModal(true);
+                setPayError("Payment was not completed. Please try again.");
+            }
+        },
+        onclose: () => { },
+    });
+};
 
     /* ═══════════════════════════════════════════════════════
        WALLET PAYMENT

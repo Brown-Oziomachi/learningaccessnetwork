@@ -24,6 +24,8 @@ import BookNegotiationCard from "@/components/negotiation/BookNegotiationCard";
 import { NegotiationHost } from "@/components/negotiation/NegotiationHost";
 import { getNegotiationSettings } from "@/lib/negotiation";
 import { VerifiedBadge, paidVerificationActive } from "@/components/seller/Verification";
+import { openNegotiation } from "@/components/negotiation/NegotiationHost";
+import { negId } from "@/lib/negotiation";
 
 /* ── palette ── */
 const NAVY = "#0d2244";
@@ -639,17 +641,18 @@ if (staticBook) {
           setBook(merged);
         }
 
-        if (raw) {
-          setIsPrintLicensingEnabled(raw.isPrintLicensingEnabled === true);
-          setIsGloballyFrozen(raw.isGloballyFrozen === true);
-          setNegSettings(getNegotiationSettings(raw));
-          setNegMeta({
-            on: raw.isNegotiable === true && Number(raw.price) > 0,
-            pct: Number(raw.maxDiscountPercent) || 0,
-            academic: raw.intent === "academic",
-          });
-          if (Number(raw.purchases) > 0) setBookSalesCount({ [cId]: Number(raw.purchases) });
-        }
+      if (raw) {
+  setIsPrintLicensingEnabled(raw.isPrintLicensingEnabled === true);
+  setIsGloballyFrozen(raw.isGloballyFrozen === true);
+  if (Number(raw.purchases) > 0) setBookSalesCount({ [cId]: Number(raw.purchases) });
+}
+
+// read from both sources, one call
+const ns = getNegotiationSettings({ ...(bookData || {}), ...(raw || {}) });
+setNegSettings(ns);
+setNegMeta({ on: !!ns.enabled, pct: ns.maxPct, academic: ns.mode === "discount" });
+console.log("NEG debug:", { isNegotiable: raw?.isNegotiable, maxDiscountPercent: raw?.maxDiscountPercent, intent: raw?.intent, parsed: ns });
+
       } catch (err) { console.error("fetchBook error:", err); }
       finally { setLoading(false); }
     };
@@ -818,7 +821,7 @@ if (staticBook) {
 
   /* Negotiation wording depends on who is looking and what the seller allows */
   const negInfo = () => {
-    if (!negMeta.on || !canBuy) return null;
+if (!negMeta.on || !canBuy || user?.uid === negSettings?.sellerId) return null;
     const pct = negMeta.pct;
     if (negMeta.academic && viewerType === "student")
       return { title: "Request student discount", sub: pct ? `Up to ${pct}% off for students` : "Ask the lecturer for a discount" };
@@ -828,11 +831,22 @@ if (staticBook) {
   };
   const neg = negInfo();
 
-  const goNegotiate = () => {
-    setBuyMenu(null);
-    setShowOptionsModal(false);
-    setShowNegotiation(true);
-  };
+const goNegotiate = () => {
+  setBuyMenu(null);
+  setShowOptionsModal(false);
+  if (!user) { router.push("/signin"); return; }
+  if (!negSettings?.enabled) { showToastMessage("This seller isn't taking offers right now."); return; }
+  openNegotiation(negId(cleanBookId, user.uid), {
+    bookId: cleanBookId,
+    bookTitle: book.title,
+    listPrice: negSettings.listPrice,
+    maxPct: negSettings.maxPct,
+    mode: negSettings.mode,
+    sellerId: negSettings.sellerId,
+    sellerName: bookOwnerProfile?.name || book?.sellerName || "Seller",
+    cover: book?.image || null,
+  });
+};
 
   /* ───────────── render helpers (plain functions, so nothing remounts) ───────────── */
 
@@ -871,9 +885,16 @@ if (staticBook) {
               </button>
             ) : (
               <div className="buy-item" style={{ cursor: "default", opacity: 0.7 }}>
-                <span className="buy-ico"><Lock size={16} /></span>
-                <span style={{ textAlign: "left" }}><strong>Fixed price</strong><em>The seller is not taking offers</em></span>
-              </div>
+  <span className="buy-ico"><Lock size={16} /></span>
+  <span style={{ textAlign: "left" }}>
+    <strong>Fixed price</strong>
+    <em>
+      {user?.uid && user.uid === negSettings?.sellerId
+        ? "This is your own listing"
+        : "The seller is not taking offers"}
+    </em>
+  </span>
+</div>
             )}
           </div>
         )}
@@ -1475,40 +1496,6 @@ if (staticBook) {
         </div>
 
         <NegotiationHost user={user} fmt={fmt} />
-
-        {/* ══ NEGOTIATION / DISCOUNT MODAL ══ */}
-        {showNegotiation && (
-          <>
-            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100 }} onClick={() => setShowNegotiation(false)} />
-            <div role="dialog" aria-modal="true" aria-label={neg?.title || "Price offer"} style={{ position: "fixed", inset: 0, zIndex: 101, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", pointerEvents: "none" }}>
-              <div style={{ pointerEvents: "auto", width: "100%", maxWidth: "480px", maxHeight: "90vh", overflowY: "auto", background: "#fff", border: `0.5px solid ${GOLD}` }}>
-                <div style={{ background: NAVY, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, position: "sticky", top: 0, zIndex: 2 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(184,150,62,0.15)", border: "0.5px solid rgba(184,150,62,0.35)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      {studentDiscountView ? <GraduationCap size={18} style={{ color: GOLD }} /> : <Tag size={18} style={{ color: GOLD }} />}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 700, color: "#fff", margin: 0 }}>{neg?.title || "Price offer"}</p>
-                      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", margin: "2px 0 0", fontFamily: "'Lato',sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{book.title}</p>
-                    </div>
-                  </div>
-                  <button onClick={() => setShowNegotiation(false)} aria-label="Close" style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", padding: 4, flexShrink: 0 }}><X size={20} /></button>
-                </div>
-                <BookNegotiationCard
-                  book={book}
-                  bookId={cleanBookId}
-                  settings={negSettings}
-                  user={user}
-                  sellerName={bookOwnerProfile?.name || book?.sellerName}
-                  fmt={fmt}
-                  isPurchased={isPurchased}
-                  isFrozen={isGloballyFrozen}
-                  onPay={(n) => { setShowNegotiation(false); router.push(`/payment?bookId=${cleanBookId}&negotiationId=${n.id}`); }}
-                />
-              </div>
-            </div>
-          </>
-        )}
 
         {/* ══ MODALS ══ */}
         {showOverview && (
