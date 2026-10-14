@@ -7,13 +7,16 @@ import { FieldValue } from "firebase-admin/firestore";
 import { VERIFY_PRICE_NGN, VERIFY_DAYS, verificationUpdate } from "@/lib/server/grantSellerVerification";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { canPay } from "@/lib/server/verificationGate";
+import { verifyPinWithLockout } from "@/lib/pinGuard";
+import { collectStats } from "@/lib/verification/collectStats";
+import { evaluateVerification } from "@/lib/verification/eligibility";
 
 class HttpError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
 
-/** TODO: use the SAME transfer-PIN check your /api/wallet-withdraw route uses. Throws if wrong. */
+/** Brute-force-safe PIN check (transactional lockout). Throws if wrong. */
 async function checkTransferPin(uid, pin) {
-    if (!/^\d{4}$/.test(pin)) throw new HttpError(400, "Enter your 4-digit PIN.");
-    throw new HttpError(501, "Wallet PIN check is not connected yet.");
+    const r = await verifyPinWithLockout(uid, pin);
+    if (!r.ok) throw new HttpError(r.status, r.error);
 }
 
 /** Shared rule lives in lib/server/verificationGate.js. Called again inside the wallet transaction. */
@@ -41,7 +44,12 @@ export async function POST(req) {
         if (isFaculty) throw new HttpError(403, "Faculty are verified through the account process.");
 
         assertCanPay(seller); // <-- NEW
-
+        if (seller.verificationStatus === "verified") { // renewal: re-check strikes and books
+            const { stats } = await collectStats(adminDb, uid, "paid");
+            if (!evaluateVerification("paid", stats).qualityOk)
+                throw new HttpError(403, "You no longer meet the verification requirements.");
+        }
+        
         const txRef = `LANVER-${uid.slice(0, 6)}-${Date.now()}`;
         const payRef = adminDb.collection("verificationPayments").doc(txRef);
         const base = { uid, amount: VERIFY_PRICE_NGN, currency: "NGN", days: VERIFY_DAYS, method: body.method, createdAt: FieldValue.serverTimestamp() };
@@ -83,7 +91,8 @@ export async function POST(req) {
         }
 
         throw new HttpError(400, "Choose Flutterwave or Wallet.");
-    } catch (e) {
+       } catch (e) {
+        if (!e.status) console.error("verification/initialize error:", e);
         return NextResponse.json({ error: e.status ? e.message : "Something went wrong. Try again." }, { status: e.status || 500 });
     }
 }

@@ -1385,6 +1385,14 @@ const adminFetch = async (path, body) => {
   return d;
 };
 const fmtVal = (v) => (v === null || v === undefined || v === '' ? '—' : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : typeof v === 'object' ? JSON.stringify(v) : String(v));
+// Firestore Timestamp, {seconds}, millis number or ISO string -> Date (or null)
+const toDate = (t) => {
+  if (!t) return null;
+  if (t.toDate) return t.toDate();
+  if (t.seconds) return new Date(t.seconds * 1000);
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? null : d;
+};
 const APP_PILL = {
   pending_review: ['pill-warn', 'Awaiting review'],
   approved_awaiting_payment: ['pill-info', 'Approved · awaiting payment'],
@@ -1485,8 +1493,8 @@ function SellerVerificationCard({ seller, profile, admin, onChanged }) {
     { label: 'Route applied for', ok: null, value: rv?.route || seller.verificationRoute || '—' },
     { label: 'Applied at', ok: null, value: applied },
     ...(rv?.rejectedReason ? [{ label: 'Rejection reason', ok: false, value: rv.rejectedReason }] : []),
-    ...(seller.verifiedUntil ? [{ label: 'Paid badge valid until', ok: null, value: toDate(seller.verifiedUntil)?.toLocaleDateString('en-NG') }] : []),
-  ];
+    ...(seller.verifiedUntil ? [{ label: 'Paid badge valid until', ok: null, value: toDate(seller.verifiedUntil)?.toLocaleDateString('en-NG') || '—' }] : []),
+    ];
 
   /* Group 2: identity (KYC), one row per field */
   const idNumber = String(kyc?.idNumber || '');
