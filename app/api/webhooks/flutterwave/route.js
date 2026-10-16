@@ -268,6 +268,37 @@ export async function POST(request) {
                 return NextResponse.json({ message: 'Bounty transaction already tracked' }, { status: 200 });
             }
 
+            after(async () => {
+                const link = `/academic/bounty/board?highlight=${bountyId}`;
+                const rewardFmt = `₦${rewardNGN.toLocaleString('en-NG')}`;
+                await Promise.allSettled([
+                    adminDb.collection('globalNotifications').add({
+                        type: 'new_bounty',
+                        title: 'New Bounty Posted on the Board 💰',
+                        message: `${postedBy} posted a ${rewardFmt} bounty: "${title}". Be the first to claim it!`,
+                        link,
+                        bountyId,
+                        reward: rewardNGN,
+                        posterName: postedBy,
+                        university,
+                        department,
+                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    }),
+                    notifyUser({
+                        userId: posterId,
+                        to: customer.email,
+                        type: 'bounty_posted',
+                        data: { bountyTitle: title, reward: rewardNGN, ctaUrl: `${SITE}${link}` },
+                        inApp: {
+                            type: 'new_bounty',
+                            title: 'Your bounty is live 🎯',
+                            message: `${rewardFmt} is held in escrow for "${title}".`,
+                            link,
+                        },
+                    }),
+                ]);
+            });
+
             return NextResponse.json({ message: 'Bounty escrow captured' }, { status: 200 });
         }
 
@@ -334,45 +365,20 @@ export async function POST(request) {
             }
 
             if (customer.email) {
-                      after(async () => {
-            const jobs = [];
-            if (activeSellerId !== 'PLATFORM_ADMIN') {
-                jobs.push(notifyUser({
-                    userId: activeSellerId,
-                    to: verifiedBook.sellerEmail,
-                    type: 'sale_alert',
-                    data: {
-                        sellerName: verifiedBook.sellerName || 'Seller',
-                        bookTitle: verifiedBook.title,
-                        amount: expectedNGN,
-                        netEarning,
-                        buyerEmail: maskEmail(customer.email || ''),
-                        currentBalance: referralResult.currentBalance,
-                    },
-                    inApp: {
-                        type: 'sale',
-                        title: 'New sale 🎉',
-                        message: `"${verifiedBook.title}" sold. ₦${Number(netEarning).toLocaleString('en-NG')} added to your balance.`,
-                        link: '/my-account/seller-account',
-                    },
-                }));
-            }
-            if (customer.email) {
-                jobs.push(sendServerNotification({
-                    type: 'order_receipt',
-                    to: customer.email,
-                    userId,
-                    data: {
-                        buyerName: customer.name || 'Reader',
-                        bookTitle: verifiedBook.title,
-                        amount: expectedNGN,
-                        sellerName: verifiedBook.sellerName || 'LAN Library',
-                        orderId: tx_ref,
-                    },
-                }));
-            }
-            await Promise.allSettled(jobs);
-        });
+                after(async () => {
+                    await sendServerNotification({
+                        type: 'order_receipt',
+                        to: customer.email,
+                        userId: buyerId,
+                        data: {
+                            buyerName: customer.name || 'Student',
+                            bookTitle,
+                            amount,
+                            sellerName: 'LAN Library',
+                            orderId: tx_ref,
+                        },
+                    }).catch(e => console.error('Print license receipt failed:', e.message));
+                });
             }
 
             return NextResponse.json({ message: 'Print license permissions issued successfully' }, { status: 200 });
@@ -597,36 +603,45 @@ export async function POST(request) {
             }).catch(e => console.error('Referral notification drop:', e));
         }
 
-         after(async () => {
-                const link = `/academic/bounty/board?highlight=${bountyId}`;
-                const rewardFmt = `₦${rewardNGN.toLocaleString('en-NG')}`;
-                await Promise.allSettled([
-                    adminDb.collection('globalNotifications').add({
-                        type: 'new_bounty',
-                        title: 'New Bounty Posted on the Board 💰',
-                        message: `${postedBy} posted a ${rewardFmt} bounty: "${title}". Be the first to claim it!`,
-                        link,
-                        bountyId,
-                        reward: rewardNGN,
-                        posterName: postedBy,
-                        university,
-                        department,
-                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                    }),
-                    notifyUser({
-                        userId: posterId,
-                        to: customer.email,
-                        type: 'bounty_posted',
-                        data: { bountyTitle: title, reward: rewardNGN, ctaUrl: `${SITE}${link}` },
-                        inApp: {
-                            type: 'new_bounty',
-                            title: 'Your bounty is live 🎯',
-                            message: `${rewardFmt} is held in escrow for "${title}".`,
-                            link,
-                        },
-                    }),
-                ]);
-         });
+        after(async () => {
+            const jobs = [];
+            if (activeSellerId !== 'PLATFORM_ADMIN') {
+                jobs.push(notifyUser({
+                    userId: activeSellerId,
+                    to: verifiedBook.sellerEmail,
+                    type: 'sale_alert',
+                    data: {
+                        sellerName: verifiedBook.sellerName || 'Seller',
+                        bookTitle: verifiedBook.title,
+                        amount: expectedNGN,
+                        netEarning,
+                        buyerEmail: maskEmail(customer.email || ''),
+                        currentBalance: referralResult.currentBalance,
+                    },
+                    inApp: {
+                        type: 'sale',
+                        title: 'New sale 🎉',
+                        message: `"${verifiedBook.title}" sold. ₦${Number(netEarning).toLocaleString('en-NG')} added to your balance.`,
+                        link: '/my-account/seller-account',
+                    },
+                }));
+            }
+            if (customer.email) {
+                jobs.push(sendServerNotification({
+                    type: 'order_receipt',
+                    to: customer.email,
+                    userId,
+                    data: {
+                        buyerName: customer.name || 'Reader',
+                        bookTitle: verifiedBook.title,
+                        amount: expectedNGN,
+                        sellerName: verifiedBook.sellerName || 'LAN Library',
+                        orderId: tx_ref,
+                    },
+                }));
+            }
+            await Promise.allSettled(jobs);
+        });
         
         return NextResponse.json({ message: 'Webhook ledger transaction processed securely' }, { status: 200 });
 

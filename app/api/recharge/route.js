@@ -117,7 +117,7 @@ async function getAirtimeItem(network) {
         }
     }
     const matches = airtimeCache.items.filter((i) => re.test(`${i.short_name} ${i.name} ${i.biller_name}`));
-    const pick = matches.find((i) => i.biller_code === 'BIL099') || matches[0] || null;
+    const pick = matches.find((i) => i.biller_code !== 'BIL099') || matches.find((i) => i.biller_code === 'BIL099') || null;
     console.log('[recharge] airtime pick:', network, pick && `${pick.biller_code}/${pick.item_code}/${pick.short_name}`);
     return pick;
 }
@@ -466,31 +466,40 @@ const billPath = `/v3/billers/${encodeURIComponent(payBiller)}/items/${encodeURI
             return NextResponse.json({ ref, status: 'pending', rechargeId: rechargeRef.id, message: 'Your request is being confirmed.' });
         }
 
+        // Flutterwave accepted the request. From here a later error must never refund or flag.
+        const paidByCard = cardTxRef;
+        reserved = 0;
+        cardTxRef = null;
+
 // top-level "success" only means "request accepted". Treat as delivered
 // only if the provider explicitly says so.
 const inner = String(data?.data?.status || '').toLowerCase();
 const delivered = flwStatus === 'success' && /^(success|successful|completed|delivered)$/.test(inner);
 const finalStatus = delivered ? 'completed' : 'pending';
 
-        // 5. Record it server-side
-        const seller = (await sellerRef.get()).data() || {};
-        await rechargeRef.set({
-            sellerId: uid,
-            sellerName: seller.businessInfo?.businessName || seller.bankDetails?.accountName || 'Unknown',
-            type, network: network || null,
-            phone: phone ? String(phone).replace(/\D/g, '') : null,
-            amount: amt,
-            plan: plan ? { name: plan.name || null, size: plan.size || null } : null,
-            ourReference: ref,
-            flwReference: data?.data?.reference || null,
-            flwTxRef: data?.data?.tx_ref || null,
-            flwResponse: data, status: finalStatus,
-            paymentMethod: cardTxRef ? 'card' : 'wallet',
-            ...(cardTxRef ? { cardTxRef } : {}),
-            createdAt: FieldValue.serverTimestamp(),
-        });
-        if (cardTxRef)
-            await adminDb.collection('cardPayments').doc(cardTxRef).set({ status: finalStatus, flwReference: ref }, { merge: true });
+        try {
+            const seller = (await sellerRef.get()).data() || {};
+            await rechargeRef.set({
+                sellerId: uid,
+                sellerName: seller.businessInfo?.businessName || seller.bankDetails?.accountName || 'Unknown',
+                type, network: network || null,
+                phone: phone ? String(phone).replace(/\D/g, '') : null,
+                amount: amt,
+                plan: plan ? { name: plan.name || null, size: plan.size || null } : null,
+                ourReference: ref,
+                flwReference: data?.data?.reference || null,
+                flwTxRef: data?.data?.tx_ref || null,
+                flwResponse: data, status: finalStatus,
+                paymentMethod: paidByCard ? 'card' : 'wallet',
+                ...(paidByCard ? { cardTxRef: paidByCard } : {}),
+                createdAt: FieldValue.serverTimestamp(),
+            });
+            if (paidByCard)
+                await adminDb.collection('cardPayments').doc(paidByCard).set({ status: finalStatus, flwReference: ref }, { merge: true });
+        } catch (e) {
+            console.error('[recharge] ACCEPTED BUT NOT RECORDED', ref, JSON.stringify(data).slice(0, 800), e.message);
+            return NextResponse.json({ ref, status: 'pending', message: 'Your request is being confirmed.' });
+        }
 
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
         if (baseUrl) fetch(`${baseUrl}/api/flutterwave-balance-alert`, { method: 'POST' }).catch(() => {});
