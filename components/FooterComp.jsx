@@ -84,6 +84,8 @@ const FOOTER_COLUMNS = [
       { label: "Terms of Service", href: "/lan/terms-of-service" },
       { label: "User Agreement", href: "/user-agreement=lib" },
       { label: "Author Development Series", href: "/writers-mindset" },
+            { label: "Blog", href: "/blog" },
+
     ],
   },
   {
