@@ -9,7 +9,9 @@ export const maxDuration = 60;
 
 export async function GET(request) {
     const secret = process.env.CRON_SECRET;
-    if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`)
+    if (!secret)
+        return NextResponse.json({ error: 'CRON_SECRET not set on this deployment' }, { status: 500 });
+    if (request.headers.get('authorization') !== `Bearer ${secret}`)
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
