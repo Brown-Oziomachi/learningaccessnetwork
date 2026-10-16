@@ -2,6 +2,8 @@
 import { NextResponse } from 'next/server';
 import https from 'https';
 import { getV3SecretKey } from '@/lib/flutterwaveToken';
+import { adminDb, adminAuth } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 // ── Network biller codes ──────────────────────────────────────────────────────
 const NETWORK_BILLER_CODES = {
@@ -88,6 +90,36 @@ function flwRequest(method, path, bodyObj = null) {
         if (bodyStr) req.write(bodyStr);
         req.end();
     });
+}
+
+const NETWORK_MATCH = {
+    MTN: /mtn/i,
+    AIRTEL: /airtel/i,
+    GLO: /\bglo\b/i,
+    '9MOBILE': /9mobile|etisalat/i,
+};
+let airtimeCache = { at: 0, items: [] };
+
+// Nigerian airtime billers (from your own account's list)
+const NG_AIRTIME_BILLERS = new Set(['BIL099', 'BIL100', 'BIL102', 'BIL103']);
+
+async function getAirtimeItem(network) {
+    const re = NETWORK_MATCH[network];
+    if (!re) return null;
+
+    if (!airtimeCache.items.length || Date.now() - airtimeCache.at > 60 * 60 * 1000) {
+        const { status, data } = await flwRequest('GET', '/v3/bill-categories?airtime=1');
+        if (status === 200 && data.status === 'success') {
+            airtimeCache = {
+                at: Date.now(),
+                items: (data.data || []).filter((i) => i.is_airtime === true && NG_AIRTIME_BILLERS.has(i.biller_code)),
+            };
+        }
+    }
+    const matches = airtimeCache.items.filter((i) => re.test(`${i.short_name} ${i.name} ${i.biller_name}`));
+    const pick = matches.find((i) => i.biller_code === 'BIL099') || matches[0] || null;
+    console.log('[recharge] airtime pick:', network, pick && `${pick.biller_code}/${pick.item_code}/${pick.short_name}`);
+    return pick;
 }
 
 // ── Get NGN wallet balance ────────────────────────────────────────────────────
@@ -277,159 +309,195 @@ export async function GET(request) {
 
 // ── POST /api/recharge ────────────────────────────────────────────────────────
 export async function POST(request) {
+    // 1. Auth
+    const token = request.headers.get('authorization')?.replace('Bearer ', '');
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    let uid;
+    try { ({ uid } = await adminAuth.verifyIdToken(token)); }
+    catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }); }
+
+    const sellerRef = adminDb.collection('sellers').doc(uid);
+    const privRef = adminDb.collection('sellerPrivate').doc(uid);
+    let reserved = 0;       // wallet amount to refund if delivery fails
+    let cardTxRef = null;   // card payment to flag if delivery fails
+
+    const fail = async (message, status = 400, details) => {
+        if (reserved) await sellerRef.update({ accountBalance: FieldValue.increment(reserved) }).catch(console.error);
+        if (cardTxRef) {
+            await adminDb.collection('cardPayments').doc(cardTxRef)
+                .set({ status: 'paid_not_delivered', error: message }, { merge: true }).catch(console.error);
+            message += ` Your card payment (${cardTxRef}) was received. Contact support to retry or refund.`;
+        }
+        return NextResponse.json({ error: message, ...(details ? { details } : {}) }, { status });
+    };
+
     try {
         const body = await request.json();
-
         const {
-            type,
-            phone,
-            amount,
-            item_code,
-            biller_code,
-            bundle_name,
-            meter_number,
-            smartcard_number,
+            type, phone, amount, item_code, biller_code, bundle_name,
+            meter_number, smartcard_number, paymentMethod, txRef, transactionId, network, plan,
         } = body;
 
-        if (isTestMode()) {
-            return NextResponse.json(
-                { error: 'Bill payments are not supported in test mode. Switch to live keys.' },
-                { status: 400 }
-            );
-        }
+        if (isTestMode())
+            return NextResponse.json({ error: 'Bill payments are not supported in test mode. Switch to live keys.' }, { status: 400 });
 
-        if (!type || !amount || !biller_code) {
-            return NextResponse.json(
-                { error: 'Missing required fields: type, amount, biller_code' },
-                { status: 400 }
-            );
-        }
+        const amt = Number(amount);
+        if (!type || !biller_code || !Number.isFinite(amt) || amt <= 0)
+            return NextResponse.json({ error: 'Missing required fields: type, amount, biller_code' }, { status: 400 });
+        if (type === 'airtime' && amt < 50)
+            return NextResponse.json({ error: 'Minimum airtime is ₦50' }, { status: 400 });
+        if (type === 'electricity' && amt < 500)
+            return NextResponse.json({ error: 'Minimum electricity purchase is ₦500' }, { status: 400 });
 
-        const ref = `LAN_${type.toUpperCase()}_${Date.now()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+        // 2. Validate input and build the Flutterwave payload BEFORE taking any money
+             const ref = `LAN_${type.toUpperCase()}_${Date.now()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+        const fmtPhone = (p) => (p?.startsWith('0') ? '+234' + p.slice(1) : p);
 
-        const flwBalance = await getFlutterwaveBalance();
-        if (flwBalance !== null && flwBalance < Number(amount)) {
-            return NextResponse.json(
-                { error: 'Service temporarily unavailable. Please try again shortly.' },
-                { status: 503 }
-            );
-        }
-
-        let payload;
-
-        if (type === 'airtime') {
-            if (!phone)
-                return NextResponse.json({ error: 'Missing phone' }, { status: 400 });
-            const formattedPhone = phone.startsWith('0') ? '+234' + phone.slice(1) : phone;
-            payload = {
-                country: 'NG',
-                customer: formattedPhone,
-                amount: Number(amount),
-                type: 'AIRTIME',
-                reference: ref,
-                recurrence: 'ONCE',
-                biller_code,
-            };
-
-        } else if (type === 'data') {
-            if (!phone)
-                return NextResponse.json({ error: 'Missing phone' }, { status: 400 });
-            if (!bundle_name)
-                return NextResponse.json(
-                    { error: 'Missing bundle_name. Pass the exact plan name from the bill categories API.' },
-                    { status: 400 }
-                );
-            const formattedPhone = phone.startsWith('0') ? '+234' + phone.slice(1) : phone;
-            payload = {
-                country: 'NG',
-                customer: formattedPhone,
-                amount: Number(amount),
-                type: bundle_name,
-                reference: ref,
-                recurrence: 'ONCE',
-                biller_code,
-                item_code,
-            };
-
-        } else if (type === 'electricity') {
-            if (!meter_number)
-                return NextResponse.json({ error: 'Missing meter_number' }, { status: 400 });
-            if (!item_code)
-                return NextResponse.json(
-                    { error: 'Missing item_code. Fetch electricity plans first and pass the item_code from the chosen plan.' },
-                    { status: 400 }
-                );
-            payload = {
-                country: 'NG',
-                customer: meter_number,
-                amount: Number(amount),
-                type: 'POWER',
-                reference: ref,
-                recurrence: 'ONCE',
-                biller_code,
-                item_code,
-            };
-
-        } else if (type === 'tv') {
-            if (!smartcard_number)
-                return NextResponse.json({ error: 'Missing smartcard_number' }, { status: 400 });
-            if (!item_code)
-                return NextResponse.json(
-                    { error: 'Missing item_code. Fetch TV plans first and pass the item_code from the chosen package.' },
-                    { status: 400 }
-                );
-            payload = {
-                country: 'NG',
-                customer: smartcard_number,
-                amount: Number(amount),
-                type: 'CABLETV',
-                reference: ref,
-                recurrence: 'ONCE',
-                biller_code,
-                item_code,
-            };
-
-        } else {
+        if (!['airtime', 'data', 'electricity', 'tv'].includes(type))
             return NextResponse.json({ error: `Invalid type: ${type}` }, { status: 400 });
+        if ((type === 'airtime' || type === 'data') && !phone)
+            return NextResponse.json({ error: 'Missing phone' }, { status: 400 });
+        if (type === 'data' && !item_code)
+            return NextResponse.json({ error: 'Missing item_code' }, { status: 400 });
+        if (type === 'electricity' && (!meter_number || !item_code))
+            return NextResponse.json({ error: 'Missing meter_number or item_code' }, { status: 400 });
+        if (type === 'tv' && (!smartcard_number || !item_code))
+            return NextResponse.json({ error: 'Missing smartcard_number or item_code' }, { status: 400 });
+
+        let itemCode = item_code;
+let payBiller = biller_code;
+if (type === 'airtime') {
+    const it = await getAirtimeItem(network);
+    if (!it)
+        return NextResponse.json({ error: 'Airtime is unavailable for this network right now.' }, { status: 503 });
+    itemCode = it.item_code;
+    payBiller = it.biller_code;   // the AIRTIME biller, not the data biller
+}
+
+        const customerId =
+            type === 'airtime' || type === 'data' ? fmtPhone(phone)
+            : type === 'electricity' ? meter_number
+            : smartcard_number;
+
+        const payload = { country: 'NG', customer_id: customerId, amount: amt, reference: ref };
+const billPath = `/v3/billers/${encodeURIComponent(payBiller)}/items/${encodeURIComponent(itemCode)}/payment`;
+        // 3. Take payment
+        if (paymentMethod === 'card') {
+            if (!txRef || !transactionId)
+                return NextResponse.json({ error: 'Missing card payment reference' }, { status: 400 });
+
+            const v = await flwRequest('GET', `/v3/transactions/${encodeURIComponent(transactionId)}/verify`);
+            const d = v.data?.data;
+            if (v.status !== 200 || v.data?.status !== 'success' || d?.status !== 'successful' ||
+                d.tx_ref !== txRef || d.currency !== 'NGN' || Number(d.amount) < amt)
+                return NextResponse.json({ error: 'Card payment could not be verified.' }, { status: 400 });
+
+            // a payment reference can only be used once
+            const payRef = adminDb.collection('cardPayments').doc(String(txRef));
+            try {
+                await adminDb.runTransaction(async (t) => {
+    const snap = await t.get(payRef);
+    if (snap.exists) {
+        const prev = snap.data();
+        // only the same user may retry, and only if delivery had failed
+        if (prev.uid !== uid || prev.status !== 'paid_not_delivered') throw new Error('DUPLICATE');
+        t.set(payRef, { status: 'processing', retriedAt: FieldValue.serverTimestamp() }, { merge: true });
+    } else {
+        t.set(payRef, { uid, amount: Number(d.amount), transactionId: String(transactionId), status: 'processing', createdAt: FieldValue.serverTimestamp() });
+    }
+});
+            } catch (e) {
+                if (e.message === 'DUPLICATE') return NextResponse.json({ error: 'This payment has already been used.' }, { status: 409 });
+                throw e;
+            }
+            cardTxRef = String(txRef);
+        } else {
+            // wallet: needs a PIN verified in the last 2 minutes, then debit atomically
+            try {
+                await adminDb.runTransaction(async (t) => {
+                    const [s, p] = await Promise.all([t.get(sellerRef), t.get(privRef)]);
+                    if (Date.now() - (p.data()?.pinVerifiedAt || 0) > 120000) throw new Error('PIN_REQUIRED');
+                    if ((s.data()?.accountBalance || 0) < amt) throw new Error('INSUFFICIENT');
+                    t.update(sellerRef, { accountBalance: FieldValue.increment(-amt), updatedAt: FieldValue.serverTimestamp() });
+                    t.set(privRef, { pinVerifiedAt: 0 }, { merge: true }); // one PIN = one purchase
+                });
+            } catch (e) {
+                if (e.message === 'PIN_REQUIRED') return NextResponse.json({ error: 'PIN confirmation expired. Please enter your PIN again.' }, { status: 403 });
+                if (e.message === 'INSUFFICIENT') return NextResponse.json({ error: 'Insufficient wallet balance.' }, { status: 400 });
+                throw e;
+            }
+            reserved = amt;
         }
 
-        console.log('[recharge] POST payload:', JSON.stringify(payload));
-        const { status, data } = await flwRequest('POST', '/v3/bills', payload);
-        console.log('[recharge] POST response:', JSON.stringify(data).slice(0, 500));
+        // 4. Deliver (refund / flag on any failure)
+             // 4. Deliver
+        const flwBalance = await getFlutterwaveBalance();
+        if (flwBalance !== null && flwBalance < amt)
+            return fail('Service temporarily unavailable. Please try again shortly.', 503);
 
-        if (status !== 200 || data.status !== 'success') {
-            return NextResponse.json(
-                { error: data.message || 'Purchase failed', details: data },
-                { status: 400 }
-            );
+        const rechargeRef = adminDb.collection('recharges').doc();
+        let status, data;
+        try {
+            ({ status, data } = await flwRequest('POST', billPath, payload));
+        } catch (e) {
+            // network error or timeout: the outcome is UNKNOWN. Do not refund automatically.
+            console.error('[recharge] FLW call threw:', e.message);
+            await rechargeRef.set({
+                sellerId: uid, type, amount: amt, ourReference: ref,
+                paymentMethod: cardTxRef ? 'card' : 'wallet', ...(cardTxRef ? { cardTxRef } : {}),
+                status: 'needs_review', createdAt: FieldValue.serverTimestamp(),
+            });
+            reserved = 0; cardTxRef = null; // keep the money held; do not refund or flag
+            return NextResponse.json({ ref, status: 'pending', rechargeId: rechargeRef.id, message: 'Your request is being confirmed.' });
+        }
+        console.error('[recharge] FLW bills ->', status, JSON.stringify(data).slice(0, 800));
+
+        const flwStatus = String(data?.status || '').toLowerCase();
+        if (!(status === 200 && (flwStatus === 'success' || flwStatus === 'pending'))) {
+            if (status >= 400 && status < 500)   // definite rejection: safe to refund
+                return fail(data?.message || `Provider error (${status}). Please try again.`, 400, data);
+            // 5xx: unknown outcome, same as a timeout
+            await rechargeRef.set({
+                sellerId: uid, type, amount: amt, ourReference: ref,
+                paymentMethod: cardTxRef ? 'card' : 'wallet', ...(cardTxRef ? { cardTxRef } : {}),
+                status: 'needs_review', flwResponse: data, createdAt: FieldValue.serverTimestamp(),
+            });
+            reserved = 0; cardTxRef = null;
+            return NextResponse.json({ ref, status: 'pending', rechargeId: rechargeRef.id, message: 'Your request is being confirmed.' });
         }
 
-        const deliveryStatus = (
-            data.data?.data?.status ||
-            data.data?.status ||
-            ''
-        ).toLowerCase();
+// top-level "success" only means "request accepted". Treat as delivered
+// only if the provider explicitly says so.
+const inner = String(data?.data?.status || '').toLowerCase();
+const delivered = flwStatus === 'success' && /^(success|successful|completed|delivered)$/.test(inner);
+const finalStatus = delivered ? 'completed' : 'pending';
 
-        if (deliveryStatus === 'failed') {
-            return NextResponse.json(
-                { error: 'Delivery failed. Your wallet has not been debited.' },
-                { status: 400 }
-            );
-        }
+        // 5. Record it server-side
+        const seller = (await sellerRef.get()).data() || {};
+        await rechargeRef.set({
+            sellerId: uid,
+            sellerName: seller.businessInfo?.businessName || seller.bankDetails?.accountName || 'Unknown',
+            type, network: network || null,
+            phone: phone ? String(phone).replace(/\D/g, '') : null,
+            amount: amt,
+            plan: plan ? { name: plan.name || null, size: plan.size || null } : null,
+            ourReference: ref,
+            flwReference: data?.data?.reference || null,
+            flwTxRef: data?.data?.tx_ref || null,
+            flwResponse: data, status: finalStatus,
+            paymentMethod: cardTxRef ? 'card' : 'wallet',
+            ...(cardTxRef ? { cardTxRef } : {}),
+            createdAt: FieldValue.serverTimestamp(),
+        });
+        if (cardTxRef)
+            await adminDb.collection('cardPayments').doc(cardTxRef).set({ status: finalStatus, flwReference: ref }, { merge: true });
 
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
-        if (baseUrl) {
-            fetch(`${baseUrl}/api/flutterwave-balance-alert`, { method: 'POST' }).catch(() => { });
-        }
+        if (baseUrl) fetch(`${baseUrl}/api/flutterwave-balance-alert`, { method: 'POST' }).catch(() => {});
 
-        return NextResponse.json({
-            ref,
-            data,
-            tx_ref: data.data?.tx_ref || null,
-        });
-
+        return NextResponse.json({ ref, status: finalStatus, rechargeId: rechargeRef.id });
     } catch (err) {
         console.error('[recharge] POST error:', err);
-        return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+        return fail(err.message || 'Server error', 500);
     }
 }

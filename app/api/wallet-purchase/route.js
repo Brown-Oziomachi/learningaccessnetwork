@@ -1,6 +1,7 @@
 import { getAdminDb, admin } from '@/lib/firebase-admin';
 import { NextResponse } from 'next/server';
 import { resolveNegotiatedPrice } from '@/lib/negotiationPricing';
+import { verifyPinWithLockout } from '@/lib/pinLockout'; // your helper's real path
 
 export async function POST(request) {
     try {
@@ -31,6 +32,12 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
+        const pinCheck = await verifyPinWithLockout(userId, pin);
+if (!pinCheck.ok) {
+    const msg = pinCheck.error === 'Set your transfer PIN first.' ? 'PIN_NOT_SET' : pinCheck.error;
+    return NextResponse.json({ error: msg }, { status: pinCheck.status });
+}
+        
         const cleanBookId = bookId.replace('firestore-', '').replace(/\s+/g, '').trim();
         const sanitizedBookId = bookId.replace(/\s+/g, '').trim();
 
@@ -113,16 +120,7 @@ export async function POST(request) {
                 return { errorStatus: 'WALLET_NOT_FOUND', message: 'Your spending wallet profile is not set up.' };
             }
 
-            const buyerWalletData = buyerWalletSnap.data();
-            const storedPin = buyerWalletData.transactionPin || buyerWalletData.transferPin;
-
-            // ── 5. Verify PIN ─────────────────────────────────────────────
-            if (!storedPin) {
-                return { errorStatus: 'PIN_NOT_SET', message: 'PIN_NOT_SET' };
-            }
-            if (pin.toString().trim() !== storedPin.toString().trim()) {
-                return { errorStatus: 'INVALID_PIN', message: 'Incorrect PIN. Please try again.' };
-            }
+           const buyerWalletData = buyerWalletSnap.data();
 
             // ── 6. Check spending capacity ────────────────────────────────
             const currentBuyerBalance = buyerWalletData.accountBalance || 0;

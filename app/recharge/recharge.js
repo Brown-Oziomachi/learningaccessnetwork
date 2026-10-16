@@ -9,8 +9,7 @@ import {
 import Navbar from "@/components/NavBar";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-  doc, getDoc, collection, runTransaction, serverTimestamp,
-  increment, getDocs, query, where, orderBy, limit,
+  doc, getDoc, collection, getDocs, query, where, orderBy, limit,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebaseConfig";
 import { useSearchParams } from "next/navigation";
@@ -177,28 +176,32 @@ function PinInput({ value, onChange, disabled = false, masked = true }) {
 
 /* ─── PIN Confirm Modal (transfer page style) ──────────────────── */
 function PinConfirmModal({ onVerify, onClose }) {
-  const [pin, setPin]       = useState("");
-  const [masked, setMasked] = useState(true);
-  const [error, setError]   = useState("");
+  const [pin, setPin]           = useState("");
+  const [masked, setMasked]     = useState(true);
+  const [error, setError]       = useState("");
   const [attempts, setAttempts] = useState(0);
+  const [checking, setChecking] = useState(false);
   const MAX = 3;
 
-const verify = async (p) => {
+  const verify = async (p) => {
     const target = p || pin;
     if (target.length < 4 || checking) return;
     setChecking(true);
-    const res = await onVerify(target);
-    setChecking(false);
-    if (!res.ok) {
-      setAttempts((a) => a + 1);
-      setPin("");
-      setError(res.error || "Incorrect PIN.");
+    try {
+      const res = await onVerify(target);
+      if (!res.ok) {
+        setAttempts((a) => a + 1);
+        setPin("");
+        setError(res.error || "Incorrect PIN.");
+      }
+    } finally {
+      setChecking(false);
     }
-};
+  };
 
   useEffect(() => {
     if (pin.length === 4 && attempts < MAX) verify(pin);
-  }, [pin]); 
+  }, [pin]);
   const locked = attempts >= MAX;
 
   return (
@@ -226,8 +229,8 @@ const verify = async (p) => {
             {masked ? "Show PIN" : "Hide PIN"}
           </button>
           {!locked && (
-            <button onClick={() => verify(pin)} disabled={pin.length < 4} style={{ ...navyBtn(pin.length < 4), marginTop: "16px" }}>
-              Confirm
+            <button onClick={() => verify(pin)} disabled={pin.length < 4 || checking} style={{ ...navyBtn(pin.length < 4 || checking), marginTop: "16px" }}>
+              {checking ? "Verifying…" : "Confirm"}
             </button>
           )}
           <button onClick={onClose} style={{ width: "100%", marginTop: "8px", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: "11px", fontFamily: "'Lato', sans-serif", padding: "8px" }}>
@@ -289,21 +292,47 @@ function NetworkBtn({ network, selected, onClick }) {
   );
 }
 
-/* ─── Success Screen (transfer page aesthetic) ─────────────────── */
-function SuccessScreen({ type, network, phone, amount, plan, txRef, paymentMethod, onReset, fmt }) {
+/* ─── Success / Processing / Failed Screen ─────────────────────── */
+function SuccessScreen({ type, network, phone, amount, plan, txRef, paymentMethod, onReset, fmt, status, onCheck, checking }) {
   const net = NETWORKS.find((n) => n.id === network);
   const typeLabel = type === "airtime" ? "Airtime" : type === "data" ? "Data Bundle" : type === "electricity" ? "Electricity" : "TV/Cable";
 
+  const pending = status === "pending";
+  const failed = status === "failed";
+
+  const accent = failed ? "#dc2626" : pending ? "#d97706" : "#16a34a";
+  const accentBg = failed ? "rgba(220,38,38,0.06)" : pending ? "rgba(217,119,6,0.06)" : "rgba(22,163,74,0.06)";
+  const accentBorder = failed ? "rgba(220,38,38,0.3)" : pending ? "rgba(217,119,6,0.3)" : "rgba(22,163,74,0.3)";
+
   return (
     <div style={{ ...sectionCard, textAlign: "center", padding: "40px 28px" }}>
-      <div style={{ width: "64px", height: "64px", border: `0.5px solid rgba(22,163,74,0.3)`, background: "rgba(22,163,74,0.06)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-        <CheckCircle2 size={28} style={{ color: "#16a34a" }} />
+      <div style={{ width: "64px", height: "64px", border: `0.5px solid ${accentBorder}`, background: accentBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+        {failed ? (
+          <AlertCircle size={28} style={{ color: accent }} />
+        ) : pending ? (
+          <Loader2 size={28} style={{ color: accent, animation: "spin 1.2s linear infinite" }} />
+        ) : (
+          <CheckCircle2 size={28} style={{ color: accent }} />
+        )}
       </div>
-      <p style={{ ...eyebrow, textAlign: "center" }}>Success</p>
+
+      <p style={{ ...eyebrow, textAlign: "center" }}>
+        {failed ? "Failed" : pending ? "Processing" : "Success"}
+      </p>
       <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: NAVY, marginBottom: "8px" }}>
-        {typeLabel} Purchased!
+        {failed ? `${typeLabel} Failed`
+          : pending ? `${typeLabel} Processing`
+          : `${typeLabel} Purchased!`}
       </h2>
-      <p style={{ fontSize: "13px", color: "#888", marginBottom: "20px" }}>Your request was processed successfully.</p>
+      <p style={{ fontSize: "13px", color: "#888", marginBottom: "20px" }}>
+        {failed
+          ? paymentMethod === "card"
+            ? "The provider could not deliver this. Your card payment was received. Contact support to retry or refund."
+            : "The provider could not deliver this. Your wallet has been refunded."
+          : pending
+            ? "Your request was accepted. You can leave this page. We'll update it in Recent Purchases."
+          : "Your request was processed successfully."}
+      </p>
 
       {/* Payment method badge */}
       <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: CREAM, border: `0.5px solid rgba(184,150,62,0.25)`, padding: "5px 12px", marginBottom: "20px" }}>
@@ -345,6 +374,11 @@ function SuccessScreen({ type, network, phone, amount, plan, txRef, paymentMetho
         )}
       </div>
 
+      {pending && (
+        <button onClick={onCheck} disabled={checking} style={{ ...goldBtn(checking), marginBottom: "10px" }}>
+          {checking ? "Checking…" : "Check status"}
+        </button>
+      )}
       <button onClick={onReset} style={navyBtn(false)}>
         <RefreshCw size={13} /> Make Another Purchase
       </button>
@@ -354,7 +388,7 @@ function SuccessScreen({ type, network, phone, amount, plan, txRef, paymentMetho
 
 /* ─── MAIN RECHARGE CLIENT ─────────────────────────────────────── */
 export default function RechargeClient() {
-      const { fmt } = useCurrency();
+  const { fmt } = useCurrency();
   const searchParams = useSearchParams();
   const [seller, setSeller]   = useState(null);
   const [loading, setLoading] = useState(true);
@@ -369,6 +403,9 @@ export default function RechargeClient() {
   const [airtimeAmount, setAirtimeAmount]     = useState("");
   const [customAmount, setCustomAmount]       = useState("");
   const [selectedPlan, setSelectedPlan]       = useState(null);
+  const [rechargeId, setRechargeId]           = useState("");
+  const [rechargeStatus, setRechargeStatus] = useState("completed");
+  const [checking, setChecking] = useState(false);
 
   const [processing, setProcessing] = useState(false);
   const [error, setError]           = useState("");
@@ -402,7 +439,6 @@ export default function RechargeClient() {
   const [smartcardNumber, setSmartcardNumber]       = useState("");
   const [airtimePlans, setAirtimePlans]             = useState([]);
   const [loadingAirtimePlans, setLoadingAirtimePlans] = useState(false);
- const [checking, setChecking] = useState(false);
 
   /* focus states */
   const [focusPhone, setFocusPhone]   = useState(false);
@@ -416,7 +452,7 @@ export default function RechargeClient() {
     if (t && ["airtime", "data", "electricity", "tv"].includes(t)) setTab(t);
   }, [searchParams]);
 
-useEffect(() => {
+  useEffect(() => {
     if (tab !== "airtime" || !selectedNetwork) return;
     setAirtimePlans([]); setLoadingAirtimePlans(true);
     fetch(`/api/recharge?type=airtime-plans&biller=${selectedNetwork}`)
@@ -455,42 +491,42 @@ useEffect(() => {
       .finally(() => setLoadingPlans(false));
   }, [selectedNetwork, tab]);
 
- useEffect(() => {
-  if (tab === "electricity" && !elecBillersLoaded) {
-    setElecBillersLoaded(true);
-    setLoadingBillers(true);
-    fetch("/api/recharge?type=electricity")
-      .then((r) => r.json())
-      .then((res) =>
-        setElecBillers(
-          (res.billers || []).map((b) => ({
-            biller_code: b.code,
-            biller_id: b.id,
-            biller_name: b.name,
-          }))
+  useEffect(() => {
+    if (tab === "electricity" && !elecBillersLoaded) {
+      setElecBillersLoaded(true);
+      setLoadingBillers(true);
+      fetch("/api/recharge?type=electricity")
+        .then((r) => r.json())
+        .then((res) =>
+          setElecBillers(
+            (res.billers || []).map((b) => ({
+              biller_code: b.code,
+              biller_id: b.id,
+              biller_name: b.name,
+            }))
+          )
         )
-      )
-      .catch(console.error)
-      .finally(() => setLoadingBillers(false));
-  }
-  if (tab === "tv" && !tvBillersLoaded) {
-    setTvBillersLoaded(true);
-    setLoadingBillers(true);
-    fetch("/api/recharge?type=tv")
-      .then((r) => r.json())
-      .then((res) =>
-        setTvBillers(
-          (res.billers || []).map((b) => ({
-            biller_code: b.code,
-            biller_id: b.id,
-            biller_name: b.name,
-          }))
+        .catch(console.error)
+        .finally(() => setLoadingBillers(false));
+    }
+    if (tab === "tv" && !tvBillersLoaded) {
+      setTvBillersLoaded(true);
+      setLoadingBillers(true);
+      fetch("/api/recharge?type=tv")
+        .then((r) => r.json())
+        .then((res) =>
+          setTvBillers(
+            (res.billers || []).map((b) => ({
+              biller_code: b.code,
+              biller_id: b.id,
+              biller_name: b.name,
+            }))
+          )
         )
-      )
-      .catch(console.error)
-      .finally(() => setLoadingBillers(false));
-  }
-}, [tab, elecBillersLoaded, tvBillersLoaded]);
+        .catch(console.error)
+        .finally(() => setLoadingBillers(false));
+    }
+  }, [tab, elecBillersLoaded, tvBillersLoaded]);
 
   useEffect(() => {
     const customerId = tab === "electricity" ? meterNumber : smartcardNumber;
@@ -523,6 +559,25 @@ useEffect(() => {
     return () => unsub();
   }, []);
 
+  /* ── Poll a pending purchase until it settles ── */
+  const checkStatus = async () => {
+    if (!rechargeId || checking) return;
+    setChecking(true);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const r = await fetch(`/api/recharge/status?id=${rechargeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await r.json();
+      if (d.status === "completed" || d.status === "failed") {
+        setRechargeStatus(d.status);
+        const snap = await getDoc(doc(db, "sellers", seller.uid));
+        if (snap.exists()) setSeller({ uid: seller.uid, ...snap.data() });
+        loadRecentRecharges(seller.uid);
+      }
+    } finally { setChecking(false); }
+  };
+
   const loadRecentRecharges = async (uid) => {
     try {
       const q = query(collection(db, "recharges"), where("sellerId", "==", uid), orderBy("createdAt", "desc"), limit(10));
@@ -532,23 +587,26 @@ useEffect(() => {
   };
 
   const requirePin = (action) => { setPinAction(() => action); setShowPinModal(true); };
- const handleVerifyPin = async (entered) => {
+  const handleVerifyPin = async (entered) => {
     try {
-        const token = await auth.currentUser.getIdToken();
-        const r = await fetch("/api/seller/pin/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ pin: entered }),
-        });
-        const d = await r.json();
-        if (d.ok) {
-            setShowPinModal(false);
-            if (pinAction) { pinAction(); setPinAction(null); }
-            return { ok: true };
-        }
-        return { ok: false, error: d.error };
+      const token = await auth.currentUser.getIdToken();
+      const r = await fetch("/api/seller/pin/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ pin: entered }),
+      });
+      const text = await r.text();
+      let d;
+      try { d = JSON.parse(text); }
+      catch { console.error("PIN verify failed:", r.status, text.slice(0, 300)); return { ok: false, error: `Server error (${r.status}). Check the logs.` }; }
+      if (d.ok) {
+        setShowPinModal(false);
+        if (pinAction) { pinAction(); setPinAction(null); }
+        return { ok: true };
+      }
+      return { ok: false, error: d.error };
     } catch { return { ok: false, error: "Could not verify PIN. Try again." }; }
-};
+  };
 
   const finalAmount =
     tab === "airtime"
@@ -571,83 +629,61 @@ useEffect(() => {
 
   const buildPostBody = () => {
     const cleanPhone = phone.replace(/\D/g, "");
-    if (tab === "airtime") return { type: "airtime", phone: cleanPhone, amount: finalAmount, biller_code: NETWORK_BILLER_CODES[selectedNetwork] };
-    if (tab === "data") return { type: "data", network: selectedNetwork, phone: cleanPhone, amount: selectedPlan.price, item_code: selectedPlan.item_code, biller_code: selectedPlan.biller_code, bundle_name: selectedPlan.name };
-    if (tab === "electricity") return { type: "electricity", meter_number: meterNumber, amount: Number(elecAmount), item_code: selectedElecPlan.item_code, biller_code: selectedElecPlan.biller_code };
-    if (tab === "tv") return { type: "tv", smartcard_number: smartcardNumber, amount: selectedTvPlan.price, item_code: selectedTvPlan.item_code, biller_code: selectedTvPlan.biller_code };
+    if (tab === "airtime") return { type: "airtime", network: selectedNetwork, phone: cleanPhone, amount: finalAmount, biller_code: NETWORK_BILLER_CODES[selectedNetwork] };
+    if (tab === "data") return { type: "data", network: selectedNetwork, phone: cleanPhone, amount: selectedPlan.price, item_code: selectedPlan.item_code, biller_code: selectedPlan.biller_code, bundle_name: selectedPlan.name, plan: { name: selectedPlan.name, size: selectedPlan.size } };
+    if (tab === "electricity") return { type: "electricity", meter_number: meterNumber, amount: Number(elecAmount), item_code: selectedElecPlan.item_code, biller_code: selectedElecPlan.biller_code, plan: { name: selectedElecPlan.name } };
+    if (tab === "tv") return { type: "tv", smartcard_number: smartcardNumber, amount: selectedTvPlan.price, item_code: selectedTvPlan.item_code, biller_code: selectedTvPlan.biller_code, plan: { name: selectedTvPlan.name } };
   };
 
-  const callFlutterwaveVTU = async () => {
-    const body = buildPostBody();
-    const res = await fetch("/api/recharge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const submitRecharge = async (extra) => {
+    const token = await auth.currentUser.getIdToken();
+    const res = await fetch("/api/recharge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ...buildPostBody(), ...extra }),
+    });
     const result = await res.json();
-    if (!res.ok) throw new Error(result.error || "Recharge failed");
-    return { ref: result.ref, data: result.data };
+    if (!res.ok) throw new Error(result.error || "Purchase failed");
+    return result;
   };
 
   const processRechargeWallet = async () => {
     setProcessing(true); setError("");
-    const amt = finalAmount; const net = selectedNetwork;
+    const amt = finalAmount;
     try {
-      if (amt > walletBalance) throw new Error(`Insufficient balance. You need ${fmt(amt || 0)}.`);
-
-      const { ref, data: flwData } = await callFlutterwaveVTU();
-      const sellerRef = doc(db, "sellers", seller.uid);
-      const rechargeRef = doc(collection(db, "recharges"));
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(sellerRef);
-        if ((snap.data()?.accountBalance || 0) < amt) throw new Error("Insufficient balance.");
-        tx.update(sellerRef, { accountBalance: increment(-amt), updatedAt: serverTimestamp() });
-        tx.set(rechargeRef, {
-          sellerId: seller.uid,
-          sellerName: seller.businessInfo?.businessName || seller.bankDetails?.accountName || "Unknown",
-          type: tab, network: net, phone: phone.replace(/\D/g, ""), amount: amt,
-          plan: tab === "data" ? selectedPlan : tab === "tv" ? selectedTvPlan : tab === "electricity" ? selectedElecPlan : null,
-          flwReference: ref, flwResponse: flwData, status: "completed", paymentMethod: "wallet", createdAt: serverTimestamp(),
-        });
-      });
-      setSeller((prev) => ({ ...prev, accountBalance: (prev.accountBalance || 0) - amt }));
-      setTxRef(ref); setPaymentMethod("wallet");
-      await loadRecentRecharges(seller.uid);
-      setStep(3);
+      if (amt > walletBalance) throw new Error(`Insufficient balance. You need ${fmt(amt)}.`);
+      const result = await submitRecharge({ paymentMethod: "wallet" });
+      setSeller((p) => ({ ...p, accountBalance: (p.accountBalance || 0) - amt }));
+      setTxRef(result.ref); setPaymentMethod("wallet");
+      setRechargeId(result.rechargeId || ""); setRechargeStatus(result.status || "completed");
+      await loadRecentRecharges(seller.uid); setStep(3);
     } catch (err) { setError(err.message || "Purchase failed. Please try again."); }
     finally { setProcessing(false); }
   };
 
-  const processRechargeCard = async (flwTxRef) => {
+  const processRechargeCard = async (flwTxRef, transactionId) => {
     setProcessing(true); setError("");
-    const amt = finalAmount; const net = selectedNetwork;
     try {
-      const verifyRes = await fetch(`/api/recharge/verify-payment?tx_ref=${flwTxRef}&amount=${amt}`);
-      const verifyResult = await verifyRes.json();
-      if (!verifyRes.ok || !verifyResult.verified) throw new Error(verifyResult.error || "Payment verification failed.");
-      const { ref, data: flwData } = await callFlutterwaveVTU();
-      const rechargeRef = doc(collection(db, "recharges"));
-      await runTransaction(db, async (tx) => {
-        tx.set(rechargeRef, {
-          sellerId: seller.uid,
-          sellerName: seller.businessInfo?.businessName || seller.bankDetails?.accountName || "Unknown",
-          type: tab, network: net, phone: phone.replace(/\D/g, ""), amount: amt,
-          plan: tab === "data" ? selectedPlan : tab === "tv" ? selectedTvPlan : tab === "electricity" ? selectedElecPlan : null,
-          flwReference: ref, flwResponse: flwData, status: "completed", paymentMethod: "card", cardTxRef: flwTxRef, createdAt: serverTimestamp(),
-        });
-      });
-      setTxRef(ref); setPaymentMethod("card");
+      const result = await submitRecharge({ paymentMethod: "card", txRef: flwTxRef, transactionId });
+      setTxRef(result.ref); setPaymentMethod("card");
+      setRechargeId(result.rechargeId || ""); setRechargeStatus(result.status || "completed");
       await loadRecentRecharges(seller.uid); setStep(3);
-    } catch (err) { setError(err.message || "Purchase failed after card payment. Please contact support with ref: " + flwTxRef); }
+    } catch (err) { setError(err.message); }
     finally { setProcessing(false); }
   };
 
   const payWithCard = () => {
     if (typeof window === "undefined" || !window.FlutterwaveCheckout) { setError("Payment widget not loaded. Please refresh."); return; }
     const ref = "LAN_CARD_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7).toUpperCase();
-    window.FlutterwaveCheckout({
+    const modal = window.FlutterwaveCheckout({
       public_key: process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY,
       tx_ref: ref, amount: finalAmount, currency: "NGN", payment_options: "card",
       customer: { email: seller?.email || "customer@example.com", name: seller?.bankDetails?.accountName || seller?.businessInfo?.businessName || "Customer" },
       customizations: { title: "LAN Recharge", description: `${tab.charAt(0).toUpperCase() + tab.slice(1)} purchase`, logo: "/lanlog.png" },
       callback: (response) => {
-        if (response.status === "successful" || response.status === "completed") processRechargeCard(response.transaction_id?.toString() || ref);
+        modal.close();
+        if (response.status === "successful" || response.status === "completed")
+          processRechargeCard(ref, response.transaction_id);
         else setError("Card payment was not completed. Please try again.");
       },
       onclose: () => {},
@@ -660,6 +696,7 @@ useEffect(() => {
     setSelectedNetwork(null); setAirtimeAmount(""); setCustomAmount(""); setSelectedPlan(null);
     setSelectedElecBiller(null); setElecPlans([]); setSelectedElecPlan(null); setMeterNumber(""); setElecAmount("");
     setSelectedTvBiller(null); setTvPlans([]); setSelectedTvPlan(null); setSmartcardNumber("");
+    setRechargeId(""); setRechargeStatus("completed");
   };
   const switchTab = (id) => {
     setTab(id); clearCommonFields(); setSelectedNetwork(null); setAirtimePlans([]); setSelectedPlan(null);
@@ -719,8 +756,6 @@ useEffect(() => {
     { id: "tv", label: "TV/Cable", icon: <Tv size={13} /> },
   ];
 
-  const tabIcons = { airtime: <Smartphone size={13} />, data: <Wifi size={13} />, electricity: <Zap size={13} />, tv: <Tv size={13} /> };
-
   /* ─── helper: biller select button ──────────────────── */
   const BillerBtn = ({ label: lbl, selected, onClick }) => (
     <button onClick={onClick} style={{
@@ -769,7 +804,7 @@ useEffect(() => {
 
         <main style={{ maxWidth: "1100px", margin: "0 auto", padding: "0" }}>
 
-          {/* ── HERO (identical to transfer page) ── */}
+          {/* ── HERO ── */}
           <section style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.07) 1px,transparent 1px),radial-gradient(rgba(255,255,255,0.025) 1px,transparent 1px)", backgroundSize: "28px 28px,14px 14px", backgroundPosition: "0 0,7px 7px", padding: "40px 24px 0" }}>
             <div style={{ maxWidth: "1060px", margin: "0 auto" }}>
               <p style={{ ...eyebrow, color: GOLDD }}>LAN Wallet · VTU Services</p>
@@ -800,7 +835,11 @@ useEffect(() => {
               <div style={{ marginBottom: "24px" }}>
                 <p style={eyebrow}>Services</p>
                 <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(20px,3vw,30px)", fontWeight: 700, color: NAVY, margin: 0 }}>
-                  {step === 1 ? "Buy Airtime & Data" : step === 2 ? "Confirm Purchase" : "Purchase Successful"}
+                  {step === 1 ? "Buy Airtime & Data"
+                    : step === 2 ? "Confirm Purchase"
+                    : rechargeStatus === "pending" ? "Purchase Processing"
+                    : rechargeStatus === "failed" ? "Purchase Failed"
+                    : "Purchase Successful"}
                 </h2>
               </div>
 
@@ -808,7 +847,6 @@ useEffect(() => {
 
                 {/* ── LEFT SIDEBAR ── */}
                 <div>
-                  {/* Account box — dark navy, identical to transfer page */}
                   <div style={{ background: NAVY, backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", padding: "22px", marginBottom: "14px" }}>
                     <p style={{ ...eyebrow, color: "rgba(184,150,62,0.75)", marginBottom: "14px" }}>Your LAN Account</p>
                     <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "15px", fontWeight: 700, color: "#fff", marginBottom: "4px" }}>{sellerName}</p>
@@ -825,7 +863,7 @@ useEffect(() => {
                   <div style={{ background: "#fff", border: `0.5px solid #e5ddd0`, padding: "18px", marginBottom: "14px" }}>
                     <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "14px", fontWeight: 700, color: NAVY, marginBottom: "14px" }}>Quick Tips</p>
                     {[
-                      [<Signal size={11} />, "All purchases are instant and non-refundable"],
+                      [<Signal size={11} />, "All purchases are non-refundable once delivered"],
                       [<Wallet size={11} />, "Pay from wallet or directly with your card"],
                       [<Lock size={11} />, "Wallet payments require your PIN"],
                       [<Receipt size={11} />, "Transactions are saved to your history"],
@@ -844,6 +882,8 @@ useEffect(() => {
                       {recentRecharges.slice(0, 5).map((r) => {
                         const net = NETWORKS.find((n) => n.id === r.network);
                         const icon = r.type === "tv" ? <Tv size={11} /> : r.type === "electricity" ? <Zap size={11} /> : r.type === "data" ? <Wifi size={11} /> : <Smartphone size={11} />;
+                        const isPending = r.status === "pending" || r.status === "needs_review";
+                        const isFailed = r.status === "failed";
                         return (
                           <div key={r.id} className="txn-row">
                             <div style={{ width: "28px", height: "28px", background: CREAM, border: `0.5px solid rgba(184,150,62,0.2)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: GOLD }}>
@@ -856,9 +896,11 @@ useEffect(() => {
                               <p style={{ fontSize: "9px", color: "#aaa", margin: 0, fontFamily: "monospace" }}>
                                 {r.type === "data" ? r.plan?.size : r.type === "tv" ? "TV/Cable" : r.type === "electricity" ? "Electricity" : "Airtime"}
                                 {" · "}{r.paymentMethod === "card" ? "Card" : "Wallet"}
+                                {isPending && <span style={{ color: "#d97706", fontWeight: 700 }}>{" · Pending"}</span>}
+                                {isFailed && <span style={{ color: "#dc2626", fontWeight: 700 }}>{" · Failed"}</span>}
                               </p>
                             </div>
-                            <p style={{ fontSize: "11px", fontWeight: 700, color: "#dc2626", flexShrink: 0 }}>
+                            <p style={{ fontSize: "11px", fontWeight: 700, color: isFailed ? "#aaa" : "#dc2626", flexShrink: 0, textDecoration: isFailed ? "line-through" : "none" }}>
                               -{fmt(r.amount || 0)}
                             </p>
                           </div>
@@ -874,7 +916,7 @@ useEffect(() => {
                   {/* STEP 1 */}
                   {step === 1 && (
                     <div className="anim">
-                      {/* Tab bar — sharp corners, transfer page style */}
+                      {/* Tab bar */}
                       <div style={{ display: "flex", background: "#fff", border: `0.5px solid #e5ddd0`, marginBottom: "0", overflow: "hidden" }}>
                         {tabs.map((t) => (
                           <button
@@ -1041,7 +1083,7 @@ useEffect(() => {
                                         price={plan.price}
                                         selected={selectedPlan?.id === plan.id}
                                         onClick={() => setSelectedPlan(plan)}
-                                        fmt={fmt}   // ← ADD THIS
+                                        fmt={fmt}
                                       />
                                     ))}
                                   </div>
@@ -1063,18 +1105,17 @@ useEffect(() => {
                                 </div>
                               ) : (
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-                                 {elecBillers.map((b) => (
-                                  <BillerBtn
-                                    key={b.biller_code}
-                                    label={b.biller_name}
-                                    selected={selectedElecBiller === b.biller_code}
-onClick={() => {
-  console.log('Elec biller selected:', b);
-  setSelectedElecBiller(b.biller_code);
-  fetchElecPlans(b.biller_id);
-}}
-                                  />
-                                ))}
+                                  {elecBillers.map((b) => (
+                                    <BillerBtn
+                                      key={b.biller_code}
+                                      label={b.biller_name}
+                                      selected={selectedElecBiller === b.biller_code}
+                                      onClick={() => {
+                                        setSelectedElecBiller(b.biller_code);
+                                        fetchElecPlans(b.biller_id);
+                                      }}
+                                    />
+                                  ))}
                                 </div>
                               )}
                             </div>
@@ -1137,12 +1178,12 @@ onClick={() => {
                             </div>
 
                             <div style={{ marginBottom: "18px" }}>
-                            <label style={label}>Amount ({fmt(1).replace(/[\d,\.]+/, "").trim() || "₦"})</label>
+                              <label style={label}>Amount ({fmt(1).replace(/[\d,\.]+/, "").trim() || "₦"})</label>
                               <div style={{ position: "relative" }}>
                                 <span style={{ position: "absolute", left: "13px", top: "50%", transform: "translateY(-50%)", color: "#aaa", fontWeight: 700, fontSize: "14px" }}>₦</span>
                                 <input
                                   type="number"
-                                  placeholder={`Min ${fmt(500)}`}                                 
+                                  placeholder={`Min ${fmt(500)}`}
                                   value={elecAmount}
                                   onFocus={() => setFocusElecAmt(true)}
                                   onBlur={() => setFocusElecAmt(false)}
@@ -1166,17 +1207,17 @@ onClick={() => {
                                 </div>
                               ) : (
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
-                               {tvBillers.map((b) => (
-                                  <BillerBtn
-                                    key={b.biller_code}
-                                    label={b.biller_name}
-                                    selected={selectedTvBiller === b.biller_code}
-onClick={() => {
-  console.log('TV biller selected:', b);
-  setSelectedTvBiller(b.biller_code);
-  fetchTvPlans(b.biller_id);
-}}                                  />
-                                ))}
+                                  {tvBillers.map((b) => (
+                                    <BillerBtn
+                                      key={b.biller_code}
+                                      label={b.biller_name}
+                                      selected={selectedTvBiller === b.biller_code}
+                                      onClick={() => {
+                                        setSelectedTvBiller(b.biller_code);
+                                        fetchTvPlans(b.biller_id);
+                                      }}
+                                    />
+                                  ))}
                                 </div>
                               )}
                             </div>
@@ -1231,7 +1272,7 @@ onClick={() => {
                                         price={plan.price}
                                         selected={selectedTvPlan?.id === plan.id}
                                         onClick={() => setSelectedTvPlan(plan)}
-                                        fmt={fmt}   // ← ADD THIS
+                                        fmt={fmt}
                                       />
                                     ))}
                                   </div>
@@ -1397,8 +1438,8 @@ onClick={() => {
                         <div>
                           <div style={{ background: CREAM, border: `0.5px solid rgba(184,150,62,0.25)`, padding: "10px 14px", marginBottom: "10px" }}>
                             <p style={{ fontSize: "11px", color: "#8a6d1e", textAlign: "center", margin: 0, lineHeight: 1.6 }}>
-                                Your wallet balance ({fmt(walletBalance)}) is insufficient.
-                                Pay {fmt(finalAmount)} directly with your card.
+                              Your wallet balance ({fmt(walletBalance)}) is insufficient.
+                              Pay {fmt(finalAmount)} directly with your card.
                             </p>
                           </div>
                           <button onClick={payWithCard} disabled={processing} style={goldBtn(processing)}>
@@ -1412,14 +1453,17 @@ onClick={() => {
                     </div>
                   )}
 
-                  {/* STEP 3 — Success */}
+                  {/* STEP 3 — Success / Processing / Failed */}
                   {step === 3 && (
-                   <SuccessScreen
-                    type={tab} network={selectedNetwork} phone={phone} amount={finalAmount}
-                    plan={tab === "data" ? selectedPlan : tab === "tv" ? selectedTvPlan : tab === "electricity" ? selectedElecPlan : null}
-                    txRef={txRef} paymentMethod={paymentMethod} onReset={resetForm}
-                    fmt={fmt}
-                  />
+                    <SuccessScreen
+                      type={tab} network={selectedNetwork} phone={phone} amount={finalAmount}
+                      plan={tab === "data" ? selectedPlan : tab === "tv" ? selectedTvPlan : tab === "electricity" ? selectedElecPlan : null}
+                      txRef={txRef} paymentMethod={paymentMethod} onReset={resetForm}
+                      fmt={fmt}
+                      status={rechargeStatus}
+                      onCheck={checkStatus}
+                      checking={checking}
+                    />
                   )}
 
                 </div>
