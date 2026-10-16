@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import { verifyPinWithLockout } from "@/lib/pinLockout"; // ← use your helper's real file name
+import { verifyPinWithLockout } from "@/lib/pinGuard";
 
 const FEE = 50;
 const PLATFORM = "LAN_LIBRARY_PLATFORM";

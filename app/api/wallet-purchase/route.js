@@ -1,7 +1,7 @@
 import { getAdminDb, admin } from '@/lib/firebase-admin';
 import { NextResponse } from 'next/server';
 import { resolveNegotiatedPrice } from '@/lib/negotiationPricing';
-import { verifyPinWithLockout } from '@/lib/pinLockout'; // your helper's real path
+import { verifyPinWithLockout } from '@/lib/pinGuard';
 
 export async function POST(request) {
     try {
@@ -33,11 +33,11 @@ export async function POST(request) {
         }
 
         const pinCheck = await verifyPinWithLockout(userId, pin);
-if (!pinCheck.ok) {
-    const msg = pinCheck.error === 'Set your transfer PIN first.' ? 'PIN_NOT_SET' : pinCheck.error;
-    return NextResponse.json({ error: msg }, { status: pinCheck.status });
-}
-        
+        if (!pinCheck.ok) {
+            const msg = pinCheck.error === 'Set your transfer PIN first.' ? 'PIN_NOT_SET' : pinCheck.error;
+            return NextResponse.json({ error: msg }, { status: pinCheck.status });
+        }
+
         const cleanBookId = bookId.replace('firestore-', '').replace(/\s+/g, '').trim();
         const sanitizedBookId = bookId.replace(/\s+/g, '').trim();
 
@@ -81,7 +81,7 @@ if (!pinCheck.ok) {
                 return { errorStatus: 'BOOK_NOT_FOUND', message: 'The requested book could not be found.' };
             }
 
-           
+
             // 🔒 SECURITY FIX: Override client-passed price completely. Use verified database value.
             const bookRecord = bookSnap.data();
 
@@ -120,7 +120,7 @@ if (!pinCheck.ok) {
                 return { errorStatus: 'WALLET_NOT_FOUND', message: 'Your spending wallet profile is not set up.' };
             }
 
-           const buyerWalletData = buyerWalletSnap.data();
+            const buyerWalletData = buyerWalletSnap.data();
 
             // ── 6. Check spending capacity ────────────────────────────────
             const currentBuyerBalance = buyerWalletData.accountBalance || 0;
