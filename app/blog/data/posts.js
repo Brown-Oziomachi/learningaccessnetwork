@@ -15,14 +15,7 @@ export const CATEGORIES = [
   { name: "Student Skills", blurb: "Digital skills and entrepreneurship for students." },
 ];
 
-// Every post automatically gets a cover image at /blog/<slug>.png
-const withImage = (p) => ({
-  ...p,
-  image: `/blog/${p.slug}.png`,
-  imageAlt: `Cover image for the article: ${p.title}`,
-});
-
-export const posts = [...earnPosts].map(withImage);
+export const posts = [...earnPosts];
 
 export const getPost = (slug) => posts.find((p) => p.slug === slug) || null;
 

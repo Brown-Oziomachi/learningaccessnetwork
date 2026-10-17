@@ -1,17 +1,19 @@
+// app/blog/page.js
 import Link from "next/link";
 import Navbar from "@/components/NavBar";
+import BlogCover from "./BlogCover";
 import { posts, CATEGORIES, SITE } from "./data/posts";
-
-const NAVY = "#0d2244";
-const GOLD = "#b8963e";
+import "./blog.css";
 
 export const metadata = {
     title: "LAN Library Blog | Study Smarter, Earn From Knowledge",
-    description: "Study tips, guides on selling academic materials, and resources for students, sellers and lecturers in Nigeria.",
+    description:
+        "Study tips, guides on selling academic materials, and resources for students, sellers and lecturers in Nigeria.",
     alternates: { canonical: `${SITE}/blog` },
     openGraph: {
         title: "LAN Library Blog",
-        description: "Study tips, guides on selling academic materials, and resources for students, sellers and lecturers.",
+        description:
+            "Study tips, guides on selling academic materials, and resources for students, sellers and lecturers.",
         url: `${SITE}/blog`,
         type: "website",
     },
@@ -20,59 +22,138 @@ export const metadata = {
 const fmtDate = (d) =>
     new Date(d).toLocaleDateString("en-NG", { year: "numeric", month: "long", day: "numeric" });
 
-export default function BlogHome() {
-    return (
-        <div style={{ background: "#f5f1ea", minHeight: "100vh", fontFamily: "'Lato', sans-serif" }}>
-            <Navbar />
-            <main style={{ maxWidth: 1000, margin: "0 auto", padding: "40px 20px 64px" }}>
-                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: GOLD, margin: "0 0 6px" }}>
-                    LAN Library Blog
-                </p>
-                <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(28px,5vw,42px)", color: NAVY, margin: "0 0 8px" }}>
-                    Knowledge should create opportunities.
-                </h1>
-                <p style={{ fontSize: 15, color: "#666", maxWidth: 560, lineHeight: 1.7, margin: "0 0 36px" }}>
-                    Learn how to study smarter, share what you know responsibly, and find resources for your courses.
-                </p>
+const catId = (name) =>
+    "cat-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
-                {CATEGORIES.map((cat) => {
-                    const list = posts.filter((p) => p.category === cat.name);
-                    if (list.length === 0) return null;
-                    return (
-                        <section key={cat.name} style={{ marginBottom: 40 }}>
-                            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: NAVY, margin: "0 0 4px" }}>{cat.name}</h2>
-                            <p style={{ fontSize: 13, color: "#888", margin: "0 0 14px" }}>{cat.blurb}</p>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))", gap: 16 }}>
-                                {list.map((p) => (
-                                    <Link
-                                        key={p.slug}
-                                        href={`/blog/${p.slug}`}
-                                        style={{ display: "block", background: "#fff", border: "0.5px solid #e5ddd0", textDecoration: "none", overflow: "hidden" }}
-                                    >
-                                        <img
-                                            src={p.image}
-                                            alt={p.imageAlt}
-                                            width={1200}
-                                            height={630}
-                                            loading="lazy"
-                                            style={{ width: "100%", height: "auto", display: "block" }}
-                                        />
-                                        <div style={{ padding: 18 }}>
-                                            <p style={{ fontSize: 10, color: GOLD, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 8px" }}>
-                                                {fmtDate(p.date)} &middot; {p.readTime}
-                                            </p>
-                                            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: NAVY, lineHeight: 1.3, margin: "0 0 8px" }}>
-                                                {p.title}
-                                            </h3>
-                                            <p style={{ fontSize: 13, color: "#777", lineHeight: 1.6, margin: 0 }}>{p.description}</p>
-                                        </div>
-                                    </Link>
-                                ))}
-                            </div>
-                        </section>
-                    );
-                })}
+const AUDIENCES = [
+    {
+        tag: "For students",
+        title: "Find study materials",
+        text: "Browse notes, study guides and documents from sellers and lecturers across the library.",
+        label: "Browse documents",
+        href: "/documents",
+    },
+    {
+        tag: "For sellers",
+        title: "Share what you know",
+        text: "Turn your original notes and guides into digital products on the LAN Library Seller Network.",
+        label: "Join the Seller Network",
+        href: "/seller/network",
+    },
+    {
+        tag: "For lecturers",
+        title: "Reach more learners",
+        text: "Publish your course materials and build your academic profile through the Faculty Network.",
+        label: "Explore the Faculty Network",
+        href: "/faculty/network",
+    },
+];
+
+function PostCard({ p }) {
+    return (
+        <Link href={`/blog/${p.slug}`} className="lb-card">
+            <BlogCover category={p.category} seed={p.slug} />
+            <div className="lb-card-body">
+                <p className="lb-card-meta">
+                    {fmtDate(p.date)} &middot; {p.readTime}
+                </p>
+                <h3 className="lb-card-title">{p.title}</h3>
+                <p className="lb-card-desc">{p.description}</p>
+                <span className="lb-card-more">
+                    Read article <span aria-hidden="true">&rarr;</span>
+                </span>
+            </div>
+        </Link>
+    );
+}
+
+export default function BlogHome() {
+    const featured = posts[0];
+    const rest = posts.slice(1);
+    const sections = CATEGORIES.map((c) => ({
+        ...c,
+        list: rest.filter((p) => p.category === c.name),
+    })).filter((s) => s.list.length > 0);
+
+    return (
+        <div className="lb-root">
+            <Navbar />
+
+            <header className="lb-hero">
+                <div className="lb-wrap">
+                    <p className="lb-eyebrow">LAN Library Blog</p>
+                    <h1 className="lb-h1">
+                        Knowledge should create <em>opportunities.</em>
+                    </h1>
+                    <p className="lb-sub">
+                        Learn how to study smarter, share what you know responsibly, and find resources for
+                        your courses.
+                    </p>
+                    <div className="lb-pills">
+                        <Link href="/documents" className="lb-pill">I am a student</Link>
+                        <Link href="/seller/network" className="lb-pill lb-pill-gold">I want to sell</Link>
+                        <Link href="/faculty/network" className="lb-pill">I am a lecturer</Link>
+                    </div>
+                </div>
+            </header>
+
+            <main className="lb-wrap">
+                {featured && (
+                    <Link href={`/blog/${featured.slug}`} className="lb-feature">
+                        <BlogCover category={featured.category} seed={featured.slug} />
+                        <div className="lb-feat-body">
+                            <span className="lb-badge">Featured guide</span>
+                            <h2 className="lb-feat-title">{featured.title}</h2>
+                            <p className="lb-feat-desc">{featured.description}</p>
+                            <p className="lb-card-meta">
+                                {fmtDate(featured.date)} &middot; {featured.readTime}
+                            </p>
+                            <span className="lb-card-more">
+                                Read the guide <span aria-hidden="true">&rarr;</span>
+                            </span>
+                        </div>
+                    </Link>
+                )}
+
+                {sections.length > 1 && (
+                    <nav className="lb-catnav" aria-label="Blog sections">
+                        {sections.map((s) => (
+                            <a key={s.name} href={`#${catId(s.name)}`}>{s.name}</a>
+                        ))}
+                    </nav>
+                )}
+
+                {sections.map((s) => (
+                    <section key={s.name} id={catId(s.name)} className="lb-section">
+                        <div className="lb-sec-head">
+                            <h2 className="lb-sec-title">{s.name}</h2>
+                            <p className="lb-sec-blurb">{s.blurb}</p>
+                        </div>
+                        <div className="lb-grid">
+                            {s.list.map((p) => (
+                                <PostCard key={p.slug} p={p} />
+                            ))}
+                        </div>
+                    </section>
+                ))}
             </main>
+
+            <section className="lb-aud">
+                <div className="lb-wrap">
+                    <h2 className="lb-aud-title">Where do you want to start?</h2>
+                    <p className="lb-aud-sub">One library, three ways to take part.</p>
+                    <div className="lb-aud-grid">
+                        {AUDIENCES.map((a) => (
+                            <div key={a.tag} className="lb-aud-card">
+                                <p className="lb-aud-tag">{a.tag}</p>
+                                <h3>{a.title}</h3>
+                                <p>{a.text}</p>
+                                <Link href={a.href}>{a.label}</Link>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
         </div>
     );
 }
