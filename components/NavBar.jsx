@@ -104,6 +104,13 @@ const SAVED_MENU_ITEMS = [
     href: "/docs",
     color: GOLD,
   },
+   {
+    icon: Bookmark,
+    label: "Blog",
+    description: "Explore our blog and learn everything you need to know about LAN Library",
+    href: "/blog",
+    color: GOLD,
+  },
   {
     icon: Bookmark,
     label: "Saved Books",

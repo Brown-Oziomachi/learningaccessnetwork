@@ -515,8 +515,6 @@ export default function SellersClient() {
     const sentinelRef = useRef(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [reportTarget, setReportTarget] = useState(null);
-    const [totalCount, setTotalCount] = useState(0);
-    const [verifiedCount, setVerifiedCount] = useState(0);
 
     const PAGE_SIZE = 12;
 
@@ -526,19 +524,7 @@ export default function SellersClient() {
         s.role === "faculty" ||
         ["Dr.", "Prof.", "Engr.", "Pharm.", "Barr.", "Lecturer"].includes(s.title);
 
-    const fetchCounts = async () => {
-        try {
-            const countSnap = await getDocs(
-                query(collection(db, "sellers"), where("isLecturer", "!=", true))
-            );
-            const nonFaculty = countSnap.docs.filter((d) => !isFacultyDoc(d.data()));
-            setTotalCount(nonFaculty.length);
-            setVerifiedCount(nonFaculty.length);
-        } catch (e) {
-            console.error("Count fetch failed:", e);
-        }
-    };
-
+  
     const navigateToProfile = (seller) => {
         if (seller.slug) {
             router.push(`/profile/${seller.slug}`);
@@ -563,6 +549,9 @@ export default function SellersClient() {
                     const userSnap = await getDoc(doc(db, "users", seller.uid));
                     if (!userSnap.exists()) return null;
                     const u = userSnap.data();
+
+                    // Only real sellers are listed
+                    if (u.isSeller !== true) return null;
 
                     const photo =
                         u.photoURL || u.photoBase64 || seller.photoBase64 || seller.photoURL || null;
@@ -605,19 +594,30 @@ export default function SellersClient() {
         if (loadingMore) return;
         cursor ? setLoadingMore(true) : setLoading(true);
         try {
-            let q = query(collection(db, "sellers"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
-            if (cursor) q = query(q, startAfter(cursor));
+            let cur = cursor;
+            let collected = [];
+            let more = true;
 
-            const snapshot = await getDocs(q);
-            const sellerDocs = snapshot.docs
-                .map((d) => ({ uid: d.id, ...d.data() }))
-                .filter((s) => !isFacultyDoc(s));
+            // Keep reading until we have a full page of real sellers (or run out of docs)
+            while (collected.length < PAGE_SIZE && more) {
+                let q = query(collection(db, "sellers"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
+                if (cur) q = query(q, startAfter(cur));
 
-            if (snapshot.docs.length < PAGE_SIZE) setHasMore(false);
+                const snapshot = await getDocs(q);
+                if (snapshot.docs.length < PAGE_SIZE) more = false;
+                if (snapshot.docs.length) cur = snapshot.docs[snapshot.docs.length - 1];
 
-            const enriched = await enrichSellers(sellerDocs);
-            setSellers((prev) => (cursor ? [...prev, ...enriched] : enriched));
-            setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+                const sellerDocs = snapshot.docs
+                    .map((d) => ({ uid: d.id, ...d.data() }))
+                    .filter((s) => !isFacultyDoc(s));
+
+                const enriched = await enrichSellers(sellerDocs);
+                collected = [...collected, ...enriched];
+            }
+
+            setHasMore(more);
+            setSellers((prev) => (cursor ? [...prev, ...collected] : collected));
+            setLastDoc(cur);
         } catch (e) {
             console.error("Error loading sellers:", e);
         } finally {
@@ -626,7 +626,6 @@ export default function SellersClient() {
     };
 
     useEffect(() => {
-        fetchCounts();
         fetchPage();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -850,8 +849,7 @@ export default function SellersClient() {
                                         lineHeight: 1.7,
                                     }}
                                 >
-                                    {totalCount || sellers.length} document sellers. Browse, connect and report.
-                                </p>
+                                    {sellers.length}{hasMore ? "+" : ""} document sellers. Browse, connect and report.                                </p>
                             </div>
 
                             <div style={{ position: "relative", width: "clamp(240px, 40vw, 360px)", flexShrink: 0 }}>
@@ -905,8 +903,8 @@ export default function SellersClient() {
                             }}
                         >
                             {[
-                                { val: totalCount || sellers.length, label: "Sellers" },
-                                { val: verifiedCount || sellers.length, label: "Verified" },
+                                { val: `${sellers.length}${hasMore ? "+" : ""}`, label: "Sellers" },
+                                { val: sellers.filter((s) => s.isVerifiedSeller).length, label: "Verified" },
                                 { val: sellers.filter((s) => (s.booksSold || 0) > 0).length, label: "Active" },
                             ].map(({ val, label }) => (
                                 <div

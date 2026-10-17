@@ -24,6 +24,7 @@ import PromotionsAdminSection from './promotions-admin-section/page';
 import TrafficAnalyticsSection from './trafficAnalyticsSection/page';
 import PrintLicenseLedger from './printLicenseLedger/Page';
 import SellerReportsSection from './sellerReportsSection/page';
+import NewsletterSubscribersSection from './newsletterSubscribersSection/page';
 import { getCountFromServer, getAggregateFromServer, sum } from 'firebase/firestore';
 import { paidVerificationActive } from '@/components/seller/Verification';
 
@@ -389,7 +390,8 @@ const NAV_SECTIONS = [
       { id: 'support', icon: MessageSquare, label: 'Support', badgeKey: 'openTickets', badgeType: 'danger' },
       { id: 'reports', icon: Flag, label: 'Reports', badgeKey: 'pendingReports', badgeType: 'danger' },
       { id: "seller-reports", icon: Shield, label: "Seller Reports", badgeKey: "pendingSellerReports", badgeType: "danger" },
-      { id: 'verification', icon: ShieldCheck, label: 'Seller Verification' },
+            { id: 'verification', icon: ShieldCheck, label: 'Seller Verification' },
+      { id: 'newsletter', icon: Send, label: 'Newsletter' },
     ]
   },
   {
@@ -3184,6 +3186,18 @@ export default function ComprehensiveAdminPanel() {
   </div>
 )}
 
+
+          {activeSection === 'newsletter' && (
+            <div>
+              <div className="section-header">
+                <div>
+                  <div className="section-title"><Send size={18} />Newsletter Subscribers</div>
+                  <div className="section-sub">Emails collected from the site footer — export to Substack</div>
+                </div>
+              </div>
+              <NewsletterSubscribersSection />
+            </div>
+          )}
 
           {activeSection === 'promotions' && (
             <div>

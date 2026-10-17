@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
 const NAVY = "#0d2244";
@@ -84,7 +84,7 @@ const FOOTER_COLUMNS = [
       { label: "Terms of Service", href: "/lan/terms-of-service" },
       { label: "User Agreement", href: "/user-agreement=lib" },
       { label: "Author Development Series", href: "/writers-mindset" },
-            { label: "Blog", href: "/blog" },
+      { label: "Blog", href: "/blog" },
 
     ],
   },
@@ -110,7 +110,31 @@ export default function Footer() {
   const [checkingSeller, setCheckingSeller] = useState(true);
   const [isSeller, setIsSeller] = useState(false);
   const [user, setUser] = useState(null);
-  const router = useRouter();
+   const router = useRouter();
+
+  const [email, setEmail] = useState("");
+  const [subStatus, setSubStatus] = useState("idle"); // idle | loading | success | exists | error
+
+  const handleSubscribe = async () => {
+    const clean = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+      setSubStatus("error");
+      return;
+    }
+    try {
+      setSubStatus("loading");
+      await setDoc(doc(db, "newsletter_subscribers", clean), {
+        email: clean,
+        source: "footer",
+        createdAt: serverTimestamp(),
+      });
+      setSubStatus("success");
+      setEmail("");
+    } catch (err) {
+      // rules allow create only, so a duplicate comes back as permission-denied
+      setSubStatus(err?.code === "permission-denied" ? "exists" : "error");
+    }
+  };
 
   const checkSellerStatus = async (userId) => {
     try {
@@ -468,9 +492,14 @@ export default function Footer() {
                 e.currentTarget.style.borderColor = "rgba(184,150,62,0.4)";
               }}
             >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/>
-          </svg>
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z" />
+              </svg>
             </a>
           </div>
 
@@ -491,6 +520,12 @@ export default function Footer() {
             <div style={{ display: "flex", gap: 8 }}>
               <input
                 type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (subStatus !== "idle") setSubStatus("idle");
+                }}
+                onKeyDown={(e) => e.key === "Enter" && handleSubscribe()}
                 placeholder="Enter your email"
                 style={{
                   flex: 1,
@@ -505,6 +540,8 @@ export default function Footer() {
                 }}
               />
               <button
+                onClick={handleSubscribe}
+                disabled={subStatus === "loading"}
                 style={{
                   background: GOLD,
                   color: NAVY,
@@ -520,11 +557,28 @@ export default function Footer() {
                 onMouseEnter={(e) => (e.currentTarget.style.background = GOLDD)}
                 onMouseLeave={(e) => (e.currentTarget.style.background = GOLD)}
               >
-                Subscribe
+                {subStatus === "loading" ? "Saving…" : "Subscribe"}
               </button>
             </div>
-            <p style={{ fontSize: 11, color: "#6b5a35", marginTop: 6 }}>
-              Get the latest books and updates delivered to your inbox
+            <p
+              style={{
+                fontSize: 11,
+                marginTop: 6,
+                color:
+                  subStatus === "success"
+                    ? "#22c55e"
+                    : subStatus === "error"
+                      ? "#ef4444"
+                      : "#6b5a35",
+              }}
+            >
+              {subStatus === "success"
+                ? "Thanks for subscribing!"
+                : subStatus === "exists"
+                  ? "You're already subscribed."
+                  : subStatus === "error"
+                    ? "Please enter a valid email and try again."
+                    : "Get the latest books and updates delivered to your inbox"}
             </p>
           </div>
         </div>
