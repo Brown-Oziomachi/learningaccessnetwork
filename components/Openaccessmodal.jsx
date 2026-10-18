@@ -402,7 +402,7 @@ export default function OpenAccessModal({
                 </a>
               </div>
             </>
-          )}
+          )}b
         </div>
       </div>
     </>

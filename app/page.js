@@ -247,6 +247,7 @@ const FOOTER_COLUMNS = [
     heading: "Company",
     links: [
       { label: "About LAN", href: "/about/lan" },
+      { label: "Blog", href: "/blog" },
       { label: "Ask Educo", href: "/students/ai-tutor" },
       { label: "LAN Shift", href: "/seller/lan-shift" },
       { label: "Help Centre", href: "/lan/net/help-center" },
