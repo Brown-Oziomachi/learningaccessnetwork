@@ -5,17 +5,18 @@ import { collection, query, where, orderBy, limit, getDocs, getCountFromServer, 
 import { db } from "@/lib/firebaseConfig";
 import Navbar from "@/components/NavBar";
 import Footer from "@/components/FooterComp";
+import BookTile, { BOOK_GRID_CSS } from "@/components/BookTile";
 
 /* ─── colour tokens ─────────────────────────────────────────── */
-const NAVY  = "#0d2244";
-const GOLD  = "#b8963e";
+const NAVY = "#0d2244";
+const GOLD = "#b8963e";
 const CREAM = "#f5f0e8";
-const BG    = "#f0faf4";   /* soft green tint background */
-const GREEN      = "#16a34a";
+const BG = "#f0faf4";   /* soft green tint background */
+const GREEN = "#16a34a";
 const GREEN_DARK = "#14532d";
-const GREEN_MID  = "#166534";
+const GREEN_MID = "#166534";
 const GREEN_LIGHT = "#86efac";
-const GREEN_PALE  = "#dcfce7";
+const GREEN_PALE = "#dcfce7";
 
 /* ─── helpers ─────────────────────────────────────────────────── */
 const getThumbnailUrl = (book) => {
@@ -30,45 +31,6 @@ const getThumbnailUrl = (book) => {
     }
     return book.image || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
 };
-
-/* ═══════════════════════════════════════════════
-   CONTRIBUTOR AVATAR
-═══════════════════════════════════════════════ */
-function ContributorAvatar({ contributor, size = 52, showName = false, onClick }) {
-    const initials = (contributor.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-    return (
-        <button
-            onClick={onClick}
-            title={contributor.name}
-            style={{
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-                background: "none", border: "none", cursor: "pointer", padding: 0,
-            }}
-        >
-            <div style={{
-                width: size, height: size, borderRadius: "50%",
-                border: `2px solid rgba(134,239,172,0.5)`,
-                overflow: "hidden", flexShrink: 0,
-                background: GREEN_DARK,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "border-color 0.18s, transform 0.18s",
-            }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = GREEN_LIGHT; e.currentTarget.style.transform = "scale(1.08)"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(134,239,172,0.5)"; e.currentTarget.style.transform = "scale(1)"; }}
-            >
-                {contributor.photoURL
-                    ? <img src={contributor.photoURL} alt={contributor.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.display = "none"; }} />
-                    : <span style={{ fontSize: size * 0.35, fontWeight: 700, color: GREEN_LIGHT, fontFamily: "'Lato',sans-serif" }}>{initials}</span>
-                }
-            </div>
-            {showName && (
-                <span style={{ fontSize: 10, fontWeight: 700, color: GREEN_LIGHT, fontFamily: "'Lato',sans-serif", letterSpacing: ".04em", maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>
-                    {contributor.name?.split(" ")[0]}
-                </span>
-            )}
-        </button>
-    );
-}
 
 /* ═══════════════════════════════════════════════
    CONTRIBUTORS MODAL
@@ -102,11 +64,11 @@ function ContributorsModal({ contributors, onClose }) {
                         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: GREEN_LIGHT, fontFamily: "'Lato',sans-serif", marginBottom: 4 }}>
                             🌿 Open Access Contributors
                         </div>
-                      <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700, color: "#fff", margin: 0 }}>
-                        {contributors.length} Contributor{contributors.length !== 1 ? "s" : ""}
-                    </h2>
+                        <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700, color: "#fff", margin: 0 }}>
+                            {contributors.length} Contributor{contributors.length !== 1 ? "s" : ""}
+                        </h2>
                     </div>
-                    <button onClick={onClose} style={{ background: "rgba(134,239,172,0.1)", border: "0.5px solid rgba(134,239,172,0.2)", color: GREEN_LIGHT, width: 36, height: 36, borderRadius: "50%", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+                    <button onClick={onClose} aria-label="Close" style={{ background: "rgba(134,239,172,0.1)", border: "0.5px solid rgba(134,239,172,0.2)", color: GREEN_LIGHT, width: 36, height: 36, borderRadius: "50%", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
                 </div>
 
                 {/* Scrollable list */}
@@ -122,7 +84,7 @@ function ContributorsModal({ contributors, onClose }) {
                                     transition: "background 0.18s, border-color 0.18s",
                                     cursor: hasProfile ? "pointer" : "default",
                                 }}
-                                    onMouseEnter={e => { if (hasProfile) { e.currentTarget.style.background = "rgba(134,239,172,0.1)"; e.currentTarget.style.borderColor = "rgba(134,239,172,0.3)"; }}}
+                                    onMouseEnter={e => { if (hasProfile) { e.currentTarget.style.background = "rgba(134,239,172,0.1)"; e.currentTarget.style.borderColor = "rgba(134,239,172,0.3)"; } }}
                                     onMouseLeave={e => { e.currentTarget.style.background = "rgba(134,239,172,0.05)"; e.currentTarget.style.borderColor = "rgba(134,239,172,0.12)"; }}
                                 >
                                     <div style={{ width: 44, height: 44, borderRadius: "50%", overflow: "hidden", background: GREEN_DARK, flexShrink: 0, border: "1.5px solid rgba(134,239,172,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -136,11 +98,11 @@ function ContributorsModal({ contributors, onClose }) {
                                         <div style={{ fontSize: 11, color: "rgba(134,239,172,0.6)", fontFamily: "'Lato',sans-serif", marginTop: 2 }}>
                                             {c.bookCount} free document{c.bookCount !== 1 ? "s" : ""} contributed
                                         </div>
-                                       {!hasProfile && (
-    <div style={{ fontSize: 9, color: "rgba(134,239,172,0.35)", fontFamily: "'Lato',sans-serif", marginTop: 2, letterSpacing: ".06em", textTransform: "uppercase", fontWeight: 700 }}>
-        {c.uid ? "External Contributor" : "Anonymous Contributor"}
-    </div>
-)}
+                                        {!hasProfile && (
+                                            <div style={{ fontSize: 9, color: "rgba(134,239,172,0.35)", fontFamily: "'Lato',sans-serif", marginTop: 2, letterSpacing: ".06em", textTransform: "uppercase", fontWeight: 700 }}>
+                                                {c.uid ? "External Contributor" : "Anonymous Contributor"}
+                                            </div>
+                                        )}
                                     </div>
                                     {hasProfile && (
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={GREEN_LIGHT} strokeWidth="2" style={{ opacity: 0.5, flexShrink: 0 }}>
@@ -168,105 +130,78 @@ function ContributorsModal({ contributors, onClose }) {
 }
 
 /* ═══════════════════════════════════════════════
-   BOOK CARD
+   BOOK CARD — now the shared small BookTile
 ═══════════════════════════════════════════════ */
 function BookCard({ book }) {
     return (
-        <Link
+        <BookTile
             href={`/book/preview?id=${book.firestoreId}`}
-            style={{ flexShrink: 0, width: 168, textDecoration: "none", display: "block" }}
-            className="oa-book-card"
-        >
-            <div style={{ position: "relative", background: "#d1fae5", overflow: "hidden" }}>
-                <img
-                    src={book.image}
-                    alt={book.title}
-                    className="oa-book-img"
-                    style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block" }}
-                    onError={e => { e.target.src = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400"; }}
-                />
-                {/* PDF badge */}
-                <div style={{ position: "absolute", top: 8, left: 8, display: "flex", alignItems: "center", gap: 4, background: "rgba(5,46,22,0.85)", padding: "3px 8px" }}>
-                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: GREEN_LIGHT, display: "inline-block" }} />
-                    <span style={{ fontSize: 9, fontWeight: 700, color: GREEN_LIGHT, fontFamily: "'Lato',sans-serif", letterSpacing: ".1em" }}>PDF</span>
-                </div>
-                {/* Free badge */}
-                <div style={{ position: "absolute", top: 8, right: 8, background: GREEN, color: "#fff", fontSize: 9, fontWeight: 700, padding: "3px 7px", fontFamily: "'Lato',sans-serif", letterSpacing: ".06em", display: "flex", alignItems: "center", gap: 3 }}>
-                    🔓 FREE
-                </div>
-            </div>
-            <div style={{ padding: "10px 10px 14px", borderTop: `0.5px solid rgba(22,163,74,0.15)`, background: "#fff" }}>
-                <h4 className="oa-book-title" style={{ fontFamily: "'Playfair Display',serif", fontSize: 12, fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35, transition: "color 0.18s" }}>
-                    {book.title}
-                </h4>
-                <p style={{ fontSize: 11, color: "#888", margin: "0 0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato',sans-serif" }}>
-                    {book.author}
-                </p>
-                {book.category && (
-                    <span style={{ display: "inline-block", background: GREEN_PALE, border: "0.5px solid rgba(22,163,74,0.3)", color: GREEN_MID, fontSize: 8, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", padding: "3px 7px", fontFamily: "'Lato',sans-serif" }}>
-                        {book.category}
-                    </span>
-                )}
-                <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 5 }}>
-                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: GREEN, display: "inline-block", flexShrink: 0 }} />
-                    <span style={{ fontSize: 10, fontWeight: 700, color: GREEN, fontFamily: "'Lato',sans-serif", letterSpacing: ".05em" }}>Open Access</span>
-                </div>
-            </div>
-        </Link>
+            image={book.image}
+            title={book.title}
+            free
+        />
     );
 }
 
 /* ═══════════════════════════════════════════════
-   ROW CAROUSEL
+   ROW CAROUSEL — same behaviour as the All Books shelves
+   (arrows only appear when there is more to scroll)
 ═══════════════════════════════════════════════ */
-function BookRow({ books, rowIndex, accentColor = GREEN_DARK }) {
-    const scrollRef = useRef(null);
+function BookRow({ books, accentColor = GREEN_DARK }) {
+    const ref = useRef(null);
+    const [canL, setCanL] = useState(false);
+    const [canR, setCanR] = useState(false);
 
-    const scroll = (dir) => {
-        if (!scrollRef.current) return;
-        scrollRef.current.scrollBy({ left: dir * 940, behavior: "smooth" });
+    const update = () => {
+        const el = ref.current;
+        if (!el) return;
+        setCanL(el.scrollLeft > 4);
+        setCanR(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    };
+
+    useEffect(() => {
+        update();
+        const el = ref.current;
+        if (!el) return;
+        el.addEventListener("scroll", update, { passive: true });
+        window.addEventListener("resize", update);
+        return () => {
+            el.removeEventListener("scroll", update);
+            window.removeEventListener("resize", update);
+        };
+    }, [books.length]);
+
+    const go = (dir) => {
+        const el = ref.current;
+        if (el) el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
     };
 
     const arrowStyle = {
-        position: "absolute", top: "40%", transform: "translateY(-50%)", zIndex: 10,
+        position: "absolute", top: 62, zIndex: 10,
         width: 34, height: 34, borderRadius: "50%",
         background: accentColor, border: "1px solid rgba(255,255,255,0.18)",
         color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: `0 4px 14px ${accentColor}55`, transition: "opacity 0.18s, transform 0.18s",
+        boxShadow: `0 4px 14px ${accentColor}55`,
     };
 
     return (
         <div style={{ position: "relative", marginBottom: 28 }}>
-            <button
-                onClick={() => scroll(-1)}
-                style={{ ...arrowStyle, left: -17 }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = "0.82"; e.currentTarget.style.transform = "translateY(-50%) scale(1.07)"; }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "translateY(-50%) scale(1)"; }}
-            >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
-            </button>
-            <div
-                ref={scrollRef}
-                style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8, scrollbarWidth: "none", msOverflowStyle: "none" }}
-                className="oa-scroll-row"
-            >
+            {canL && (
+                <button onClick={() => go(-1)} aria-label="Scroll left" style={{ ...arrowStyle, left: -17 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
+                </button>
+            )}
+            <div ref={ref} className="oa-track">
                 {books.map(book => <BookCard key={book.id} book={book} />)}
             </div>
-            <button
-                onClick={() => scroll(1)}
-                style={{ ...arrowStyle, right: -17 }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = "0.82"; e.currentTarget.style.transform = "translateY(-50%) scale(1.07)"; }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "translateY(-50%) scale(1)"; }}
-            >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
-            </button>
+            {canR && (
+                <button onClick={() => go(1)} aria-label="Scroll right" style={{ ...arrowStyle, right: -17 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
+                </button>
+            )}
         </div>
     );
 }
-
-/* ═══════════════════════════════════════════════
-   MAIN PAGE
-═══════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════
    CATEGORY META — icon, colour accent, description
@@ -360,17 +295,24 @@ const getCategoryMeta = (cat) => {
     return CATEGORY_META[key] || CATEGORY_META["general"];
 };
 
-export default function OpenAccessPage() {
-    const [books, setBooks]               = useState([]);
-    const [loading, setLoading]           = useState(true);
-    const [search, setSearch]             = useState("");
-    const [contributors, setContributors] = useState([]);
-    const [freeContributors, setFreeContributors] = useState([]);
-    const [showContributorsModal, setShowContributorsModal] = useState(false);
-    const [showModal, setShowModal]       = useState(false);
-    const [totalFree, setTotalFree] = useState(null);
+/* Books per shelf row (tiles are smaller now, so more fit) */
+const BOOKS_PER_ROW = 12;
 
-    /* ── Fetch all free books (no limit) ── */
+/* ═══════════════════════════════════════════════
+   MAIN PAGE
+═══════════════════════════════════════════════ */
+export default function OpenAccessPage() {
+    const [books, setBooks] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState("");
+    const [contributors, setContributors] = useState([]);
+    const [showModal, setShowModal] = useState(false);
+    const [totalFree, setTotalFree] = useState(null);
+    /* NEW: category chip filter + sort */
+    const [activeCat, setActiveCat] = useState("all");
+    const [sortBy, setSortBy] = useState("newest");
+
+    /* ── Fetch free books ── */
     useEffect(() => {
         (async () => {
             try {
@@ -378,13 +320,13 @@ export default function OpenAccessPage() {
                     collection(db, "advertMyBook"),
                     where("isFree", "==", true),
                     where("status", "==", "approved"),
-                                      orderBy("createdAt", "desc"),
+                    orderBy("createdAt", "desc"),
                     limit(60)
                 );
                 const snap = await getDocs(q);
                 getCountFromServer(
                     query(collection(db, "advertMyBook"), where("isFree", "==", true), where("status", "==", "approved"))
-                ).then(s => setTotalFree(s.data().count)).catch(() => {});
+                ).then(s => setTotalFree(s.data().count)).catch(() => { });
                 const arr = [];
                 const sellerMap = {}; /* uid → { name, photoURL, bookCount } */
 
@@ -424,17 +366,7 @@ export default function OpenAccessPage() {
 
                 setBooks(arr);
 
-                /* ── Enrich contributors ─────────────────────────────────────────
-                   The upload page (AdvertiseClient) always writes:
-                     userId   = auth.currentUser.uid
-                     sellerName = userData.displayName (from users/{uid})
-                   So:
-                   • Has a real uid in the doc  → uploaded via LAN → check users/{uid}
-                   • uid is null / "anon-*"     → came via external API import → skip
-                   We only need ONE read (users/{uid}) per contributor.
-                   No sellers collection fetch needed — slug is built from
-                   firstName + surname stored in users, matching the SellersClient logic.
-                ─────────────────────────────────────────────────────────────────── */
+                /* ── Enrich contributors (one users/{uid} read each) ── */
                 const makeSlug = (firstName, surname) =>
                     [firstName, surname]
                         .filter(Boolean)
@@ -450,14 +382,14 @@ export default function OpenAccessPage() {
                 const enriched = await Promise.all(
                     contributorList.map(async (c) => {
                         /* No real uid = external/API book, never uploaded via LAN */
-                       if (!c.uid || c.uid.startsWith("anon-")) {
-    return {
-        ...c,
-        hasLANAccount: false,
-        slug: null,
-        name: c.name && !c.name.startsWith("anon-") ? c.name : "Anonymous Contributor",
-    };
-}
+                        if (!c.uid || c.uid.startsWith("anon-")) {
+                            return {
+                                ...c,
+                                hasLANAccount: false,
+                                slug: null,
+                                name: c.name && !c.name.startsWith("anon-") ? c.name : "Anonymous Contributor",
+                            };
+                        }
 
                         try {
                             const uSnap = await getDoc(doc(db, "users", c.uid));
@@ -469,15 +401,15 @@ export default function OpenAccessPage() {
 
                             const ud = uSnap.data();
                             const firstName = ud.firstName || "";
-                            const surname   = ud.surname   || "";
-                            const fullName  = (firstName + " " + surname).trim()
+                            const surname = ud.surname || "";
+                            const fullName = (firstName + " " + surname).trim()
                                 || ud.displayName || c.name;
 
                             return {
                                 ...c,
                                 hasLANAccount: true,
-                                slug:     makeSlug(firstName, surname),
-                                name:     fullName,
+                                slug: makeSlug(firstName, surname),
+                                name: fullName,
                                 photoURL: ud.photoURL || ud.profileImage || c.photoURL || null,
                             };
                         } catch {
@@ -486,11 +418,7 @@ export default function OpenAccessPage() {
                         }
                     })
                 );
-                /* Only show contributors who:
-                   1. Have a verified LAN account (users doc exists)
-                   2. Provably uploaded at least one free book via the platform
-                   External/API books (anon-* or missing users doc) are excluded entirely. */
-            setContributors(enriched.filter(c => c.bookCount > 0));            
+                setContributors(enriched.filter(c => c.bookCount > 0));
             } catch (e) {
                 console.error(e);
             } finally {
@@ -499,32 +427,60 @@ export default function OpenAccessPage() {
         })();
     }, []);
 
-    /* ── Filter ── */
-    const filtered = books.filter(b =>
+    /* ── Search filter ── */
+    const searched = books.filter(b =>
         b.title.toLowerCase().includes(search.toLowerCase()) ||
         b.author.toLowerCase().includes(search.toLowerCase()) ||
         b.category.toLowerCase().includes(search.toLowerCase())
     );
 
-    const BOOKS_PER_ROW = 10;
+    /* ── Category chips (counts come from the search-filtered list) ── */
+    const catCounts = {};
+    searched.forEach(b => {
+        const c = (b.category || "General").trim();
+        catCounts[c] = (catCounts[c] || 0) + 1;
+    });
+    const chipCats = Object.entries(catCounts).sort((a, b) => b[1] - a[1]);
 
-    /* ── Visible contributors (first 5) ── */
- const visibleContributors = contributors.slice(0, 6);
-const hasMoreContributors = contributors.length > 6;
+    /* If the active chip disappears after a new search, fall back to "all" */
+    const effectiveCat = activeCat === "all" || catCounts[activeCat] ? activeCat : "all";
+
+    /* ── Apply category + sort ── */
+    let filtered = effectiveCat === "all"
+        ? searched
+        : searched.filter(b => (b.category || "General").trim() === effectiveCat);
+
+    if (sortBy === "title") filtered = [...filtered].sort((a, b) => a.title.localeCompare(b.title));
+    if (sortBy === "author") filtered = [...filtered].sort((a, b) => a.author.localeCompare(b.author));
+    /* "newest" = original Firestore order (createdAt desc) */
+
+    /* ── Visible contributors (first 6) ── */
+    const visibleContributors = contributors.slice(0, 6);
+    const hasMoreContributors = contributors.length > 6;
 
     return (
         <>
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
+                ${BOOK_GRID_CSS}
 
                 .oa-root { font-family:'Lato',sans-serif; background:${BG}; min-height:100vh; }
                 .oa-serif { font-family:'Playfair Display',Georgia,serif; }
 
-                .oa-book-card:hover .oa-book-title { color:${GREEN} !important; }
-                .oa-book-card:hover .oa-book-img { transform:scale(1.05); }
-                .oa-book-img { transition:transform 0.45s cubic-bezier(.4,0,.2,1); }
+                /* Same shelf sizing as the All Books page */
+                .oa-track { display:flex; gap:14px; overflow-x:auto; scroll-snap-type:x proximity; padding:4px 2px 12px; scrollbar-width:none; -ms-overflow-style:none; }
+                .oa-track::-webkit-scrollbar { display:none; }
+                .oa-track > * { flex:0 0 128px; min-width:0; scroll-snap-align:start; }
+                @media (min-width:640px) { .oa-track > * { flex-basis:144px; } .oa-track { gap:18px; } }
 
-                .oa-scroll-row::-webkit-scrollbar { display:none; }
+                .oa-chip { border:0.5px solid rgba(22,163,74,0.3); background:#fff; color:${GREEN_MID}; font-family:'Lato',sans-serif; font-size:12px; font-weight:700; padding:8px 14px; cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; gap:6px; transition:background .15s,color .15s,border-color .15s; }
+                .oa-chip:hover { border-color:${GREEN}; }
+                .oa-chip.active { background:${GREEN_DARK}; color:#fff; border-color:${GREEN_DARK}; }
+                .oa-chip .n { font-size:10px; opacity:.65; font-weight:400; }
+                .oa-chip:focus-visible, .oa-select:focus-visible { outline:2px solid ${GREEN}; outline-offset:2px; }
+                .oa-select { border:0.5px solid rgba(22,163,74,0.3); background:#fff; color:${GREEN_MID}; font-family:'Lato',sans-serif; font-size:12px; font-weight:700; padding:10px 12px; outline:none; cursor:pointer; }
+                .oa-nobar { scrollbar-width:none; -ms-overflow-style:none; }
+                .oa-nobar::-webkit-scrollbar { display:none; }
 
                 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
                 .skeleton { background:#bbf7d0; border-radius:4px; animation:pulse 1.5s ease-in-out infinite; }
@@ -623,7 +579,7 @@ const hasMoreContributors = contributors.length > 6;
                                     <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(134,239,172,0.6)", fontFamily: "'Lato',sans-serif", marginBottom: 8 }}>
                                         Open Access Contributors
                                     </div>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                                         {/* Stacked avatars */}
                                         <div style={{ display: "flex" }}>
                                             {visibleContributors.map((c, i) => {
@@ -668,15 +624,15 @@ const hasMoreContributors = contributors.length > 6;
                                                 onMouseEnter={e => e.currentTarget.style.background = "rgba(134,239,172,0.18)"}
                                                 onMouseLeave={e => e.currentTarget.style.background = "rgba(134,239,172,0.1)"}
                                             >
-                                                +{contributors.length - 5} more
+                                                +{contributors.length - visibleContributors.length} more
                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                                             </button>
                                         )}
 
-                                      <span style={{ fontSize: 12, color: "rgba(220,252,231,0.4)", fontFamily: "'Lato',sans-serif", fontStyle: "italic" }}>
-    {contributors.length} contributor{contributors.length !== 1 ? "s" : ""} —{" "}
-    {contributors.filter(c => c.hasLANAccount).length} verified LAN accounts
-</span>
+                                        <span style={{ fontSize: 12, color: "rgba(220,252,231,0.4)", fontFamily: "'Lato',sans-serif", fontStyle: "italic" }}>
+                                            {contributors.length} contributor{contributors.length !== 1 ? "s" : ""} —{" "}
+                                            {contributors.filter(c => c.hasLANAccount).length} verified LAN accounts
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -685,9 +641,10 @@ const hasMoreContributors = contributors.length > 6;
                         {/* Stats */}
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 32, borderTop: "0.5px solid rgba(134,239,172,0.15)", paddingTop: 24 }}>
                             {[
-                                { val: loading ? "…" : (totalFree ?? books.length), label: "Free Documents" },                                { val: "0₦",                          label: "Cost to Access" },
-                                { val: contributors.length || "…",    label: "Contributors" },
-                                { val: "Always",                      label: "Available" },
+                                { val: loading ? "…" : (totalFree ?? books.length), label: "Free Documents" },
+                                { val: "0₦", label: "Cost to Access" },
+                                { val: contributors.length || "…", label: "Contributors" },
+                                { val: "Always", label: "Available" },
                             ].map(({ val, label }) => (
                                 <div key={label}>
                                     <div className="oa-serif" style={{ fontSize: 26, fontWeight: 700, color: "#fff" }}>{val}</div>
@@ -704,7 +661,7 @@ const hasMoreContributors = contributors.length > 6;
                 <section style={{ maxWidth: 1240, margin: "0 auto", padding: "56px 40px" }}>
 
                     {loading ? (
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))", gap: 20 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px,1fr))", gap: 20 }}>
                             {Array.from({ length: 20 }).map((_, i) => (
                                 <div key={i}>
                                     <div className="skeleton" style={{ width: "100%", aspectRatio: "3/4", marginBottom: 10 }} />
@@ -714,7 +671,7 @@ const hasMoreContributors = contributors.length > 6;
                             ))}
                         </div>
 
-                    ) : filtered.length === 0 ? (
+                    ) : searched.length === 0 ? (
                         <div style={{ textAlign: "center", padding: "80px 24px" }}>
                             <div className="oa-serif" style={{ fontSize: 22, color: GREEN_DARK, marginBottom: 8 }}>No documents found</div>
                             <p style={{ fontSize: 14, color: "#aaa" }}>Try a different search term, or check back soon.</p>
@@ -723,7 +680,7 @@ const hasMoreContributors = contributors.length > 6;
                     ) : (
                         <>
                             {/* ── Top summary bar ── */}
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 48, flexWrap: "wrap", gap: 12 }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
                                 <div>
                                     <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".22em", textTransform: "uppercase", color: GREEN, marginBottom: 4, fontFamily: "'Lato',sans-serif" }}>
                                         🔓 Free to Read
@@ -737,9 +694,35 @@ const hasMoreContributors = contributors.length > 6;
                                 </span>
                             </div>
 
+                            {/* ── NEW: category chips + sort ── */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 44 }}>
+                                <div className="oa-nobar" style={{ display: "flex", gap: 8, overflowX: "auto", flex: 1 }}>
+                                    <button
+                                        className={`oa-chip${effectiveCat === "all" ? " active" : ""}`}
+                                        onClick={() => setActiveCat("all")}
+                                    >
+                                        All <span className="n">{searched.length}</span>
+                                    </button>
+                                    {chipCats.map(([cat, n]) => (
+                                        <button
+                                            key={cat}
+                                            className={`oa-chip${effectiveCat === cat ? " active" : ""}`}
+                                            onClick={() => setActiveCat(cat)}
+                                        >
+                                            {getCategoryMeta(cat).icon} {cat} <span className="n">{n}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                                <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="oa-select" aria-label="Sort documents">
+                                    <option value="newest">Newest</option>
+                                    <option value="title">Title A to Z</option>
+                                    <option value="author">Author A to Z</option>
+                                </select>
+                            </div>
+
                             {/* ── Category sections ── */}
                             {(() => {
-                                /* Group books by normalised category */
+                                /* Group books by category */
                                 const grouped = {};
                                 filtered.forEach(b => {
                                     const cat = (b.category || "General").trim();
@@ -753,7 +736,7 @@ const hasMoreContributors = contributors.length > 6;
 
                                 return sortedCats.map(([cat, catBooks], ci) => {
                                     const meta = getCategoryMeta(cat);
-                                    /* Split into rows of 10 */
+                                    /* Split into rows */
                                     const catRows = [];
                                     for (let i = 0; i < catBooks.length; i += BOOKS_PER_ROW) {
                                         catRows.push(catBooks.slice(i, i + BOOKS_PER_ROW));
@@ -807,7 +790,7 @@ const hasMoreContributors = contributors.length > 6;
                                                 </div>
                                             </div>
 
-                                            {/* ── Rows of 10 ── */}
+                                            {/* ── Rows ── */}
                                             {catRows.map((rowBooks, ri) => (
                                                 <div key={ri}>
                                                     {catRows.length > 1 && (
@@ -818,7 +801,7 @@ const hasMoreContributors = contributors.length > 6;
                                                             </span>
                                                         </div>
                                                     )}
-                                                    <BookRow books={rowBooks} rowIndex={ri} accentColor={meta.accent} />
+                                                    <BookRow books={rowBooks} accentColor={meta.accent} />
                                                     {ri < catRows.length - 1 && (
                                                         <div style={{ height: 1, background: `linear-gradient(to right, transparent, ${meta.accent}40, transparent)`, margin: "16px 0 28px" }} />
                                                     )}

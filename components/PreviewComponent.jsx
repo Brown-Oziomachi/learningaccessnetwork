@@ -63,6 +63,8 @@ const driveFileId = (book) => {
 };
 
 
+const isPlaceholderImg = (u) => /photo-1544947950|placeholder|no-cover|default-cover/i.test(String(u || ""));
+
 const coverCandidates = (book) => {
   if (!book) return [];
   const out = [];
@@ -72,8 +74,9 @@ const coverCandidates = (book) => {
     out.push(`https://drive.google.com/thumbnail?id=${id}&sz=w1000`);
     out.push(`https://lh3.googleusercontent.com/d/${id}=w1000`);
   }
-  [book.image, book.coverImage].forEach((u) => {
-    if (u) out.push(u);
+  /* coverImage first (the uploaded cover), image second, placeholders never */
+  [book.coverImage, book.image].forEach((u) => {
+    if (u && !isPlaceholderImg(u)) out.push(u);
   });
   return [...new Set(out)];
 };
@@ -113,7 +116,8 @@ function BookCover({ book, title, titleSize = 14, fit = "contain", natural = fal
           key={src}
           src={src}
           alt={title}
-          loading="eager"
+                    loading="eager"
+          referrerPolicy="no-referrer"
           decoding="async"
           onLoad={() => setLoaded(true)}
           onError={() => { setLoaded(false); setIdx((i) => i + 1); }}
@@ -312,6 +316,7 @@ export default function BookPreviewPage({ bookDetails }) {
   const [negMeta, setNegMeta] = useState({ on: false, pct: 0, academic: false });
   const [buyMenu, setBuyMenu] = useState(null); // which split button's menu is open
   const [showNegotiation, setShowNegotiation] = useState(false);
+  const [showSaveAd, setShowSaveAd] = useState(false);
 
   const [bookOwnerProfile, setBookOwnerProfile] = useState(null);
   const [ownerFollowers, setOwnerFollowers] = useState(0);
@@ -622,13 +627,15 @@ export default function BookPreviewPage({ bookDetails }) {
           const realTitle = raw?.bookTitle || raw?.title;
           if (realTitle && looksLikeId(merged.title, cId)) merged.title = realTitle;
                    if (!merged.title) merged.title = "Untitled document";
-          if (raw) {
-            merged.driveFileId = merged.driveFileId || raw.driveFileId;
-            merged.embedUrl = merged.embedUrl || raw.embedUrl;
-            merged.pdfUrl = merged.pdfUrl || raw.pdfUrl;
-            merged.coverImage = merged.coverImage || raw.coverImage || raw.image;
-            merged.image = merged.image || raw.image;
-          }
+                   if (raw) {
+                     /* The uploaded document is the source of truth for the cover, same as the list pages */
+                     merged.driveFileId = raw.driveFileId || merged.driveFileId;
+                     merged.embedUrl = raw.embedUrl || merged.embedUrl;
+                     merged.pdfUrl = raw.pdfUrl || merged.pdfUrl;
+                     merged.coverImage =
+                       raw.coverImage || raw.image || merged.coverImage;
+                     merged.image = raw.coverImage || raw.image || merged.image;
+                   }
 const staticBook = booksData.find((b) => String(b.id).replace("firestore-", "") === String(cId));
 if (staticBook) {
   merged.image = merged.image || staticBook.image;
@@ -670,8 +677,10 @@ console.log("NEG debug:", { isNegotiable: raw?.isNegotiable, maxDiscountPercent:
           category: data.category, price: free ? 0 : data.price, isFree: free ? true : data.isFree,
           accessType: free ? "free" : data.accessType, pages: data.pages, format: data.format || "PDF",
           driveFileId: data.driveFileId, pdfUrl: data.pdfUrl, embedUrl: data.embedUrl,
-          coverImage: data.coverImage || null, isFromFirestore: true,
-        };
+          coverImage: data.coverImage || null,
+          image: data.image || data.coverImage || null,
+          isFromFirestore: true,
+                };
       };
       let freeBooks = []; let paidBooks = [];
       try {
@@ -693,7 +702,7 @@ console.log("NEG debug:", { isNegotiable: raw?.isNegotiable, maxDiscountPercent:
       if (ud.exists()) {
         const pb = ud.data().purchasedBooks || {};
         const cId = bookId?.replace("firestore-", "");
-        let purchased = pb[bookId] || pb[cId] || pb[`firestore-${cId}`];
+        let purchased = pb[bookId] || pb[cId] || pb[`firestore-${cId}`] || pb[`oa_${cId}`];
         if (!purchased)
           purchased = Object.keys(pb).some((key) => {
             const ck = key.replace("firestore-", "");
@@ -763,6 +772,13 @@ console.log("NEG debug:", { isNegotiable: raw?.isNegotiable, maxDiscountPercent:
       showToastMessage("Saved to your library! Opening in My Books…");
       setTimeout(() => router.push("/my-books"), 1200);
     } catch { router.push("/my-books"); }
+  };
+
+    /* Free documents show the ad modal first. Already-saved ones just open My Books. */
+  const requestFreeSave = () => {
+    if (!user) { router.push("/signin"); return; }
+    if (isPurchased) { router.push("/my-books"); return; }
+    setShowSaveAd(true);
   };
 
   const handleShare = () => {
@@ -1084,7 +1100,7 @@ const goNegotiate = () => {
                 <p style={{ fontSize: "11px", fontWeight: 700, color: GOLD, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>Open Access</p>
                 <p style={{ fontSize: "13px", fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato',sans-serif" }}>Save a copy to your library</p>
               </div>
-              <button onClick={handleFreeAccess} style={{ display: "flex", alignItems: "center", gap: "8px", background: NAVY, color: GOLD, padding: "11px 22px", border: `0.5px solid ${GOLD}`, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em" }}>
+              <button onClick={requestFreeSave} style={{ display: "flex", alignItems: "center", gap: "8px", background: NAVY, color: GOLD, padding: "11px 22px", border: `0.5px solid ${GOLD}`, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.06em" }}>
                 <Download size={14} /> Save to My Books
               </button>
             </div>
@@ -1140,7 +1156,7 @@ const goNegotiate = () => {
   );
 
   const actionList = (askLabel) => [
-    { icon: isGloballyFrozen ? <Lock size={18} style={{ color: "#aaa" }} /> : free ? <Unlock size={18} style={{ color: "#16a34a" }} /> : <Download size={18} />, label: isGloballyFrozen ? "Frozen" : free ? "Save Free" : isPurchased ? "Open" : "Purchase", onClick: isGloballyFrozen ? () => alert("This document is currently frozen.") : free ? handleFreeAccess : isPurchased ? () => router.push("/my-books") : handlePurchase },
+    { icon: isGloballyFrozen ? <Lock size={18} style={{ color: "#aaa" }} /> : free ? <Unlock size={18} style={{ color: "#16a34a" }} /> : <Download size={18} />, label: isGloballyFrozen ? "Frozen" : free ? "Save Free" : isPurchased ? "Open" : "Purchase", onClick: isGloballyFrozen ? () => alert("This document is currently frozen.") : free ? requestFreeSave : isPurchased ? () => router.push("/my-books") : handlePurchase },
     { icon: <Bookmark size={18} style={isSaved ? { fill: NAVY, color: NAVY } : {}} />, label: isSaved ? "Saved" : "Save", onClick: handleSaveForLater },
     { icon: <Share2 size={18} />, label: "Share", onClick: handleShare },
     { icon: <ThumbsUp size={18} />, label: positiveRatingPercent !== null ? `${positiveRatingPercent}%` : "Rate", onClick: () => setShowFeedbackModal(true) },
@@ -1190,7 +1206,12 @@ const goNegotiate = () => {
         .buy-ico { width:34px; height:34px; display:flex; align-items:center; justify-content:center; background:${CREAM}; border:0.5px solid #e5ddd0; border-radius:8px; color:${GOLD}; flex-shrink:0; }
       `}</style>
 
-      <OpenAccessModal isOpen={false} onClose={() => {}} book={book} countdownSec={10} />
+      <OpenAccessModal
+        isOpen={showSaveAd}
+        onClose={() => setShowSaveAd(false)}
+        book={{ ...book, driveFileId: driveFileId(book) }}
+        countdownSec={10}
+      />
 
       <div className="lan-root" style={{ minHeight: "100vh" }}>
         {/* ══ HEADER ══ */}
@@ -1211,7 +1232,7 @@ const goNegotiate = () => {
                   <span style={{ fontSize: "10px", fontWeight: 700, color: "#a5b4fc", fontFamily: "'Lato',sans-serif", letterSpacing: "0.08em" }}>❄ FROZEN</span>
                 </div>
               ) : free ? (
-                <button className="lan-header-cta" onClick={handleFreeAccess} style={{ display: "flex", alignItems: "center", gap: "5px", background: "rgba(22,163,74,0.15)", color: "#86efac", padding: "7px 12px", border: "0.5px solid rgba(22,163,74,0.4)", fontSize: "11px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.05em", whiteSpace: "nowrap", flexShrink: 0 }}>
+                <button className="lan-header-cta" onClick={requestFreeSave} style={{ display: "flex", alignItems: "center", gap: "5px", background: "rgba(22,163,74,0.15)", color: "#86efac", padding: "7px 12px", border: "0.5px solid rgba(22,163,74,0.4)", fontSize: "11px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", letterSpacing: "0.05em", whiteSpace: "nowrap", flexShrink: 0 }}>
                   <Unlock size={12} /> SAVE FREE
                 </button>
               ) : !isPurchased ? (
@@ -1245,7 +1266,7 @@ const goNegotiate = () => {
                 {isGloballyFrozen ? (
                   <div style={{ width: "100%", background: "rgba(99,102,241,0.15)", border: "0.5px solid rgba(99,102,241,0.3)", padding: "11px", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#a5b4fc", fontFamily: "'Lato',sans-serif" }}>❄ Resource Frozen by Admin</div>
                 ) : free ? (
-                  <button onClick={() => { setShowNavMenu(false); handleFreeAccess(); }} style={{ width: "100%", background: "#16a34a", color: "#fff", padding: "11px", border: "none", fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                  <button onClick={() => { setShowNavMenu(false); requestFreeSave(); }} style={{ width: "100%", background: "#16a34a", color: "#fff", padding: "11px", border: "none", fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
                     <Unlock size={14} /> Save to My Library
                   </button>
                 ) : !isPurchased ? (

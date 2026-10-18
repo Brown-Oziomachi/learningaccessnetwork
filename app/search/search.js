@@ -1,415 +1,580 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
-  doc, getDoc, collection, query, where,
-  getDocs, setDoc, increment, orderBy, limit, updateDoc
+  collection, query, where, getDocs, getDoc, doc, setDoc, updateDoc,
+  increment, orderBy, limit,
 } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
 import { booksData } from "@/lib/booksData";
-import { FileText, X, TrendingUp, Search, ArrowRight, SlidersHorizontal, Flag, ExternalLink, ShieldCheck, Star, BookOpen } from "lucide-react";
+import { X, Search, SlidersHorizontal, ShieldCheck, TrendingUp, FileText } from "lucide-react";
 import Link from "next/link";
 import Navbar from "@/components/NavBar";
 import FeaturedAdsCarousel from "@/components/FeaturedAdsCarousel";
 import { useAds } from "@/lib/useAds";
-import { parseSearchQuery } from "@/lib/searchQueryParser";
+import { paidVerificationActive } from "@/components/seller/Verification";
+import {
+  norm, fromFirestore, fromPlatform, buildIndex, buildProfileIndex, parseQuery,
+  queryHints, searchBooks, searchProfiles, orderByTrust, trustTier, uniShort,
+  intentKey, INTENT_LABEL,
+} from "@/lib/searchEngine";
 
-/* ─── colour tokens ─────────────────────────────────────────── */
+/* ─── design tokens (same navy / gold / cream as the rest of LAN) ─── */
 const NAVY = "#0d2244";
 const GOLD = "#b8963e";
 const CREAM = "#f5f0e8";
 const BG = "#f5f1ea";
+const LINE = "#e5ddd0";
+const TTL = 10 * 60 * 1000;
 
-/* ─── helpers ─────────────────────────────────────────────────── */
-const getThumbnailUrl = (book) => {
-  if (!book) return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
-  if (book.driveFileId) return `https://drive.google.com/thumbnail?id=${book.driveFileId}&sz=w400`;
-  if (book.embedUrl) {
-    const m = book.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
-    if (m) { const id = m[1] || m[2] || m[3]; if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`; }
+const uniq = (a) => [...new Set(a)];
+
+/* ═══════════════════════════════════════════════════════════
+   DATA LOADERS (cached in memory for 10 minutes)
+═══════════════════════════════════════════════════════════ */
+let BOOKS = null;
+let BOOKS_P = null;
+
+/** Every approved document, plus the built-in platform books, indexed for search */
+async function loadBooks() {
+  if (BOOKS && Date.now() - BOOKS.at < TTL) return BOOKS;
+  if (BOOKS_P) return BOOKS_P;
+  BOOKS_P = (async () => {
+    const live = [];
+    try {
+      const snap = await getDocs(
+        query(collection(db, "advertMyBook"), where("status", "==", "approved"), limit(1500))
+      );
+      snap.forEach((d) => live.push(fromFirestore(d.id, d.data())));
+    } catch (e) {
+      console.warn("[search] could not load the library:", e);
+    }
+    const liveKeys = new Set(live.map((b) => `${norm(b.title)}|${norm(b.author)}`));
+    const platform = (booksData || [])
+      .map((b) => { try { return fromPlatform(b); } catch { return null; } })
+      .filter((b) => b && !liveKeys.has(`${norm(b.title)}|${norm(b.author)}`));
+    const list = [...live, ...platform];
+    const bySeller = new Map();
+    live.forEach((b) => b.sellerId && bySeller.set(b.sellerId, (bySeller.get(b.sellerId) || 0) + 1));
+    BOOKS = { at: Date.now(), list, index: buildIndex(list), bySeller };
+    return BOOKS;
+  })().finally(() => { BOOKS_P = null; });
+  return BOOKS_P;
+}
+
+let SELLERS = null;
+let SELLERS_P = null;
+
+/** Slim seller list (no photos, no balances) used for people search and trust flags */
+async function loadSellers() {
+  if (SELLERS && Date.now() - SELLERS.at < TTL) return SELLERS;
+  if (SELLERS_P) return SELLERS_P;
+  SELLERS_P = (async () => {
+    const list = [];
+    try {
+      const snap = await getDocs(query(collection(db, "sellers"), limit(500)));
+      snap.forEach((d) => {
+        if (d.id === "LAN_LIBRARY_PLATFORM") return;
+        const s = d.data();
+        let verified = false;
+        try { verified = !!paidVerificationActive({ id: d.id, ...s }); }
+        catch { verified = s.isVerifiedSeller === true; }
+        list.push({
+          uid: d.id,
+          name: s.sellerName || s.businessInfo?.businessName || "",
+          title: s.sellerTitle || s.title || "",
+          slug: s.slug || "",
+          university: s.university || "",
+          department: s.department || "",
+          business: s.businessInfo?.businessName || "",
+          state: s.businessInfo?.state || "",
+          booksSold: s.booksSold || 0,
+          photo: /^https?:/.test(s.photoURL || "") ? s.photoURL : "",
+          verified,
+          faculty: s.isLecturer === true || s.role === "lecturer" || s.role === "faculty",
+        });
+      });
+    } catch (e) {
+      console.warn("[search] could not load sellers:", e);
+    }
+    SELLERS = { at: Date.now(), list, index: buildProfileIndex(list) };
+    return SELLERS;
+  })().finally(() => { SELLERS_P = null; });
+  return SELLERS_P;
+}
+
+const USERS = new Map();
+async function loadUser(uid) {
+  if (USERS.has(uid)) return USERS.get(uid);
+  let data = null;
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    data = snap.exists() ? snap.data() : null;
+  } catch { /* user doc not readable */ }
+  USERS.set(uid, data);
+  return data;
+}
+
+const facultyApproved = (u) =>
+  !!u && (u.lecturerVerificationStatus === "approved" || u.isVerifiedFaculty === true);
+
+/** uid -> { verified, faculty } for the sellers behind the best matches */
+async function loadTrust(ids) {
+  const { list } = await loadSellers();
+  const byId = new Map(list.map((s) => [s.uid, s]));
+  const out = new Map();
+  await Promise.all(
+    ids.map(async (id) => {
+      const s = byId.get(id);
+      const u = await loadUser(id);
+      out.set(id, {
+        verified: s ? s.verified : u?.isVerifiedSeller === true,
+        faculty: !!(s?.faculty || facultyApproved(u)),
+      });
+    })
+  );
+  return out;
+}
+
+/** Profiles whose name matches the query. Only real sellers are returned. */
+async function findProfiles(pq, bySeller) {
+  const { index } = await loadSellers();
+  const hits = searchProfiles(index, pq).slice(0, 12);
+  const people = (
+    await Promise.all(
+      hits.map(async (h) => {
+        const p = h.item.profile;
+        const u = await loadUser(p.uid);
+        if (!u || u.isSeller !== true) return null;
+        const faculty = !!(p.faculty || facultyApproved(u));
+        const verified = p.verified;
+        return {
+          ...p,
+          name: p.name || u.displayName || [u.firstName, u.surname].filter(Boolean).join(" "),
+          title: p.title || u.lecturerTitle || "",
+          faculty,
+          verified,
+          tier: trustTier({ faculty, verified }),
+          score: h.score,
+          photo: u.photoURL || u.photoBase64 || p.photo || "",
+          bio: u.bio || "",
+          institution: u.institution || u.university || u.selectedUniversity || p.university || "",
+          docs: bySeller.get(p.uid) || 0,
+        };
+      })
+    )
+  ).filter(Boolean);
+  people.sort((a, b) => b.tier - a.tier || b.score - a.score);
+  return people.slice(0, 6);
+}
+
+/** Most searched: top queries from searchAnalytics, resolved to their best document */
+async function loadPopular() {
+  const lib = await loadBooks();
+  const out = [];
+  const seen = new Set();
+  try {
+    const snap = await getDocs(query(collection(db, "searchAnalytics"), orderBy("count", "desc"), limit(12)));
+    for (const d of snap.docs) {
+      const x = d.data();
+      const hit = x.query ? searchBooks(lib.index, parseQuery(x.query), false)[0] : null;
+      if (hit && !seen.has(hit.item.book.id)) {
+        seen.add(hit.item.book.id);
+        out.push({ book: hit.item.book, tier: 0, trending: x.count });
+      }
+    }
+  } catch { /* analytics not readable yet */ }
+  if (!out.length) {
+    lib.list
+      .slice()
+      .sort((a, b) => (b.salesCount * 5 + b.views + b.searchScore) - (a.salesCount * 5 + a.views + a.searchScore))
+      .slice(0, 15)
+      .forEach((b) => out.push({ book: b, tier: 0 }));
   }
-  if (book.pdfUrl?.includes("drive.google.com")) {
-    const m = book.pdfUrl.match(/[-\w]{25,}/);
+  return out;
+}
+
+const track = async (n) => {
+  try {
+    const id = n.replace(/\s+/g, "-").slice(0, 60);
+    if (id.length < 3) return;
+    await setDoc(
+      doc(db, "searchAnalytics", id),
+      { query: n.slice(0, 80), count: increment(1), lastSearched: new Date().toISOString() },
+      { merge: true }
+    );
+  } catch { /* analytics rules not published yet */ }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   SMALL HELPERS
+═══════════════════════════════════════════════════════════ */
+
+/** Cover image URL, or "" when there is none (the card then shows its own placeholder) */
+function thumb(b) {
+  if (b.image) return b.image;
+  if (b.driveFileId) return `https://drive.google.com/thumbnail?id=${b.driveFileId}&sz=w400`;
+  if (b.embedUrl) {
+    const m = b.embedUrl.match(/\/d\/(.*?)\/|\/file\/d\/(.*?)\/|id=(.*?)(&|$)/);
+    const id = m && (m[1] || m[2] || m[3]);
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`;
+  }
+  if (b.pdfUrl?.includes("drive.google.com")) {
+    const m = b.pdfUrl.match(/[-\w]{25,}/);
     if (m) return `https://drive.google.com/thumbnail?id=${m[0]}&sz=w400`;
   }
-  return book.image || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400";
+  return "";
+}
+
+/** One useful detail line for every kind of document, so no card is ever empty */
+function typeMeta(b) {
+  const uni = uniShort(b.university);
+  const yr = (String(b.session || "").match(/\d{4}/) || [""])[0];
+  const lvl = /^\d{3}$/.test(norm(b.level)) ? `${norm(b.level)}L` : "";
+  const t = norm(`${b.docType} ${b.category}`);
+
+  let parts;
+  if (/past question|exam|jamb|waec|neco|utme/.test(t)) {
+    parts = [b.courseCode, b.examBody, uni, yr, lvl];
+  } else if (b.intent === "divinity" || /divinity|theolog|religion|sermon/.test(t)) {
+    parts = [b.theologicalCategory, b.doctrine, b.author];
+  } else if (/novel|fiction|literature|poem|play/.test(t)) {
+    parts = [b.genre, b.author];
+  } else if (/note|handout|textbook|project|thesis|tutorial|lab|slide/.test(t)) {
+    parts = [b.courseCode, uni, b.author, b.department];
+  } else {
+    parts = [b.courseCode, b.author, uni, b.subject, b.department];
+  }
+  parts.push(b.author, b.sellerName, b.category);
+
+  const out = [];
+  parts.forEach((p) => { if (p && !out.includes(p)) out.push(p); });
+  return out.slice(0, 2).join(" · ") || "Document";
+}
+
+const makeSlug = (title, first, last) =>
+  [title, first, last].filter(Boolean).join(" ").trim().toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-");
+
+const profileHref = (p) => {
+  if (p.slug) return `/profile/${p.slug}`;
+  const parts = (p.name || "").trim().split(/\s+/);
+  const slug = makeSlug(p.title, parts[0], parts.slice(1).join(" "));
+  return slug ? `/profile/${slug}` : `/seller-profile?sellerId=${p.uid}`;
 };
 
-const chunkArray = (arr, size) => {
-  const chunks = [];
-  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
-  return chunks;
+const EMPTY = {
+  uni: "", type: "", dept: "", level: "", intent: "", session: "",
+  freeOnly: false, trustedOnly: false, priceMin: "", priceMax: "",
 };
+const countActive = (f) => Object.values(f).filter((v) => v !== "" && v !== false).length;
 
-/* ─── Client-side score calculator (mirrors Cloud Function) ── */
-const REQUIRED_TAG_KEYS = ["institution", "courseCode", "department", "year", "resourceType"];
-
-function computeClientScore(doc) {
-  const salesCount = Number(doc.sales_count || doc.salesCount || 0);
-  const avgRating = Number(doc.average_rating || doc.averageRating || 0);
-  const totalReviews = Number(doc.total_review_count || doc.totalReviewCount || 0);
-  const isFaculty = Boolean(doc.isFaculty || doc.isVerifiedFaculty);
-  const isFullyTagged = REQUIRED_TAG_KEYS.every(k => {
-    const v = doc[k] || (doc.tags && doc.tags[k]);
-    return v && String(v).trim().length > 0;
+function applyFilters(rows, f) {
+  const min = f.priceMin !== "" ? Number(f.priceMin) : null;
+  const max = f.priceMax !== "" ? Number(f.priceMax) : null;
+  return rows.filter((r) => {
+    const b = r.book;
+    if (f.uni && r.uniKey !== f.uni) return false;
+    if (f.type && b.docType !== f.type) return false;
+    if (f.dept && b.department !== f.dept) return false;
+    if (f.level && norm(b.level) !== f.level) return false;
+    if (f.intent && intentKey(b.intent) !== f.intent) return false;
+    if (f.session && !String(b.session || "").includes(f.session)) return false;
+    if (f.freeOnly && !b.isFree) return false;
+    if (f.trustedOnly && !r.tier) return false;
+    if (min !== null && b.price < min) return false;
+    if (max !== null && b.price > max) return false;
+    return true;
   });
-
-  let ratingBoost = 0;
-  if (avgRating >= 5.0) ratingBoost = 80;
-  else if (avgRating >= 4.5) ratingBoost = 60;
-  else if (avgRating >= 4.0) ratingBoost = 40;
-  else if (avgRating >= 3.5) ratingBoost = 15;
-
-  return (salesCount * 5) + (avgRating * 15) + (totalReviews * 10) +
-    (isFaculty ? 100 : 0) + (isFullyTagged ? 30 : 0) + ratingBoost;
 }
 
-/* ─── Star rating display helper ───────────────────────────── */
-function StarRating({ rating = 0, count = 0 }) {
-  const r = Math.round(rating * 2) / 2; // round to nearest 0.5
+function sortRows(rows, sort) {
+  if (sort === "relevance") return rows;
+  const by = {
+    newest: (a, b) => b.book.createdMs - a.book.createdMs,
+    price_low: (a, b) => a.book.price - b.book.price,
+    price_high: (a, b) => b.book.price - a.book.price,
+    rating: (a, b) => b.book.averageRating - a.book.averageRating || b.book.totalReviewCount - a.book.totalReviewCount,
+    popular: (a, b) => (b.book.salesCount * 5 + b.book.views) - (a.book.salesCount * 5 + a.book.views),
+  }[sort];
+  return by ? rows.slice().sort(by) : rows;
+}
+
+function buildFacets(rows) {
+  const tally = (get) => {
+    const m = new Map();
+    rows.forEach((r) => { const v = get(r); if (v) m.set(v, (m.get(v) || 0) + 1); });
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14);
+  };
+  return {
+    uni: tally((r) => r.uniKey),
+    type: tally((r) => r.book.docType),
+    dept: tally((r) => r.book.department),
+    level: tally((r) => norm(r.book.level)),
+    intent: tally((r) => intentKey(r.book.intent)),
+    session: tally((r) => (String(r.book.session || "").match(/\d{4}/) || [""])[0]),
+  };
+}
+
+const levelLabel = (l) => (/^\d{3}$/.test(l) ? `${l} Level` : l === "pg" ? "Postgraduate" : l.toUpperCase());
+
+const SORTS = [
+  ["relevance", "Best match"],
+  ["newest", "Newest"],
+  ["popular", "Most purchased"],
+  ["rating", "Top rated"],
+  ["price_low", "Price: low to high"],
+  ["price_high", "Price: high to low"],
+];
+
+/* ═══════════════════════════════════════════════════════════
+   COMPONENTS
+═══════════════════════════════════════════════════════════ */
+function SearchAdCard({ ad, tier }) {
+  const click = async () => {
+    const id = ad.adId || ad.id;
+    if (id) {
+      try { await updateDoc(doc(db, "promotions", id), { clicks: increment(1) }); } catch { /* ignore */ }
+    }
+    if (ad.adLink) window.open(ad.adLink, "_blank");
+  };
+  const accent = tier === "Gold" ? GOLD : "#aaa";
+  const src = ad.image || ad.imageUrl || ad.coverImage || null;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
-      {[1, 2, 3, 4, 5].map(s => (
-        <span key={s} style={{ fontSize: "9px", color: s <= r ? GOLD : "#ddd", lineHeight: 1 }}>★</span>
+    <div onClick={click} className="sx-ad">
+      <div className="sx-cover">
+        {src ? (
+          <img src={src} alt={ad.title || "Ad"} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+        ) : (
+          <div className="sx-ph"><FileText size={24} strokeWidth={1.5} /><span>Sponsored</span></div>
+        )}
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, background: "rgba(13,34,68,.82)", padding: "3px 6px", display: "flex", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 8, fontWeight: 700, color: accent }}>{tier}</span>
+          <span style={{ fontSize: 8, fontWeight: 700, background: accent, color: NAVY, padding: "0 4px" }}>AD</span>
+        </div>
+      </div>
+      <div className="sx-body">
+        <h4 className="sx-title">{ad.title || "Sponsored"}</h4>
+        <p className="sx-line">{ad.author || ad.sponsor || "Sponsored"}</p>
+      </div>
+    </div>
+  );
+}
+
+function ProfileCard({ p }) {
+  const label = p.faculty ? "Verified Faculty" : p.verified ? "Verified Seller" : "Seller";
+  const accent = p.faculty ? GOLD : p.verified ? "#0369a1" : "#94a3b8";
+  const initial = (p.name || "?").trim()[0]?.toUpperCase() || "?";
+  const [bad, setBad] = useState(false);
+  return (
+    <Link href={profileHref(p)} className="sx-person" style={{ borderTopColor: accent }}>
+      <div className="sx-avatar" style={{ borderColor: accent }}>
+        {p.photo && !bad ? (
+          <img src={p.photo} alt="" onError={() => setBad(true)} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }} />
+        ) : (
+          <span style={{ fontFamily: "'Playfair Display',serif", fontSize: 24, fontWeight: 700, color: accent }}>{initial}</span>
+        )}
+      </div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <h3 className="sx-person-name">{[p.title, p.name].filter(Boolean).join(" ")}</h3>
+          {(p.faculty || p.verified) && <ShieldCheck size={13} style={{ color: accent, flexShrink: 0 }} />}
+        </div>
+        <p style={{ fontSize: 11, fontWeight: 700, color: accent, margin: "2px 0 0" }}>{label}</p>
+        {p.institution && <p className="sx-person-sub">{p.institution}</p>}
+        <p className="sx-person-sub">
+          {p.docs > 0 ? `${p.docs} document${p.docs !== 1 ? "s" : ""}` : "View profile"}
+          {p.booksSold > 0 ? ` · ${p.booksSold} sold` : ""}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+function BookCard({ r, isOwned }) {
+  const b = r.book;
+  const faculty = r.tier >= 2;
+  const verified = r.tier === 1;
+  const src = thumb(b);
+  const [bad, setBad] = useState(false);
+  const typeLabel = b.docType || INTENT_LABEL[intentKey(b.intent)] || "Document";
+
+  return (
+    <Link href={`/book/preview?id=${String(b.id).replace("firestore-", "")}`} className="sx-card">
+      <div className="sx-cover">
+        {src && !bad ? (
+          <img src={src} alt={b.title} loading="lazy" onError={() => setBad(true)} />
+        ) : (
+          <div className="sx-ph">
+            <FileText size={26} strokeWidth={1.5} />
+            <span>{typeLabel}</span>
+          </div>
+        )}
+        <span className="sx-pdf"><i />{b.format || "PDF"}</span>
+        {(faculty || verified) && (
+          <span className={`sx-trust ${faculty ? "fac" : "ver"}`}>
+            <ShieldCheck size={8} />{faculty ? "Faculty" : "Verified"}
+          </span>
+        )}
+        {isOwned && <span className="sx-owned">Owned</span>}
+        {r.trending ? <span className="sx-trend"><TrendingUp size={9} />{r.trending}</span> : null}
+      </div>
+
+      <div className="sx-body">
+        <h4 className="sx-title">{b.title}</h4>
+        <p className="sx-line">{typeMeta(b)}</p>
+        <span className="sx-type">{typeLabel}</span>
+        <div className="sx-price">
+          {b.isFree ? (
+            <span style={{ color: "#15803d" }}>Free</span>
+          ) : (
+            <span style={{ color: NAVY }}>₦{Number(b.price).toLocaleString()}</span>
+          )}
+          {b.isNegotiable && !b.isFree && <em>Negotiable</em>}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function BookGrid({ rows, owned }) {
+  return (
+    <div className="sx-grid">
+      {rows.map((r) => (
+        <BookCard key={r.book.id} r={r} isOwned={owned.has(r.book.id) || (r.book.firestoreId && owned.has(r.book.firestoreId))} />
       ))}
-      {count > 0 && (
-        <span style={{ fontSize: "9px", color: "#aaa", fontFamily: "'Lato',sans-serif", marginLeft: "2px" }}>
-          ({count})
-        </span>
-      )}
     </div>
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   USER PROFILE CARD
-════════════════════════════════════════════════════════════════ */
-function UserProfileCard({ user }) {
-  const [reporting, setReporting] = useState(false);
-  const [reported, setReported] = useState(false);
-
-  const badgeConfig = {
-    "Verified Faculty": { bg: "#fffbeb", border: GOLD, text: GOLD, icon: "🏛️" },
-    "Platinum Seller": { bg: "#f5f3ff", border: "#7c3aed", text: "#7c3aed", icon: "💎" },
-    "Gold Seller": { bg: "#fffbeb", border: GOLD, text: "#92400e", icon: "🥇" },
-    "Silver Seller": { bg: "#f8fafc", border: "#94a3b8", text: "#475569", icon: "🥈" },
-    "Bronze Seller": { bg: "#fdf6ee", border: "#cd7f32", text: "#92400e", icon: "🥉" },
-  };
-
-  const badge = user.badge || user.sellerTier || user.role || "Verified Seller";
-  const bc = badgeConfig[badge] || { bg: "#f0f9ff", border: "#0ea5e9", text: "#0369a1", icon: "✓" };
-
-  const handleReport = async () => {
-    if (reported) return;
-    setReporting(true);
-    try {
-      await setDoc(doc(db, "reports", `${user.uid || user.id}-${Date.now()}`), {
-        reportedUserId: user.uid || user.id,
-        reportedUserName: user.displayName || user.name,
-        reportedBy: auth.currentUser?.uid || "anonymous",
-        reason: "Flagged from search results",
-        timestamp: new Date().toISOString(),
-      });
-      setReported(true);
-    } catch { }
-    setReporting(false);
-  };
-
+function SectionHead({ title, sub, count }) {
   return (
-    <div style={{
-      background: "#fff",
-      border: "1px solid #e5ddd0",
-      borderTop: `3px solid ${bc.border}`,
-      padding: "20px",
-      position: "relative",
-      transition: "box-shadow .2s",
-    }}
-      onMouseEnter={e => e.currentTarget.style.boxShadow = "0 8px 32px rgba(13,34,68,.08)"}
-      onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
-    >
-      {/* Entity type label */}
-      <div style={{
-        position: "absolute", top: "10px", right: "10px",
-        fontSize: "8px", fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase",
-        color: bc.text, background: bc.bg, border: `1px solid ${bc.border}`,
-        padding: "3px 8px", fontFamily: "'Lato',sans-serif",
-      }}>
-        {bc.icon} {badge}
-      </div>
-
-      <div style={{ display: "flex", gap: "14px", alignItems: "flex-start", marginTop: "8px" }}>
-        {/* Avatar */}
-        <div style={{ flexShrink: 0 }}>
-          {user.photoURL || user.avatar ? (
-            <img
-              src={user.photoURL || user.avatar}
-              alt={user.displayName || user.name}
-              style={{ width: "56px", height: "56px", borderRadius: "50%", objectFit: "cover", border: `2px solid ${bc.border}` }}
-              onError={e => {
-                e.target.style.display = "none";
-                e.target.nextSibling.style.display = "flex";
-              }}
-            />
-          ) : null}
-          <div style={{
-            width: "56px", height: "56px", borderRadius: "50%",
-            background: bc.bg, border: `2px solid ${bc.border}`,
-            display: (user.photoURL || user.avatar) ? "none" : "flex",
-            alignItems: "center", justifyContent: "center",
-            fontFamily: "'Playfair Display',serif", fontSize: "20px", fontWeight: 700, color: bc.text,
-          }}>
-            {(user.displayName || user.name || "?")[0].toUpperCase()}
-          </div>
-        </div>
-
-        {/* Info */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 style={{
-            fontFamily: "'Playfair Display',serif", fontSize: "16px", fontWeight: 700,
-            color: NAVY, margin: "0 0 3px", lineHeight: 1.2,
-          }}>
-            {user.displayName || user.name}
-          </h3>
-
-          {user.institution && (
-            <p style={{ fontSize: "11px", color: "#888", margin: "0 0 6px", fontFamily: "'Lato',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              🎓 {user.institution}
-            </p>
-          )}
-
-          {user.bio && (
-            <p style={{
-              fontSize: "11px", color: "#666", margin: "0 0 10px",
-              fontFamily: "'Lato',sans-serif", lineHeight: 1.6,
-              display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
-            }}>
-              {user.bio}
-            </p>
-          )}
-
-          {/* Stats */}
-          <div style={{ display: "flex", gap: "12px", marginBottom: "12px", flexWrap: "wrap" }}>
-            {user.documentCount > 0 && (
-              <span style={{ fontSize: "10px", color: "#888", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", gap: "3px" }}>
-                <BookOpen size={10} style={{ color: GOLD }} />
-                {user.documentCount} docs
-              </span>
-            )}
-            {user.totalSales > 0 && (
-              <span style={{ fontSize: "10px", color: "#888", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", gap: "3px" }}>
-                <TrendingUp size={10} style={{ color: "#22c55e" }} />
-                {user.totalSales} sales
-              </span>
-            )}
-            {user.averageRating > 0 && (
-              <StarRating rating={user.averageRating} count={user.reviewCount} />
-            )}
-          </div>
-
-          {/* Action buttons */}
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <Link
-              href={`/seller/profile/${user.uid || user.id}`}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: "5px",
-                padding: "8px 16px", background: NAVY, color: "#fff",
-                fontSize: "10px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
-                textDecoration: "none", fontFamily: "'Lato',sans-serif",
-                transition: "background .15s",
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = "#162f5a"}
-              onMouseLeave={e => e.currentTarget.style.background = NAVY}
-            >
-              <ExternalLink size={10} /> View Profile
-            </Link>
-
-            <button
-              onClick={handleReport}
-              disabled={reported}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: "4px",
-                padding: "7px 12px",
-                background: "transparent",
-                color: reported ? "#aaa" : "#ef4444",
-                border: `1px solid ${reported ? "#e5ddd0" : "#fca5a5"}`,
-                fontSize: "10px", fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase",
-                fontFamily: "'Lato',sans-serif", cursor: reported ? "default" : "pointer",
-                transition: "all .15s",
-              }}
-              title={reported ? "Reported — thank you" : "Report this account"}
-            >
-              <Flag size={10} /> {reported ? "Reported" : "Report"}
-            </button>
-          </div>
-        </div>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+      <div style={{ width: 4, height: 30, background: GOLD, flexShrink: 0 }} />
+      <div style={{ minWidth: 0 }}>
+        <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700, color: NAVY, margin: 0 }}>
+          {title}
+          {count !== undefined && <span style={{ fontSize: 14, fontWeight: 400, color: "#bbb", marginLeft: 8, fontFamily: "'Lato',sans-serif" }}>({count})</span>}
+        </h3>
+        {sub && <p style={{ fontSize: 12, color: "#888", margin: "2px 0 0" }}>{sub}</p>}
       </div>
     </div>
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   FILTER PANEL
-════════════════════════════════════════════════════════════════ */
-const UNIVERSITIES = [
-  "University of Lagos", "Obafemi Awolowo University", "Ahmadu Bello University",
-  "University of Ibadan", "Federal University of Technology Akure", "University of Benin",
-  "Lagos State University", "University of Ghana", "University of Nigeria Nsukka",
-  "University of Port Harcourt", "Bayero University Kano", "University of Jos",
-];
+function Chip({ on, onClick, children }) {
+  return (
+    <button type="button" onClick={onClick} className={`sx-pill${on ? " on" : ""}`}>{children}</button>
+  );
+}
 
-const RESOURCE_TYPES = [
-  "Past Questions", "Lecture Notes", "Textbook", "Lab Manual",
-  "Lab Report", "Assignment", "Project", "Thesis", "Summary", "Slides",
-];
-
-const YEARS = Array.from({ length: 8 }, (_, i) => String(2026 - i));
-
-function FilterPanel({ filters, onChange, onClose, resultCount }) {
-  const [local, setLocal] = useState(filters);
-
-  const set = (key, val) => setLocal(prev => ({ ...prev, [key]: val }));
-
-  const apply = () => { onChange(local); onClose(); };
-  const reset = () => {
-    const empty = { institution: "", year: "", documentType: "", priceMin: "", priceMax: "", facultyOnly: false, fullyTaggedOnly: false };
-    setLocal(empty);
-    onChange(empty);
-    onClose();
-  };
-
-  const activeCount = Object.values(local).filter(v => v !== "" && v !== false).length;
+function FilterPanel({ filters, facets, onApply, onClose }) {
+  const [f, setF] = useState(filters);
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+  const toggle = (k, v) => set(k, f[k] === v ? "" : v);
+  const label = { fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: NAVY, display: "block", marginBottom: 8 };
+  const field = { width: "100%", padding: "10px 12px", border: `0.5px solid ${LINE}`, background: "#fff", fontSize: 13, color: NAVY };
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(13,34,68,.6)", zIndex: 60,
-      display: "flex", alignItems: "flex-end",
-    }} onClick={onClose}>
-      <div
-        style={{
-          background: BG, width: "100%", maxWidth: "500px", margin: "0 auto",
-          padding: "28px 24px 32px", borderTop: `3px solid ${GOLD}`,
-          maxHeight: "90vh", overflowY: "auto",
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-          <div>
-            <p style={{ fontSize: "8px", fontWeight: 700, letterSpacing: ".2em", textTransform: "uppercase", color: GOLD, margin: "0 0 2px", fontFamily: "'Lato',sans-serif" }}>Filter & Sort</p>
-            <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: "20px", fontWeight: 700, color: NAVY, margin: 0 }}>
-              Refine Results
-              {activeCount > 0 && <span style={{ fontSize: "12px", color: GOLD, fontFamily: "'Lato',sans-serif", marginLeft: "8px" }}>({activeCount} active)</span>}
-            </h2>
-          </div>
-          <button onClick={onClose} style={{ width: "32px", height: "32px", border: "0.5px solid #e5ddd0", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#888" }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(13,34,68,.6)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: BG, width: "100%", maxWidth: 520, margin: "0 auto", padding: "26px 24px 30px", borderTop: `3px solid ${GOLD}`, maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
+          <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700, color: NAVY, margin: 0 }}>Refine results</h2>
+          <button onClick={onClose} aria-label="Close" style={{ width: 32, height: 32, border: `0.5px solid ${LINE}`, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#888" }}>
             <X size={14} />
           </button>
         </div>
 
-        {/* Institution */}
-        <div style={{ marginBottom: "20px" }}>
-          <label style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: NAVY, display: "block", marginBottom: "8px", fontFamily: "'Lato',sans-serif" }}>Institution</label>
-          <select
-            value={local.institution || ""}
-            onChange={e => set("institution", e.target.value)}
-            style={{ width: "100%", padding: "10px 12px", border: "0.5px solid #e5ddd0", background: "#fff", fontFamily: "'Lato',sans-serif", fontSize: "13px", color: NAVY, appearance: "none", cursor: "pointer" }}
-          >
-            <option value="">All Institutions</option>
-            {UNIVERSITIES.map(u => <option key={u} value={u}>{u}</option>)}
-          </select>
-        </div>
+        {facets.uni.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <label style={label}>University</label>
+            <select style={field} value={f.uni} onChange={(e) => set("uni", e.target.value)}>
+              <option value="">All universities</option>
+              {facets.uni.map(([v, n]) => <option key={v} value={v}>{v} ({n})</option>)}
+            </select>
+          </div>
+        )}
 
-        {/* Document Type */}
-        <div style={{ marginBottom: "20px" }}>
-          <label style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: NAVY, display: "block", marginBottom: "8px", fontFamily: "'Lato',sans-serif" }}>Document Type</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-            {RESOURCE_TYPES.map(rt => (
-              <button
-                key={rt}
-                onClick={() => set("documentType", local.documentType === rt ? "" : rt)}
-                style={{
-                  padding: "6px 14px", fontSize: "11px", fontWeight: 700,
-                  fontFamily: "'Lato',sans-serif", letterSpacing: ".06em", textTransform: "uppercase",
-                  background: local.documentType === rt ? NAVY : "#fff",
-                  color: local.documentType === rt ? "#fff" : "#666",
-                  border: `1px solid ${local.documentType === rt ? NAVY : "#e5ddd0"}`,
-                  cursor: "pointer", transition: "all .12s",
-                }}
-              >{rt}</button>
-            ))}
+        {facets.type.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <label style={label}>Document type</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {facets.type.map(([v, n]) => <Chip key={v} on={f.type === v} onClick={() => toggle("type", v)}>{v} ({n})</Chip>)}
+            </div>
+          </div>
+        )}
+
+        {facets.intent.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <label style={label}>Category</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {facets.intent.map(([v, n]) => <Chip key={v} on={f.intent === v} onClick={() => toggle("intent", v)}>{INTENT_LABEL[v] || v} ({n})</Chip>)}
+            </div>
+          </div>
+        )}
+
+        {facets.level.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <label style={label}>Level</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {facets.level.map(([v, n]) => <Chip key={v} on={f.level === v} onClick={() => toggle("level", v)}>{levelLabel(v)} ({n})</Chip>)}
+            </div>
+          </div>
+        )}
+
+        {facets.dept.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <label style={label}>Department</label>
+            <select style={field} value={f.dept} onChange={(e) => set("dept", e.target.value)}>
+              <option value="">All departments</option>
+              {facets.dept.map(([v, n]) => <option key={v} value={v}>{v} ({n})</option>)}
+            </select>
+          </div>
+        )}
+
+        {facets.session.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <label style={label}>Session / year</label>
+            <select style={field} value={f.session} onChange={(e) => set("session", e.target.value)}>
+              <option value="">Any year</option>
+              {facets.session.map(([v, n]) => <option key={v} value={v}>{v} ({n})</option>)}
+            </select>
+          </div>
+        )}
+
+        <div style={{ marginBottom: 18 }}>
+          <label style={label}>Price (₦)</label>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <input type="number" placeholder="Min" value={f.priceMin} onChange={(e) => set("priceMin", e.target.value)} style={{ ...field, flex: 1 }} />
+            <span style={{ color: "#ccc" }}>–</span>
+            <input type="number" placeholder="Max" value={f.priceMax} onChange={(e) => set("priceMax", e.target.value)} style={{ ...field, flex: 1 }} />
           </div>
         </div>
 
-        {/* Year */}
-        <div style={{ marginBottom: "20px" }}>
-          <label style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: NAVY, display: "block", marginBottom: "8px", fontFamily: "'Lato',sans-serif" }}>Year</label>
-          <select
-            value={local.year || ""}
-            onChange={e => set("year", e.target.value)}
-            style={{ width: "100%", padding: "10px 12px", border: "0.5px solid #e5ddd0", background: "#fff", fontFamily: "'Lato',sans-serif", fontSize: "13px", color: NAVY, appearance: "none", cursor: "pointer" }}
-          >
-            <option value="">All Years</option>
-            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </div>
-
-        {/* Price range */}
-        <div style={{ marginBottom: "20px" }}>
-          <label style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: NAVY, display: "block", marginBottom: "8px", fontFamily: "'Lato',sans-serif" }}>Price Range (₦)</label>
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <input
-              type="number" placeholder="Min" value={local.priceMin || ""}
-              onChange={e => set("priceMin", e.target.value)}
-              style={{ flex: 1, padding: "10px 12px", border: "0.5px solid #e5ddd0", background: "#fff", fontFamily: "'Lato',sans-serif", fontSize: "13px", color: NAVY }}
-            />
-            <span style={{ color: "#ccc", fontFamily: "'Lato',sans-serif" }}>–</span>
-            <input
-              type="number" placeholder="Max" value={local.priceMax || ""}
-              onChange={e => set("priceMax", e.target.value)}
-              style={{ flex: 1, padding: "10px 12px", border: "0.5px solid #e5ddd0", background: "#fff", fontFamily: "'Lato',sans-serif", fontSize: "13px", color: NAVY }}
-            />
-          </div>
-        </div>
-
-        {/* Toggles */}
-        <div style={{ marginBottom: "24px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
           {[
-            ["facultyOnly", "🏛️ Faculty uploads only", "Show documents uploaded by Verified Faculty members"],
-            ["fullyTaggedOnly", "🏷️ Fully tagged documents only", "Only documents with complete metadata (institution, course code, dept, year, type)"],
-          ].map(([key, label, desc]) => (
-            <div
-              key={key}
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "#fff", border: "0.5px solid #e5ddd0", cursor: "pointer" }}
-              onClick={() => set(key, !local[key])}
-            >
+            ["trustedOnly", "Verified faculty and sellers only", "Hide documents from sellers without a verified badge"],
+            ["freeOnly", "Free documents only", "Open access documents with no price"],
+          ].map(([k, title, desc]) => (
+            <div key={k} onClick={() => set(k, !f[k])} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 12, background: "#fff", border: `0.5px solid ${LINE}`, cursor: "pointer" }}>
               <div>
-                <div style={{ fontSize: "12px", fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif" }}>{label}</div>
-                <div style={{ fontSize: "10px", color: "#888", fontFamily: "'Lato',sans-serif", marginTop: "2px" }}>{desc}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: NAVY }}>{title}</div>
+                <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{desc}</div>
               </div>
-              <div style={{
-                width: "40px", height: "22px", borderRadius: "99px",
-                background: local[key] ? NAVY : "#e5ddd0",
-                position: "relative", flexShrink: 0, marginLeft: "12px",
-                transition: "background .15s",
-              }}>
-                <div style={{
-                  position: "absolute", top: "3px",
-                  left: local[key] ? "21px" : "3px",
-                  width: "16px", height: "16px", borderRadius: "50%", background: "#fff",
-                  transition: "left .15s",
-                }} />
+              <div style={{ width: 40, height: 22, borderRadius: 99, background: f[k] ? NAVY : LINE, position: "relative", flexShrink: 0, marginLeft: 12 }}>
+                <div style={{ position: "absolute", top: 3, left: f[k] ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
               </div>
             </div>
           ))}
         </div>
 
-        {/* Actions */}
-        <div style={{ display: "flex", gap: "10px" }}>
-          <button onClick={apply} style={{ flex: 1, padding: "13px", background: NAVY, color: "#fff", fontFamily: "'Lato',sans-serif", fontSize: "12px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", border: "none", cursor: "pointer" }}>
-            Apply Filters
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => { onApply(f); onClose(); }} style={{ flex: 1, padding: 13, background: NAVY, color: "#fff", fontSize: 12, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", border: "none", cursor: "pointer" }}>
+            Show results
           </button>
-          <button onClick={reset} style={{ padding: "13px 20px", background: "transparent", color: "#888", fontFamily: "'Lato',sans-serif", fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", border: "0.5px solid #e5ddd0", cursor: "pointer" }}>
+          <button onClick={() => { onApply(EMPTY); onClose(); }} style={{ padding: "13px 20px", background: "transparent", color: "#888", fontSize: 12, fontWeight: 700, border: `0.5px solid ${LINE}`, cursor: "pointer" }}>
             Reset
           </button>
         </div>
@@ -418,753 +583,374 @@ function FilterPanel({ filters, onChange, onClose, resultCount }) {
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   MAIN COMPONENT
-════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   PAGE
+═══════════════════════════════════════════════════════════ */
 export default function SearchClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const q = searchParams.get("q")?.toLowerCase() || "";
+  const pathname = usePathname();
+  const q = (searchParams.get("q") || "").trim();
 
-  /* ── state ── */
-  const [searchResults, setSearchResults] = useState([]);
-  const [userResults, setUserResults] = useState([]);
-  const [mostSearchedBooks, setMostSearchedBooks] = useState([]);
-  const [purchasedBookIds, setPurchasedBookIds] = useState(new Set());
+  const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showMostSearched, setShowMostSearched] = useState(false);
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [parsedQuery, setParsedQuery] = useState(null);
-  const [filters, setFilters] = useState({
-    institution: "", year: "", documentType: "",
-    priceMin: "", priceMax: "", facultyOnly: false, fullyTaggedOnly: false,
-  });
+  const [rows, setRows] = useState([]);
+  const [people, setPeople] = useState([]);
+  const [relaxed, setRelaxed] = useState(false);
+  const [hints, setHints] = useState([]);
+  const [popular, setPopular] = useState([]);
+  const [owned, setOwned] = useState(() => new Set());
+  const [filters, setFilters] = useState(EMPTY);
+  const [sort, setSort] = useState("relevance");
+  const [showFilters, setShowFilters] = useState(false);
+  const [draft, setDraft] = useState(q);
+  const [shown, setShown] = useState(40);
+  const runRef = useRef(0);
 
   const goldAds = useAds("Gold", 5);
   const silverAds = useAds("Silver", 3);
 
-  /* ── track search ── */
-  const trackSearch = useCallback(async (sq) => {
-    if (!sq || sq.length < 2) return;
-    try {
-      await setDoc(doc(db, "searchAnalytics", sq), {
-        query: sq, count: increment(1), lastSearched: new Date().toISOString(),
-      }, { merge: true });
-    } catch { }
-  }, []);
+  useEffect(() => { setDraft(q); }, [q]);
 
-  /* ── most searched ── */
-  const fetchMostSearchedBooks = useCallback(async () => {
-    try {
-      const snap = await getDocs(collection(db, "searchAnalytics"));
-      const searches = [];
-      snap.forEach(d => searches.push({ query: d.data().query, count: d.data().count }));
-      searches.sort((a, b) => b.count - a.count);
-      const top = searches.slice(0, 10);
-      const matched = [];
-      for (const s of top) {
-        const book = booksData.find(b =>
-          b.title?.toLowerCase().includes(s.query) || b.author?.toLowerCase().includes(s.query)
-        );
-        if (book && !matched.find(m => m.id === book.id)) {
-          matched.push({ ...book, image: getThumbnailUrl(book), searchCount: s.count, source: "platform" });
-        }
-      }
-      setMostSearchedBooks(matched);
-    } catch { }
-  }, []);
-
-  /* ── purchased books ── */
+  /* build the index once */
   useEffect(() => {
-    const fetch = async () => {
+    let alive = true;
+    loadBooks().then(() => { if (alive) setReady(true); });
+    loadSellers().catch(() => { });
+    return () => { alive = false; };
+  }, []);
+
+  /* books this visitor already owns */
+  useEffect(() => {
+    const off = onAuthStateChanged(auth, async (u) => {
+      if (!u) { setOwned(new Set()); return; }
       try {
-        const user = auth.currentUser;
-        if (!user) return;
-        const ud = await getDoc(doc(db, "users", user.uid));
-        if (ud.exists()) {
-          const pb = ud.data().purchasedBooks || [];
-          setPurchasedBookIds(new Set(pb.map(b => b.id)));
-        }
-      } catch { }
-    };
-    fetch();
-    fetchMostSearchedBooks();
-  }, [fetchMostSearchedBooks]);
+        const snap = await getDoc(doc(db, "users", u.uid));
+        const pb = snap.exists() ? snap.data().purchasedBooks : null;
+        const ids = Array.isArray(pb)
+          ? pb.map((b) => String(b?.id ?? b))
+          : pb && typeof pb === "object" ? Object.keys(pb) : [];
+        setOwned(new Set(ids));
+      } catch { /* ignore */ }
+    });
+    return () => off();
+  }, []);
 
-  /* ══════════════════════════════════════════════════════════════
-     CORE SEARCH — weighted, ranked, dual-collection
-  ══════════════════════════════════════════════════════════════ */
+  /* the search itself */
   useEffect(() => {
-    const performSearch = async () => {
-      if (!q) {
-        setSearchResults([]);
-        setUserResults([]);
-        setShowMostSearched(true);
-        return;
-      }
+    if (!ready) return;
+    const run = ++runRef.current;
+    setShown(40);
+    setFilters(EMPTY);
 
-      setShowMostSearched(false);
+    if (!q) {
+      setRows([]); setPeople([]); setHints([]); setRelaxed(false); setLoading(false);
+      loadPopular().then((p) => { if (run === runRef.current) setPopular(p); });
+      return;
+    }
+
+    (async () => {
       setLoading(true);
-
-      // Parse the query into tokens
-      const parsed = parseSearchQuery(q);
-      setParsedQuery(parsed);
-      trackSearch(q);
-
       try {
-        /* ── 1. Platform booksData (client-side, scored) ── */
-        const platformResults = booksData
-          .filter(b => {
-            const searchable = [
-              b.title, b.author, b.category, b.courseCode,
-              b.university, b.department, b.faculty,
-              b.resourceType, b.description, b.subject, b.level,
-              ...(b.tags || []),
-            ].filter(Boolean).join(" ").toLowerCase();
+        const lib = await loadBooks();
+        const pq = parseQuery(q);
+        setHints(queryHints(pq));
 
-            // Text match
-            const textMatch = searchable.includes(q);
-
-            // Structured token match (higher relevance)
-            const tokenMatch = (
-              (parsed.tokens.courseCodes?.some(cc => searchable.includes(cc.toLowerCase()))) ||
-              (parsed.tokens.institution && searchable.includes(parsed.tokens.institution.toLowerCase())) ||
-              (parsed.tokens.documentType && searchable.includes(parsed.tokens.documentType.toLowerCase()))
-            );
-
-            return textMatch || tokenMatch;
-          })
-          .map(b => {
-            const scoreFromDb = Number(b.searchScore || 0);
-            const clientScore = computeClientScore(b);
-            const tokenBoost = (
-              (parsed.tokens.courseCodes?.some(cc => b.courseCode?.toLowerCase() === cc.toLowerCase()) ? 200 : 0) +
-              (parsed.tokens.institution && b.university?.toLowerCase() === parsed.tokens.institution.toLowerCase() ? 150 : 0) +
-              (parsed.tokens.documentType && b.resourceType?.toLowerCase() === parsed.tokens.documentType.toLowerCase() ? 100 : 0)
-            );
-            return {
-              ...b,
-              image: getThumbnailUrl(b),
-              source: "platform",
-              entity_type: "document",
-              _finalScore: (scoreFromDb || clientScore) + tokenBoost,
-            };
-          });
-
-        /* ── 2. Firestore advertMyBook (scored + filtered) ── */
-        const firestoreResults = [];
-        try {
-          // Build query with active filters
-          let constraints = [where("status", "==", "approved")];
-
-          // Apply structured token filters
-          if (filters.institution || parsed.tokens.institution) {
-            constraints.push(where("university", "==", filters.institution || parsed.tokens.institution));
-          }
-          if (filters.documentType || parsed.tokens.documentType) {
-            constraints.push(where("resourceType", "==", filters.documentType || parsed.tokens.documentType));
-          }
-          if (filters.year || parsed.tokens.year) {
-            constraints.push(where("year", "==", filters.year || parsed.tokens.year));
-          }
-          if (filters.priceMin) constraints.push(where("price", ">=", Number(filters.priceMin)));
-          if (filters.priceMax) constraints.push(where("price", "<=", Number(filters.priceMax)));
-          if (filters.facultyOnly) constraints.push(where("isFaculty", "==", true));
-          if (filters.fullyTaggedOnly) constraints.push(where("isFullyTagged", "==", true));
-
-          // Use pre-calculated searchScore when available (needs composite index)
-          const hasFieldFilters = constraints.length > 1;
-          if (!hasFieldFilters) {
-            // Simple case: orderBy searchScore directly
-            constraints.push(orderBy("searchScore", "desc"), limit(80));
-          } else {
-            // Filtered case: fetch then client-sort (Firestore inequality limit)
-            constraints.push(limit(80));
-          }
-
-          const snap = await getDocs(query(collection(db, "advertMyBook"), ...constraints));
-
-          snap.forEach(d => {
-            const data = d.data();
-            const searchable = [
-              data.bookTitle, data.author, data.category, data.courseCode,
-              data.university, data.department, data.faculty, data.resourceType,
-              data.description, data.tags?.join(" "), data.subject, data.level,
-            ].filter(Boolean).join(" ").toLowerCase();
-
-            const textMatch = searchable.includes(q);
-            const tokenMatch = (
-              (parsed.tokens.courseCodes?.some(cc => searchable.includes(cc.toLowerCase()))) ||
-              (parsed.tokens.institution && searchable.includes(parsed.tokens.institution.toLowerCase())) ||
-              (parsed.tokens.documentType && searchable.includes(parsed.tokens.documentType.toLowerCase()))
-            );
-
-            if (!textMatch && !tokenMatch) return;
-
-            const scoreFromDb = Number(data.searchScore || 0);
-            const clientScore = computeClientScore(data);
-            const tokenBoost = (
-              (parsed.tokens.courseCodes?.some(cc => data.courseCode?.toLowerCase() === cc.toLowerCase()) ? 200 : 0) +
-              (parsed.tokens.institution && data.university?.toLowerCase() === parsed.tokens.institution.toLowerCase() ? 150 : 0) +
-              (parsed.tokens.documentType && data.resourceType?.toLowerCase() === parsed.tokens.documentType.toLowerCase() ? 100 : 0)
-            );
-
-            const b = {
-              id: `firestore-${d.id}`, firestoreId: d.id,
-              title: data.bookTitle, author: data.author, category: data.category,
-              price: data.price, pages: data.pages, format: data.format || "PDF",
-              description: data.description, driveFileId: data.driveFileId,
-              pdfUrl: data.pdfUrl, previewUrl: data.previewUrl, embedUrl: data.embedUrl,
-              courseCode: data.courseCode || "", university: data.university || "",
-              department: data.department || "", faculty: data.faculty || "",
-              resourceType: data.resourceType || "", subject: data.subject || "",
-              level: data.level || "", tags: data.tags || [],
-              isFaculty: data.isFaculty || false, isFullyTagged: data.isFullyTagged || false,
-              averageRating: data.averageRating || data.average_rating || 0,
-              totalReviewCount: data.totalReviewCount || data.total_review_count || 0,
-              salesCount: data.salesCount || data.sales_count || 0,
-              isFromFirestore: true, source: "firestore", entity_type: "document",
-              _finalScore: (scoreFromDb || clientScore) + tokenBoost,
-            };
-            b.image = getThumbnailUrl(b);
-            firestoreResults.push(b);
-          });
-        } catch (err) {
-          console.warn("Firestore advertMyBook query error:", err);
+        let found = searchBooks(lib.index, pq, false);
+        let soft = false;
+        if (!found.length) {
+          found = searchBooks(lib.index, pq, true);
+          soft = found.length > 0;
         }
+        found = found.slice(0, 400);
 
-        /* ── 3. User / Seller profile search ── */
-        const userMatches = [];
-        if (parsed.isPersonSearch || parsed.tokens.personSurname) {
-          const searchName = (parsed.tokens.personSurname || q).toLowerCase();
-          try {
-            // Search sellers collection
-            const sellersSnap = await getDocs(
-              query(
-                collection(db, "sellers"),
-                where("status", "in", ["active", "verified"]),
-                limit(5)
-              )
-            );
-            sellersSnap.forEach(d => {
-              const data = d.data();
-              const nameMatch = (
-                data.displayName?.toLowerCase().includes(searchName) ||
-                data.name?.toLowerCase().includes(searchName) ||
-                data.firstName?.toLowerCase().includes(searchName) ||
-                data.lastName?.toLowerCase().includes(searchName)
-              );
-              if (nameMatch) {
-                userMatches.push({
-                  ...data,
-                  uid: d.id,
-                  entity_type: "user",
-                  source: "sellers",
-                });
-              }
-            });
+        const ids = uniq(found.slice(0, 150).map((r) => r.item.book.sellerId).filter(Boolean)).slice(0, 80);
+        const trust = await loadTrust(ids);
+        const ranked = orderByTrust(found, (b) => trust.get(b.sellerId));
+        const folks = await findProfiles(pq, lib.bySeller);
 
-            // Also search users collection
-            const usersSnap = await getDocs(
-              query(
-                collection(db, "users"),
-                where("role", "in", ["seller", "faculty", "Verified Faculty", "lecturer"]),
-                limit(20)
-              )
-            );
-            usersSnap.forEach(d => {
-              const data = d.data();
-              const nameMatch = (
-                data.displayName?.toLowerCase().includes(searchName) ||
-                data.name?.toLowerCase().includes(searchName)
-              );
-              if (nameMatch && !userMatches.find(u => u.uid === d.id)) {
-                userMatches.push({
-                  ...data,
-                  uid: d.id,
-                  entity_type: "user",
-                  source: "users",
-                });
-              }
-            });
-          } catch (err) {
-            console.warn("User search error:", err);
-          }
-        }
-
-        /* ── 4. Merge + sort all document results ── */
-        const allDocs = [...platformResults, ...firestoreResults];
-
-        // Deduplicate by title+author similarity
-        const seen = new Set();
-        const deduped = allDocs.filter(b => {
-          const key = `${b.title?.toLowerCase().replace(/\s+/g, "")}-${b.author?.toLowerCase().replace(/\s+/g, "")}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-
-        // Sort: purchased first, then by _finalScore desc
-        deduped.sort((a, b) => {
-          const aPurchased = purchasedBookIds.has(a.id) ? 1 : 0;
-          const bPurchased = purchasedBookIds.has(b.id) ? 1 : 0;
-          if (bPurchased !== aPurchased) return bPurchased - aPurchased;
-          return (b._finalScore || 0) - (a._finalScore || 0);
-        });
-
-        setSearchResults(deduped);
-        setUserResults(userMatches);
-      } catch (err) {
-        console.error("Search error:", err);
-        setSearchResults(
-          booksData
-            .filter(b => b.title?.toLowerCase().includes(q) || b.author?.toLowerCase().includes(q))
-            .map(b => ({ ...b, image: getThumbnailUrl(b), source: "platform", entity_type: "document" }))
-        );
+        if (run !== runRef.current) return;
+        setRows(ranked);
+        setRelaxed(soft);
+        setPeople(folks);
+        if (ranked.length) track(pq.n);
+      } catch (e) {
+        console.error("[search]", e);
+        if (run === runRef.current) { setRows([]); setPeople([]); }
       } finally {
-        setLoading(false);
+        if (run === runRef.current) setLoading(false);
       }
-    };
+    })();
+  }, [q, ready]);
 
-    performSearch();
-  }, [q, filters, trackSearch]);
+  const facets = useMemo(() => buildFacets(rows), [rows]);
+  const visible = useMemo(() => sortRows(applyFilters(rows, filters), sort), [rows, filters, sort]);
+  const trustedRows = sort === "relevance" ? visible.filter((r) => r.trusted) : [];
+  const otherRows = sort === "relevance" ? visible.filter((r) => !r.trusted) : visible;
+  const active = countActive(filters);
 
-  const isPurchased = id => purchasedBookIds.has(id);
-
-  const activeFilterCount = Object.values(filters).filter(v => v !== "" && v !== false).length;
-
-  /* ── Ad card ── */
-  const SearchAdCard = ({ ad, tier }) => {
-    const handleClick = async () => {
-      const id = ad.adId || ad.id;
-      if (id) {
-        try { await updateDoc(doc(db, "promotions", id), { clicks: increment(1) }); } catch { }
-      }
-      if (ad.adLink) window.open(ad.adLink, "_blank");
-    };
-    const accentColor = tier === "Gold" ? GOLD : "#aaa";
-    const imgSrc = ad.image || ad.imageUrl || ad.coverImage || null;
-    return (
-      <div onClick={handleClick} style={{ flexShrink: 0, width: 160, cursor: "pointer" }}>
-        <div style={{ position: "relative", background: "#ede8df", overflow: "hidden", marginBottom: 8 }}>
-          {imgSrc
-            ? <img src={imgSrc} alt={ad.title || "Ad"}
-              style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block" }}
-              onError={e => e.target.style.display = "none"} />
-            : <div style={{ width: "100%", aspectRatio: "3/4", background: "#ddd", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#aaa" }}>No image</div>
-          }
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, background: "rgba(13,34,68,.8)", padding: "4px 8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 7, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: accentColor, fontFamily: "'Lato',sans-serif" }}>Featured · {tier}</span>
-            <span style={{ fontSize: 7, fontWeight: 700, background: accentColor, color: NAVY, padding: "1px 5px", fontFamily: "'Lato',sans-serif" }}>AD</span>
-          </div>
-          <div style={{ position: "absolute", bottom: 6, left: 6, background: NAVY, padding: "2px 7px", fontSize: 7, fontWeight: 700, color: "#fff", fontFamily: "'Lato',sans-serif", letterSpacing: ".08em", display: "flex", alignItems: "center", gap: 3 }}>
-            <span style={{ width: 4, height: 4, borderRadius: "50%", background: "#22c55e" }} />PDF
-          </div>
-        </div>
-        <h4 style={{ fontFamily: "'Playfair Display',serif", fontSize: 12, fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.3 }}>{ad.title || "Sponsored"}</h4>
-        <p style={{ fontSize: 10, color: "#888", margin: 0, fontFamily: "'Lato',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad.author || ad.sponsor || ""}</p>
-      </div>
-    );
+  const submit = (e) => {
+    e.preventDefault();
+    const v = draft.trim();
+    router.push(v ? `${pathname}?q=${encodeURIComponent(v)}` : pathname);
   };
 
-  /* ── Book Card ── */
-  const BookCard = ({ book, showTrending = false }) => {
-    const owned = isPurchased(book.id);
-    return (
-      <Link href={`/book/preview?id=${String(book.id).replace("firestore-", "")}`} style={{ textDecoration: "none", display: "block" }}>
-        <div style={{ position: "relative", background: "#ede8df", overflow: "hidden" }}>
-          <img
-            src={getThumbnailUrl(book)}
-            alt={book.title}
-            style={{ width: "100%", aspectRatio: "3/4", objectFit: "cover", display: "block", transition: "transform 0.5s cubic-bezier(0.4,0,0.2,1)" }}
-            className="book-thumb-img"
-            onError={e => { e.target.style.display = "none"; }}
-          />
-          {/* Faculty badge */}
-          {book.isFaculty && (
-            <div style={{ position: "absolute", top: "8px", right: "8px", background: GOLD, color: NAVY, fontSize: "8px", fontWeight: 700, padding: "2px 6px", fontFamily: "'Lato',sans-serif", display: "flex", alignItems: "center", gap: "3px" }}>
-              <ShieldCheck size={8} /> FACULTY
-            </div>
-          )}
-          {/* PDF badge */}
-          <div style={{ position: "absolute", top: book.isFaculty ? "28px" : "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: NAVY, padding: "3px 8px", fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em", color: "#fff", fontFamily: "'Lato', sans-serif" }}>
-            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", display: "inline-block" }} /> PDF
-          </div>
-          {owned && (
-            <span style={{ position: "absolute", bottom: "8px", right: "8px", background: "#15803d", color: "#fff", fontSize: "9px", fontWeight: 700, padding: "3px 8px", fontFamily: "'Lato', sans-serif" }}>OWNED</span>
-          )}
-          {showTrending && book.searchCount && (
-            <div style={{ position: "absolute", bottom: "8px", left: "8px", display: "inline-flex", alignItems: "center", gap: "4px", background: "#ea580c", padding: "3px 8px", fontSize: "9px", fontWeight: 700, color: "#fff", fontFamily: "'Lato', sans-serif" }}>
-              <TrendingUp size={10} /> {book.searchCount}
-            </div>
-          )}
-        </div>
-        <div style={{ padding: "10px 10px 12px", borderTop: "0.5px solid #f0ebe0", background: "#fff" }}>
-          <h4 style={{ fontFamily: "'Playfair Display', serif", fontSize: "13px", fontWeight: 700, color: NAVY, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.35 }}>
-            {book.title}
-          </h4>
-          <p style={{ fontSize: "11px", color: "#888", margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Lato', sans-serif" }}>
-            {book.author}
-          </p>
-          {/* Rating */}
-          {book.averageRating > 0 && (
-            <div style={{ marginBottom: "4px" }}>
-              <StarRating rating={book.averageRating} count={book.totalReviewCount} />
-            </div>
-          )}
-          {/* Meta tags */}
-          {(book.university || book.courseCode) && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "5px" }}>
-              {book.courseCode && (
-                <span style={{ fontSize: "9px", fontWeight: 700, background: "rgba(13,34,68,0.08)", color: NAVY, padding: "2px 6px", letterSpacing: "0.06em", fontFamily: "'Lato',sans-serif" }}>
-                  {book.courseCode}
-                </span>
-              )}
-              {book.university && (
-                <span style={{ fontSize: "9px", color: "#aaa", fontFamily: "'Lato',sans-serif", padding: "2px 0" }}>
-                  {book.university}
-                </span>
-              )}
-            </div>
-          )}
-          {book.resourceType && (
-            <span style={{ fontSize: "9px", fontWeight: 700, color: GOLD, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'Lato',sans-serif", display: "block", marginBottom: "4px" }}>
-              {book.resourceType}
-            </span>
-          )}
-          {book.price && (
-            <p style={{ fontSize: "12px", fontWeight: 700, color: NAVY, margin: 0, fontFamily: "'Lato', sans-serif" }}>
-              ₦{Number(book.price).toLocaleString()}
-            </p>
-          )}
-          {/* Fully-tagged indicator */}
-          {book.isFullyTagged && (
-            <div style={{ marginTop: "4px", fontSize: "8px", color: "#22c55e", fontFamily: "'Lato',sans-serif", fontWeight: 700, letterSpacing: ".06em" }}>
-              ✓ COMPLETE METADATA
-            </div>
-          )}
-        </div>
-      </Link>
-    );
-  };
+  const filterChips = Object.entries(filters)
+    .filter(([, v]) => v !== "" && v !== false)
+    .map(([k, v]) => {
+      const text = {
+        uni: v, type: v, dept: v, session: v,
+        level: levelLabel(String(v)), intent: INTENT_LABEL[v] || v,
+        freeOnly: "Free only", trustedOnly: "Verified only",
+        priceMin: `From ₦${v}`, priceMax: `Up to ₦${v}`,
+      }[k];
+      return { k, text };
+    });
 
-  /* ── Book section (grid + optional carousel on mobile) ── */
-  const BookSection = ({ title, books, showTrending = false, count }) => (
-    <div style={{ marginBottom: "48px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
-        <div style={{ width: "4px", height: "28px", background: GOLD }} />
-        <div>
-          <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, margin: "0 0 2px", fontFamily: "'Lato', sans-serif" }}>
-            {showTrending ? "Most Popular" : "Results"}
-          </p>
-          <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: NAVY, margin: 0 }}>
-            {title}
-            {count !== undefined && (
-              <span style={{ fontSize: "14px", fontWeight: 400, color: "#bbb", marginLeft: "8px", fontFamily: "'Lato', sans-serif" }}>({count})</span>
-            )}
-          </h3>
-        </div>
-      </div>
+  const hasAnything = visible.length > 0 || people.length > 0;
 
-      {/* Mobile carousel */}
-      <div className="lg:hidden">
-        {chunkArray(books, 5).map((row, ri) => (
-          <div key={ri} style={{ overflowX: "auto", paddingBottom: "12px", marginBottom: "8px" }} className="sbar-none">
-            <div style={{ display: "flex", gap: "10px", minWidth: "max-content" }}>
-              {row.map(book => (
-                <div key={book.id} style={{ flexShrink: 0, width: "150px" }}>
-                  <BookCard book={book} showTrending={showTrending} />
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Desktop grid */}
-      <div className="lg-grid-override" style={{ display: "none" }}>
-        {books.map(book => <BookCard key={book.id} book={book} showTrending={showTrending} />)}
-      </div>
-    </div>
-  );
-
-  /* ─────────────────────── RENDER ─────────────────────────── */
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lato:wght@300;400;700&display=swap');
-        .search-root { font-family: 'Lato', sans-serif; background: ${BG}; min-height: 100vh; }
-        .sbar-none { scrollbar-width: none; -ms-overflow-style: none; }
-        .sbar-none::-webkit-scrollbar { display: none; }
-        .book-thumb-img { transition: transform 0.5s cubic-bezier(0.4,0,0.2,1); }
-        .book-thumb-wrapper:hover .book-thumb-img { transform: scale(1.06); }
-        @media (min-width: 1024px) {
-          .lg-grid-override { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
-          .lg\\:hidden { display: none !important; }
-        }
-        .spinner { width: 36px; height: 36px; border: 2px solid rgba(13,34,68,0.1); border-top-color: ${GOLD}; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .search-book-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        @media (min-width: 480px)  { .search-book-grid { grid-template-columns: repeat(3, 1fr); } }
-        @media (min-width: 768px)  { .search-book-grid { grid-template-columns: repeat(4, 1fr); gap: 16px; } }
-        @media (min-width: 1024px) { .search-book-grid { grid-template-columns: repeat(5, 1fr); } }
-        .user-results-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-        @media (min-width: 640px)  { .user-results-grid { grid-template-columns: repeat(2, 1fr); } }
-        @media (min-width: 1024px) { .user-results-grid { grid-template-columns: repeat(3, 1fr); } }
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900&family=Lato:wght@300;400;700&display=swap');
+        .sx { font-family:'Lato',sans-serif; background:${BG}; min-height:100vh; overflow-x:hidden; }
+        .sx *, .sx *::before, .sx *::after { box-sizing:border-box; }
+        .sx-wrap { max-width:1200px; margin:0 auto; padding:0 24px; }
+        .sx-hero { background:${NAVY}; background-image:radial-gradient(rgba(184,150,62,.06) 1px,transparent 1px); background-size:22px 22px; padding:44px 0 32px; }
+        .sx-hero h1 { font-family:'Playfair Display',serif; font-size:clamp(26px,5vw,42px); font-weight:700; color:#fff; margin:0 0 6px; line-height:1.1; }
+        .sx-form { display:flex; margin-top:20px; max-width:720px; }
+        .sx-form input { flex:1; min-width:0; padding:14px 16px; border:none; font-size:15px; color:${NAVY}; outline:none; font-family:'Lato',sans-serif; }
+        .sx-form button { padding:0 24px; background:${GOLD}; color:${NAVY}; border:none; font-weight:700; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:7px; }
+        .sx-form button:hover { background:#d4aa5a; }
+        .sx-hint { font-size:11px; font-weight:700; background:rgba(184,150,62,.15); color:#d4aa5a; border:1px solid rgba(184,150,62,.3); padding:3px 10px; }
+        .sx-bar { background:${CREAM}; border-bottom:.5px solid ${LINE}; padding:12px 0; }
+        .sx-btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; background:#fff; color:#666; border:1px solid ${LINE}; }
+        .sx-btn.on { background:${NAVY}; color:#fff; border-color:${NAVY}; }
+        .sx-sel { padding:8px 10px; font-size:12px; border:1px solid ${LINE}; background:#fff; color:${NAVY}; }
+        .sx-tag { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; background:#fff; border:.5px solid ${LINE}; font-size:11px; font-weight:700; color:${NAVY}; }
+        .sx-tag button { background:none; border:none; padding:0; cursor:pointer; color:#aaa; display:flex; }
+
+        /* ── small document tiles (same size as the All Books page) ── */
+        .sx-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(112px, 1fr)); gap:22px 14px; }
+        @media (min-width:640px) { .sx-grid { grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:26px 18px; } }
+        .sx-card, .sx-ad { display:block; min-width:0; text-decoration:none; cursor:pointer; }
+        .sx-card:focus-visible, .sx-person:focus-visible { outline:2px solid ${GOLD}; outline-offset:2px; }
+        .sx-cover { position:relative; aspect-ratio:3/4; background:#ece6d8; overflow:hidden; box-shadow:0 4px 12px rgba(13,34,68,.14); }
+        .sx-cover img { width:100%; height:100%; object-fit:cover; display:block; transition:transform .4s; }
+        .sx-card:hover .sx-cover img { transform:scale(1.05); }
+        .sx-ph { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:10px; text-align:center; color:${NAVY}; background:linear-gradient(160deg, #f3ede0 0%, #e4dbc6 100%); }
+        .sx-ph svg { opacity:.45; }
+        .sx-ph span { font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; line-height:1.3; opacity:.7; max-width:100%; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+        .sx-pdf { position:absolute; top:6px; left:6px; display:inline-flex; align-items:center; gap:3px; background:${NAVY}; padding:2px 6px; font-size:8px; font-weight:700; color:#fff; }
+        .sx-pdf i { width:4px; height:4px; border-radius:50%; background:#22c55e; display:inline-block; }
+        .sx-trust { position:absolute; top:6px; right:6px; display:inline-flex; align-items:center; gap:2px; padding:2px 5px; font-size:8px; font-weight:700; }
+        .sx-trust.fac { background:${GOLD}; color:${NAVY}; }
+        .sx-trust.ver { background:#e0f2fe; color:#0369a1; }
+        .sx-owned { position:absolute; bottom:6px; right:6px; background:#15803d; color:#fff; font-size:8px; font-weight:700; padding:2px 6px; }
+        .sx-trend { position:absolute; bottom:6px; left:6px; display:inline-flex; align-items:center; gap:3px; background:#ea580c; color:#fff; font-size:8px; font-weight:700; padding:2px 6px; }
+        .sx-body { padding:8px 2px 0; min-width:0; }
+        .sx-title { font-family:'Playfair Display',serif; font-size:12px; font-weight:700; color:${NAVY}; margin:0 0 3px; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
+        .sx-line { font-size:10.5px; color:#888; margin:0 0 3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .sx-type { display:block; font-size:9px; font-weight:700; color:${GOLD}; letter-spacing:.08em; text-transform:uppercase; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .sx-price { display:flex; align-items:center; gap:6px; margin-top:3px; font-size:12px; font-weight:700; }
+        .sx-price em { font-style:normal; font-size:9px; font-weight:700; color:${GOLD}; }
+
+        .sx-ads { display:flex; gap:14px; overflow-x:auto; padding-bottom:8px; scrollbar-width:none; }
+        .sx-ads::-webkit-scrollbar { display:none; }
+        .sx-ads > * { flex:0 0 120px; }
+        @media (min-width:640px) { .sx-ads > * { flex-basis:140px; } }
+
+        .sx-people { display:grid; grid-template-columns:1fr; gap:12px; }
+        @media (min-width:640px) { .sx-people { grid-template-columns:repeat(2,1fr); } }
+        @media (min-width:1024px) { .sx-people { grid-template-columns:repeat(3,1fr); } }
+        .sx-person { display:flex; gap:14px; align-items:center; min-width:0; padding:16px; background:#fff; border:.5px solid ${LINE}; border-top:3px solid ${GOLD}; text-decoration:none; transition:box-shadow .15s; }
+        .sx-person:hover { box-shadow:0 6px 20px rgba(13,34,68,.08); }
+        .sx-avatar { width:64px; height:64px; border-radius:20px; overflow:hidden; border:1.5px solid ${GOLD}; background:${CREAM}; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .sx-person-name { font-family:'Playfair Display',serif; font-size:16px; font-weight:700; color:${NAVY}; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .sx-person-sub { font-size:11px; color:#888; margin:2px 0 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .sx-pill { padding:6px 14px; font-size:11px; font-weight:700; background:#fff; color:#666; border:1px solid ${LINE}; cursor:pointer; }
+        .sx-pill.on { background:${NAVY}; color:#fff; border-color:${NAVY}; }
+        .sx-spin { width:36px; height:36px; border:2px solid rgba(13,34,68,.1); border-top-color:${GOLD}; border-radius:50%; animation:sxspin .7s linear infinite; margin:0 auto; }
+        @keyframes sxspin { to { transform:rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .sx *, .sx-spin { animation:none !important; transition:none !important; } }
       `}</style>
 
-      <div className="search-root">
+      <div className="sx">
         <Navbar />
 
-        {/* ── Search Hero ── */}
-        <div style={{
-          background: NAVY,
-          backgroundImage: "radial-gradient(rgba(184,150,62,0.06) 1px, transparent 1px)",
-          backgroundSize: "22px 22px",
-          padding: "48px 24px 36px",
-        }}>
-          <div style={{ maxWidth: "900px", margin: "0 auto" }}>
-            {q ? (
-              <>
-                <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", marginBottom: "10px", fontFamily: "'Lato', sans-serif" }}>
-                  Search Results
-                </p>
-                <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(28px, 5vw, 46px)", fontWeight: 700, color: "#fff", margin: "0 0 12px", lineHeight: 1.08 }}>
-                  Results for <span style={{ color: GOLD, fontStyle: "italic" }}>"{q}"</span>
-                </h1>
-                {!loading && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-                    <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.5)", margin: 0, fontWeight: 300 }}>
-                      {searchResults.length} document{searchResults.length !== 1 ? "s" : ""}
-                      {userResults.length > 0 && ` · ${userResults.length} profile${userResults.length !== 1 ? "s" : ""}`}
-                      {" "}found
-                    </p>
+        {/* ── Hero with its own search box ── */}
+        <section className="sx-hero">
+          <div className="sx-wrap">
+            <h1>{q ? `Results for “${q}”` : "Search the library"}</h1>
+            <p style={{ fontSize: 14, color: "rgba(255,255,255,.55)", margin: 0, fontWeight: 300 }}>
+              {q
+                ? loading ? "Searching…" : `${visible.length} document${visible.length !== 1 ? "s" : ""}${people.length ? ` and ${people.length} profile${people.length !== 1 ? "s" : ""}` : ""} found`
+                : "Search by title, course code, university, author or lecturer"}
+            </p>
 
-                    {/* Parsed token chips */}
-                    {parsedQuery?.hasStructuredTokens && (
-                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                        {parsedQuery.tokens.courseCodes?.map(cc => (
-                          <span key={cc} style={{ fontSize: "9px", fontWeight: 700, letterSpacing: ".1em", background: "rgba(184,150,62,.15)", color: GOLD, border: "1px solid rgba(184,150,62,.3)", padding: "3px 10px", fontFamily: "'Lato',sans-serif" }}>
-                            {cc}
-                          </span>
-                        ))}
-                        {parsedQuery.tokens.institution && (
-                          <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: ".1em", background: "rgba(255,255,255,.08)", color: "rgba(255,255,255,.6)", border: "1px solid rgba(255,255,255,.12)", padding: "3px 10px", fontFamily: "'Lato',sans-serif" }}>
-                            {parsedQuery.tokens.institutionAbbr || parsedQuery.tokens.institution}
-                          </span>
-                        )}
-                        {parsedQuery.tokens.documentType && (
-                          <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: ".1em", background: "rgba(255,255,255,.08)", color: "rgba(255,255,255,.6)", border: "1px solid rgba(255,255,255,.12)", padding: "3px 10px", fontFamily: "'Lato',sans-serif" }}>
-                            {parsedQuery.tokens.documentType}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(184,150,62,0.7)", marginBottom: "10px", fontFamily: "'Lato', sans-serif" }}>Trending</p>
-                <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(28px, 5vw, 46px)", fontWeight: 700, color: "#fff", margin: "0 0 8px", lineHeight: 1.08 }}>
-                  Most Searched <span style={{ color: GOLD, fontStyle: "italic" }}>Documents</span>
-                </h1>
-                <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.5)", margin: 0, fontWeight: 300 }}>
-                  What students across Africa are looking for
-                </p>
-              </>
+            <form onSubmit={submit} className="sx-form">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="e.g. CHE 301 UNILAG past questions"
+                aria-label="Search documents"
+              />
+              <button type="submit"><Search size={15} />Search</button>
+            </form>
+
+            {hints.length > 0 && !loading && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+                {hints.map((h) => <span key={h.kind + h.label} className="sx-hint">{h.label}</span>)}
+              </div>
             )}
           </div>
-        </div>
+        </section>
 
         {/* ── Filter bar ── */}
-        {q && (
-          <div style={{ background: CREAM, borderBottom: "0.5px solid #e5ddd0", padding: "12px 24px" }}>
-            <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-              <button
-                onClick={() => setShowFilterPanel(true)}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: "6px",
-                  padding: "8px 16px", background: activeFilterCount > 0 ? NAVY : "#fff",
-                  color: activeFilterCount > 0 ? "#fff" : "#666",
-                  border: `1px solid ${activeFilterCount > 0 ? NAVY : "#e5ddd0"}`,
-                  fontFamily: "'Lato',sans-serif", fontSize: "11px", fontWeight: 700,
-                  letterSpacing: ".08em", textTransform: "uppercase", cursor: "pointer",
-                  transition: "all .15s",
-                }}
-              >
-                <SlidersHorizontal size={13} />
-                Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
+        {q && !loading && rows.length > 0 && (
+          <div className="sx-bar">
+            <div className="sx-wrap" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <button className={`sx-btn${active ? " on" : ""}`} onClick={() => setShowFilters(true)}>
+                <SlidersHorizontal size={13} />Filters{active ? ` (${active})` : ""}
               </button>
-
-              {/* Active filter chips */}
-              {activeFilterCount > 0 && (
-                <>
-                  {Object.entries(filters).filter(([, v]) => v !== "" && v !== false).map(([k, v]) => (
-                    <span key={k} style={{
-                      display: "inline-flex", alignItems: "center", gap: "6px",
-                      padding: "5px 10px", background: "#fff", border: "0.5px solid #e5ddd0",
-                      fontSize: "10px", fontWeight: 700, color: NAVY, fontFamily: "'Lato',sans-serif",
-                    }}>
-                      {String(v === true ? k : v)}
-                      <X size={10} style={{ cursor: "pointer", color: "#aaa" }}
-                        onClick={() => setFilters(prev => ({ ...prev, [k]: typeof prev[k] === "boolean" ? false : "" }))}
-                      />
-                    </span>
-                  ))}
-                  <button
-                    onClick={() => setFilters({ institution: "", year: "", documentType: "", priceMin: "", priceMax: "", facultyOnly: false, fullyTaggedOnly: false })}
-                    style={{ fontSize: "10px", fontWeight: 700, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'Lato',sans-serif", textDecoration: "underline" }}
-                  >
-                    Clear all
+              {filterChips.map(({ k, text }) => (
+                <span key={k} className="sx-tag">
+                  {text}
+                  <button aria-label={`Remove ${text}`} onClick={() => setFilters((p) => ({ ...p, [k]: typeof p[k] === "boolean" ? false : "" }))}>
+                    <X size={11} />
                   </button>
-                </>
+                </span>
+              ))}
+              {active > 0 && (
+                <button onClick={() => setFilters(EMPTY)} style={{ fontSize: 11, fontWeight: 700, color: "#aaa", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+                  Clear all
+                </button>
               )}
-
-              <span style={{ marginLeft: "auto", fontSize: "10px", color: "#aaa", fontFamily: "'Lato',sans-serif" }}>
-                {!loading && `${searchResults.length + userResults.length} result${searchResults.length + userResults.length !== 1 ? "s" : ""}`}
-              </span>
+              <select className="sx-sel" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort results" style={{ marginLeft: "auto" }}>
+                {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
             </div>
           </div>
         )}
 
         {/* ── Ads ── */}
-        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "24px 24px 0" }}>
-          {goldAds.length > 0 && (
-            <div style={{ marginBottom: 24 }}>
-              <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: GOLD, fontFamily: "'Lato',sans-serif", margin: "0 0 6px" }}>Featured · Gold</p>
-              <p style={{ fontSize: 20, fontWeight: 700, color: NAVY, fontFamily: "'Playfair Display', serif", margin: "0 0 10px" }}>Recommended for You</p>
-              <div className="sbar-none" style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 8 }}>
-                {goldAds.map(ad => <SearchAdCard key={ad.adId} ad={ad} tier="Gold" />)}
-              </div>
-            </div>
-          )}
-          {silverAds.length > 0 && (
-            <div style={{ marginBottom: 8 }}>
-              <p style={{ fontSize: 8, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: "#aaa", fontFamily: "'Lato',sans-serif", margin: "0 0 10px" }}>Featured · Silver</p>
-              <div className="sbar-none" style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 8 }}>
-                {silverAds.map(ad => <SearchAdCard key={ad.adId} ad={ad} tier="Silver" />)}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <hr style={{ color: "#ddd", margin: 0 }} />
-
-        {/* ── Main content ── */}
-        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "48px 24px" }}>
-
-          {/* Loading */}
-          {loading && (
-            <div style={{ textAlign: "center", padding: "80px 24px" }}>
-              <div className="spinner" />
-              <p style={{ fontSize: "12px", color: "#bbb", marginTop: "16px", fontWeight: 300 }}>Searching documents…</p>
-            </div>
-          )}
-
-          {/* Most searched */}
-          {!loading && showMostSearched && (
-            mostSearchedBooks.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "80px 24px" }}>
-                <div style={{ width: "64px", height: "64px", border: "0.5px solid #e5ddd0", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                  <Search size={28} style={{ color: "#ccc" }} />
+        {(goldAds.length > 0 || silverAds.length > 0) && (
+          <div className="sx-wrap" style={{ paddingTop: 24 }}>
+            {goldAds.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: GOLD, margin: "0 0 4px" }}>Featured · Gold</p>
+                <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: NAVY, margin: "0 0 10px" }}>Recommended for you</p>
+                <div className="sx-ads">
+                  {goldAds.map((ad) => <SearchAdCard key={ad.adId || ad.id} ad={ad} tier="Gold" />)}
                 </div>
-                <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "20px", color: NAVY, margin: "0 0 6px" }}>No search data yet</p>
-                <p style={{ fontSize: "12px", color: "#bbb" }}>Be the first to search for something!</p>
               </div>
-            ) : (
-              <BookSection title="Most Searched Documents" books={mostSearchedBooks} showTrending count={mostSearchedBooks.length} />
-            )
+            )}
+            {silverAds.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: "#aaa", margin: "0 0 10px" }}>Featured · Silver</p>
+                <div className="sx-ads">
+                  {silverAds.map((ad) => <SearchAdCard key={ad.adId || ad.id} ad={ad} tier="Silver" />)}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Results ── */}
+        <main className="sx-wrap" style={{ padding: "40px 24px 48px" }}>
+          {(!ready || loading) && (
+            <div style={{ textAlign: "center", padding: "70px 0" }}>
+              <div className="sx-spin" />
+              <p style={{ fontSize: 12, color: "#bbb", marginTop: 14 }}>{ready ? "Searching documents…" : "Preparing the library…"}</p>
+            </div>
           )}
 
-          {/* No results */}
-          {!loading && !showMostSearched && searchResults.length === 0 && userResults.length === 0 && (
-            <div style={{ textAlign: "center", padding: "80px 24px" }}>
-              <div style={{ width: "64px", height: "64px", border: "0.5px solid #e5ddd0", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+          {/* No query: most searched */}
+          {ready && !q && popular.length > 0 && (
+            <>
+              <SectionHead title="Most searched documents" sub="What students across Africa are looking for" count={popular.length} />
+              <BookGrid rows={popular} owned={owned} />
+            </>
+          )}
+
+          {/* Nothing found */}
+          {ready && q && !loading && !hasAnything && (
+            <div style={{ textAlign: "center", padding: "70px 24px" }}>
+              <div style={{ width: 64, height: 64, border: `.5px solid ${LINE}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                 <FileText size={28} style={{ color: "#ccc" }} />
               </div>
-              <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", color: NAVY, margin: "0 0 8px" }}>No results found</p>
-              <p style={{ fontSize: "13px", color: "#bbb", marginBottom: "24px", fontWeight: 300 }}>
-                No documents or profiles matched "{q}". Try a different search term or adjust your filters.
+              <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, color: NAVY, margin: "0 0 8px" }}>No results for “{q}”</p>
+              <p style={{ fontSize: 13, color: "#999", maxWidth: 420, margin: "0 auto 22px", lineHeight: 1.6 }}>
+                Try fewer words, a course code like CHE 301, or a university name or abbreviation like UNILAG.
+                {active > 0 ? " You also have filters turned on." : ""}
               </p>
-              {activeFilterCount > 0 && (
-                <button
-                  onClick={() => setFilters({ institution: "", year: "", documentType: "", priceMin: "", priceMax: "", facultyOnly: false, fullyTaggedOnly: false })}
-                  style={{ padding: "12px 24px", background: GOLD, color: NAVY, border: "none", cursor: "pointer", fontFamily: "'Lato',sans-serif", fontSize: "12px", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: "12px" }}
-                >
-                  Clear Filters
+              {active > 0 && (
+                <button onClick={() => setFilters(EMPTY)} style={{ padding: "12px 24px", background: GOLD, color: NAVY, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, marginRight: 8 }}>
+                  Clear filters
                 </button>
               )}
-              <Link href="/home" style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "12px 24px", background: NAVY, color: "#fff", fontSize: "12px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none", fontFamily: "'Lato', sans-serif", marginLeft: "8px" }}>
-                ← Back to Home
+              <Link href="/home" style={{ display: "inline-block", padding: "12px 24px", background: NAVY, color: "#fff", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
+                Back to home
               </Link>
             </div>
           )}
 
-          {/* Results */}
-          {!loading && !showMostSearched && (searchResults.length > 0 || userResults.length > 0) && (() => {
-            const purchased = searchResults.filter(b => isPurchased(b.id));
-            const unpurchased = searchResults.filter(b => !isPurchased(b.id));
+          {ready && q && !loading && hasAnything && (
+            <>
+              {relaxed && (
+                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", padding: "12px 16px", marginBottom: 28, fontSize: 13, color: "#92400e" }}>
+                  No document matched every word, so these are the closest matches.
+                </div>
+              )}
 
-            // Group unpurchased by resourceType
-            const groups = {};
-            unpurchased.forEach(b => {
-              const key = b.resourceType || b.category || "Other Documents";
-              if (!groups[key]) groups[key] = [];
-              groups[key].push(b);
-            });
+              {people.length > 0 && (
+                <section style={{ marginBottom: 44 }}>
+                  <SectionHead title="Faculty and sellers" sub="Profiles that match your search" count={people.length} />
+                  <div className="sx-people">{people.map((p) => <ProfileCard key={p.uid} p={p} />)}</div>
+                </section>
+              )}
 
-            return (
-              <>
-                {/* ── User Profile Cards (person search) ── */}
-                {userResults.length > 0 && (
-                  <div style={{ marginBottom: "48px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
-                      <div style={{ width: "4px", height: "28px", background: GOLD }} />
-                      <div>
-                        <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: GOLD, margin: "0 0 2px", fontFamily: "'Lato', sans-serif" }}>Sellers & Faculty</p>
-                        <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", fontWeight: 700, color: NAVY, margin: 0 }}>
-                          Profiles Found
-                          <span style={{ fontSize: "14px", fontWeight: 400, color: "#bbb", marginLeft: "8px", fontFamily: "'Lato', sans-serif" }}>({userResults.length})</span>
-                        </h3>
-                      </div>
+              {trustedRows.length > 0 && (
+                <section style={{ marginBottom: 44 }}>
+                  <SectionHead title="From verified faculty and sellers" sub="Matches uploaded by verified accounts come first" count={trustedRows.length} />
+                  <BookGrid rows={trustedRows.slice(0, 40)} owned={owned} />
+                </section>
+              )}
+
+              {visible.length === 0 && rows.length > 0 && (
+                <p style={{ textAlign: "center", color: "#999", fontSize: 14, padding: "30px 0" }}>
+                  No documents match these filters.{" "}
+                  <button onClick={() => setFilters(EMPTY)} style={{ background: "none", border: "none", color: NAVY, fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>Clear filters</button>
+                </p>
+              )}
+
+              {otherRows.length > 0 && (
+                <section>
+                  <SectionHead
+                    title={trustedRows.length > 0 ? "More results" : "Documents"}
+                    count={otherRows.length}
+                  />
+                  <BookGrid rows={otherRows.slice(0, shown)} owned={owned} />
+                  {otherRows.length > shown && (
+                    <div style={{ textAlign: "center", marginTop: 28 }}>
+                      <button onClick={() => setShown((n) => n + 40)} style={{ padding: "12px 32px", background: NAVY, color: "#fff", border: "none", fontSize: 12, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", cursor: "pointer" }}>
+                        Show more ({otherRows.length - shown} left)
+                      </button>
                     </div>
-                    <div className="user-results-grid">
-                      {userResults.map(user => (
-                        <UserProfileCard key={user.uid || user.id} user={user} />
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  )}
+                </section>
+              )}
+            </>
+          )}
+        </main>
 
-                {/* ── Purchased docs ── */}
-                {purchased.length > 0 && (
-                  <BookSection title="Your Purchased Documents" books={purchased} count={purchased.length} />
-                )}
-
-                {/* ── Grouped unpurchased docs ── */}
-                {Object.entries(groups).map(([type, books]) => (
-                  <BookSection key={type} title={type} books={books} count={books.length} />
-                ))}
-              </>
-            );
-          })()}
-        </div>
-
-        {/* Ad carousel footer */}
         <section style={{ padding: "0 0 32px" }}>
           <FeaturedAdsCarousel tier="Gold" maxAds={5} autoPlay />
         </section>
       </div>
 
-      {/* Filter panel */}
-      {showFilterPanel && (
-        <FilterPanel
-          filters={filters}
-          onChange={setFilters}
-          onClose={() => setShowFilterPanel(false)}
-          resultCount={searchResults.length}
-        />
+      {showFilters && (
+        <FilterPanel filters={filters} facets={facets} onApply={setFilters} onClose={() => setShowFilters(false)} />
       )}
     </>
   );
